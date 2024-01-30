@@ -1,0 +1,80 @@
+*~
+.idea
+.vscode
+migrates
+config.cfg
+*.log
+*_packed.js
+*_packed.css
+*.orig
+*.zip
+nohup.out
+.DS_Store
+*.py[cod]
+
+# C extensions
+*.so
+
+# Packages
+*.egg
+*.egg-info
+build
+eggs
+parts
+bin
+var
+sdist
+develop-eggs
+.installed.cfg
+#lib
+#lib64
+Pipfile.lock
+
+# Installer logs
+pip-log.txt
+
+# Unit test / coverage reports
+.coverage
+.tox
+nosetests.xml
+.pytest_cache
+oneterm-api/test-output
+oneterm-api/api/uploaded_files
+oneterm-api/migrations/versions
+
+# Translations
+#*.mo
+messages.pot
+
+# Mr Developer
+.mr.developer.cfg
+.project
+.pydevproject
+
+# Complexity
+output/*.html
+output/*/index.html
+
+# Sphinx
+docs/_build
+
+# Virtualenvs
+env/
+
+
+# Configuration
+settings.py
+
+# Development database
+*.db
+
+# UI
+oneterm-ui/node_modules
+oneterm-ui/dist
+oneterm-ui/yarn.lock
+
+# Log files
+oneterm-ui/npm-debug.log*
+oneterm-ui/yarn-debug.log*
+oneterm-ui/yarn-error.log*
+oneterm-ui/package-lock.json

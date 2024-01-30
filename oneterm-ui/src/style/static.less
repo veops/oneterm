@@ -1,0 +1,57 @@
+@border-radius-base: 2px; // 组件/浮层圆角
+@primary-color: #2f54eb; // 全局主色 六大品牌色
+@primary-color_2: #7f97fa;
+@primary-color_3: #d3e3fd;
+@primary-color_4: #e1efff;
+@primary-color_5: #f0f5ff;
+@primary-color_6: #f9fbff;
+
+@scrollbar-color: rgba(47, 122, 235, 0.2);
+
+@layout-header-background: #fff;
+@layout-header-height: 40px;
+@layout-header-icon-height: 34px;
+@layout-header-font-color: #020000;
+@layout-header-font-selected-color: #2857bc;
+
+//dark
+@layout-background-color: #182132;
+@layout-background-color-light: #262f40;
+//light
+@layout-background-light-color: #fafafa;
+@layout-background-light-color-light: #f0f0f0;
+
+@layout-sidebar-color: #1d264c; //bg
+@layout-sidebar-sub-color: #000c37; //bg
+@layout-sidebar-selected-color: #3e4a71; //selected bg
+@layout-sidebar-arrow-color: rgba(255, 255, 255, 0.6);
+@layout-sidebar-font-color: #fff;
+@layout-sidebar-disabled-font-color: rgba(255, 255, 255, 0.6);
+
+#custom_colors() {
+  color_1: #2f54eb; //primary color
+  color_2: #f0f5ff; //light background color
+  color_3: #d2e2ff;
+}
+
+.ops_display_wrapper(@backgroundColor:#custom_colors()[color_2]) {
+  cursor: pointer;
+  padding: 5px 8px;
+  background-color: @backgroundColor;
+  border-radius: 5px;
+  height: 30px;
+  color: rgba(0, 0, 0, 0.6);
+  white-space: nowrap;
+}
+
+.ops_popover_item() {
+  cursor: pointer;
+  padding: 5px 10px;
+  &:hover {
+    background-color: #custom_colors[color_2];
+  }
+}
+.ops_popover_item_selected() {
+  background-color: #custom_colors[color_2];
+  color: #custom_colors[color_1];
+}

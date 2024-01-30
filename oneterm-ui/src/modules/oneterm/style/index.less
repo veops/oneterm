@@ -1,0 +1,66 @@
+@import '~@/style/static.less';
+
+.oneterm-layout {
+  width: 100%;
+  height: 100%;
+  .oneterm-header {
+    border-left: 4px solid @primary-color;
+    padding-left: 10px;
+    margin-bottom: 24px;
+    font-size: 16px;
+    font-weight: 400;
+    > i {
+      cursor: pointer;
+      &:hover {
+        color: @primary-color;
+      }
+    }
+  }
+  .oneterm-layout-container {
+    width: 100%;
+    height: calc(100% - 48px);
+    background-color: #ffffff;
+    border-radius: 15px;
+    padding: 18px;
+    .oneterm-layout-container-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .oneterm-layout-pagination {
+      text-align: right;
+      margin-top: 8px;
+    }
+  }
+}
+
+.oneterm-charttime {
+  .chart-time-display-time {
+    background-color: @primary-color_5;
+  }
+}
+
+.oneterm-table-right {
+  background-color: #4dcb7333;
+  border-radius: 22px;
+  line-height: 24px;
+  padding: 5px 15px 5px 25px;
+  position: relative;
+  &::after {
+    content: '';
+    position: absolute;
+    width: 9px;
+    height: 9px;
+    background: #4dcb73;
+    border-radius: 50%;
+    top: 50%;
+    transform: translateY(-50%);
+    left: 10px;
+  }
+}
+.oneterm-table-error {
+  background-color: #f2637b33;
+}
+.oneterm-table-right.oneterm-table-error::after {
+  background: #f2637b;
+}

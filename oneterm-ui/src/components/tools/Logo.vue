@@ -4,7 +4,7 @@
       @click="jumpTo"
       v-if="showTitle && !collapsed"
       style="width: 100%; height: 100%; cursor: pointer"
-      :src="file_name ? `/api/common-setting/v1/file/${file_name}` : require('@/assets/logo_VECMDB.png')"
+      :src="file_name ? `/api/common-setting/v1/file/${file_name}` : require('@/assets/logo_oneterm.png')"
     />
     <img
       @click="jumpTo"

@@ -4,7 +4,7 @@
       <span>维易科技<br />让运维更简单</span>
     </div>
     <div class="ops-login-right">
-      <img src="../../assets/logo_VECMDB.png" />
+      <img src="../../assets/logo_oneterm.png" />
       <a-form
         id="formLogin"
         ref="formLogin"

@@ -3,7 +3,7 @@ version: "3.0"
 services:
   oneterm-api:
     image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-api:1.24.1
-    container_name: oneterm-api-1
+    container_name: oneterm-api
     volumes:
       - file-data:/replay
       - ./docs/api.yaml:/oneterm/config.yaml
@@ -24,8 +24,6 @@ services:
     restart: always
     volumes:
       - ./docs/ssh.yaml:/oneterm/config.yaml
-      - /data/jumper/cmd/ssh/ssh:/ssh
-    command: sleep 10000
     depends_on:
       - oneterm-api
     networks:
@@ -34,8 +32,9 @@ services:
           - oneterm-ssh
 
   mysql:
-    image: mysql:latest
-    container_name: oneterm-mysql-1
+    image: registry.cn-hangzhou.aliyuncs.com/veops/mysql:latest
+    #image: mysql:8.0.30
+    container_name: oneterm-mysql
     environment:
       TZ: Asia/Shanghai
       MYSQL_ROOT_PASSWORD: '123456'
@@ -56,8 +55,8 @@ services:
       - '23306:3306'
 
   redis:
-    image: redis:latest
-    container_name: oneterm-redis-1
+    image: registry.cn-hangzhou.aliyuncs.com/veops/redis:latest
+    container_name: oneterm-redis
     #command: redis-server --requirepass tyrj5QVP9rHs
     restart: always
     environment:
@@ -133,7 +132,7 @@ volumes:
 networks:
   new:
     driver: bridge
-    name: oneterm_network-1
+    name: oneterm_network
     ipam:
       config:
         - subnet: 172.30.0.0/24

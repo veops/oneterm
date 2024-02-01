@@ -61,8 +61,8 @@ export default {
       const { session_id, is_monitor } = this.$route.query
       this.websocket = new WebSocket(
         is_monitor
-          ? `ws://${document.location.hostname}/api/oneterm/v1/connect/monitor/${session_id}?w=${this.term.cols}&h=${this.term.rows}`
-          : `ws://${document.location.hostname}/api/oneterm/v1/connect/${session_id}?w=${this.term.cols}&h=${this.term.rows}`
+          ? `ws://${document.location.host}/api/oneterm/v1/connect/monitor/${session_id}?w=${this.term.cols}&h=${this.term.rows}`
+          : `ws://${document.location.host}/api/oneterm/v1/connect/${session_id}?w=${this.term.cols}&h=${this.term.rows}`
       )
       this.websocket.onopen = this.websocketOpen()
       this.websocket.onmessage = this.getMessage

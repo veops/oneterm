@@ -1,0 +1,1626 @@
+definitions:
+  controller.HttpResponse:
+    properties:
+      code:
+        type: integer
+      data: {}
+      message:
+        type: string
+    type: object
+  controller.ListData:
+    properties:
+      count:
+        type: integer
+      list:
+        items: {}
+        type: array
+    type: object
+  model.AccessAuth:
+    properties:
+      allow:
+        type: boolean
+      cmd_ids:
+        items:
+          type: integer
+        type: array
+      end:
+        type: string
+      ranges:
+        items:
+          $ref: '#/definitions/model.Range'
+        type: array
+      start:
+        type: string
+    type: object
+  model.Account:
+    properties:
+      account:
+        type: string
+      account_type:
+        type: integer
+      asset_count:
+        type: integer
+      created_at:
+        type: string
+      creator_id:
+        type: integer
+      id:
+        type: integer
+      name:
+        type: string
+      password:
+        type: string
+      phrase:
+        type: string
+      pk:
+        type: string
+      resource_id:
+        type: integer
+      updated_at:
+        type: string
+      updater_id:
+        type: integer
+    type: object
+  model.Asset:
+    properties:
+      access_auth:
+        $ref: '#/definitions/model.AccessAuth'
+      authorization:
+        $ref: '#/definitions/model.Map-int-model_Slice-int'
+      ci_id:
+        type: integer
+      comment:
+        type: string
+      connectable:
+        type: boolean
+      created_at:
+        type: string
+      creator_id:
+        type: integer
+      gateway_id:
+        type: integer
+      id:
+        type: integer
+      ip:
+        type: string
+      name:
+        type: string
+      node_chain:
+        type: string
+      parent_id:
+        type: integer
+      protocols:
+        items:
+          type: string
+        type: array
+      resource_id:
+        type: integer
+      updated_at:
+        type: string
+      updater_id:
+        type: integer
+    type: object
+  model.Command:
+    properties:
+      cmds:
+        items:
+          type: string
+        type: array
+      created_at:
+        type: string
+      creator_id:
+        type: integer
+      enable:
+        type: boolean
+      id:
+        type: integer
+      name:
+        type: string
+      resource_id:
+        type: integer
+      updated_at:
+        type: string
+      updater_id:
+        type: integer
+    type: object
+  model.Config:
+    properties:
+      created_at:
+        type: string
+      creator_id:
+        type: integer
+      id:
+        type: integer
+      timeout:
+        type: integer
+      updated_at:
+        type: string
+      updater_id:
+        type: integer
+    type: object
+  model.Gateway:
+    properties:
+      account:
+        type: string
+      account_type:
+        type: integer
+      asset_count:
+        type: integer
+      created_at:
+        type: string
+      creator_id:
+        type: integer
+      host:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      password:
+        type: string
+      phrase:
+        type: string
+      pk:
+        type: string
+      port:
+        type: integer
+      resource_id:
+        type: integer
+      updated_at:
+        type: string
+      updater_id:
+        type: integer
+    type: object
+  model.History:
+    properties:
+      action_type:
+        type: integer
+      created_at:
+        type: string
+      creator_id:
+        type: integer
+      id:
+        type: integer
+      new:
+        $ref: '#/definitions/model.Map-string-any'
+      old:
+        $ref: '#/definitions/model.Map-string-any'
+      remote_ip:
+        type: string
+      target_id:
+        type: integer
+      type:
+        type: string
+    type: object
+  model.Map-int-model_Slice-int:
+    additionalProperties:
+      items:
+        type: integer
+      type: array
+    type: object
+  model.Map-string-any:
+    additionalProperties: {}
+    type: object
+  model.Map-string-string:
+    additionalProperties:
+      type: string
+    type: object
+  model.Node:
+    properties:
+      access_auth:
+        $ref: '#/definitions/model.AccessAuth'
+      asset_count:
+        type: integer
+      authorization:
+        $ref: '#/definitions/model.Map-int-model_Slice-int'
+      comment:
+        type: string
+      created_at:
+        type: string
+      creator_id:
+        description: ResourceId int       `json:"resource_id"`
+        type: integer
+      gateway_id:
+        type: integer
+      has_child:
+        type: boolean
+      id:
+        type: integer
+      name:
+        type: string
+      parent_id:
+        type: integer
+      protocols:
+        items:
+          type: string
+        type: array
+      sync:
+        $ref: '#/definitions/model.Sync'
+      updated_at:
+        type: string
+      updater_id:
+        type: integer
+    type: object
+  model.PublicKey:
+    properties:
+      created_at:
+        type: string
+      creator_id:
+        description: ResourceId int       `json:"resource_id"`
+        type: integer
+      id:
+        type: integer
+      mac:
+        type: string
+      name:
+        type: string
+      pk:
+        type: string
+      uid:
+        type: integer
+      updated_at:
+        type: string
+      updater_id:
+        type: integer
+      username:
+        type: string
+    type: object
+  model.Range:
+    properties:
+      times:
+        items:
+          type: string
+        type: array
+      week:
+        type: integer
+    type: object
+  model.ReqAuth:
+    properties:
+      method:
+        type: integer
+      password:
+        type: string
+      pk:
+        type: string
+      username:
+        type: string
+    type: object
+  model.Session:
+    properties:
+      account_id:
+        type: integer
+      account_info:
+        type: string
+      asset_id:
+        type: integer
+      asset_info:
+        type: string
+      client_ip:
+        type: string
+      closed_at:
+        type: string
+      cmd_count:
+        type: integer
+      created_at:
+        type: string
+      duration:
+        type: integer
+      gateway_id:
+        type: integer
+      gateway_info:
+        type: string
+      id:
+        type: integer
+      protocol:
+        type: string
+      session_id:
+        type: string
+      session_type:
+        type: integer
+      status:
+        type: integer
+      uid:
+        type: integer
+      updated_at:
+        type: string
+      user_name:
+        type: string
+    type: object
+  model.SessionCmd:
+    properties:
+      cmd:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: integer
+      level:
+        type: integer
+      result:
+        type: string
+      session_id:
+        type: string
+    type: object
+  model.SessionOptionAsset:
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
+    type: object
+  model.StatAccount:
+    properties:
+      count:
+        type: integer
+      name:
+        type: string
+    type: object
+  model.StatAsset:
+    properties:
+      asset:
+        type: integer
+      connect:
+        type: integer
+      session:
+        type: integer
+      time:
+        type: string
+      user:
+        type: integer
+    type: object
+  model.StatAssetType:
+    properties:
+      count:
+        type: integer
+      name:
+        type: string
+    type: object
+  model.StatCount:
+    properties:
+      asset:
+        type: integer
+      connect:
+        type: integer
+      gateway:
+        description: TotalUser    int64 `json:"total_user"`
+        type: integer
+      session:
+        type: integer
+      total_asset:
+        type: integer
+      total_gateway:
+        type: integer
+      user:
+        type: integer
+    type: object
+  model.StatCountOfUser:
+    properties:
+      asset:
+        type: integer
+      connect:
+        type: integer
+      session:
+        type: integer
+      total_asset:
+        type: integer
+    type: object
+  model.Sync:
+    properties:
+      enable:
+        type: boolean
+      filters:
+        type: string
+      frequency:
+        type: number
+      mapping:
+        $ref: '#/definitions/model.Map-string-string'
+      type_id:
+        type: integer
+    type: object
+info:
+  contact: {}
+paths:
+  /account:
+    get:
+      parameters:
+      - description: page_index
+        in: query
+        name: page_index
+        required: true
+        type: integer
+      - description: page_size
+        in: query
+        name: page_size
+        required: true
+        type: integer
+      - description: name or account
+        in: query
+        name: search
+        type: integer
+      - description: account id
+        in: query
+        name: id
+        type: integer
+      - description: account ids
+        in: query
+        name: ids
+        type: string
+      - description: account name
+        in: query
+        name: name
+        type: string
+      - description: is info mode
+        in: query
+        name: info
+        type: boolean
+      - description: account type
+        in: query
+        name: type
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/controller.HttpResponse'
+            - properties:
+                data:
+                  allOf:
+                  - $ref: '#/definitions/controller.ListData'
+                  - properties:
+                      list:
+                        items:
+                          $ref: '#/definitions/model.Account'
+                        type: array
+                    type: object
+              type: object
+      tags:
+      - account
+    post:
+      parameters:
+      - description: account
+        in: body
+        name: account
+        required: true
+        schema:
+          $ref: '#/definitions/model.Account'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - account
+  /account/:id:
+    delete:
+      parameters:
+      - description: account id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - account
+    put:
+      parameters:
+      - description: account id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: account
+        in: body
+        name: account
+        required: true
+        schema:
+          $ref: '#/definitions/model.Account'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - account
+  /asset:
+    get:
+      parameters:
+      - description: page_index
+        in: query
+        name: page_index
+        required: true
+        type: integer
+      - description: page_size
+        in: query
+        name: page_size
+        required: true
+        type: integer
+      - description: name or ip
+        in: query
+        name: search
+        type: integer
+      - description: asset id
+        in: query
+        name: id
+        type: integer
+      - description: asset ids
+        in: query
+        name: ids
+        type: string
+      - description: asset's parent id
+        in: query
+        name: parent_id
+        type: integer
+      - description: asset name
+        in: query
+        name: name
+        type: string
+      - description: asset ip
+        in: query
+        name: ip
+        type: string
+      - description: is info mode
+        in: query
+        name: info
+        type: boolean
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/controller.HttpResponse'
+            - properties:
+                data:
+                  allOf:
+                  - $ref: '#/definitions/controller.ListData'
+                  - properties:
+                      list:
+                        items:
+                          $ref: '#/definitions/model.Asset'
+                        type: array
+                    type: object
+              type: object
+      tags:
+      - asset
+    post:
+      parameters:
+      - description: asset
+        in: body
+        name: asset
+        required: true
+        schema:
+          $ref: '#/definitions/model.Asset'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - asset
+  /asset/:id:
+    delete:
+      parameters:
+      - description: asset id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - asset
+    put:
+      parameters:
+      - description: asset id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: asset
+        in: body
+        name: asset
+        required: true
+        schema:
+          $ref: '#/definitions/model.Asset'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - asset
+  /asset/query_by_server:
+    get:
+      parameters:
+      - description: page index
+        in: query
+        name: page_index
+        required: true
+        type: integer
+      - description: page size
+        in: query
+        name: page_size
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/controller.HttpResponse'
+            - properties:
+                data:
+                  allOf:
+                  - $ref: '#/definitions/controller.ListData'
+                  - properties:
+                      list:
+                        items:
+                          $ref: '#/definitions/model.Asset'
+                        type: array
+                    type: object
+              type: object
+      tags:
+      - asset
+  /asset/update_by_server:
+    put:
+      parameters:
+      - description: asset id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: asset update request
+        in: body
+        name: req
+        required: true
+        schema:
+          additionalProperties:
+            additionalProperties: true
+            type: object
+          type: object
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - asset
+  /command:
+    get:
+      parameters:
+      - description: command id
+        in: query
+        name: page_index
+        required: true
+        type: integer
+      - description: command id
+        in: query
+        name: page_size
+        required: true
+        type: integer
+      - description: name or cmds
+        in: query
+        name: search
+        type: integer
+      - description: command id
+        in: query
+        name: id
+        type: integer
+      - description: command ids
+        in: query
+        name: ids
+        type: string
+      - description: command name
+        in: query
+        name: name
+        type: string
+      - description: command enable
+        in: query
+        name: enable
+        type: integer
+      - description: is info mode
+        in: query
+        name: info
+        type: boolean
+      - description: name or cmds
+        in: query
+        name: search
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/controller.HttpResponse'
+            - properties:
+                data:
+                  allOf:
+                  - $ref: '#/definitions/controller.ListData'
+                  - properties:
+                      list:
+                        items:
+                          $ref: '#/definitions/model.Command'
+                        type: array
+                    type: object
+              type: object
+      tags:
+      - command
+    post:
+      parameters:
+      - description: command
+        in: body
+        name: command
+        required: true
+        schema:
+          $ref: '#/definitions/model.Command'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - command
+  /command/:id:
+    delete:
+      parameters:
+      - description: command id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - command
+    put:
+      parameters:
+      - description: command id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: command
+        in: body
+        name: command
+        required: true
+        schema:
+          $ref: '#/definitions/model.Command'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - command
+  /config:
+    get:
+      parameters:
+      - description: is info mode
+        in: query
+        name: info
+        type: boolean
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/controller.HttpResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Config'
+              type: object
+      tags:
+      - config
+    post:
+      parameters:
+      - description: config
+        in: body
+        name: command
+        required: true
+        schema:
+          $ref: '#/definitions/model.Config'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - config
+  /connect/:asset_id/:account_id/:protocol:
+    post:
+      parameters:
+      - description: width
+        in: query
+        name: w
+        type: integer
+      - description: height
+        in: query
+        name: h
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/controller.HttpResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Session'
+              type: object
+      tags:
+      - connect
+  /connect/:session_id:
+    get:
+      parameters:
+      - description: session id
+        in: path
+        name: session_id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - connect
+  /connect/close/:session_id:
+    post:
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - connect
+  /connect/monitor/:session_id:
+    get:
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - connect
+  /gateway:
+    get:
+      parameters:
+      - description: gateway id
+        in: query
+        name: page_index
+        required: true
+        type: integer
+      - description: gateway id
+        in: query
+        name: page_size
+        required: true
+        type: integer
+      - description: name or host or account or port
+        in: query
+        name: search
+        type: integer
+      - description: gateway id
+        in: query
+        name: id
+        type: integer
+      - description: gateway ids
+        in: query
+        name: ids
+        type: string
+      - description: gateway name
+        in: query
+        name: name
+        type: string
+      - description: is info mode
+        in: query
+        name: info
+        type: boolean
+      - description: account type
+        in: query
+        name: type
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/controller.HttpResponse'
+            - properties:
+                data:
+                  allOf:
+                  - $ref: '#/definitions/controller.ListData'
+                  - properties:
+                      list:
+                        items:
+                          $ref: '#/definitions/model.Gateway'
+                        type: array
+                    type: object
+              type: object
+      tags:
+      - gateway
+    post:
+      parameters:
+      - description: gateway
+        in: body
+        name: gateway
+        required: true
+        schema:
+          $ref: '#/definitions/model.Gateway'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - gateway
+  /gateway/:id:
+    delete:
+      parameters:
+      - description: gateway id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - gateway
+    put:
+      parameters:
+      - description: gateway id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: gateway
+        in: body
+        name: gateway
+        required: true
+        schema:
+          $ref: '#/definitions/model.Gateway'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - gateway
+  /history:
+    get:
+      parameters:
+      - description: page_index
+        in: query
+        name: page_index
+        required: true
+        type: integer
+      - description: page_size
+        in: query
+        name: page_size
+        required: true
+        type: integer
+      - description: type
+        enum:
+        - account
+        - asset
+        - command
+        - gateway
+        - node
+        - public_key
+        in: query
+        name: type
+        type: string
+      - description: target_id
+        in: query
+        name: target_id
+        type: integer
+      - description: uid
+        in: query
+        name: uid
+        type: integer
+      - description: create=1 delete=2 update=3
+        in: query
+        name: action_type
+        type: integer
+      - description: start time, RFC3339
+        in: query
+        name: start
+        type: string
+      - description: end time, RFC3339
+        in: query
+        name: end
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/controller.HttpResponse'
+            - properties:
+                data:
+                  allOf:
+                  - $ref: '#/definitions/controller.ListData'
+                  - properties:
+                      list:
+                        items:
+                          $ref: '#/definitions/model.History'
+                        type: array
+                    type: object
+              type: object
+      tags:
+      - history
+  /history/type/mapping:
+    get:
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/controller.HttpResponse'
+            - properties:
+                data:
+                  additionalProperties:
+                    type: string
+                  type: object
+              type: object
+      tags:
+      - session
+  /node:
+    get:
+      parameters:
+      - description: node id
+        in: query
+        name: page_index
+        required: true
+        type: integer
+      - description: node id
+        in: query
+        name: page_size
+        required: true
+        type: integer
+      - description: node id
+        in: query
+        name: id
+        type: integer
+      - description: node ids
+        in: query
+        name: ids
+        type: string
+      - description: node's parent id
+        in: query
+        name: parent_id
+        type: integer
+      - description: node name
+        in: query
+        name: name
+        type: string
+      - description: exclude itself and its child
+        in: query
+        name: no_self_child
+        type: integer
+      - description: include itself and its parent
+        in: query
+        name: self_parent
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/controller.HttpResponse'
+            - properties:
+                data:
+                  allOf:
+                  - $ref: '#/definitions/controller.ListData'
+                  - properties:
+                      list:
+                        items:
+                          $ref: '#/definitions/model.Node'
+                        type: array
+                    type: object
+              type: object
+      tags:
+      - node
+    post:
+      parameters:
+      - description: node
+        in: body
+        name: node
+        required: true
+        schema:
+          $ref: '#/definitions/model.Node'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - node
+  /node/:id:
+    delete:
+      parameters:
+      - description: node id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - node
+    put:
+      parameters:
+      - description: node id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: node
+        in: body
+        name: node
+        required: true
+        schema:
+          $ref: '#/definitions/model.Node'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - node
+  /public_key:
+    get:
+      parameters:
+      - description: publicKey id
+        in: query
+        name: page_index
+        required: true
+        type: integer
+      - description: publicKey id
+        in: query
+        name: page_size
+        required: true
+        type: integer
+      - description: name or mac
+        in: query
+        name: search
+        type: integer
+      - description: publicKey id
+        in: query
+        name: id
+        type: integer
+      - description: publicKey name
+        in: query
+        name: name
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/controller.HttpResponse'
+            - properties:
+                data:
+                  allOf:
+                  - $ref: '#/definitions/controller.ListData'
+                  - properties:
+                      list:
+                        items:
+                          $ref: '#/definitions/model.PublicKey'
+                        type: array
+                    type: object
+              type: object
+      tags:
+      - public_key
+    post:
+      parameters:
+      - description: publicKey
+        in: body
+        name: publicKey
+        required: true
+        schema:
+          $ref: '#/definitions/model.PublicKey'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - public_key
+  /public_key/:id:
+    delete:
+      parameters:
+      - description: publicKey id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - public_key
+    put:
+      parameters:
+      - description: publicKey id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: publicKey
+        in: body
+        name: publicKey
+        required: true
+        schema:
+          $ref: '#/definitions/model.PublicKey'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - public_key
+  /public_key/auth:
+    post:
+      parameters:
+      - description: method 1password 2publickey
+        in: body
+        name: req
+        schema:
+          $ref: '#/definitions/model.ReqAuth'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - public_key
+  /session:
+    get:
+      parameters:
+      - description: page_index
+        in: query
+        name: page_index
+        required: true
+        type: integer
+      - description: page_size
+        in: query
+        name: page_size
+        required: true
+        type: integer
+      - description: search
+        in: query
+        name: search
+        type: string
+      - description: status, online=1, offline=2
+        in: query
+        name: status
+        type: integer
+      - description: start, RFC3339
+        in: query
+        name: start
+        type: string
+      - description: end, RFC3339
+        in: query
+        name: end
+        type: string
+      - description: uid
+        in: query
+        name: uid
+        type: integer
+      - description: asset id
+        in: query
+        name: asset_id
+        type: integer
+      - description: client_ip
+        in: query
+        name: client_ip
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/controller.HttpResponse'
+            - properties:
+                data:
+                  allOf:
+                  - $ref: '#/definitions/controller.ListData'
+                  - properties:
+                      list:
+                        items:
+                          $ref: '#/definitions/model.Session'
+                        type: array
+                    type: object
+              type: object
+      tags:
+      - session
+    post:
+      parameters:
+      - description: session
+        in: body
+        name: sessino
+        required: true
+        schema:
+          $ref: '#/definitions/model.Session'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - session
+  /session/:session_id/cmd:
+    get:
+      parameters:
+      - description: page_index
+        in: query
+        name: page_index
+        required: true
+        type: integer
+      - description: page_size
+        in: query
+        name: page_size
+        required: true
+        type: integer
+      - description: session id
+        in: path
+        name: session_id
+        required: true
+        type: string
+      - description: search
+        in: query
+        name: search
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/controller.HttpResponse'
+            - properties:
+                data:
+                  allOf:
+                  - $ref: '#/definitions/controller.ListData'
+                  - properties:
+                      list:
+                        items:
+                          $ref: '#/definitions/model.SessionCmd'
+                        type: array
+                    type: object
+              type: object
+      tags:
+      - session
+  /session/cmd:
+    post:
+      parameters:
+      - description: SessionCmd
+        in: body
+        name: sessioncmd
+        required: true
+        schema:
+          $ref: '#/definitions/model.SessionCmd'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - session
+  /session/option/asset:
+    get:
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/controller.HttpResponse'
+            - properties:
+                data:
+                  allOf:
+                  - $ref: '#/definitions/controller.ListData'
+                  - properties:
+                      list:
+                        items:
+                          $ref: '#/definitions/model.SessionOptionAsset'
+                        type: array
+                    type: object
+              type: object
+      tags:
+      - session
+  /session/option/clientip:
+    get:
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/controller.HttpResponse'
+            - properties:
+                data:
+                  items:
+                    type: string
+                  type: array
+              type: object
+      tags:
+      - session
+  /session/replay/:session_id:
+    get:
+      parameters:
+      - description: session id
+        in: path
+        name: session_id
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+      tags:
+      - session
+    post:
+      parameters:
+      - description: session id
+        in: path
+        name: session_id
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - session
+  /stat/account:
+    get:
+      parameters:
+      - description: account name
+        enum:
+        - day
+        - week
+        - month
+        in: query
+        name: type
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/controller.HttpResponse'
+            - properties:
+                data:
+                  allOf:
+                  - $ref: '#/definitions/controller.ListData'
+                  - properties:
+                      list:
+                        items:
+                          $ref: '#/definitions/model.StatAccount'
+                        type: array
+                    type: object
+              type: object
+      tags:
+      - stat
+  /stat/asset:
+    get:
+      parameters:
+      - description: account name
+        enum:
+        - day
+        - week
+        - month
+        in: query
+        name: type
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/controller.HttpResponse'
+            - properties:
+                data:
+                  allOf:
+                  - $ref: '#/definitions/controller.ListData'
+                  - properties:
+                      list:
+                        items:
+                          $ref: '#/definitions/model.StatAsset'
+                        type: array
+                    type: object
+              type: object
+      tags:
+      - stat
+  /stat/assettype:
+    get:
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/controller.HttpResponse'
+            - properties:
+                data:
+                  allOf:
+                  - $ref: '#/definitions/controller.ListData'
+                  - properties:
+                      list:
+                        items:
+                          $ref: '#/definitions/model.StatAssetType'
+                        type: array
+                    type: object
+              type: object
+      tags:
+      - stat
+  /stat/count:
+    get:
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/controller.HttpResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.StatCount'
+              type: object
+      tags:
+      - stat
+  /stat/count/ofuser:
+    get:
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/controller.HttpResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.StatCountOfUser'
+              type: object
+      tags:
+      - stat
+  /stat/rank/ofuser:
+    get:
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/controller.HttpResponse'
+            - properties:
+                data:
+                  allOf:
+                  - $ref: '#/definitions/controller.ListData'
+                  - properties:
+                      list:
+                        items:
+                          $ref: '#/definitions/model.StatAsset'
+                        type: array
+                    type: object
+              type: object
+      tags:
+      - stat
+swagger: "2.0"

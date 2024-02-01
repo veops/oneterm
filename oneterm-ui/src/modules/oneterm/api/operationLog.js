@@ -15,10 +15,3 @@ export function getResourceType(params) {
         params: params
     })
 }
-
-export function getCiType() {
-    return axios({
-        url: 'v0.1/ci_types',
-        method: 'get',
-    })
-}

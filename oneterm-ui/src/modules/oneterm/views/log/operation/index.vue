@@ -159,7 +159,7 @@
 import moment from 'moment'
 import _ from 'lodash'
 import ChartTime from '@/components/chartTime'
-import { getOperationLogList, getResourceType, getCiType } from '../../../api/operationLog'
+import { getOperationLogList, getResourceType } from '../../../api/operationLog'
 import { getAccountList } from '../../../api/account'
 import { getCommandList } from '../../../api/command'
 import { chartTimeTagsList } from '../constants.js'
@@ -187,7 +187,6 @@ export default {
       diffArr: [],
       textareaValue: '',
       accountList: [],
-      ciTypeList: [],
       commandList: [],
     }
   },
@@ -205,7 +204,6 @@ export default {
   mounted() {
     this.getResourceTypeMap()
     this.getAccount()
-    this.getCiTypeList()
     this.getCommand()
   },
   methods: {
@@ -358,11 +356,6 @@ export default {
         page_index: 1,
       }).then((res) => {
         this.accountList = res?.data?.list || []
-      })
-    },
-    getCiTypeList() {
-      getCiType().then((res) => {
-        this.ciTypeList = res.ci_types
       })
     },
     getResourceTypeMap() {

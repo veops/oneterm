@@ -78,3 +78,17 @@ oneterm-ui/npm-debug.log*
 oneterm-ui/yarn-debug.log*
 oneterm-ui/yarn-error.log*
 oneterm-ui/package-lock.json
+
+
+## backend
+
+*.log
+*.cast
+vendor/
+volume
+
+backend/cmd/ssh/ssh
+backend/cmd/ssh/config.yaml
+backend/cmd/ssh/app.log
+backend/cmd/api/api
+backend/cmd/api/config.yaml

@@ -1,0 +1,140 @@
+version: "3.0"
+
+services:
+  oneterm-api:
+    image: oneterm-api:1.24.1
+    container_name: oneterm-api-1
+    volumes:
+      - file-data:/replay
+      - ./docs/api.yaml:/oneterm/config.yaml
+    depends_on:
+      - mysql
+      - redis
+    restart: always
+    networks:
+      new:
+        aliases:
+          - oneterm-api
+
+  oneterm-ssh:
+    image: oneterm-ssh:1.24.26
+    container_name: oneterm-ssh
+    ports:
+      - "12229:12228"
+    restart: always
+    volumes:
+      - ./docs/ssh.yaml:/oneterm/config.yaml
+      - /data/jumper/cmd/ssh/ssh:/ssh
+    command: sleep 10000
+    depends_on:
+      - oneterm-api
+    networks:
+      new:
+        aliases:
+          - oneterm-ssh
+
+  mysql:
+    image: mysql:latest
+    container_name: oneterm-mysql-1
+    environment:
+      TZ: Asia/Shanghai
+      MYSQL_ROOT_PASSWORD: '123456'
+      MYSQL_DATABASE: 'oneterm'
+    volumes:
+      - db-data:/var/lib/mysql
+      - ./docs/mysqld.cnf:/etc/mysql/conf.d/mysqld.cnf
+      - ./docs/acl.sql:/docker-entrypoint-initdb.d/2-acl.sql
+      - ./docs/api.sql:/docker-entrypoint-initdb.d/3-api.sql
+      - ./docs/create-users.sql:/docker-entrypoint-initdb.d/1-create-users.sql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    restart: always
+    networks:
+      new:
+        aliases:
+          - mysql
+    ports:
+      - '23306:3306'
+
+  redis:
+    image: redis:latest
+    container_name: oneterm-redis-1
+    #command: redis-server --requirepass tyrj5QVP9rHs
+    restart: always
+    environment:
+      TZ: Asia/Shanghai
+    networks:
+      new:
+        aliases:
+          - redis
+
+  oneterm-ui:
+    image: oneterm-ui:1.24.3
+    container_name: oneterm-ui
+    depends_on:
+      - oneterm-api
+    environment:
+      TZ: Asia/Shanghai
+      ONETERM_API_HOST: oneterm-api:8080
+      ACL_API_HOST: acl-api:5000
+      NGINX_PORT: 80
+    volumes:
+      - ./docs/nginx.oneterm.conf.example:/etc/nginx/conf.d/nginx.oneterm.conf.example
+    restart: always
+    command:
+      - /bin/sh
+      - -c
+      - |
+        envsubst '$$ONETERM_API_HOST  $$ACL_API_HOST $$NGINX_PORT' < /etc/nginx/conf.d/nginx.oneterm.conf.example > /etc/nginx/conf.d/oneterm.conf
+        nginx -g  'daemon off;'
+    networks:
+      - new
+    ports:
+      - "8000:80"
+
+  acl-api:
+    image: registry.cn-hangzhou.aliyuncs.com/veops/acl-api:1.1
+    container_name: oneterm-acl-api
+    environment:
+      #TZ: Asia/Shanghai
+      WAIT_HOSTS: mysql:3306, redis:6379
+    volumes:
+      - ./docs/settings.py:/data/app/acl/settings.py
+      - ./docs/app.py:/data/apps/acl/api/lib/perm/acl/app.py
+      - ./docs/.env:/data/apps/acl/.env
+      - ./docs/nginx.oneterm.conf.example:/etc/nginx/conf.d/nginx.oneterm.conf.example
+    restart: always
+    command:
+      - /bin/sh
+      - -c
+      - |
+        sleep 2
+        flask db-setup
+        flask init-acl
+        flask init-department
+
+        gunicorn --workers=3 autoapp:app -b 0.0.0.0:5000 -D --access-logfile logs/access.log --error-logfile logs/error.log
+
+        celery -A celery_worker.celery worker -E -Q acl_async --logfile=one_acl_async.log --autoscale=2,1 -D
+    depends_on:
+      - mysql
+      - redis
+    networks:
+      new:
+        aliases:
+          - acl-api
+
+volumes:
+  db-data:
+    driver: local
+    name: oneterm_db-data
+  file-data:
+    driver: local
+    name: oneterm_file-data
+
+networks:
+  new:
+    driver: bridge
+    name: oneterm_network-1
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24

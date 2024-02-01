@@ -1,0 +1,13 @@
+.idea
+*.log
+*.cast
+vendor/
+volume
+
+cmd/ssh/ssh
+cmd/ssh/config.yaml
+cmd/ssh/app.log
+
+cmd/api/api
+cmd/api/config.yaml
+

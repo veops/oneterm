@@ -1,0 +1,12 @@
+
+protocols:
+  ssh:
+    api: oneterm-api:8080
+    ip: '0.0.0.0'
+    port: 2222
+    webUser: "test"
+    webToken: "135790"
+    privateKeyPath: /root/.ssh/id_ed25519
+
+
+i18nDir: ./translate

@@ -1,0 +1,167 @@
+[MsgArgumentError]
+hash = "sha1-362dc86add63740c0adfc87b90fa6d1a76b0af2d"
+many = "Bad Request: Argument is invalid, {{.err}}"
+one = "Bad Request: Argument is invalid, {{.err}}"
+other = "Bad Request: Argument is invalid, {{.err}}"
+
+[MsgBadRequest]
+hash = "sha1-ce2a43b7dbe690adefef142f93b5f37e29ceb5f9"
+many = "Bad Request: {{.err}}"
+one = "Bad Request: {{.err}}"
+other = "Bad Request: {{.err}}"
+
+[MsgConnectServer]
+hash = "sha1-3d9e42d4d82b873203fef24cf7865de8c64d9dc4"
+many = "Connect Server Error"
+one = "Connect Server Error"
+other = "Connect Server Error"
+
+[MsgDupName]
+hash = "sha1-e170045255d10872b5cbcf32f29c0fdbcebb8d6c"
+many = "Bad Request: {{.name}} is duplicate"
+one = "Bad Request: {{.name}} is duplicate"
+other = "Bad Request: {{.name}} is duplicate"
+
+[MsgHasChild]
+hash = "sha1-657547f2a971f07890ee54e5a5b3d15801efef9d"
+many = "Bad Request: This folder has sub folder or assert, cannot be deleted"
+one = "Bad Request: This folder has sub folder or assert, cannot be deleted"
+other = "Bad Request: This folder has sub folder or assert, cannot be deleted"
+
+[MsgHasDepdency]
+hash = "sha1-742d552bba52b9dedec287d46b70f6bc810dc759"
+many = "Bad Request: Asset {{.name}} dependens on this, cannot be deleted"
+one = "Bad Request: Asset {{.name}} dependens on this, cannot be deleted"
+other = "Bad Request: Asset {{.name}} dependens on this, cannot be deleted"
+
+[MsgInternalError]
+hash = "sha1-a52fb3157738021674255481e2e949e83064dd2b"
+many = "Server Error: {{.err}}"
+one = "Server Error: {{.err}}"
+other = "Server Error: {{.err}}"
+
+[MsgInvalidSessionId]
+hash = "sha1-cde5615d9fe5010a47a5572c5bbdd379d5d9bf41"
+many = "Bad Request: Invalid session id {{.sessionId}}"
+one = "Bad Request: Invalid session id {{.sessionId}}"
+other = "Bad Request: Invalid session id {{.sessionId}}"
+
+[MsgLoadSession]
+hash = "sha1-58aa1fb9d4e3648849877723a19dc64634e1da3d"
+many = "Load Session Faild"
+one = "Load Session Faild"
+other = "Load Session Faild"
+
+[MsgNoPerm]
+hash = "sha1-086946e776d00a6f09fbae8f3df244cd2160f433"
+many = "Bad Request: You do not have {{.perm}} permission"
+one = "Bad Request: You do not have {{.perm}} permission"
+other = "Bad Request: You do not have {{.perm}} permission"
+
+[MsgRemote]
+hash = "sha1-0c6217c9a4b713d7ab02d8422a8ae7f3339e31ec"
+many = "Bad Request: {{.message}}"
+one = "Bad Request: {{.message}}"
+other = "Bad Request: {{.message}}"
+
+[MsgRemoteServer]
+hash = "sha1-1b419a55cf846d5f9779b2e883cc9f4c5c89aa9d"
+many = "Server Error: {{.message}}"
+one = "Server Error: {{.message}}"
+other = "Server Error: {{.message}}"
+
+[MsgSessionEnd]
+hash = "sha1-1dec3e3125610522edc06e644f321d1a9c166508"
+many = "\n----------Session {{.sessionId}} has been ended----------\n"
+one = "\n----------Session {{.sessionId}} has been ended----------\n"
+other = "\n----------Session {{.sessionId}} has been ended----------\n"
+
+[MsgSshAccountLoginError]
+hash = "sha1-56b115cbab2672d62913f0be2533b286213f5697"
+many = "AccountLoginErrorOther"
+one = "\u001b[1;30;32m failed login \u001b[0m \u001b[4;30;3m {{.User}}\u001b[0m\n\u001b[0;33m you need to choose asset again \u001b[0m\n"
+other = "AccountLoginErrorOther"
+
+[MsgSshMultiSshAccountForAsset]
+hash = "sha1-610e0729478a3bcf0dbd20ba8d2ac99285ef1203"
+many = "MultiSshAccountForAssetOther"
+one = "choose account: \n\u001b[0;31m {{.Accounts}} \u001b[0m\n"
+other = "MultiSshAccountForAssetOther"
+
+[MsgSshNoAssetPermission]
+hash = "sha1-c2e665e88c6439ed5be62508c90171fbe6dc5124"
+many = "NoAssetPermissionOther"
+one = "No permission for :\u001b[0;31m {{.Host}} \u001b[0m\r\n"
+other = "NoAssetPermissionOther"
+
+[MsgSshNoSshAccessMethod]
+hash = "sha1-c6687b9f627968f6a94050ea5651ba8198ff022f"
+many = "NoSshAccessMethodOther"
+one = "No ssh access method for :\u001b[0;31m {{.Host}} \u001b[0m\r\n"
+other = "NoSshAccessMethodOther"
+
+[MsgSshNoSshAccountForAsset]
+hash = "sha1-361247824ccc685fc82ef91ed0d67dbeab9e01cb"
+many = "NoSshAccountForAssetOther"
+one = "No ssh account for :\u001b[0;31m {{.Host}} \u001b[0m\r\n"
+other = "NoSshAccountForAssetOther"
+
+[MsgSshShowAssetResults]
+hash = "sha1-2911e21b4a1a6c46cc67c8212c6918c8f4ce8d32"
+many = "ShowAssetResultsOther"
+one = "Total host count is:\u001b[0;32m {{.Count}} \u001b[0m \r\n{{.Msg}}\r\n"
+other = "ShowAssetResultsOther"
+
+[MsgSshWelcomeMsg]
+hash = "sha1-764a3cb5c081536d5f574875ab5758d9b26942e8"
+many = "WelcomeMsgOther"
+one = "\u001b[0;33m Current User: {{.User}} \u001b[0m\r\n\u001b[1;30;32m IP/hostname \u001b[0m to search and login if only one, eg. 192\r\n\u001b[1;30;32m /s \u001b[0m to switch language between english and 中文\r\n\u001b[1;30;32m /* \u001b[0m to list all host which you have permission\r\n\u001b[1;30;32m /q \u001b[0m to exit\r\n\u001b[1;30;32m ? \u001b[0m for help\r\n"
+other = "\u001b[0;33m Current User: {{.User}} \u001b[0m\r\n\u001b[1;30;32m IP/hostname \u001b[0m to search and login if only one, eg. 192\r\n\u001b[1;30;32m /s \u001b[0m to switch language between english and 中文\r\n\u001b[1;30;32m /* \u001b[0m to list all host which you have permission\r\n\u001b[1;30;32m /q \u001b[0m to exit\r\n\u001b[1;30;32m ? \u001b[0m for help\r\n"
+
+[MsgTypeMappingAccount]
+one = "Account"
+other = "Account"
+
+[MsgTypeMappingAsset]
+one = "Asset"
+other = "Asset"
+
+[MsgTypeMappingCommand]
+one = "Command"
+other = "Command"
+
+[MsgTypeMappingGateway]
+one = "Gateway"
+other = "Gateway"
+
+[MsgTypeMappingNode]
+one = "Node"
+other = "Node"
+
+[MsgTypeMappingPublicKey]
+one = "Public Key"
+other = "Public Key"
+
+[MsgWrongMac]
+one = "Bad Request: Invalid Mac address"
+other = "Bad Request: Invalid Mac address"
+
+[MsgWrongPk]
+one = "Bad Request: Invalid SSH public key"
+other = "Bad Request: Invalid SSH public key"
+
+[MsgSshCommandRefused]
+one = "\u001b[0;31m you have no permission to execute command: \u001b[0m  \u001b[0;33m{{.Command}} \u001b[0m\r\n"
+other= "\u001b[0;31m you have no permission to execute command: \u001b[0m  \u001b[0;33m{{.Command}} \u001b[0m\r\n"
+
+[MsgSshNoMatchingAsset]
+one = "\u001b[0;33mNo matching asset for :\u001b[0m  \u001b[4;94m{{.Host}} \u001b[0m\r\n"
+other = "MsgSshNoMatchingAsset"
+
+[MsgSShHostIdleTimeout]
+one = "\r\n\u001b[0;31m disconnect since idle more than\u001b[0m \u001b[0;33m {{.Idle}} \u001b[0m\r\n"
+other = "\r\n\u001b[0;31m disconnect since idle more than\u001b[0m \u001b[0;33m {{.Idle}} \u001b[0m\r\n"
+
+[MsgSshAccessRefusedInTimespan]
+one = "\r\n\u001b[0;31m disconnect since current time is not allowed \u001b[0m\r\n"
+other = "\r\n\u001b[0;31m disconnect since current time is not allowed \u001b[0m\r\n"

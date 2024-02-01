@@ -1,0 +1,31 @@
+[MsgTypeMappingAccount]
+hash = "sha1-85dfa32c97d8618d1bea083609e2c8a29845abe5"
+other = "账号"
+
+[MsgTypeMappingAsset]
+hash = "sha1-4426afd90a77a35fb37ebd7110b9989cf7bed224"
+other = "资产"
+
+[MsgTypeMappingCommand]
+hash = "sha1-8901895fb1b1d4c4ea2fec368c25176bf73e2f7e"
+other = "命令"
+
+[MsgTypeMappingGateway]
+hash = "sha1-5a0e1818803b6bbdbb0cb77d88080aeaff8b5d2a"
+other = "网关"
+
+[MsgTypeMappingNode]
+hash = "sha1-260f7a8cd4f6938b3cc185a619847cb83d670219"
+other = "文件夹"
+
+[MsgTypeMappingPublicKey]
+hash = "sha1-590e3d26e76d9c4e5fe2aaf976d54d1f46cb8b31"
+other = "公钥"
+
+[MsgWrongMac]
+hash = "sha1-2b836bb6de89fdc386c739b6ce1d0f61959de02e"
+other = "请求错误: 非法MAC地址"
+
+[MsgWrongPk]
+hash = "sha1-9859553174705cf52d08a18fab79dc3e05a0230f"
+other = "请求错误: 非法SSH公钥"

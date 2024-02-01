@@ -22,13 +22,14 @@ const err = (error) => {
   if (error.response && reg.test(error.response.status)) {
     const errorMsg = ((error.response || {}).data || {}).message || '服务端未知错误, 请联系管理员！'
     message.error(errorMsg)
+  } else if (error.response.status === 404 && error.config.url.includes('cmdb')) {
+    message.warning('如需联动cmdb使用，请联系维易官方bd@veops.cn')
   } else if (error.response.status === 412) {
     let seconds = 5
     notification.warning({
       key: 'notification',
       message: 'WARNING',
-      description:
-        '修改已提交，请等待审核（5s）',
+      description: '修改已提交，请等待审核（5s）',
       duration: 5,
     })
     let interval = setInterval(() => {
@@ -41,9 +42,8 @@ const err = (error) => {
       notification.warning({
         key: 'notification',
         message: 'WARNING',
-        description:
-          `修改已提交，请等待审核（${seconds}s）`,
-        duration: seconds
+        description: `修改已提交，请等待审核（${seconds}s）`,
+        duration: seconds,
       })
     }, 1000)
   } else if (error.config.url === '/api/v0.1/ci_types/can_define_computed' || error.config.isShowMessage === false) {
@@ -61,7 +61,7 @@ const err = (error) => {
 }
 
 // request interceptor
-service.interceptors.request.use(config => {
+service.interceptors.request.use((config) => {
   const token = Vue.ls.get(ACCESS_TOKEN)
   if (token) {
     config.headers['Access-Token'] = token // 让每个请求携带自定义 token 请根据实际情况自行修改
@@ -79,10 +79,7 @@ const installer = {
   vm: {},
   install(Vue) {
     Vue.use(VueAxios, service)
-  }
+  },
 }
 
-export {
-  installer as VueAxios,
-  service as axios
-}
+export { installer as VueAxios, service as axios }

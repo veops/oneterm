@@ -1,0 +1,18 @@
+FROM golang:1.21.3-alpine3.17
+WORKDIR /oneterm
+COPY . .
+RUN go env -w GOPROXY=https://goproxy.cn,direct \
+    && go build --ldflags "-s -w" -o ./build/ssh ./cmd/ssh/ssh.go
+
+FROM alpine:latest
+RUN set -eux && sed -i 's/dl-cdn.alpinelinux.org/mirrors.ustc.edu.cn/g' /etc/apk/repositories
+RUN apk add tzdata
+RUN mkdir -p '/root/.ssh'
+RUN touch '/root/.ssh/id_ed25519'
+ENV TZ=Asia/Shanghai
+WORKDIR /oneterm
+COPY --from=0 /oneterm/cmd/ssh/config.yaml .
+COPY --from=0 /oneterm/pkg/i18n/translate ./translate
+COPY --from=0 /oneterm/build/ssh .
+CMD [ "./ssh","ssh","-c","./config.yaml"]
+

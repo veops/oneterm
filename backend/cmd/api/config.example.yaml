@@ -1,0 +1,58 @@
+mode: debug
+
+http:
+  ip: 0.0.0.0
+  port: 8080
+
+mysql:
+  ip: mysql
+  port: 3306
+  user: root
+  password: root
+
+redis:
+  addr: myredis:6379
+  password: root
+
+log:
+  level: debug
+  path: app.log
+  format: json
+  maxSize: 1
+  # consoleEnable Whether to enable outputting logs to the console as the sametime
+  consoleEnable: true
+
+auth:
+  acl:
+    appId: acl app id
+    secretKey: acl app secret key
+    url: http://host/api/v1
+    resourceNames:
+      - key: account
+        value: account
+      - key: asset
+        value: asset
+      - key: command
+        value: command
+      - key: gateway
+        value: gateway
+      - key: authorization
+        value: authorization
+
+cmdb:
+  url: http://host/api/v0.1
+
+secretKey: acl secret key
+
+worker:
+  uid: 123
+  rid: 456
+  key: acl key
+  secret: acl secret
+
+sshServer:
+  ip: 127.0.0.1
+  port: 2222
+  account: test
+  password: 135790
+  xtoken: 123456

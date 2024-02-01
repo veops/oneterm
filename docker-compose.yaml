@@ -2,7 +2,7 @@ version: "3.0"
 
 services:
   oneterm-api:
-    image: oneterm-api:1.24.1
+    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-api:1.24.1
     container_name: oneterm-api-1
     volumes:
       - file-data:/replay
@@ -17,7 +17,7 @@ services:
           - oneterm-api
 
   oneterm-ssh:
-    image: oneterm-ssh:1.24.26
+    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-ssh:1.24.1
     container_name: oneterm-ssh
     ports:
       - "12229:12228"
@@ -68,7 +68,7 @@ services:
           - redis
 
   oneterm-ui:
-    image: oneterm-ui:1.24.3
+    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-ui:1.24.1
     container_name: oneterm-ui
     depends_on:
       - oneterm-api
@@ -99,7 +99,6 @@ services:
       WAIT_HOSTS: mysql:3306, redis:6379
     volumes:
       - ./docs/settings.py:/data/app/acl/settings.py
-      - ./docs/app.py:/data/apps/acl/api/lib/perm/acl/app.py
       - ./docs/.env:/data/apps/acl/.env
       - ./docs/nginx.oneterm.conf.example:/etc/nginx/conf.d/nginx.oneterm.conf.example
     restart: always
@@ -114,7 +113,7 @@ services:
 
         gunicorn --workers=3 autoapp:app -b 0.0.0.0:5000 -D --access-logfile logs/access.log --error-logfile logs/error.log
 
-        celery -A celery_worker.celery worker -E -Q acl_async --logfile=one_acl_async.log --autoscale=2,1 -D
+        celery -A celery_worker.celery worker -E -Q acl_async --logfile=one_acl_async.log --autoscale=2,1 
     depends_on:
       - mysql
       - redis

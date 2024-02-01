@@ -4,11 +4,11 @@
   <a href=""><img src="https://img.shields.io/badge/Go-%3E%3D%201.18-%23007d9c" alt="go>=1.18"></a>
   <a href="https://goreportcard.com/report/github.com/veops/oneterm"><img src="https://goreportcard.com/badge/github.com/veops/oneterm" alt="API"></a>
 </p>
-oneterm: sample, lightweight, safe jump service
+oneterm: 简单、轻量、安全的跳板机服务
 
 ---
 
-## 🚀Install
+## 🚀安装
 
 ### docker-compose
 
@@ -19,25 +19,25 @@ cp cmd/ssh/confTemplate.yaml cmd/ssh/conf.yaml # edit your config
 docker compose up -d
 ```
 
+## 👀在线体验
 
-## 👀Demo
+在线地址：https://demo.veops.com/
 
-demo link：https://demo.veops.com/
+账号：admin/user
 
-account：admin/user
+密码：admin/user
 
-password：admin/user
 
-## 📚Docs
+## 📚产品文档
 
-doc link：https://veops.cn/docs/
+文档地址：https://veops.cn/docs/
 
 ## 🔗相关项目
 
-[go-ansiterm](https://github.com/veops/go-ansiterm)：Linux terminal emulator
+[go-ansiterm](https://github.com/veops/go-ansiterm)：linux终端仿真器
 
-## 🤝Community
+## 🤝社区交流
 
-**Welcome to follow our WeChat official account and join our group channels**
+**欢迎关注公众号(维易科技OneOps)，关注后可加入微信群，进行产品和技术交流。**
 
-![Wechat Official Account: 维易科技OneOps](docs/images/wechat.jpg)
+![公众号: 维易科技OneOps](docs/images/wechat.jpg)

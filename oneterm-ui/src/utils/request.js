@@ -22,7 +22,7 @@ const err = (error) => {
   if (error.response && reg.test(error.response.status)) {
     const errorMsg = ((error.response || {}).data || {}).message || '服务端未知错误, 请联系管理员！'
     message.error(errorMsg)
-  } else if (error.response.status === 404 && error.config.url.includes('cmdb')) {
+  } else if (error.response.status === 404 && error.config.url.includes('ci_types')) {
     message.warning('如需联动cmdb使用，请联系维易官方bd@veops.cn')
   } else if (error.response.status === 412) {
     let seconds = 5

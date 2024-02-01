@@ -4,7 +4,7 @@
   <a href=""><img src="https://img.shields.io/badge/Go-%3E%3D%201.18-%23007d9c" alt="go>=1.18"></a>
   <a href="https://goreportcard.com/report/github.com/veops/oneterm"><img src="https://goreportcard.com/badge/github.com/veops/oneterm" alt="API"></a>
 </p>
-oneterm: sample, lightweight, safe jump service
+oneterm simple, lightweight, safe jump service
 
 ---
 

@@ -1,6 +1,12 @@
 <template>
   <a-form-model ref="form" :model="form" :rules="rules" :label-col="{ span: 5 }" :wrapper-col="{ span: 16 }">
-    <a-form-model-item :label="$t(`oneterm.assetList.time`)">
+    <a-form-model-item>
+      <span slot="label">
+        <a-tooltip placement="right" :title="$t('oneterm.assetList.timeTip')">
+          <a><a-icon type="question-circle"/></a>
+        </a-tooltip>
+        {{ $t(`oneterm.assetList.time`) }}
+      </span>
       <a-radio-group v-model="form.allow" style="display:block;margin:8px 0;">
         <a-radio :value="true">
           {{ $t('oneterm.assetList.allowAccess') }}

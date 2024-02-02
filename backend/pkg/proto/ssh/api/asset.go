@@ -94,8 +94,10 @@ func (a *AssetCore) HasPermission(data *model.AccessAuth) bool {
 		return false
 	}
 	in = false
+	has := false
 	week, hm := now.Weekday(), now.Format("15:04")
 	for _, r := range data.Ranges {
+		has = has || len(r.Times) > 0
 		if (r.Week+1)%7 == int(week) {
 			for _, str := range r.Times {
 				ss := strings.Split(str, "~")
@@ -103,7 +105,7 @@ func (a *AssetCore) HasPermission(data *model.AccessAuth) bool {
 			}
 		}
 	}
-	return in == data.Allow
+	return !has || in == data.Allow
 }
 
 func (a *AssetCore) Gateway(cookie string, id int) (res *model.Gateway, err error) {

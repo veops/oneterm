@@ -104,6 +104,7 @@ const oneterm_zh = {
         sync: '开启同步',
         frequency: '同步频率',
         time: '时段',
+        timeTip: '可选择允许/禁止接入的时段，不选择则不做任何限制',
         effectiveDate: '生效日期',
         commandFilter: '命令过滤',
         allowAccess: '允许接入',
@@ -130,7 +131,8 @@ const oneterm_zh = {
         gatewayAccountTip: '登陆资产使用的账号',
         gatewaySecretkeyTip: '私钥文件，如：\n-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----',
         gatewayPhraseTip: '可选，生成密钥时使用的加密串(passphrase)',
-        publicKeyTip: '用于用户登录自动认证，即在相应的机器上登录无需输入账号密码'
+        publicKeyTip: '用于用户登录自动认证，即在相应的机器上登录无需输入账号密码',
+        protocolPlaceholder: '端口号，默认22'
     },
     log: {
         time: '时间',

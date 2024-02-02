@@ -174,6 +174,7 @@ export default {
               .then((res) => {
                 this.$message.success(this.$t('editSuccess'))
                 this.$emit('submitAsset', true, parent_id)
+                this.visible = false
               })
               .finally(() => {
                 this.loading = false
@@ -183,6 +184,7 @@ export default {
               .then((res) => {
                 this.$message.success(this.$t('createSuccess'))
                 this.$emit('submitAsset', true)
+                this.visible = false
               })
               .finally(() => {
                 this.loading = false

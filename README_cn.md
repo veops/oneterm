@@ -4,7 +4,12 @@
   <a href=""><img src="https://img.shields.io/badge/Go-%3E%3D%201.18-%23007d9c" alt="go>=1.18"></a>
   <a href="https:https://github.com/sendya/ant-design-pro-vue"><img src="https://img.shields.io/badge/UI-Ant%20Design%20Pro%20Vue-brightgreen" alt="UI"></a>
 </p>
-oneterm 简单、轻量、安全的跳板机服务
+
+**`OneTerm`** 堡垒机，基于4A理念，即认证(Authen)、授权(Authorize)、账号(Account)、审计(Audit)设计开发。
+
+`主要用途`：主要用于企业通过实现对IT人员操作行为的控制和审计来提升IT内部控制、合规安全性的产品。
+
+`主要功能`：角色管理、授权审批、资源访问控制、会话审计等。
 
 ---
 
@@ -15,7 +20,7 @@ oneterm 简单、轻量、安全的跳板机服务
 ```bash
 git clone https://github.com/veops/oneterm.git
 cd oneterm
-docker compose up -d
+docker-compose up -d
 ```
 
 ## ✅验证
@@ -38,10 +43,11 @@ ssh-keygen -t ed25519 # 根据提示生成key
 cat /root/.ssh/id_ed25519.pub # 拷贝公钥, 公钥地址从上一步生成的过程中获取，如下图所示
 ifconfig | grep -B1 "xxx.xxx.xxx.xxx" | awk '/ether/{print $2}' # 获取mac地址， 其中xxx.xxx.xxx.xxx换成您本机的IP
 ```
-![img.png](img.png)
+
+![img.png](docs/images/img.png)
 
 2. 将公钥和mac放在平台上
-![img_1.png](img_1.png)
+![img_1.png](docs/images/img_1.png)
 
 ### 更精简的的登录方式
 ```shell
@@ -60,10 +66,6 @@ Host oneterm
     User admin # 此处替换为您oneterm上的平台用户
 ```
 
-
-
-
-
 ## 📚产品文档
 
 文档地址：https://veops.cn/docs/docs/oneterm/onterm_design
@@ -75,10 +77,10 @@ Host oneterm
 
 ## 🔗相关项目
 
-[go-ansiterm](https://github.com/veops/go-ansiterm)：linux终端仿真器
+[go-ansiterm](https://github.com/veops/go-ansiterm)：linux终端仿真器,主要是根据终端输入和服务器回显解析命令
 
 ## 🤝社区交流
 
 **欢迎关注公众号(维易科技OneOps)，关注后可加入微信群，进行产品和技术交流。**
 
-![公众号: 维易科技OneOps](backend/docs/images/wechat.jpg)
+![公众号: 维易科技OneOps](docs/images/wechat.jpg)

@@ -22,6 +22,7 @@ services:
     ports:
       - "12229:12228"
     restart: always
+    tty: true
     volumes:
       - ./docs/ssh.yaml:/oneterm/config.yaml
     depends_on:

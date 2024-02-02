@@ -23,6 +23,47 @@ docker compose up -d
 - username: admin
 - password: 123456
 
+## SSH终端
+### 效果
+![Example GIF](./docs/images/ssh-client.gif)
+### 登录
+```shell
+ssh -p12229 admin@127.0.0.1 # 注意这里端口,用户，地址需要换成您当前环境的
+```
+### 免密登录配置
+> 终端免密登录是为了增加安全性以及便捷性而设计
+1. 生成并获取公钥, 获取mac地址
+```shell
+ssh-keygen -t ed25519 # 根据提示生成key
+cat /root/.ssh/id_ed25519.pub # 拷贝公钥, 公钥地址从上一步生成的过程中获取，如下图所示
+ifconfig | grep -B1 "xxx.xxx.xxx.xxx" | awk '/ether/{print $2}' # 获取mac地址， 其中xxx.xxx.xxx.xxx换成您本机的IP
+```
+![img.png](img.png)
+
+2. 将公钥和mac放在平台上
+![img_1.png](img_1.png)
+
+### 更精简的的登录方式
+```shell
+ssh oneterm
+```
+> 要达到这种效果，可进行如下配置
+1. 创建ssh config文件
+```shell
+touch ~/.ssh/config
+```
+2. 将以下内容添加到 **`~/.ssh/config`**
+```shell
+Host oneterm
+    HostName 127.0.0.1 # 此处替换为您oneterm的ssh server的地址
+    Port 12229 # 此处替换为您oneterm的ssh server的端口
+    User admin # 此处替换为您oneterm上的平台用户
+```
+
+
+
+
+
 ## 📚产品文档
 
 文档地址：https://veops.cn/docs/docs/oneterm/onterm_design

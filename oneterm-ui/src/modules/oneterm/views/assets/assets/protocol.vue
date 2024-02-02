@@ -8,7 +8,7 @@
               ssh
             </a-select-option>
           </a-select>
-          <a-input v-model="pro.label" style="width: calc(100% - 100px)" />
+          <a-input :placeholder="$t('oneterm.assetList.protocolPlaceholder')" v-model="pro.label" style="width: calc(100% - 100px)" />
         </a-input-group>
         <a-space>
           <a @click="addPro"><a-icon type="plus-circle"/></a>
@@ -74,7 +74,7 @@ export default {
         gateway_id: undefined,
       },
       rules: {},
-      protocols: [{ id: uuidv4(), value: 'ssh', label: '' }],
+      protocols: [{ id: uuidv4(), value: 'ssh', label: '22' }],
       gatewayList: [],
     }
   },
@@ -85,7 +85,7 @@ export default {
   },
   methods: {
     addPro() {
-      this.protocols.push({ id: uuidv4(), value: 'ssh', label: '' })
+      this.protocols.push({ id: uuidv4(), value: 'ssh', label: '22' })
     },
     deletePro(index) {
       this.protocols.splice(index, 1)
@@ -103,7 +103,7 @@ export default {
             value: p.split(':')[0],
             label: p.split(':')[1],
           }))
-        : [{ id: uuidv4(), value: 'ssh', label: '' }]
+        : [{ id: uuidv4(), value: 'ssh', label: '22' }]
     },
   },
 }

@@ -29,6 +29,7 @@ import (
 )
 
 func (i *InteractiveHandler) Proxy(line string, accountId int) (step int, err error) {
+	fmt.Println("Proxy....")
 	step = 1
 	if accountId > 0 {
 		var accountName string
@@ -144,9 +145,9 @@ func (i *InteractiveHandler) Proxy(line string, accountId int) (step int, err er
 
 		var sshPort string
 		for _, v := range host.Protocols {
-			tmp := strings.Split(v, ":")
-			if len(tmp) == 2 && tmp[0] == "ssh" {
-				sshPort = tmp[1]
+			if strings.HasPrefix(v, "ssh") {
+				sshPort = getSshPort(v)
+				break
 			}
 		}
 		if sshPort == "" {
@@ -192,6 +193,17 @@ func (i *InteractiveHandler) Proxy(line string, accountId int) (step int, err er
 		}
 	}
 	return
+}
+
+func getSshPort(protocol string) (sshPort string) {
+	tmp := strings.Split(protocol, ":")
+	if len(tmp) == 2 && tmp[0] == "ssh" {
+		sshPort = tmp[1]
+	}
+	if strings.TrimSpace(sshPort) == "" {
+		sshPort = "22"
+	}
+	return sshPort
 }
 
 func (i *InteractiveHandler) bind(userConn gossh.Session, hostConn *client.Connection) error {

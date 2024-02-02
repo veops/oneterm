@@ -4,7 +4,12 @@
   <a href=""><img src="https://img.shields.io/badge/Go-%3E%3D%201.18-%23007d9c" alt="go>=1.18"></a>
   <a href="https:https://github.com/sendya/ant-design-pro-vue"><img src="https://img.shields.io/badge/UI-Ant%20Design%20Pro%20Vue-brightgreen" alt="UI"></a>
 </p>
-oneterm Provide secure access and control over all infrastructure
+
+**`OneTerm`** Bastion Host, based on the 4A concept, i.e., Authentication, Authorization, Account, and Audit, is designed and developed.
+
+`Main use`: It is mainly used for products that enhance IT internal control and compliance security by implementing control and audit of IT personnel's operating behaviors in enterprises.
+
+`Main functions`: role management, authorization approval, resource access control, session audit, etc.
 
 ---
 
@@ -15,7 +20,7 @@ oneterm Provide secure access and control over all infrastructure
 ```bash
 git clone https://github.com/veops/oneterm.git
 cd oneterm
-docker compose up -d
+docker-compose up -d
 ```
 
 ## ✅ Validation
@@ -40,10 +45,10 @@ ssh-keygen -t ed25519 # Generate the key following the prompts
 cat /root/.ssh/id_ed25519.pub # Copy the public key. The public key address is obtained from the generation process as shown in the previous step
 ifconfig | grep -B1 "xxx.xxx.xxx.xxx" | awk '/ether/{print $2}' # Get the MAC address, replace xxx.xxx.xxx.xxx with your local IP
 ```
-![img.png](img.png)
+![img.png](docs/images/img.png)
 
 2. Place the public key and MAC on the platform
-   ![img_1.png](img_1.png)
+   ![img_1.png](docs/images/img_1.png)
 
 ### More Streamlined Login Method
 ```shell

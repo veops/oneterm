@@ -24,6 +24,44 @@ docker compose up -d
 - username: admin
 - password: 123456
 
+
+## SSH
+### View
+![Example GIF](./docs/images/ssh-client.gif)
+### Login
+```shell
+ssh -p12229 admin@127.0.0.1 # 注意这里端口,用户，地址需要换成您当前环境的
+```
+### Passwordless Login Configuration
+> Terminal passwordless login is designed for enhanced security and convenience.
+1. Generate and retrieve the public key, get the MAC address
+```shell
+ssh-keygen -t ed25519 # Generate the key following the prompts
+cat /root/.ssh/id_ed25519.pub # Copy the public key. The public key address is obtained from the generation process as shown in the previous step
+ifconfig | grep -B1 "xxx.xxx.xxx.xxx" | awk '/ether/{print $2}' # Get the MAC address, replace xxx.xxx.xxx.xxx with your local IP
+```
+![img.png](img.png)
+
+2. Place the public key and MAC on the platform
+   ![img_1.png](img_1.png)
+
+### More Streamlined Login Method
+```shell
+ssh oneterm
+```
+> To achieve this effect, you can configure as follows:
+1. Create the ssh config file
+```shell
+touch ~/.ssh/config
+```
+2. Add the following content to **`~/.ssh/config`**
+```shell
+Host oneterm
+    HostName 127.0.0.1 # Replace with the address of your oneterm's ssh server
+    Port 12229 # Replace with the port of your oneterm's ssh server
+    User admin # Replace with your platform user on oneterm
+```
+
 ## 📚Docs
 
 doc link：https://veops.cn/docs/docs/oneterm/onterm_design

@@ -762,7 +762,11 @@ func (i *InteractiveHandler) NewSession(account *model.Account, gateway *model.G
 	i.Locker.Lock()
 	defer i.Locker.Unlock()
 	if i.SshClient == nil {
-		con, ch, er := client.NewSShClient(strings.ReplaceAll(i.SessionReq.Protocol, "ssh", i.SelectedAsset.Ip), account, gateway)
+		protocol := i.SessionReq.Protocol
+		if strings.HasPrefix(i.SessionReq.Protocol, "ssh:") {
+			protocol = "ssh:" + getSshPort(i.SessionReq.Protocol)
+		}
+		con, ch, er := client.NewSShClient(strings.ReplaceAll(protocol, "ssh", i.SelectedAsset.Ip), account, gateway)
 		if er != nil {
 			err = er
 			return

@@ -18,6 +18,11 @@ cd oneterm
 docker compose up -d
 ```
 
+## ✅验证
+- 浏览器打开: [http://127.0.0.1:8000](http://127.0.0.1:8000)
+- username: admin
+- password: 123456
+
 ## 📚产品文档
 
 文档地址：https://veops.cn/docs/docs/oneterm/onterm_design

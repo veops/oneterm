@@ -1,80 +1,84 @@
 <template>
-  <div class="asset-create-asset">
-    <div class="asset-create-asset-container">
-      <p>
-        <strong>{{ $t(`oneterm.baseInfo`) }}</strong>
-      </p>
-      <a-form-model
-        ref="baseForm"
-        :model="baseForm"
-        :rules="baseRules"
-        :label-col="{ span: 5 }"
-        :wrapper-col="{ span: 16 }"
-      >
-        <a-form-model-item :label="$t(`oneterm.name`)" prop="name">
-          <a-input v-model="baseForm.name" :placeholder="`${$t(`placeholder1`)}`" />
-        </a-form-model-item>
-        <a-form-model-item label="IP" prop="ip">
-          <a-input v-model="baseForm.ip" :placeholder="`${$t(`placeholder1`)}`" />
-        </a-form-model-item>
-        <a-form-model-item :label="$t(`oneterm.node`)" prop="parent_id">
-          <treeselect
-            class="custom-treeselect custom-treeselect-bgcAndBorder"
-            :style="{
-              '--custom-height': '32px',
-              lineHeight: '32px',
-              '--custom-bg-color': '#fff',
-              '--custom-border': '1px solid #d9d9d9',
-            }"
-            v-model="baseForm.parent_id"
-            :multiple="false"
-            :clearable="true"
-            searchable
-            :options="nodeList"
-            :placeholder="`${$t(`placeholder2`)}`"
-            :normalizer="
-              (node) => {
-                return {
-                  id: node.id,
-                  label: node.name,
-                }
+  <CustomDrawer :closable="false" :visible="visible" width="1000px" :title="title">
+    <p>
+      <strong>{{ $t(`oneterm.baseInfo`) }}</strong>
+    </p>
+    <a-form-model
+      ref="baseForm"
+      :model="baseForm"
+      :rules="baseRules"
+      :label-col="{ span: 5 }"
+      :wrapper-col="{ span: 16 }"
+    >
+      <a-form-model-item :label="$t(`oneterm.name`)" prop="name">
+        <a-input v-model="baseForm.name" :placeholder="`${$t(`placeholder1`)}`" />
+      </a-form-model-item>
+      <a-form-model-item label="IP" prop="ip">
+        <a-input v-model="baseForm.ip" :placeholder="`${$t(`placeholder1`)}`" />
+      </a-form-model-item>
+      <a-form-model-item :label="$t(`oneterm.node`)" prop="parent_id">
+        <treeselect
+          class="custom-treeselect custom-treeselect-bgcAndBorder"
+          :style="{
+            '--custom-height': '32px',
+            lineHeight: '32px',
+            '--custom-bg-color': '#fff',
+            '--custom-border': '1px solid #d9d9d9',
+          }"
+          v-model="baseForm.parent_id"
+          :multiple="false"
+          :clearable="true"
+          searchable
+          :options="nodeList"
+          :placeholder="`${$t(`placeholder2`)}`"
+          :normalizer="
+            (node) => {
+              return {
+                id: node.id,
+                label: node.name,
               }
-            "
+            }
+          "
+        >
+          <div
+            :title="node.label"
+            slot="option-label"
+            slot-scope="{ node }"
+            :style="{ width: '100%', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }"
           >
-            <div
-              :title="node.label"
-              slot="option-label"
-              slot-scope="{ node }"
-              :style="{ width: '100%', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }"
-            >
-              {{ node.label }}
-            </div>
-          </treeselect>
-        </a-form-model-item>
-        <a-form-model-item :label="$t('oneterm.comment')" prop="comment">
-          <a-textarea v-model="baseForm.comment" :placeholder="`${$t(`placeholder1`)}`" />
-        </a-form-model-item>
-      </a-form-model>
-      <p>
-        <strong>{{ $t(`oneterm.protocol`) }}</strong>
-      </p>
-      <Protocol ref="protocol" />
-      <p>
-        <strong>{{ $t(`oneterm.accountAuthorization`) }}</strong>
-      </p>
-      <Account ref="account" />
-      <p>
-        <strong>{{ $t(`oneterm.accessRestrictions`) }}</strong>
-      </p>
-      <AccessAuth ref="accessAuth" />
+            {{ node.label }}
+          </div>
+        </treeselect>
+      </a-form-model-item>
+      <a-form-model-item :label="$t('oneterm.comment')" prop="comment">
+        <a-textarea v-model="baseForm.comment" :placeholder="`${$t(`placeholder1`)}`" />
+      </a-form-model-item>
+    </a-form-model>
+    <p>
+      <strong>{{ $t(`oneterm.protocol`) }}</strong>
+    </p>
+    <Protocol ref="protocol" />
+    <p>
+      <strong>{{ $t(`oneterm.accountAuthorization`) }}</strong>
+    </p>
+    <Account ref="account" />
+    <p>
+      <strong>{{ $t(`oneterm.accessRestrictions`) }}</strong>
+    </p>
+    <AccessAuth ref="accessAuth" />
+    <div class="custom-drawer-bottom-action">
+      <a-button
+        :loading="loading"
+        @click="
+          () => {
+            visible = false
+          }
+        "
+      >{{ $t(`cancel`) }}</a-button
+      >
+      <a-button :loading="loading" @click="handleSubmit" type="primary">{{ $t(`confirm`) }}</a-button>
     </div>
-    <div class="asset-create-asset-footer">
-      <a-space>
-        <a-button :loading="loading" @click="$emit('goBack')">{{ $t(`cancel`) }}</a-button>
-        <a-button :loading="loading" @click="handleSubmit" type="primary">{{ $t(`confirm`) }}</a-button>
-      </a-space>
-    </div>
-  </div>
+  </CustomDrawer>
 </template>
 
 <script>
@@ -89,6 +93,8 @@ export default {
   components: { Protocol, Account, AccessAuth },
   data() {
     return {
+      visible: false,
+      type: 'create',
       assetId: null,
       loading: false,
       baseForm: {
@@ -104,34 +110,46 @@ export default {
       nodeList: [],
     }
   },
+  computed: {
+    title() {
+      if (this.type === 'create') {
+        return this.$t(`oneterm.assetList.createAsset`)
+      }
+      return this.$t(`oneterm.assetList.editAsset`)
+    },
+  },
   mounted() {
     getNodeList().then((res) => {
       this.nodeList = res?.data?.list || []
     })
   },
   methods: {
-    setAsset(asset) {
-      const {
-        id = null,
-        name = '',
-        ip = '',
-        comment = '',
-        parent_id,
-        gateway_id = undefined,
-        protocols = [],
-        authorization = {},
-        access_auth = {},
-      } = asset ?? {}
-      this.assetId = id
-      this.baseForm = {
-        name,
-        ip,
-        comment,
-        parent_id: parent_id || undefined,
-      }
-      this.$refs.protocol.setValues({ gateway_id, protocols })
-      this.$refs.account.setValues({ authorization })
-      this.$refs.accessAuth.setValues(access_auth)
+    setAsset(asset, type) {
+      this.visible = true
+      this.type = type
+      this.$nextTick(() => {
+        const {
+          id = null,
+          name = '',
+          ip = '',
+          comment = '',
+          parent_id,
+          gateway_id = undefined,
+          protocols = [],
+          authorization = {},
+          access_auth = {},
+        } = asset ?? {}
+        this.assetId = id
+        this.baseForm = {
+          name,
+          ip,
+          comment,
+          parent_id: parent_id || undefined,
+        }
+        this.$refs.protocol.setValues({ gateway_id, protocols })
+        this.$refs.account.setValues({ authorization })
+        this.$refs.accessAuth.setValues(access_auth)
+      })
     },
     handleSubmit() {
       this.$refs.baseForm.validate((valid) => {

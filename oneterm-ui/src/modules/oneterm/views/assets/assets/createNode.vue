@@ -1,150 +1,154 @@
 <template>
-  <div class="asset-create-node">
-    <div class="asset-create-node-container">
-      <p>
-        <strong>{{ $t(`oneterm.baseInfo`) }}</strong>
-      </p>
-      <a-form-model
-        ref="baseForm"
-        :model="baseForm"
-        :rules="baseRules"
-        :label-col="{ span: 5 }"
-        :wrapper-col="{ span: 16 }"
-      >
-        <a-form-model-item :label="$t('oneterm.assetList.floderName')" prop="name">
-          <a-input v-model="baseForm.name" :placeholder="`${$t(`placeholder1`)}`" />
-        </a-form-model-item>
-        <a-form-model-item :label="$t(`oneterm.node`)" prop="parent_id">
-          <treeselect
-            class="custom-treeselect custom-treeselect-bgcAndBorder"
-            :style="{
-              '--custom-height': '32px',
-              lineHeight: '32px',
-              '--custom-bg-color': '#fff',
-              '--custom-border': '1px solid #d9d9d9',
-            }"
-            v-model="baseForm.parent_id"
-            :multiple="false"
-            :clearable="true"
-            searchable
-            :options="nodeList"
-            :placeholder="`${$t(`placeholder2`)}`"
-            :normalizer="
-              (node) => {
-                return {
-                  id: node.id,
-                  label: node.name,
-                }
+  <CustomDrawer :closable="false" :visible="visible" width="1000px" :title="title">
+    <p>
+      <strong>{{ $t(`oneterm.baseInfo`) }}</strong>
+    </p>
+    <a-form-model
+      ref="baseForm"
+      :model="baseForm"
+      :rules="baseRules"
+      :label-col="{ span: 5 }"
+      :wrapper-col="{ span: 16 }"
+    >
+      <a-form-model-item :label="$t('oneterm.assetList.floderName')" prop="name">
+        <a-input v-model="baseForm.name" :placeholder="`${$t(`placeholder1`)}`" />
+      </a-form-model-item>
+      <a-form-model-item :label="$t(`oneterm.node`)" prop="parent_id">
+        <treeselect
+          class="custom-treeselect custom-treeselect-bgcAndBorder"
+          :style="{
+            '--custom-height': '32px',
+            lineHeight: '32px',
+            '--custom-bg-color': '#fff',
+            '--custom-border': '1px solid #d9d9d9',
+          }"
+          v-model="baseForm.parent_id"
+          :multiple="false"
+          :clearable="true"
+          searchable
+          :options="nodeList"
+          :placeholder="`${$t(`placeholder2`)}`"
+          :normalizer="
+            (node) => {
+              return {
+                id: node.id,
+                label: node.name,
               }
-            "
-          >
-            <div
-              :title="node.label"
-              slot="option-label"
-              slot-scope="{ node }"
-              :style="{ width: '100%', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }"
-            >
-              {{ node.label }}
-            </div>
-          </treeselect>
-        </a-form-model-item>
-        <a-form-model-item :label="$t('oneterm.comment')" prop="comment">
-          <a-textarea v-model="baseForm.comment" :placeholder="`${$t(`placeholder1`)}`" />
-        </a-form-model-item>
-      </a-form-model>
-      <p>
-        <strong>{{ $t(`oneterm.assetList.cmdbSync`) }}</strong>
-      </p>
-      <a-form-model ref="syncForm" :model="syncForm" :label-col="{ span: 5 }" :wrapper-col="{ span: 16 }">
-        <a-form-model-item
-          :label="$t('oneterm.cmdbType')"
-          prop="type_id"
-          :style="{ display: 'flex', alignItems: 'center' }"
+            }
+          "
         >
-          <CMDBTypeSelect v-model="syncForm.type_id" selectType="ci_type" @select="changeTypeId" />
-        </a-form-model-item>
-        <a-form-model-item :label="$t('oneterm.fieldMap')">
-          <div v-for="item in fieldMap" :key="item.id">
-            <div class="cmdb-radio-slot-field">
-              <div class="slot-field1">
-                <span>*</span>
-                <a-input disabled size="small" :style="{ width: '200px' }" v-model="item['attribute'].label" />
-              </div>
-              <div class="slot-field2" :style="{ marginLeft: '150px' }">
-                <treeselect
-                  class="custom-treeselect custom-treeselect-bgcAndBorder"
-                  :style="{
-                    '--custom-height': '24px',
-                    lineHeight: '24px',
-                    '--custom-bg-color': '#fff',
-                    '--custom-border': '1px solid #d9d9d9',
-                    width: '250px',
-                  }"
-                  v-model="item.field_name"
-                  :multiple="false"
-                  :clearable="true"
-                  searchable
-                  :options="attributes"
-                  :placeholder="`${$t(`placeholder2`)}`"
-                  :normalizer="
-                    (node) => {
-                      return {
-                        id: node.name,
-                        label: node.alias || node.name,
-                      }
-                    }
-                  "
-                >
-                  <div
-                    :title="node.label"
-                    slot="option-label"
-                    slot-scope="{ node }"
-                    :style="{ width: '100%', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }"
-                  >
-                    {{ node.label }}
-                  </div>
-                </treeselect>
-              </div>
-            </div>
-            <span v-if="item.error" style="color:red">{{ `${$t(`placeholder2`)}` }}</span>
+          <div
+            :title="node.label"
+            slot="option-label"
+            slot-scope="{ node }"
+            :style="{ width: '100%', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }"
+          >
+            {{ node.label }}
           </div>
-        </a-form-model-item>
-        <a-form-model-item :label="$t('oneterm.filter')" class="cmdb-value-filter">
-          <FilterComp
-            ref="filterComp"
-            :isDropdown="false"
-            :canSearchPreferenceAttrList="attributes"
-            @setExpFromFilter="setExpFromFilter"
-            :expression="filterExp ? `q=${filterExp}` : ''"
-          />
-        </a-form-model-item>
-        <a-form-model-item :label="$t('oneterm.assetList.sync')" prop="enable">
-          <a-switch v-model="syncForm.enable" />
-        </a-form-model-item>
-        <a-form-model-item :label="$t('oneterm.assetList.frequency')" prop="frequency">
-          <a-input-number :min="0" v-model="syncForm.frequency" />{{ $t('hour') }}
-        </a-form-model-item>
-      </a-form-model>
-      <p>
-        <strong>{{ $t(`oneterm.protocol`) }}</strong>
-      </p>
-      <Protocol ref="protocol" />
-      <p>
-        <strong>{{ $t(`oneterm.accountAuthorization`) }}</strong>
-      </p>
-      <Account ref="account" />
-      <p>
-        <strong>{{ $t(`oneterm.accessRestrictions`) }}</strong>
-      </p>
-      <AccessAuth ref="accessAuth" />
+        </treeselect>
+      </a-form-model-item>
+      <a-form-model-item :label="$t('oneterm.comment')" prop="comment">
+        <a-textarea v-model="baseForm.comment" :placeholder="`${$t(`placeholder1`)}`" />
+      </a-form-model-item>
+    </a-form-model>
+    <p>
+      <strong>{{ $t(`oneterm.assetList.cmdbSync`) }}</strong>
+    </p>
+    <a-form-model ref="syncForm" :model="syncForm" :label-col="{ span: 5 }" :wrapper-col="{ span: 16 }">
+      <a-form-model-item
+        :label="$t('oneterm.cmdbType')"
+        prop="type_id"
+        :style="{ display: 'flex', alignItems: 'center' }"
+      >
+        <CMDBTypeSelect v-model="syncForm.type_id" selectType="ci_type" @select="changeTypeId" />
+      </a-form-model-item>
+      <a-form-model-item :label="$t('oneterm.fieldMap')">
+        <div v-for="item in fieldMap" :key="item.id">
+          <div class="cmdb-radio-slot-field">
+            <div class="slot-field1">
+              <span>*</span>
+              <a-input disabled size="small" :style="{ width: '200px' }" v-model="item['attribute'].label" />
+            </div>
+            <div class="slot-field2" :style="{ marginLeft: '150px' }">
+              <treeselect
+                class="custom-treeselect custom-treeselect-bgcAndBorder"
+                :style="{
+                  '--custom-height': '24px',
+                  lineHeight: '24px',
+                  '--custom-bg-color': '#fff',
+                  '--custom-border': '1px solid #d9d9d9',
+                  width: '250px',
+                }"
+                v-model="item.field_name"
+                :multiple="false"
+                :clearable="true"
+                searchable
+                :options="attributes"
+                :placeholder="`${$t(`placeholder2`)}`"
+                :normalizer="
+                  (node) => {
+                    return {
+                      id: node.name,
+                      label: node.alias || node.name,
+                    }
+                  }
+                "
+              >
+                <div
+                  :title="node.label"
+                  slot="option-label"
+                  slot-scope="{ node }"
+                  :style="{ width: '100%', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }"
+                >
+                  {{ node.label }}
+                </div>
+              </treeselect>
+            </div>
+          </div>
+          <span v-if="item.error" style="color:red">{{ `${$t(`placeholder2`)}` }}</span>
+        </div>
+      </a-form-model-item>
+      <a-form-model-item :label="$t('oneterm.filter')" class="cmdb-value-filter">
+        <FilterComp
+          ref="filterComp"
+          :isDropdown="false"
+          :canSearchPreferenceAttrList="attributes"
+          @setExpFromFilter="setExpFromFilter"
+          :expression="filterExp ? `q=${filterExp}` : ''"
+        />
+      </a-form-model-item>
+      <a-form-model-item :label="$t('oneterm.assetList.sync')" prop="enable">
+        <a-switch v-model="syncForm.enable" />
+      </a-form-model-item>
+      <a-form-model-item :label="$t('oneterm.assetList.frequency')" prop="frequency">
+        <a-input-number :min="0" v-model="syncForm.frequency" />{{ $t('hour') }}
+      </a-form-model-item>
+    </a-form-model>
+    <p>
+      <strong>{{ $t(`oneterm.protocol`) }}</strong>
+    </p>
+    <Protocol ref="protocol" />
+    <p>
+      <strong>{{ $t(`oneterm.accountAuthorization`) }}</strong>
+    </p>
+    <Account ref="account" />
+    <p>
+      <strong>{{ $t(`oneterm.accessRestrictions`) }}</strong>
+    </p>
+    <AccessAuth ref="accessAuth" />
+    <div class="custom-drawer-bottom-action">
+      <a-button
+        :loading="loading"
+        @click="
+          () => {
+            visible = false
+          }
+        "
+      >{{ $t(`cancel`) }}</a-button
+      >
+      <a-button :loading="loading" @click="handleSubmit" type="primary">{{ $t(`confirm`) }}</a-button>
     </div>
-    <div class="asset-create-node-footer">
-      <a-space>
-        <a-button :loading="loading" @click="$emit('goBack')">{{ $t(`cancel`) }}</a-button>
-        <a-button :loading="loading" @click="handleSubmit" type="primary">{{ $t(`confirm`) }}</a-button>
-      </a-space>
-    </div>
-  </div>
+  </CustomDrawer>
 </template>
 
 <script>
@@ -161,6 +165,8 @@ export default {
   components: { CMDBTypeSelect, FilterComp, Protocol, Account, AccessAuth },
   data() {
     return {
+      visible: false,
+      type: 'create',
       nodeId: null,
       loading: false,
       baseForm: {
@@ -196,68 +202,79 @@ export default {
       nodeList: [],
     }
   },
-  computed: {},
+  computed: {
+    title() {
+      if (this.type === 'create') {
+        return this.$t(`oneterm.assetList.createFloder`)
+      }
+      return this.$t(`oneterm.assetList.editFloder`)
+    },
+  },
   mounted() {},
   methods: {
-    setNode(node) {
-      const params = {}
-      if (node?.id) {
-        params.no_self_child = node.id
-      }
-      getNodeList(params).then((res) => {
-        this.nodeList = res?.data?.list || []
-      })
-      console.log(node)
-      const {
-        id = null,
-        name = '',
-        comment = '',
-        parent_id,
-        sync = {},
-        gateway_id = undefined,
-        protocols = [],
-        authorization = {},
-        access_auth = {},
-      } = node ?? {}
-      const { type_id = undefined, enable = true, frequency = undefined, filters = '', mapping = {} } = sync
-      this.nodeId = id
-      this.baseForm = {
-        name,
-        parent_id: parent_id || undefined,
-        comment,
-      }
-      this.syncForm = {
-        type_id,
-        enable,
-        frequency,
-      }
-
-      this.changeTypeId({ id: type_id })
-      this.fieldMap =
-        JSON.stringify(mapping) === '{}'
-          ? [
-              {
-                field_name: undefined,
-                attribute: { value: 'name', label: this.$t('oneterm.name') },
-              },
-              {
-                field_name: undefined,
-                attribute: { value: 'ip', label: 'IP' },
-              },
-            ]
-          : Object.keys(mapping).map((key) => {
-              return {
-                field_name: mapping[key],
-                attribute: { value: key, label: this.fieldMapObj[key] },
-              }
-            })
-      this.filterExp = filters
+    setNode(node, type) {
+      this.visible = true
+      this.type = type
       this.$nextTick(() => {
-        this.$refs.filterComp.visibleChange(true, false)
+        const params = {}
+        if (node?.id) {
+          params.no_self_child = node.id
+        }
+        getNodeList(params).then((res) => {
+          this.nodeList = res?.data?.list || []
+        })
+        console.log(node)
+        const {
+          id = null,
+          name = '',
+          comment = '',
+          parent_id,
+          sync = {},
+          gateway_id = undefined,
+          protocols = [],
+          authorization = {},
+          access_auth = {},
+        } = node ?? {}
+        const { type_id = undefined, enable = true, frequency = undefined, filters = '', mapping = {} } = sync
+        this.nodeId = id
+        this.baseForm = {
+          name,
+          parent_id: parent_id || undefined,
+          comment,
+        }
+        this.syncForm = {
+          type_id,
+          enable,
+          frequency,
+        }
+
+        this.changeTypeId({ id: type_id })
+        this.fieldMap =
+          JSON.stringify(mapping) === '{}'
+            ? [
+                {
+                  field_name: undefined,
+                  attribute: { value: 'name', label: this.$t('oneterm.name') },
+                },
+                {
+                  field_name: undefined,
+                  attribute: { value: 'ip', label: 'IP' },
+                },
+              ]
+            : Object.keys(mapping).map((key) => {
+                return {
+                  field_name: mapping[key],
+                  attribute: { value: key, label: this.fieldMapObj[key] },
+                }
+              })
+        this.filterExp = filters
+        this.$nextTick(() => {
+          this.$refs.filterComp.visibleChange(true, false)
+        })
+        this.$refs.protocol.setValues({ gateway_id, protocols })
+        this.$refs.account.setValues({ authorization })
+        this.$refs.accessAuth.setValues(access_auth)
       })
-      this.$refs.protocol.setValues({ gateway_id, protocols })
-      this.$refs.account.setValues({ authorization })
-      this.$refs.accessAuth.setValues(access_auth)
     },
     async changeTypeId({ id }) {
       if (id) {
@@ -344,32 +361,6 @@ export default {
 </script>
 
 <style lang="less" scoped>
-.asset-create-node {
-  width: 100%;
-  height: calc(100vh - 112px);
-  margin-bottom: -24px;
-  background-color: #ffffff;
-  border-radius: 15px;
-  position: relative;
-  .asset-create-node-container {
-    height: calc(100% - 56px);
-    padding: 18px 5vw;
-    overflow: auto;
-    strong {
-      color: #000;
-    }
-  }
-  .asset-create-node-footer {
-    width: 100%;
-    padding: 12px 5vw;
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    box-shadow: 0px -1px 0px #e4eaf7;
-    text-align: right;
-  }
-}
-
 .cmdb-radio-slot-field {
   display: flex;
   align-items: center;

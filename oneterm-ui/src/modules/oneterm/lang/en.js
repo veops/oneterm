@@ -104,6 +104,7 @@ const oneterm_en = {
         sync: 'Enable Synchronization',
         frequency: 'Frequency',
         time: 'Time',
+        timeTip: 'You can choose to allow/prohibit access during certain time periods. If not selected, no restrictions will be imposed.',
         effectiveDate: 'Effective Date',
         commandFilter: 'Command Filter',
         allowAccess: 'Allow Access',
@@ -130,7 +131,8 @@ const oneterm_en = {
         gatewayAccountTip: 'Account used to log in to assets',
         gatewaySecretkeyTip: 'Secret key, such as: \n-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----',
         gatewayPhraseTip: 'Optional, the encryption string used when generating the key(passphrase)',
-        publicKeyTip: 'Used for automatic user login authentication, which means logging in on the corresponding machine without entering an account password'
+        publicKeyTip: 'Used for automatic user login authentication, which means logging in on the corresponding machine without entering an account password',
+        protocolPlaceholder: 'port, default 22'
     },
     log: {
         time: 'Time',

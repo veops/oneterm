@@ -30,7 +30,7 @@ docker compose up -d
 ![Example GIF](./docs/images/ssh-client.gif)
 ### Login
 ```shell
-ssh -p12229 admin@127.0.0.1 # 注意这里端口,用户，地址需要换成您当前环境的
+ssh -p12229 admin@127.0.0.1 # Note that the port, user, and address need to be replaced with your current environment
 ```
 ### Passwordless Login Configuration
 > Terminal passwordless login is designed for enhanced security and convenience.

@@ -339,6 +339,7 @@ export default {
               .then((res) => {
                 this.$message.success(this.$t('editSuccess'))
                 this.$emit('submitNode')
+                this.visible = false
               })
               .finally(() => {
                 this.loading = false
@@ -348,6 +349,7 @@ export default {
               .then((res) => {
                 this.$message.success(this.$t('createSuccess'))
                 this.$emit('submitNode')
+                this.visible = false
               })
               .finally(() => {
                 this.loading = false

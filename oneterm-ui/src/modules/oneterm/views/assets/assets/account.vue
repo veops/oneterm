@@ -13,8 +13,8 @@
             <treeselect
               class="custom-treeselect custom-treeselect-bgcAndBorder"
               :style="{
-                '--custom-height': '24px',
-                lineHeight: '24px',
+                '--custom-height': '32px',
+                lineHeight: '32px',
                 '--custom-bg-color': '#fff',
                 '--custom-border': '1px solid #d9d9d9',
               }"
@@ -51,8 +51,8 @@
             <treeselect
               class="custom-treeselect custom-treeselect-bgcAndBorder"
               :style="{
-                '--custom-height': '24px',
-                lineHeight: '24px',
+                '--custom-height': '32px',
+                lineHeight: '32px',
                 '--custom-bg-color': '#fff',
                 '--custom-border': '1px solid #d9d9d9',
               }"
@@ -95,11 +95,13 @@
               :placeholder="`${$t(`placeholder2`)}`"
               class="custom-treeselect custom-treeselect-bgcAndBorder"
               :style="{
-                '--custom-height': '24px',
-                lineHeight: '24px',
+                '--custom-height': '32px',
+                lineHeight: '32px',
                 '--custom-bg-color': '#fff',
                 '--custom-border': '1px solid #d9d9d9',
+                '--custom-multiple-lineHeight': '18px',
               }"
+              :limit="1"
             />
           </td>
           <td>

@@ -10,7 +10,7 @@
     :noOptionsText="$t('cs.components.empty')"
     :class="className ? className : 'ops-setting-treeselect'"
     value-consists-of="LEAF_PRIORITY"
-    :limit="20"
+    :limit="limit"
     :limitText="(count) => `+ ${count}`"
     v-bind="$attrs"
     appendToBody
@@ -59,6 +59,10 @@ export default {
     employeeKey: {
       type: String,
       default: 'employee_id',
+    },
+    limit: {
+      type: Number,
+      default: 20,
     },
   },
   data() {

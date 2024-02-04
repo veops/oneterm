@@ -214,7 +214,7 @@ export default {
       return null
     },
     changeEnable(row) {
-      putCommandById(row.id, { ...row, enable: Number(!row.enable) }).then(() => {
+      putCommandById(row.id, { ...row, enable: Boolean(!row.enable) }).then(() => {
         this.$message.success(this.$t('editSuccess'))
         this.updateTableData()
       })

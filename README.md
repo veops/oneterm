@@ -5,8 +5,6 @@
   <a href="https:https://github.com/sendya/ant-design-pro-vue"><img src="https://img.shields.io/badge/UI-Ant%20Design%20Pro%20Vue-brightgreen" alt="UI"></a>
 </p>
 
-[English](README.md) / [中文](README_cn.md)
-
 **`OneTerm`** Bastion Host, based on the 4A concept, i.e., Authentication, Authorization, Account, and Audit, is designed and developed.
 
 `Main use`: It is mainly used for products that enhance IT internal control and compliance security by implementing control and audit of IT personnel's operating behaviors in enterprises.
@@ -14,6 +12,11 @@
 `Main functions`: role management, authorization approval, resource access control, session audit, etc.
 
 ---
+[English](README.md) / [中文](README_cn.md)
+- Product document：https://veops.cn/docs/
+- Preview online: <a href="https://term.veops.cn/oneterm/workstation" target="_blank">OneOTerm</a>
+   - username: **`demo`**   or   **`admin`**
+   - password: 123456
 
 ## 🚀Install
 

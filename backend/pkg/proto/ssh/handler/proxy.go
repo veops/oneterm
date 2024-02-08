@@ -404,6 +404,7 @@ func (i *InteractiveHandler) bind(userConn gossh.Session, hostConn *client.Conne
 }
 
 func (i *InteractiveHandler) CommandLevel(cmd string) int {
+	// TODO
 	return 0
 }
 
@@ -432,6 +433,7 @@ func (i *InteractiveHandler) Command() string {
 
 func (i *InteractiveHandler) HandleData(src string, data []byte, hostConn *client.Connection,
 	targetOutputChan chan<- []byte) (err error) {
+	fmt.Printf("data:%#v\n", data)
 	switch src {
 	case "input": // input from user
 		if hostConn.Parser.State(data) {
@@ -458,6 +460,7 @@ func (i *InteractiveHandler) HandleData(src string, data []byte, hostConn *clien
 			i.Parser.Output.Listener.Reset()
 			i.Parser.OutputData = nil
 			i.Parser.InputData = nil
+			i.Parser.Ps2 = ""
 			if _, valid := i.CommandCheck(command); valid {
 				if strings.TrimSpace(command) != "" {
 					go i.Sshd.Core.Audit.AddCommand(model.SessionCmd{Cmd: command, Level: i.CommandLevel(command), SessionId: hostConn.SessionId})

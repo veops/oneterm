@@ -17,7 +17,7 @@ services:
           - oneterm-api
 
   oneterm-ssh:
-    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-ssh:1.24.1
+    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-ssh:1.24.2
     container_name: oneterm-ssh
     ports:
       - "12229:12228"
@@ -25,6 +25,9 @@ services:
     tty: true
     volumes:
       - ./docs/ssh.yaml:/oneterm/config.yaml
+      - ./docs/scripts/entrypoint.sh:/oneterm/entrypoint.sh
+      - ssh-data:/root/.ssh
+    entrypoint: ./entrypoint.sh
     depends_on:
       - oneterm-api
     networks:
@@ -129,6 +132,9 @@ volumes:
   file-data:
     driver: local
     name: oneterm_file-data
+  ssh-data:
+    driver: local
+    name: oneterm_ssh
 
 networks:
   new:

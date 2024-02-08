@@ -4,15 +4,22 @@ COPY . .
 RUN go env -w GOPROXY=https://goproxy.cn,direct \
     && go build --ldflags "-s -w" -o ./build/ssh ./cmd/ssh/ssh.go
 
+
 FROM alpine:latest
-RUN set -eux && sed -i 's/dl-cdn.alpinelinux.org/mirrors.ustc.edu.cn/g' /etc/apk/repositories
-RUN apk add tzdata
-RUN mkdir -p '/root/.ssh'
-RUN touch '/root/.ssh/id_ed25519'
+
+RUN set -eux && sed -i 's/dl-cdn.alpinelinux.org/mirrors.ustc.edu.cn/g' /etc/apk/repositories && \
+    apk add tzdata && \
+    apk add --update openssh && \
+    mkdir -p '~/.ssh' && \
+    echo "./ssh ssh -c config.yaml" > entrypoint.sh
+
 ENV TZ=Asia/Shanghai
+ENV TERM=xterm-color256
 WORKDIR /oneterm
-COPY --from=0 /oneterm/cmd/ssh/config.yaml .
-COPY --from=0 /oneterm/pkg/i18n/translate ./translate
+
+COPY  ./cmd/ssh/config.example.yaml config.yaml
+COPY  ./pkg/i18n/translate ./translate
 COPY --from=0 /oneterm/build/ssh .
-CMD [ "./ssh","ssh","-c","./config.yaml"]
+
+ENTRYPOINT ["sh", "./entrypoint.sh"]
 

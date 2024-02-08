@@ -86,4 +86,4 @@ doc link：https://veops.cn/docs/docs/oneterm/onterm_design
 
 **Welcome to follow our WeChat official account and join our group channels**
 
-![Wechat Official Account: 维易科技OneOps](backend/docs/images/wechat.jpg)
+![Wechat Official Account: 维易科技OneOps](docs/images/wechat.jpg)

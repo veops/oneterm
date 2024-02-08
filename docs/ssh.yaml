@@ -8,6 +8,6 @@ protocols:
     webUser: "test"
     webToken: "135790"
     privateKeyPath: "/root/.ssh/id_ed25519"
-    plainMode: true
+    plainMode: false
 
 i18nDir: /oneterm/translate

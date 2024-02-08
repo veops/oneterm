@@ -5,8 +5,6 @@
   <a href="https:https://github.com/sendya/ant-design-pro-vue"><img src="https://img.shields.io/badge/UI-Ant%20Design%20Pro%20Vue-brightgreen" alt="UI"></a>
 </p>
 
-[English](README.md) / [中文](README_cn.md)
-
 **`OneTerm`** 堡垒机，基于4A理念，即认证(Authen)、授权(Authorize)、账号(Account)、审计(Audit)设计开发。
 
 `主要用途`：主要用于企业通过实现对IT人员操作行为的控制和审计来提升IT内部控制、合规安全性的产品。
@@ -14,6 +12,15 @@
 `主要功能`：角色管理、授权审批、资源访问控制、会话审计等。
 
 ---
+[English](README.md) / [中文](README_cn.md)
+- 产品文档：https://veops.cn/docs/
+- 在线体验: <a href="https://term.veops.cn/oneterm/workstation" target="_blank">OneTerm</a>
+    - username: **`demo`**   或者   **`admin`**
+    - password: **`123456`**
+> **重要提示**: 体验账号是多人共享，因此后台数据会不定期重置
+
+
+
 
 ## 🚀安装
 

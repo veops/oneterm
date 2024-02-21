@@ -17,7 +17,7 @@
 - 在线体验: <a href="https://term.veops.cn/oneterm/workstation" target="_blank">OneTerm</a>
     - username: **`demo`**   或者   **`admin`**
     - password: **`123456`**
-> **重要提示**: 体验账号是多人共享，因此后台数据会不定期重置
+> **重要提示**:  **`main`** 分支在开发过程中可能处于不稳定的状态，请通过[release](https://github.com/veops/oneterm/releases)获取，或者直接通过镜像部署
 
 
 

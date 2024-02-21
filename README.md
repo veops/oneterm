@@ -18,6 +18,8 @@
    - username: **`demo`**   or   **`admin`**
    - password: 123456
 
+> **ATTENTION**: branch `main` may be unstable as the result of continued development, please pull code from [release](https://github.com/veops/oneterm/releases) or deploy via docker image
+
 ## 🚀Install
 
 ### docker-compose

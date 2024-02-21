@@ -26,6 +26,7 @@ import (
 	myi18n "github.com/veops/oneterm/pkg/i18n"
 	"github.com/veops/oneterm/pkg/logger"
 	"github.com/veops/oneterm/pkg/server/auth/acl"
+	"github.com/veops/oneterm/pkg/server/guacd"
 	"github.com/veops/oneterm/pkg/server/model"
 	"github.com/veops/oneterm/pkg/server/storage/db/mysql"
 )
@@ -158,21 +159,47 @@ func sendMsg(ws *websocket.Conn, session *model.Session, chs *model.SessionChans
 //	@Router		/connect/:asset_id/:account_id/:protocol [post]
 func (c *Controller) Connect(ctx *gin.Context) {
 	chs := makeChans()
+	protocol := ctx.Param("protocol")
+	sessionId := ""
 
-	resp := &model.SshResp{}
-	go doSsh(ctx, cast.ToInt(ctx.Query("w")), cast.ToInt(ctx.Query("h")), newSshReq(ctx, model.SESSIONACTION_NEW), chs)
-	if err := <-chs.ErrChan; err != nil {
-		logger.L.Error("failed to connect", zap.Error(err))
-		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrConnectServer, Data: map[string]any{"err": err}})
-		return
+	switch strings.Split(protocol, ":")[0] {
+	case "ssh":
+		resp := &model.SshResp{}
+		go doSsh(ctx, cast.ToInt(ctx.Query("w")), cast.ToInt(ctx.Query("h")), newSshReq(ctx, model.SESSIONACTION_NEW), chs)
+		if err := <-chs.ErrChan; err != nil {
+			logger.L.Error("failed to connect", zap.Error(err))
+			ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrConnectServer, Data: map[string]any{"err": err}})
+			return
+		}
+		resp = <-chs.RespChan
+		if resp.Code != 0 {
+			logger.L.Error("failed to connect", zap.Any("resp", *resp))
+			ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrConnectServer, Data: map[string]any{"err": resp.Message}})
+			return
+		}
+		sessionId = resp.SessionId
+	case "vnc", "rdp":
+		asset, account := &model.Asset{}, &model.Account{}
+		if err := mysql.DB.Model(&asset).Where("id = ?", ctx.Param("asset_id")).First(asset).Error; err != nil {
+			ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+			return
+		}
+		if err := mysql.DB.Model(&account).Where("id = ?", ctx.Param("account_id")).First(asset).Error; err != nil {
+			ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+			return
+		}
+
+		t, err := guacd.NewTunnel(protocol, asset, account, nil)
+		if err != nil {
+			ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrConnectServer, Data: map[string]any{"err": err}})
+			return
+		}
+		t.Handshake()
+	default:
+		logger.L.Error("wrong protocol " + protocol)
 	}
-	resp = <-chs.RespChan
-	if resp.Code != 0 {
-		logger.L.Error("failed to connect", zap.Any("resp", *resp))
-		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrConnectServer, Data: map[string]any{"err": resp.Message}})
-		return
-	}
-	v, ok := onlineSession.Load(resp.SessionId)
+
+	v, ok := onlineSession.Load(sessionId)
 	if !ok {
 		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrLoadSession, Data: map[string]any{"err": "cannot find in sync map"}})
 		return

@@ -93,7 +93,12 @@ func (c *Controller) UpsertSession(ctx *gin.Context) {
 		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
 		return
 	}
-	handleUpsertSession(ctx, data)
+	if err := handleUpsertSession(ctx, data); err != nil {
+		logger.L.Error("upsert session failed", zap.Error(err))
+		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+	}
+
+	ctx.JSON(http.StatusOK, defaultHttpResponse)
 }
 
 func handleUpsertSession(ctx *gin.Context, data *model.Session) (err error) {
@@ -103,7 +108,6 @@ func handleUpsertSession(ctx *gin.Context, data *model.Session) (err error) {
 		}).
 		Create(data).
 		Error; err != nil {
-		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
 
@@ -114,14 +118,11 @@ func handleUpsertSession(ctx *gin.Context, data *model.Session) (err error) {
 		}
 		_, ok := onlineSession.LoadOrStore(data.SessionId, data)
 		if ok {
-			ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": "failed to loadstore online session"}})
-			return
+			err = fmt.Errorf("failed to loadstore online session")
 		}
 	case model.SESSIONSTATUS_OFFLINE:
 		// doOfflineOnlineSession(ctx, data.SessionId, "")
 	}
-
-	ctx.JSON(http.StatusOK, defaultHttpResponse)
 
 	return
 }

@@ -54,7 +54,9 @@ var (
 func (c *Controller) Connecting(ctx *gin.Context) {
 	sessionId := ctx.Param("session_id")
 
-	ws, err := Upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
+	ws, err := Upgrader.Upgrade(ctx.Writer, ctx.Request, http.Header{
+		"sec-websocket-protocol": {ctx.GetHeader("sec-websocket-protocol")},
+	})
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, err)
 		return
@@ -122,7 +124,7 @@ func (c *Controller) Connecting(ctx *gin.Context) {
 			logger.L.Warn("close by admin", zap.String("username", closeBy))
 			return
 		case err := <-chs.ErrChan:
-			logger.L.Error("connection failed", zap.Error(err))
+			logger.L.Error("disconnected", zap.Error(err))
 			return
 		case in := <-chs.InChan:
 			if isSssh {
@@ -144,8 +146,10 @@ func (c *Controller) Connecting(ctx *gin.Context) {
 		case <-tk.C:
 			sendMsg(ws, session, chs)
 		case <-tk1s.C:
-			ws.WriteMessage(websocket.TextMessage, nil)
-			writeToMonitors(session.Monitors, nil)
+			if isSssh {
+				ws.WriteMessage(websocket.TextMessage, nil)
+				writeToMonitors(session.Monitors, nil)
+			}
 		}
 	}
 }
@@ -311,6 +315,22 @@ func doSsh(ctx *gin.Context, w, h int, req *model.SshReq, chs *model.SessionChan
 	}()
 	defer sess.Close()
 
+	go func() {
+		for {
+			rn, size, err := buf.ReadRune()
+			if err != nil {
+				logger.L.Debug("buf ReadRune failed", zap.Error(err))
+				return
+			}
+			if size <= 0 || rn == utf8.RuneError {
+				continue
+			}
+			p := make([]byte, utf8.RuneLen(rn))
+			utf8.EncodeRune(p, rn)
+			chs.OutChan <- p
+		}
+	}()
+
 	for {
 		select {
 		case err = <-waitChan:
@@ -330,18 +350,6 @@ func doSsh(ctx *gin.Context, w, h int, req *model.SshReq, chs *model.SessionChan
 			if err := sess.WindowChange(h, w); err != nil {
 				logger.L.Warn("reset window size failed", zap.Error(err))
 			}
-		default:
-			rn, size, err := buf.ReadRune()
-			if err != nil {
-				logger.L.Debug("buf ReadRune failed", zap.Error(err))
-				return
-			}
-			if size <= 0 || rn == utf8.RuneError {
-				continue
-			}
-			p := make([]byte, utf8.RuneLen(rn))
-			utf8.EncodeRune(p, rn)
-			chs.OutChan <- p
 		}
 	}
 }
@@ -396,23 +404,23 @@ func doGuacd(ctx *gin.Context, w, h, dpi int, protocol string, chs *model.Sessio
 		logger.L.Error(err.Error())
 		return
 	}
-	if err := mysql.DB.Model(&account).Where("id = ?", ctx.Param("account_id")).First(asset).Error; err != nil {
+	if err := mysql.DB.Model(&account).Where("id = ?", ctx.Param("account_id")).First(account).Error; err != nil {
 		logger.L.Error("find account failed", zap.Error(err))
 		return
 	}
 	if asset.GatewayId != 0 {
-		if err := mysql.DB.Model(&account).Where("id = ?", asset.GatewayId).First(asset).Error; err != nil {
+		if err := mysql.DB.Model(&gateway).Where("id = ?", asset.GatewayId).First(gateway).Error; err != nil {
 			logger.L.Error("find gateway failed", zap.Error(err))
 			return
 		}
 	}
 
-	t, err := guacd.NewTunnel(protocol, asset, account, gateway)
+	t, err := guacd.NewTunnel(ctx.Query("screen_width"), ctx.Query("screen_height"), ctx.Query("screen_dpi"), protocol, asset, account, gateway)
 	if err != nil {
 		logger.L.Error("guacd tunnel failed", zap.Error(err))
 		return
 	}
-	if err := t.Handshake(); err != nil {
+	if err = t.Handshake(); err != nil {
 		logger.L.Error("guacd handshake failed", zap.Error(err))
 		return
 	}
@@ -439,30 +447,33 @@ func doGuacd(ctx *gin.Context, w, h, dpi int, protocol string, chs *model.Sessio
 
 	go func() {
 		for {
-			select {
-			case <-chs.AwayChan:
+			p, err := t.Read()
+			if err != nil {
+				logger.L.Debug("read instruction failed", zap.Error(err))
 				return
-			default:
-				instruction, err := t.Read()
-				if err != nil {
-					logger.L.Debug("read instruction failed", zap.Error(err))
-					return
-				}
-				if len(instruction) <= 0 {
-					continue
-				}
-
-				chs.OutChan <- instruction
 			}
+			if len(p) <= 0 {
+				continue
+			}
+			chs.OutChan <- p
 		}
 	}()
+
+	for {
+		select {
+		case <-chs.AwayChan:
+			return
+		case in := <-chs.InChan:
+			fmt.Println(t.Write(in))
+		}
+	}
 }
 
 func newGuacdSession(ctx *gin.Context, sessionId string, asset *model.Asset, account *model.Account, gateway *model.Gateway) *model.Session {
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
 	return &model.Session{
 		SessionType: model.SESSIONTYPE_WEB,
-		SessionId:   ctx.Param("session_id"),
+		SessionId:   sessionId,
 		Uid:         currentUser.GetUid(),
 		UserName:    currentUser.GetUserName(),
 		AssetId:     asset.Id,
@@ -470,9 +481,10 @@ func newGuacdSession(ctx *gin.Context, sessionId string, asset *model.Asset, acc
 		AccountId:   account.Id,
 		AccountInfo: fmt.Sprintf("%s(%s)", account.Name, account.Account),
 		GatewayId:   gateway.Id,
-		GatewayInfo: fmt.Sprintf("%s:%d", gateway.Host, gateway.Port),
+		GatewayInfo: lo.Ternary(gateway.Id == 0, "", fmt.Sprintf("%s:%d", gateway.Host, gateway.Port)),
 		ClientIp:    ctx.ClientIP(),
 		Protocol:    ctx.Param("protocol"),
+		Status:      model.SESSIONSTATUS_ONLINE,
 	}
 }
 
@@ -713,4 +725,55 @@ func checkTime(data *model.AccessAuth) bool {
 		}
 	}
 	return !has || in == data.Allow
+}
+
+// Connect godoc
+//
+//	@Tags		connect
+//	@Success	200	{object}	HttpResponse
+//	@Param		w	query		int	false	"width"
+//	@Param		h	query		int	false	"height"
+//	@Param		dpi	query		int	false	"dpi"
+//	@Success	200			{object}	HttpResponse{data=model.Session}
+//	@Router		/connect/:asset_id/:account_id/:protocol [post]
+func (c *Controller) TestConnect(ctx *gin.Context) {
+	ctx.Set("session", &acl.Session{
+		Uid: 916,
+		Acl: acl.Acl{
+			Uid:         916,
+			UserName:    "ruiji.wei",
+			Rid:         729,
+			RoleName:    "",
+			ParentRoles: []string{"admin", "oneterm_admin"},
+			ChildRoles:  []string{},
+			NickName:    "",
+		},
+	})
+	ctx.Params = append(ctx.Params, gin.Param{Key: "asset_id", Value: "1"}, gin.Param{Key: "account_id", Value: "1"}, gin.Param{Key: "protocol", Value: "rdp:13389"})
+	c.Connect(ctx)
+}
+
+// Connect godoc
+//
+//	@Tags		connect
+//	@Param		w	query		int	false	"width"
+//	@Param		h	query		int	false	"height"
+//	@Param		dpi	query		int	false	"dpi"
+//	@Success	200	{object}	HttpResponse
+//	@Param		session_id	path		int	true	"session id"
+//	@Router		/connect/:session_id [get]
+func (c *Controller) TestConnecting(ctx *gin.Context) {
+	ctx.Set("session", &acl.Session{
+		Uid: 916,
+		Acl: acl.Acl{
+			Uid:         916,
+			UserName:    "ruiji.wei",
+			Rid:         729,
+			RoleName:    "",
+			ParentRoles: []string{"admin", "oneterm_admin"},
+			ChildRoles:  []string{},
+			NickName:    "",
+		},
+	})
+	c.Connecting(ctx)
 }

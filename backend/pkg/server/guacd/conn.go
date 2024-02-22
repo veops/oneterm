@@ -8,7 +8,10 @@ import (
 	"time"
 
 	"github.com/samber/lo"
+	"github.com/veops/oneterm/pkg/conf"
+	"github.com/veops/oneterm/pkg/logger"
 	"github.com/veops/oneterm/pkg/server/model"
+	"github.com/veops/oneterm/pkg/util"
 )
 
 const Version = "VERSION_1_5_0"
@@ -33,21 +36,31 @@ type Tunnel struct {
 	Config *Configuration
 }
 
-func NewTunnel(protocol string, asset *model.Asset, account *model.Account, gateway *model.Gateway) (t *Tunnel, err error) {
-	ss := strings.Split(protocol, ":")
-	protocol, port := ss[0], ss[1]
-
-	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%s", asset.Ip, port), time.Second*3)
+func NewTunnel(w, h, dpi, protocol string, asset *model.Asset, account *model.Account, gateway *model.Gateway) (t *Tunnel, err error) {
+	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", conf.Cfg.Guacd.Ip, conf.Cfg.Guacd.Port), time.Second*3)
 	if err != nil {
 		return
 	}
-
+	ss := strings.Split(protocol, ":")
+	protocol, port := ss[0], ss[1]
 	t = &Tunnel{
 		conn:   conn,
 		reader: bufio.NewReader(conn),
 		writer: bufio.NewWriter(conn),
 		Config: &Configuration{
 			Protocol: protocol,
+			Parameters: map[string]string{
+				"width":       w,
+				"height":      h,
+				"dpi":         dpi,
+				"scheme":      protocol,
+				"hostname":    asset.Ip,
+				"port":        port,
+				"ignore-cert": "true",
+				"security":    "",
+				"username":    account.Account,
+				"password":    util.DecryptAES(account.Password),
+			},
 		},
 	}
 
@@ -82,6 +95,9 @@ func (t *Tunnel) Handshake() (err error) {
 		}
 		parameters[i] = t.Config.Parameters[name]
 	}
+	logger.L.Sugar().Debug("config---", t.Config.Parameters)
+	logger.L.Sugar().Debug("args---", args)
+	logger.L.Sugar().Debug("parameters---", parameters)
 
 	// size audio ...
 	if _, err = t.WriteInstruction(NewInstruction("size", t.Config.Parameters["width"], t.Config.Parameters["height"], t.Config.Parameters["dpi"])); err != nil {

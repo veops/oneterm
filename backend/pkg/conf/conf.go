@@ -130,6 +130,11 @@ type SshServer struct {
 	Xtoken   string `yaml:"xtoken"`
 }
 
+type Guacd struct {
+	Ip   string `yaml:"ip"`
+	Port int    `yaml:"port"`
+}
+
 type ConfigYaml struct {
 	Mode      string         `yaml:"mode"`
 	Http      *HttpConfig    `yaml:"http"`
@@ -141,6 +146,7 @@ type ConfigYaml struct {
 	Cmdb      *Cmdb          `yaml:"cmdb"`
 	Worker    *Worker        `yaml:"worker"`
 	SshServer *SshServer     `yaml:"sshServer"`
+	Guacd     *Guacd         `yaml:"guacd"`
 	Protocols map[string]any `yaml:"protocols"`
 
 	I18nDir string `yaml:"i18nDir"`

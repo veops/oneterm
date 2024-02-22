@@ -275,7 +275,7 @@ func (i *InteractiveHandler) HostInfo(id int) (asset *model.Asset, err error) {
 func (i *InteractiveHandler) Check(id int, host *model.Asset) (asset *model.Asset, state bool, err error) {
 	assets, er := i.AcquireAssets("", id)
 	if er != nil {
-		err = err
+		err = er
 		return
 	}
 	if len(assets) == 0 {
@@ -406,6 +406,7 @@ func (i *InteractiveHandler) Schedule(pty *gossh.Pty) {
 		_, err = i.Proxy(host.Ip, r.AccountId)
 		if err != nil {
 			logger.L.Error(err.Error(), zap.String("module", "proxy"))
+			i.wrapJsonResponse("", 1, err.Error())
 		}
 		return
 	} else {
@@ -744,7 +745,7 @@ func (i *InteractiveHandler) wrapJsonResponse(sessionId string, code int, messag
 	if st, ok := i.Session.Context().Value("sshType").(int); ok && st != model.SESSIONTYPE_WEB {
 		return
 	}
-	res, er := json.Marshal(model.SshResp{
+	res, er := json.Marshal(model.ServerResp{
 		Code:      code,
 		Message:   message,
 		SessionId: sessionId,

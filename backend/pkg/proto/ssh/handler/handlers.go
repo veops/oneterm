@@ -105,7 +105,6 @@ func (s *sshdServer) Auth(ctx gossh.Context) bool {
 }
 
 func (s *sshdServer) HomeHandler(gs gossh.Session) {
-
 	if py, winChan, isPty := gs.Pty(); isPty {
 		if py.Window.Height == 0 {
 			py.Window.Height = 24

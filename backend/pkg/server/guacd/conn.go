@@ -65,7 +65,7 @@ func (t *Tunnel) Handshake() (err error) {
 	}()
 
 	// select
-	if err = t.WriteInstruction(NewInstruction("select", lo.Ternary(t.Config.ConnectionId == "", t.Config.Protocol, t.Config.ConnectionId))); err != nil {
+	if _, err = t.WriteInstruction(NewInstruction("select", lo.Ternary(t.Config.ConnectionId == "", t.Config.Protocol, t.Config.ConnectionId))); err != nil {
 		return
 	}
 
@@ -84,24 +84,24 @@ func (t *Tunnel) Handshake() (err error) {
 	}
 
 	// size audio ...
-	if err = t.WriteInstruction(NewInstruction("size", t.Config.Parameters["width"], t.Config.Parameters["height"], t.Config.Parameters["dpi"])); err != nil {
+	if _, err = t.WriteInstruction(NewInstruction("size", t.Config.Parameters["width"], t.Config.Parameters["height"], t.Config.Parameters["dpi"])); err != nil {
 		return
 	}
-	if err = t.WriteInstruction(NewInstruction("audio", "audio/L8", "audio/L16")); err != nil {
+	if _, err = t.WriteInstruction(NewInstruction("audio", "audio/L8", "audio/L16")); err != nil {
 		return
 	}
-	if err = t.WriteInstruction(NewInstruction("video")); err != nil {
+	if _, err = t.WriteInstruction(NewInstruction("video")); err != nil {
 		return
 	}
-	if err = t.WriteInstruction(NewInstruction("image", "image/jpeg", "image/png", "image/webp")); err != nil {
+	if _, err = t.WriteInstruction(NewInstruction("image", "image/jpeg", "image/png", "image/webp")); err != nil {
 		return
 	}
-	if err = t.WriteInstruction(NewInstruction("timezone", "Asia/Shanghai")); err != nil {
+	if _, err = t.WriteInstruction(NewInstruction("timezone", "Asia/Shanghai")); err != nil {
 		return
 	}
 
 	// connect
-	if err = t.WriteInstruction(NewInstruction("connect", parameters...)); err != nil {
+	if _, err = t.WriteInstruction(NewInstruction("connect", parameters...)); err != nil {
 		return
 	}
 
@@ -121,20 +121,27 @@ func (t *Tunnel) Handshake() (err error) {
 	return
 }
 
-func (t *Tunnel) WriteInstruction(instruction *Instruction) (err error) {
-	_, err = t.writer.Write([]byte(instruction.String()))
+func (t *Tunnel) Write(p []byte) (n int, err error) {
+	n, err = t.writer.Write(p)
 	if err != nil {
 		return
 	}
 	err = t.writer.Flush()
-	if err != nil {
-		return
-	}
+	return
+}
+
+func (t *Tunnel) WriteInstruction(instruction *Instruction) (n int, err error) {
+	n, err = t.Write([]byte(instruction.String()))
+	return
+}
+
+func (t *Tunnel) Read() (p []byte, err error) {
+	p, err = t.reader.ReadBytes(Delimiter)
 	return
 }
 
 func (t *Tunnel) ReadInstruction() (instruction *Instruction, err error) {
-	data, err := t.reader.ReadBytes(Delimiter)
+	data, err := t.Read()
 	if err != nil {
 		return
 	}

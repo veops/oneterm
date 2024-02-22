@@ -93,7 +93,7 @@ type SshReq struct {
 	SessionId      string `json:"session_id"`
 }
 
-type SshResp struct {
+type ServerResp struct {
 	Code      int    `json:"code"`
 	Message   string `json:"message"`
 	SessionId string `json:"session_id"`
@@ -105,7 +105,7 @@ type SessionChans struct {
 	Rin        io.Reader
 	Win        io.Writer
 	ErrChan    chan error
-	RespChan   chan *SshResp
+	RespChan   chan *ServerResp
 	InChan     chan []byte
 	OutChan    chan []byte
 	Buf        *bytes.Buffer

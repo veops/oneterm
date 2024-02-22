@@ -17,6 +17,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/nicksnyder/go-i18n/v2/i18n"
+	"github.com/samber/lo"
 	"github.com/spf13/cast"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/ssh"
@@ -44,6 +45,9 @@ var (
 // Connect godoc
 //
 //	@Tags		connect
+//	@Param		w	query		int	false	"width"
+//	@Param		h	query		int	false	"height"
+//	@Param		dpi	query		int	false	"dpi"
 //	@Success	200	{object}	HttpResponse
 //	@Param		session_id	path		int	true	"session id"
 //	@Router		/connect/:session_id [get]
@@ -87,9 +91,12 @@ func (c *Controller) Connecting(ctx *gin.Context) {
 		return
 	}
 	session.Connected.CompareAndSwap(false, true)
+	isSssh := strings.HasPrefix(session.Protocol, "ssh")
 
 	chs := session.Chans
-	chs.WindowChan <- fmt.Sprintf("%s,%s", ctx.Query("w"), ctx.Query("h"))
+	if isSssh {
+		chs.WindowChan <- fmt.Sprintf("%s,%s,%s", ctx.Query("w"), ctx.Query("h"), ctx.Query("dpi"))
+	}
 	defer func() {
 		close(chs.AwayChan)
 	}()
@@ -107,25 +114,31 @@ func (c *Controller) Connecting(ctx *gin.Context) {
 			logger.L.Error("websocket read failed", zap.Error(err))
 			return
 		case closeBy := <-chs.CloseChan:
-			out := []byte("\r\n \033[31m closed by admin")
-			ws.WriteMessage(websocket.TextMessage, out)
-			writeToMonitors(session.Monitors, out)
+			if isSssh {
+				out := []byte("\r\n \033[31m closed by admin")
+				ws.WriteMessage(websocket.TextMessage, out)
+				writeToMonitors(session.Monitors, out)
+			}
 			logger.L.Warn("close by admin", zap.String("username", closeBy))
 			return
 		case err := <-chs.ErrChan:
-			logger.L.Error("ssh connection failed", zap.Error(err))
+			logger.L.Error("connection failed", zap.Error(err))
 			return
 		case in := <-chs.InChan:
-			rt := in[0]
-			msg := in[1:]
-			switch rt {
-			case '1':
-				chs.Win.Write(msg)
-			case '9':
+			if isSssh {
+				rt := in[0]
+				msg := in[1:]
+				switch rt {
+				case '1':
+					chs.Win.Write(msg)
+				case '9':
+					continue
+				case 'w':
+					chs.WindowChan <- string(msg)
+				}
 				continue
-			case 'w':
-				chs.WindowChan <- string(msg)
 			}
+			chs.Win.Write(in)
 		case out := <-chs.OutChan:
 			chs.Buf.Write(out)
 		case <-tk.C:
@@ -155,50 +168,34 @@ func sendMsg(ws *websocket.Conn, session *model.Session, chs *model.SessionChans
 //	@Success	200	{object}	HttpResponse
 //	@Param		w	query		int	false	"width"
 //	@Param		h	query		int	false	"height"
+//	@Param		dpi	query		int	false	"dpi"
 //	@Success	200			{object}	HttpResponse{data=model.Session}
 //	@Router		/connect/:asset_id/:account_id/:protocol [post]
 func (c *Controller) Connect(ctx *gin.Context) {
-	chs := makeChans()
-	protocol := ctx.Param("protocol")
-	sessionId := ""
+	w, h, dpi, protocol, chs := cast.ToInt(ctx.Query("w")), cast.ToInt(ctx.Query("h")), cast.ToInt(ctx.Query("dpi")), ctx.Param("protocol"), makeChans()
+	sessionId, resp := "", &model.ServerResp{}
 
 	switch strings.Split(protocol, ":")[0] {
 	case "ssh":
-		resp := &model.SshResp{}
-		go doSsh(ctx, cast.ToInt(ctx.Query("w")), cast.ToInt(ctx.Query("h")), newSshReq(ctx, model.SESSIONACTION_NEW), chs)
-		if err := <-chs.ErrChan; err != nil {
-			logger.L.Error("failed to connect", zap.Error(err))
-			ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrConnectServer, Data: map[string]any{"err": err}})
-			return
-		}
-		resp = <-chs.RespChan
-		if resp.Code != 0 {
-			logger.L.Error("failed to connect", zap.Any("resp", *resp))
-			ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrConnectServer, Data: map[string]any{"err": resp.Message}})
-			return
-		}
-		sessionId = resp.SessionId
+		go doSsh(ctx, w, h, newSshReq(ctx, model.SESSIONACTION_NEW), chs)
 	case "vnc", "rdp":
-		asset, account := &model.Asset{}, &model.Account{}
-		if err := mysql.DB.Model(&asset).Where("id = ?", ctx.Param("asset_id")).First(asset).Error; err != nil {
-			ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
-			return
-		}
-		if err := mysql.DB.Model(&account).Where("id = ?", ctx.Param("account_id")).First(asset).Error; err != nil {
-			ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
-			return
-		}
-
-		t, err := guacd.NewTunnel(protocol, asset, account, nil)
-		if err != nil {
-			ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrConnectServer, Data: map[string]any{"err": err}})
-			return
-		}
-		t.Handshake()
+		go doGuacd(ctx, w, h, dpi, protocol, chs)
 	default:
 		logger.L.Error("wrong protocol " + protocol)
 	}
 
+	if err := <-chs.ErrChan; err != nil {
+		logger.L.Error("failed to connect", zap.Error(err))
+		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrConnectServer, Data: map[string]any{"err": err}})
+		return
+	}
+	resp = <-chs.RespChan
+	if resp.Code != 0 {
+		logger.L.Error("failed to connect", zap.Any("resp", *resp))
+		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrConnectServer, Data: map[string]any{"err": resp.Message}})
+		return
+	}
+	sessionId = resp.SessionId
 	v, ok := onlineSession.Load(sessionId)
 	if !ok {
 		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrLoadSession, Data: map[string]any{"err": "cannot find in sync map"}})
@@ -299,7 +296,7 @@ func doSsh(ctx *gin.Context, w, h int, req *model.SshReq, chs *model.SessionChan
 		logger.L.Error("ssh read bytes failed", zap.Error(err))
 		return
 	}
-	resp := &model.SshResp{}
+	resp := &model.ServerResp{}
 	if err = json.Unmarshal([]byte(line)[0:len(line)-1], resp); err != nil {
 		logger.L.Error("ssh resp", zap.Error(err), zap.String("resp content", string(line)))
 		return
@@ -311,21 +308,6 @@ func doSsh(ctx *gin.Context, w, h int, req *model.SshReq, chs *model.SessionChan
 	waitChan := make(chan error)
 	go func() {
 		waitChan <- sess.Wait()
-	}()
-	go func() {
-		for {
-			rn, size, err := buf.ReadRune()
-			if err != nil {
-				logger.L.Debug("buf ReadRune failed", zap.Error(err))
-				return
-			}
-			if size <= 0 || rn == utf8.RuneError {
-				continue
-			}
-			p := make([]byte, utf8.RuneLen(rn))
-			utf8.EncodeRune(p, rn)
-			chs.OutChan <- p
-		}
 	}()
 	defer sess.Close()
 
@@ -348,6 +330,18 @@ func doSsh(ctx *gin.Context, w, h int, req *model.SshReq, chs *model.SessionChan
 			if err := sess.WindowChange(h, w); err != nil {
 				logger.L.Warn("reset window size failed", zap.Error(err))
 			}
+		default:
+			rn, size, err := buf.ReadRune()
+			if err != nil {
+				logger.L.Debug("buf ReadRune failed", zap.Error(err))
+				return
+			}
+			if size <= 0 || rn == utf8.RuneError {
+				continue
+			}
+			p := make([]byte, utf8.RuneLen(rn))
+			utf8.EncodeRune(p, rn)
+			chs.OutChan <- p
 		}
 	}
 }
@@ -358,7 +352,7 @@ func makeChans() *model.SessionChans {
 		Rin:        rin,
 		Win:        win,
 		ErrChan:    make(chan error),
-		RespChan:   make(chan *model.SshResp),
+		RespChan:   make(chan *model.ServerResp),
 		InChan:     make(chan []byte),
 		OutChan:    make(chan []byte),
 		Buf:        &bytes.Buffer{},
@@ -381,6 +375,104 @@ func newSshReq(ctx *gin.Context, action int) *model.SshReq {
 		Protocol:       ctx.Param("protocol"),
 		Action:         action,
 		SessionId:      ctx.Param("session_id"),
+	}
+}
+
+func doGuacd(ctx *gin.Context, w, h, dpi int, protocol string, chs *model.SessionChans) {
+	currentUser, _ := acl.GetSessionFromCtx(ctx)
+
+	var err error
+	defer func() {
+		chs.ErrChan <- err
+	}()
+
+	asset, account, gateway := &model.Asset{}, &model.Account{}, &model.Gateway{}
+	if err := mysql.DB.Model(&asset).Where("id = ?", ctx.Param("asset_id")).First(asset).Error; err != nil {
+		logger.L.Error("find asset failed", zap.Error(err))
+		return
+	}
+	if !checkTime(asset.AccessAuth) {
+		err = fmt.Errorf("invalid access time")
+		logger.L.Error(err.Error())
+		return
+	}
+	if err := mysql.DB.Model(&account).Where("id = ?", ctx.Param("account_id")).First(asset).Error; err != nil {
+		logger.L.Error("find account failed", zap.Error(err))
+		return
+	}
+	if asset.GatewayId != 0 {
+		if err := mysql.DB.Model(&account).Where("id = ?", asset.GatewayId).First(asset).Error; err != nil {
+			logger.L.Error("find gateway failed", zap.Error(err))
+			return
+		}
+	}
+
+	t, err := guacd.NewTunnel(protocol, asset, account, gateway)
+	if err != nil {
+		logger.L.Error("guacd tunnel failed", zap.Error(err))
+		return
+	}
+	if err := t.Handshake(); err != nil {
+		logger.L.Error("guacd handshake failed", zap.Error(err))
+		return
+	}
+	session := newGuacdSession(ctx, t.Uuid, asset, account, gateway)
+	if err = handleUpsertSession(ctx, session); err != nil {
+		return
+	}
+
+	resp := &model.ServerResp{
+		Code:      lo.Ternary(err == nil, 0, -1),
+		Message:   lo.TernaryF(err == nil, func() string { return "" }, func() string { return err.Error() }),
+		SessionId: t.Uuid,
+		Uid:       currentUser.GetUid(),
+		UserName:  currentUser.GetUserName(),
+	}
+
+	chs.ErrChan <- nil
+	chs.RespChan <- resp
+
+	defer func() {
+		session.Status = model.SESSIONSTATUS_OFFLINE
+		session.ClosedAt = lo.ToPtr(time.Now())
+	}()
+
+	go func() {
+		for {
+			select {
+			case <-chs.AwayChan:
+				return
+			default:
+				instruction, err := t.Read()
+				if err != nil {
+					logger.L.Debug("read instruction failed", zap.Error(err))
+					return
+				}
+				if len(instruction) <= 0 {
+					continue
+				}
+
+				chs.OutChan <- instruction
+			}
+		}
+	}()
+}
+
+func newGuacdSession(ctx *gin.Context, sessionId string, asset *model.Asset, account *model.Account, gateway *model.Gateway) *model.Session {
+	currentUser, _ := acl.GetSessionFromCtx(ctx)
+	return &model.Session{
+		SessionType: model.SESSIONTYPE_WEB,
+		SessionId:   ctx.Param("session_id"),
+		Uid:         currentUser.GetUid(),
+		UserName:    currentUser.GetUserName(),
+		AssetId:     asset.Id,
+		AssetInfo:   fmt.Sprintf("%s(%s)", asset.Name, asset.Ip),
+		AccountId:   account.Id,
+		AccountInfo: fmt.Sprintf("%s(%s)", account.Name, account.Account),
+		GatewayId:   gateway.Id,
+		GatewayInfo: fmt.Sprintf("%s:%d", gateway.Host, gateway.Port),
+		ClientIp:    ctx.ClientIP(),
+		Protocol:    ctx.Param("protocol"),
 	}
 }
 
@@ -597,4 +689,28 @@ func doOfflineOnlineSession(ctx *gin.Context, sessionId string, closer string) {
 			})
 		}
 	}
+}
+
+func checkTime(data *model.AccessAuth) bool {
+	now := time.Now()
+	in := true
+	if (data.Start != nil && now.Before(*data.Start)) || (data.End != nil && now.After(*data.End)) {
+		in = false
+	}
+	if !in {
+		return false
+	}
+	in = false
+	has := false
+	week, hm := now.Weekday(), now.Format("15:04")
+	for _, r := range data.Ranges {
+		has = has || len(r.Times) > 0
+		if (r.Week+1)%7 == int(week) {
+			for _, str := range r.Times {
+				ss := strings.Split(str, "~")
+				in = in || (len(ss) >= 2 && hm >= ss[0] && hm <= ss[1])
+			}
+		}
+	}
+	return !has || in == data.Allow
 }

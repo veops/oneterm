@@ -93,7 +93,11 @@ func (c *Controller) UpsertSession(ctx *gin.Context) {
 		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
 		return
 	}
-	if err := mysql.DB.
+	handleUpsertSession(ctx, data)
+}
+
+func handleUpsertSession(ctx *gin.Context, data *model.Session) (err error) {
+	if err = mysql.DB.
 		Clauses(clause.OnConflict{
 			DoUpdates: clause.AssignmentColumns([]string{"status", "closed_at"}),
 		}).
@@ -118,6 +122,8 @@ func (c *Controller) UpsertSession(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, defaultHttpResponse)
+
+	return
 }
 
 // CreateSessionCommand godoc

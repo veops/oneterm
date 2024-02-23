@@ -21,6 +21,7 @@ import (
 	"github.com/spf13/cast"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/sync/errgroup"
 	"gorm.io/gorm"
 
 	"github.com/veops/oneterm/pkg/conf"
@@ -93,41 +94,39 @@ func (c *Controller) Connecting(ctx *gin.Context) {
 		return
 	}
 	session.Connected.CompareAndSwap(false, true)
-	isSssh := strings.HasPrefix(session.Protocol, "ssh")
-
-	chs := session.Chans
-	if isSssh {
-		chs.WindowChan <- fmt.Sprintf("%s,%s,%s", ctx.Query("w"), ctx.Query("h"), ctx.Query("dpi"))
+	if strings.HasPrefix(session.Protocol, "ssh") {
+		err = handleSsh(ctx, ws, session)
+	} else {
+		err = handleGuacd(ctx, ws, session)
 	}
+}
+
+func handleSsh(ctx *gin.Context, ws *websocket.Conn, session *model.Session) (err error) {
+	chs := session.Chans
 	defer func() {
 		close(chs.AwayChan)
 	}()
-	readWsErrChan := make(chan error)
-	go func() {
-		readWsErrChan <- readWsMsg(ctx, ws, chs)
-	}()
+	chs.WindowChan <- fmt.Sprintf("%s,%s,%s", ctx.Query("w"), ctx.Query("h"), ctx.Query("dpi"))
 	tk, tk1s := time.NewTicker(time.Millisecond*100), time.NewTicker(time.Second)
-	defer sendMsg(ws, session, chs)
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case err := <-readWsErrChan:
-			logger.L.Error("websocket read failed", zap.Error(err))
-			return
-		case closeBy := <-chs.CloseChan:
-			if isSssh {
+	g := &errgroup.Group{}
+	g.Go(func() error {
+		return readWsMsg(ctx, ws, chs)
+	})
+	g.Go(func() error {
+		for {
+			select {
+			case <-ctx.Done():
+				return nil
+			case closeBy := <-chs.CloseChan:
 				out := []byte("\r\n \033[31m closed by admin")
 				ws.WriteMessage(websocket.TextMessage, out)
 				writeToMonitors(session.Monitors, out)
-			}
-			logger.L.Warn("close by admin", zap.String("username", closeBy))
-			return
-		case err := <-chs.ErrChan:
-			logger.L.Error("disconnected", zap.Error(err))
-			return
-		case in := <-chs.InChan:
-			if isSssh {
+				logger.L.Warn("close by admin", zap.String("username", closeBy))
+				return nil
+			case err := <-chs.ErrChan:
+				logger.L.Error("disconnected", zap.Error(err))
+				return err
+			case in := <-chs.InChan:
 				rt := in[0]
 				msg := in[1:]
 				switch rt {
@@ -138,20 +137,53 @@ func (c *Controller) Connecting(ctx *gin.Context) {
 				case 'w':
 					chs.WindowChan <- string(msg)
 				}
-				continue
-			}
-			chs.Win.Write(in)
-		case out := <-chs.OutChan:
-			chs.Buf.Write(out)
-		case <-tk.C:
-			sendMsg(ws, session, chs)
-		case <-tk1s.C:
-			if isSssh {
+			case out := <-chs.OutChan:
+				chs.Buf.Write(out)
+			case <-tk.C:
+				sendMsg(ws, session, chs)
+			case <-tk1s.C:
 				ws.WriteMessage(websocket.TextMessage, nil)
 				writeToMonitors(session.Monitors, nil)
 			}
 		}
-	}
+	})
+	err = g.Wait()
+	return
+}
+
+func handleGuacd(ctx *gin.Context, ws *websocket.Conn, session *model.Session) (err error) {
+	chs := session.Chans
+	defer func() {
+		close(chs.AwayChan)
+	}()
+	tk := time.NewTicker(time.Millisecond * 100)
+	g := &errgroup.Group{}
+	g.Go(func() error {
+		return readWsMsg(ctx, ws, chs)
+	})
+	g.Go(func() error {
+		for {
+			select {
+			case <-ctx.Done():
+				return nil
+			case closeBy := <-chs.CloseChan:
+				out := []byte("\r\n \033[31m closed by admin")
+				ws.WriteMessage(websocket.TextMessage, out)
+				writeToMonitors(session.Monitors, out)
+				logger.L.Warn("close by admin", zap.String("username", closeBy))
+				return nil
+			case err := <-chs.ErrChan:
+				logger.L.Error("disconnected", zap.Error(err))
+				return err
+			case out := <-chs.OutChan:
+				chs.Buf.Write(out)
+			case <-tk.C:
+				sendMsg(ws, session, chs)
+			}
+		}
+	})
+	err = g.Wait()
+	return
 }
 
 func sendMsg(ws *websocket.Conn, session *model.Session, chs *model.SessionChans) {
@@ -183,7 +215,9 @@ func (c *Controller) Connect(ctx *gin.Context) {
 	case "ssh":
 		go doSsh(ctx, w, h, newSshReq(ctx, model.SESSIONACTION_NEW), chs)
 	case "vnc", "rdp":
-		go doGuacd(ctx, w, h, dpi, protocol, chs)
+		w, h, dpi = cast.ToInt(ctx.Query("screen_width")), cast.ToInt(ctx.Query("screen_height")), cast.ToInt(ctx.Query("screen_dpi"))
+		w, h, dpi = 731, 929, 128
+		go doGuacd(ctx, "", w, h, dpi, protocol, chs)
 	default:
 		logger.L.Error("wrong protocol " + protocol)
 	}
@@ -310,17 +344,17 @@ func doSsh(ctx *gin.Context, w, h int, req *model.SshReq, chs *model.SessionChan
 	chs.RespChan <- resp
 
 	waitChan := make(chan error)
-	go func() {
+	g := errgroup.Group{}
+	g.Go(func() error {
 		waitChan <- sess.Wait()
-	}()
-	defer sess.Close()
-
-	go func() {
+		return nil
+	})
+	g.Go(func() error {
 		for {
 			rn, size, err := buf.ReadRune()
 			if err != nil {
 				logger.L.Debug("buf ReadRune failed", zap.Error(err))
-				return
+				return err
 			}
 			if size <= 0 || rn == utf8.RuneError {
 				continue
@@ -329,28 +363,32 @@ func doSsh(ctx *gin.Context, w, h int, req *model.SshReq, chs *model.SessionChan
 			utf8.EncodeRune(p, rn)
 			chs.OutChan <- p
 		}
-	}()
-
-	for {
-		select {
-		case err = <-waitChan:
-			return
-		case <-chs.AwayChan:
-			return
-		case s := <-chs.WindowChan:
-			wh := strings.Split(s, ",")
-			if len(wh) < 2 {
-				continue
-			}
-			w = cast.ToInt(wh[0])
-			h = cast.ToInt(wh[1])
-			if w <= 0 || h <= 0 {
-				continue
-			}
-			if err := sess.WindowChange(h, w); err != nil {
-				logger.L.Warn("reset window size failed", zap.Error(err))
+	})
+	g.Go(func() error {
+		for {
+			select {
+			case err = <-waitChan:
+				return err
+			case <-chs.AwayChan:
+				return fmt.Errorf("away")
+			case s := <-chs.WindowChan:
+				wh := strings.Split(s, ",")
+				if len(wh) < 2 {
+					continue
+				}
+				w = cast.ToInt(wh[0])
+				h = cast.ToInt(wh[1])
+				if w <= 0 || h <= 0 {
+					continue
+				}
+				if err := sess.WindowChange(h, w); err != nil {
+					logger.L.Warn("reset window size failed", zap.Error(err))
+				}
 			}
 		}
+	})
+	if err = g.Wait(); err != nil {
+		logger.L.Warn("doSsh stopped", zap.Error(err))
 	}
 }
 
@@ -386,7 +424,7 @@ func newSshReq(ctx *gin.Context, action int) *model.SshReq {
 	}
 }
 
-func doGuacd(ctx *gin.Context, w, h, dpi int, protocol string, chs *model.SessionChans) {
+func doGuacd(ctx *gin.Context, connection string, w, h, dpi int, protocol string, chs *model.SessionChans) {
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
 
 	var err error
@@ -415,7 +453,7 @@ func doGuacd(ctx *gin.Context, w, h, dpi int, protocol string, chs *model.Sessio
 		}
 	}
 
-	t, err := guacd.NewTunnel(ctx.Query("screen_width"), ctx.Query("screen_height"), ctx.Query("screen_dpi"), protocol, asset, account, gateway)
+	t, err := guacd.NewTunnel("", w, h, dpi, protocol, asset, account, gateway)
 	if err != nil {
 		logger.L.Error("guacd tunnel failed", zap.Error(err))
 		return
@@ -424,7 +462,7 @@ func doGuacd(ctx *gin.Context, w, h, dpi int, protocol string, chs *model.Sessio
 		logger.L.Error("guacd handshake failed", zap.Error(err))
 		return
 	}
-	session := newGuacdSession(ctx, t.Uuid, asset, account, gateway)
+	session := newGuacdSession(ctx, t.ConnectionId, asset, account, gateway)
 	if err = handleUpsertSession(ctx, session); err != nil {
 		return
 	}
@@ -432,7 +470,7 @@ func doGuacd(ctx *gin.Context, w, h, dpi int, protocol string, chs *model.Sessio
 	resp := &model.ServerResp{
 		Code:      lo.Ternary(err == nil, 0, -1),
 		Message:   lo.TernaryF(err == nil, func() string { return "" }, func() string { return err.Error() }),
-		SessionId: t.Uuid,
+		SessionId: t.ConnectionId,
 		Uid:       currentUser.GetUid(),
 		UserName:  currentUser.GetUserName(),
 	}
@@ -445,27 +483,34 @@ func doGuacd(ctx *gin.Context, w, h, dpi int, protocol string, chs *model.Sessio
 		session.ClosedAt = lo.ToPtr(time.Now())
 	}()
 
-	go func() {
+	g := &errgroup.Group{}
+	g.Go(func() error {
 		for {
 			p, err := t.Read()
 			if err != nil {
 				logger.L.Debug("read instruction failed", zap.Error(err))
-				return
+				return err
 			}
-			if len(p) <= 0 {
+			if len(p) <= 0 || bytes.HasPrefix(p, guacd.InternalOpcodeIns) {
 				continue
 			}
 			chs.OutChan <- p
 		}
-	}()
-
-	for {
-		select {
-		case <-chs.AwayChan:
-			return
-		case in := <-chs.InChan:
-			fmt.Println(t.Write(in))
+	})
+	g.Go(func() error {
+		for {
+			select {
+			case <-chs.AwayChan:
+				return fmt.Errorf("away")
+			case in := <-chs.InChan:
+				if !bytes.HasPrefix(in, guacd.InternalOpcodeIns) {
+					t.Write(in)
+				}
+			}
 		}
+	})
+	if err = g.Wait(); err != nil {
+		logger.L.Warn("doGuacd stopped", zap.Error(err))
 	}
 }
 
@@ -750,6 +795,7 @@ func (c *Controller) TestConnect(ctx *gin.Context) {
 		},
 	})
 	ctx.Params = append(ctx.Params, gin.Param{Key: "asset_id", Value: "1"}, gin.Param{Key: "account_id", Value: "1"}, gin.Param{Key: "protocol", Value: "rdp:13389"})
+	fmt.Println("----------ing", ctx.Query("screen_width"), ctx.Query("screen_height"), ctx.Query("screen_dpi"))
 	c.Connect(ctx)
 }
 
@@ -775,5 +821,6 @@ func (c *Controller) TestConnecting(ctx *gin.Context) {
 			NickName:    "",
 		},
 	})
+	fmt.Println("----------", ctx.Query("screen_width"), ctx.Query("screen_height"), ctx.Query("screen_dpi"))
 	c.Connecting(ctx)
 }

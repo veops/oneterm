@@ -4,7 +4,15 @@ import (
 	"fmt"
 	"strings"
 )
-const Delimiter = ';'
+
+const (
+	InternalDataOpcode = ""
+	Delimiter          = ';'
+)
+
+var (
+	InternalOpcodeIns = []byte(fmt.Sprint(len(InternalDataOpcode), ".", InternalDataOpcode))
+)
 
 type Instruction struct {
 	Opcode string

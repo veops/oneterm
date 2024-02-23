@@ -71,7 +71,7 @@ func Init() (err error) {
 	ctx := &gin.Context{}
 	for _, s := range sessions {
 		if s.SessionType == model.SESSIONTYPE_WEB {
-			doOfflineOnlineSession(ctx, s.SessionId, "")
+			offlineSession(ctx, s.SessionId, "")
 			continue
 		}
 		s.Monitors = &sync.Map{}

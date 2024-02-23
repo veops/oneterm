@@ -3,6 +3,7 @@ package model
 import (
 	"bytes"
 	"io"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -55,6 +56,20 @@ type Session struct {
 func (m *Session) TableName() string {
 	return "session"
 }
+
+func (m *Session) IsSsh() bool {
+	return strings.HasPrefix(m.Protocol, "ssh")
+}
+
+func (m *Session) HasMonitors() (has bool) {
+	m.Monitors.Range(func(key, value any) bool {
+		has = true
+		return false
+	})
+	return
+}
+
+
 
 type SessionCmd struct {
 	Id        int    `json:"id" gorm:"column:id;primarykey"`

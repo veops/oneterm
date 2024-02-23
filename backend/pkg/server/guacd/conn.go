@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/samber/lo"
 	"github.com/spf13/cast"
 	"github.com/veops/oneterm/pkg/conf"
@@ -14,7 +15,11 @@ import (
 	"github.com/veops/oneterm/pkg/util"
 )
 
-const Version = "VERSION_1_5_0"
+const (
+	recordingPath   = "/playback"
+	createRecording = "true"
+	ignoreCert      = "true"
+)
 
 type Configuration struct {
 	Protocol   string
@@ -28,10 +33,11 @@ func NewConfiguration() (config *Configuration) {
 }
 
 type Tunnel struct {
+	SessionId    string
+	ConnectionId string
 	conn         net.Conn
 	reader       *bufio.Reader
 	writer       *bufio.Writer
-	ConnectionId string
 	Config       *Configuration
 }
 
@@ -50,27 +56,33 @@ func NewTunnel(connectionId string, w, h, dpi int, protocol string, asset *model
 		Config: &Configuration{
 			Protocol: protocol,
 			Parameters: map[string]string{
-				"width":       cast.ToString(w),
-				"height":      cast.ToString(h),
-				"dpi":         cast.ToString(dpi),
-				"scheme":      protocol,
-				"hostname":    asset.Ip,
-				"port":        port,
-				"ignore-cert": "true",
-				"security":    "",
-				"username":    account.Account,
-				"password":    util.DecryptAES(account.Password),
+				"recording-path":        recordingPath,
+				"create-recording-path": createRecording,
+				"ignore-cert":           ignoreCert,
+				"width":                 cast.ToString(w),
+				"height":                cast.ToString(h),
+				"dpi":                   cast.ToString(dpi),
+				"scheme":                protocol,
+				"hostname":              asset.Ip,
+				"port":                  port,
+				"username":              account.Account,
+				"password":              util.DecryptAES(account.Password),
 			},
 		},
 	}
+	if t.ConnectionId == "" {
+		t.SessionId = uuid.New().String()
+	}
+
+	err = t.handshake()
 
 	return
 }
 
-// Handshake
+// handshake
 //
 //	https://guacamole.apache.org/doc/gug/guacamole-protocol.html#handshake-phase
-func (t *Tunnel) Handshake() (err error) {
+func (t *Tunnel) handshake() (err error) {
 	defer func() {
 		if err != nil {
 			t.conn.Close()

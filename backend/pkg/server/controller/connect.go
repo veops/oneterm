@@ -145,9 +145,8 @@ func handleGuacd(ctx *gin.Context, ws *websocket.Conn, session *model.Session) (
 		for {
 			select {
 			case closeBy := <-chs.CloseChan:
-				out := []byte("\r\n \033[31m closed by admin")
+				out := guacd.NewInstruction("disconnect", "closed by admin").Bytes()
 				ws.WriteMessage(websocket.TextMessage, out)
-				writeToMonitors(session.Monitors, out)
 				err := fmt.Errorf("colse by admin %s", closeBy)
 				logger.L.Warn(err.Error())
 				return err
@@ -173,7 +172,9 @@ func sendMsg(ws *websocket.Conn, session *model.Session, chs *model.SessionChans
 	if ws != nil {
 		ws.WriteMessage(websocket.TextMessage, out)
 	}
-	writeToMonitors(session.Monitors, out)
+	if session != nil && session.IsSsh() {
+		writeToMonitors(session.Monitors, out)
+	}
 	chs.Buf.Reset()
 }
 
@@ -192,9 +193,9 @@ func (c *Controller) Connect(ctx *gin.Context) {
 
 	switch strings.Split(protocol, ":")[0] {
 	case "ssh":
-		go doSsh(ctx, newSshReq(ctx, model.SESSIONACTION_NEW), chs)
+		go connectSsh(ctx, newSshReq(ctx, model.SESSIONACTION_NEW), chs)
 	case "vnc", "rdp":
-		go doGuacd(ctx, "", protocol, chs)
+		go connectGuacd(ctx, protocol, chs)
 	default:
 		logger.L.Error("wrong protocol " + protocol)
 	}
@@ -248,7 +249,7 @@ func readWsMsg(ctx context.Context, ws *websocket.Conn, chs *model.SessionChans)
 	}
 }
 
-func doSsh(ctx *gin.Context, req *model.SshReq, chs *model.SessionChans) (err error) {
+func connectSsh(ctx *gin.Context, req *model.SshReq, chs *model.SessionChans) (err error) {
 	w, h := cast.ToInt(ctx.Query("w")), cast.ToInt(ctx.Query("h"))
 	defer func() {
 		chs.ErrChan <- err
@@ -407,9 +408,9 @@ func newSshReq(ctx *gin.Context, action int) *model.SshReq {
 	}
 }
 
-func doGuacd(ctx *gin.Context, connection string, protocol string, chs *model.SessionChans) {
+func connectGuacd(ctx *gin.Context, protocol string, chs *model.SessionChans) {
 	w, h, dpi := cast.ToInt(ctx.Query("w")), cast.ToInt(ctx.Query("h")), cast.ToInt(ctx.Query("dpi"))
-	w, h, dpi = 731, 929, 128 //TODO
+	w, h, dpi = 731, 929, 96 //TODO
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
 
 	var err error
@@ -444,7 +445,7 @@ func doGuacd(ctx *gin.Context, connection string, protocol string, chs *model.Se
 		return
 	}
 
-	session := newGuacdSession(ctx, t.SessionId, asset, account, gateway)
+	session := newGuacdSession(ctx, t.ConnectionId, t.SessionId, asset, account, gateway)
 	if err = handleUpsertSession(ctx, session); err != nil {
 		return
 	}
@@ -506,22 +507,23 @@ func doGuacd(ctx *gin.Context, connection string, protocol string, chs *model.Se
 	}
 }
 
-func newGuacdSession(ctx *gin.Context, sessionId string, asset *model.Asset, account *model.Account, gateway *model.Gateway) *model.Session {
+func newGuacdSession(ctx *gin.Context, connectionId, sessionId string, asset *model.Asset, account *model.Account, gateway *model.Gateway) *model.Session {
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
 	return &model.Session{
-		SessionType: model.SESSIONTYPE_WEB,
-		SessionId:   sessionId,
-		Uid:         currentUser.GetUid(),
-		UserName:    currentUser.GetUserName(),
-		AssetId:     asset.Id,
-		AssetInfo:   fmt.Sprintf("%s(%s)", asset.Name, asset.Ip),
-		AccountId:   account.Id,
-		AccountInfo: fmt.Sprintf("%s(%s)", account.Name, account.Account),
-		GatewayId:   gateway.Id,
-		GatewayInfo: lo.Ternary(gateway.Id == 0, "", fmt.Sprintf("%s:%d", gateway.Host, gateway.Port)),
-		ClientIp:    ctx.ClientIP(),
-		Protocol:    ctx.Param("protocol"),
-		Status:      model.SESSIONSTATUS_ONLINE,
+		SessionType:  model.SESSIONTYPE_WEB,
+		SessionId:    sessionId,
+		Uid:          currentUser.GetUid(),
+		UserName:     currentUser.GetUserName(),
+		AssetId:      asset.Id,
+		AssetInfo:    fmt.Sprintf("%s(%s)", asset.Name, asset.Ip),
+		AccountId:    account.Id,
+		AccountInfo:  fmt.Sprintf("%s(%s)", account.Name, account.Account),
+		GatewayId:    gateway.Id,
+		GatewayInfo:  lo.Ternary(gateway.Id == 0, "", fmt.Sprintf("%s:%d", gateway.Host, gateway.Port)),
+		ClientIp:     ctx.ClientIP(),
+		Protocol:     ctx.Param("protocol"),
+		Status:       model.SESSIONSTATUS_ONLINE,
+		ConnectionId: connectionId,
 	}
 }
 
@@ -567,48 +569,21 @@ func (c *Controller) ConnectMonitor(ctx *gin.Context) {
 		return
 	}
 
-	g := &errgroup.Group{}
-
+	g, gctx := errgroup.WithContext(ctx)
+	chs := makeChans()
 	switch session.SessionType {
 	case model.SESSIONTYPE_WEB:
 		if !session.IsSsh() {
-			//TODO
+			chs = makeChans()
+			g.Go(func() error {
+				return monitGuacd(ctx, session.ConnectionId, chs, ws)
+			})
 		}
 	case model.SESSIONTYPE_CLIENT:
 		// clinet only has ssh type
 		if !session.HasMonitors() {
-			req := newSshReq(ctx, model.SESSIONACTION_MONITOR)
-			req.SessionId = sessionId
-			chs := makeChans()
-			session.Chans = chs
-			logger.L.Debug("connect to monitor client", zap.String("sessionId", sessionId))
-			go doSsh(ctx, req, chs)
-			if err = <-chs.ErrChan; err != nil {
-				err = &ApiError{Code: ErrConnectServer, Data: map[string]any{"err": err}}
-				return
-			}
-			resp := <-chs.RespChan
-			if resp.Code != 0 {
-				err = &ApiError{Code: ErrConnectServer, Data: map[string]any{"err": resp.Message}}
-				return
-			}
-			tk := time.NewTicker(time.Millisecond * 100)
 			g.Go(func() error {
-				for {
-					select {
-					case closeBy := <-chs.CloseChan:
-						writeToMonitors(session.Monitors, []byte("\r\n \033[31m closed by admin"))
-						logger.L.Warn("close by admin", zap.String("username", closeBy))
-						return nil
-					case err := <-chs.ErrChan:
-						logger.L.Error("ssh connection failed", zap.Error(err))
-						return err
-					case out := <-chs.OutChan:
-						chs.Buf.Write(out)
-					case <-tk.C:
-						sendMsg(nil, session, chs)
-					}
-				}
+				return monitSsh(ctx, session, chs)
 			})
 		}
 	}
@@ -616,18 +591,135 @@ func (c *Controller) ConnectMonitor(ctx *gin.Context) {
 	session.Monitors.Store(key, ws)
 	defer func() {
 		session.Monitors.Delete(key)
-		if session.IsSsh() && !session.HasMonitors() {
-			close(session.Chans.AwayChan)
+		if session.IsSsh() {
+			if session.SessionType == model.SESSIONTYPE_CLIENT && !session.HasMonitors() {
+				close(chs.AwayChan)
+			}
+		} else {
+			close(chs.AwayChan)
 		}
 	}()
 
-	for {
-		_, _, err = ws.ReadMessage()
-		if err != nil {
-			logger.L.Warn("end monitor", zap.Error(err))
-			return
+	g.Go(func() error {
+		for {
+			select {
+			case <-gctx.Done():
+			default:
+				_, _, err = ws.ReadMessage()
+				if err != nil {
+					logger.L.Warn("end monitor", zap.Error(err))
+					return err
+				}
+			}
 		}
+	})
+
+	err = g.Wait()
+}
+
+func monitSsh(ctx *gin.Context, session *model.Session, chs *model.SessionChans) (err error) {
+	req := newSshReq(ctx, model.SESSIONACTION_MONITOR)
+	req.SessionId = session.SessionId
+	chs = makeChans()
+	session.Chans = chs
+	logger.L.Debug("connect to monitor client", zap.String("sessionId", session.SessionId))
+	go connectSsh(ctx, req, chs)
+	if err = <-chs.ErrChan; err != nil {
+		err = &ApiError{Code: ErrConnectServer, Data: map[string]any{"err": err}}
+		return
 	}
+	resp := <-chs.RespChan
+	if resp.Code != 0 {
+		err = &ApiError{Code: ErrConnectServer, Data: map[string]any{"err": resp.Message}}
+		return
+	}
+	tk := time.NewTicker(time.Millisecond * 100)
+	g, gctx := errgroup.WithContext(ctx)
+	g.Go(func() error {
+		for {
+			select {
+			case <-gctx.Done():
+				return nil
+			case closeBy := <-chs.CloseChan:
+				writeToMonitors(session.Monitors, []byte("\r\n \033[31m closed by admin"))
+				logger.L.Warn("close by admin", zap.String("username", closeBy))
+				return nil
+			case err := <-chs.ErrChan:
+				logger.L.Error("ssh connection failed", zap.Error(err))
+				return err
+			case out := <-chs.OutChan:
+				chs.Buf.Write(out)
+			case <-tk.C:
+				sendMsg(nil, session, chs)
+			}
+		}
+	})
+
+	if err = g.Wait(); err != nil {
+		logger.L.Warn("monit ssh stopped", zap.Error(err))
+	}
+
+	return
+}
+
+func monitGuacd(ctx *gin.Context, connectionId string, chs *model.SessionChans, ws *websocket.Conn) (err error) {
+	w, h, dpi := cast.ToInt(ctx.Query("w")), cast.ToInt(ctx.Query("h")), cast.ToInt(ctx.Query("dpi"))
+	w, h, dpi = 731, 929, 96 //TODO
+
+	defer func() {
+		chs.ErrChan <- err
+	}()
+
+	t, err := guacd.NewTunnel(connectionId, w, h, dpi, "", nil, nil, nil)
+	if err != nil {
+		logger.L.Error("guacd tunnel failed", zap.Error(err))
+		return
+	}
+
+	g, gctx := errgroup.WithContext(ctx)
+	g.Go(func() error {
+		for {
+			select {
+			case <-gctx.Done():
+				return nil
+			default:
+				p, err := t.Read()
+				if err != nil {
+					logger.L.Debug("read instruction failed", zap.Error(err))
+					return err
+				}
+				if len(p) <= 0 || bytes.HasPrefix(p, guacd.InternalOpcodeIns) {
+					continue
+				}
+				chs.OutChan <- p
+			}
+		}
+	})
+	tk := time.NewTicker(time.Millisecond * 100)
+	g.Go(func() error {
+		for {
+			select {
+			case closeBy := <-chs.CloseChan:
+				out := guacd.NewInstruction("disconnect", "closed by admin").Bytes()
+				ws.WriteMessage(websocket.TextMessage, out)
+				err := fmt.Errorf("colse by admin %s", closeBy)
+				logger.L.Warn(err.Error())
+				return err
+			case err := <-chs.ErrChan:
+				logger.L.Error("disconnected", zap.Error(err))
+				return err
+			case out := <-chs.OutChan:
+				chs.Buf.Write(out)
+			case <-tk.C:
+				sendMsg(ws, nil, chs)
+			}
+		}
+	})
+	if err = g.Wait(); err != nil {
+		logger.L.Warn("monit guacd stopped", zap.Error(err))
+	}
+
+	return
 }
 
 // ConnectClose godoc
@@ -663,7 +755,7 @@ func (c *Controller) ConnectClose(ctx *gin.Context) {
 	chs := makeChans()
 	req := newSshReq(ctx, model.SESSIONACTION_CLOSE)
 	req.SessionId = session.SessionId
-	go doSsh(ctx, req, chs)
+	go connectSsh(ctx, req, chs)
 	if err = <-chs.ErrChan; err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrConnectServer, Data: map[string]any{"err": err}})
 		return

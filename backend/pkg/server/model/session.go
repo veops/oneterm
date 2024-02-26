@@ -48,9 +48,10 @@ type Session struct {
 
 	CmdCount int64 `json:"cmd_count" gorm:"-"`
 
-	Monitors  *sync.Map     `json:"-" gorm:"-"`
-	Chans     *SessionChans `json:"-" gorm:"-"`
-	Connected atomic.Bool   `json:"-" gorm:"-"`
+	Monitors     *sync.Map     `json:"-" gorm:"-"`
+	Chans        *SessionChans `json:"-" gorm:"-"`
+	Connected    atomic.Bool   `json:"-" gorm:"-"`
+	ConnectionId string        `json:"-" gorm:"-"`
 }
 
 func (m *Session) TableName() string {
@@ -68,8 +69,6 @@ func (m *Session) HasMonitors() (has bool) {
 	})
 	return
 }
-
-
 
 type SessionCmd struct {
 	Id        int    `json:"id" gorm:"column:id;primarykey"`
@@ -127,4 +126,7 @@ type SessionChans struct {
 	WindowChan chan string
 	AwayChan   chan struct{}
 	CloseChan  chan string
+}
+
+type SessionManager struct {
 }

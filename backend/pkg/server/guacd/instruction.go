@@ -40,6 +40,10 @@ func (i *Instruction) String() string {
 	return i.cache
 }
 
+func (i *Instruction) Bytes() []byte {
+	return []byte(i.String())
+}
+
 func (i *Instruction) Parse(content string) *Instruction {
 	if strings.LastIndex(content, ";") > 0 {
 		content = strings.TrimRight(content, ";")

@@ -21,6 +21,10 @@ const (
 	ignoreCert      = "true"
 )
 
+var (
+	gatewayManager = &model.GateWayManager{}
+)
+
 type Configuration struct {
 	Protocol   string
 	Parameters map[string]string
@@ -39,6 +43,7 @@ type Tunnel struct {
 	reader       *bufio.Reader
 	writer       *bufio.Writer
 	Config       *Configuration
+	g            *model.GatewayTunnel
 }
 
 func NewTunnel(connectionId string, w, h, dpi int, protocol string, asset *model.Asset, account *model.Account, gateway *model.Gateway) (t *Tunnel, err error) {
@@ -55,23 +60,42 @@ func NewTunnel(connectionId string, w, h, dpi int, protocol string, asset *model
 		ConnectionId: connectionId,
 		Config: &Configuration{
 			Protocol: protocol,
-			Parameters: map[string]string{
-				"recording-path":        recordingPath,
-				"create-recording-path": createRecording,
-				"ignore-cert":           ignoreCert,
-				"width":                 cast.ToString(w),
-				"height":                cast.ToString(h),
-				"dpi":                   cast.ToString(dpi),
-				"scheme":                protocol,
-				"hostname":              asset.Ip,
-				"port":                  port,
-				"username":              account.Account,
-				"password":              util.DecryptAES(account.Password),
-			},
+			Parameters: lo.TernaryF(
+				connectionId == "",
+				func() map[string]string {
+					return map[string]string{
+						"recording-path":        recordingPath,
+						"create-recording-path": createRecording,
+						"ignore-cert":           ignoreCert,
+						"width":                 cast.ToString(w),
+						"height":                cast.ToString(h),
+						"dpi":                   cast.ToString(dpi),
+						"scheme":                protocol,
+						"hostname":              asset.Ip,
+						"port":                  port,
+						"username":              account.Account,
+						"password":              util.DecryptAES(account.Password),
+					}
+				}, func() map[string]string {
+					return map[string]string{
+						"width":     cast.ToString(w),
+						"height":    cast.ToString(h),
+						"dpi":       cast.ToString(dpi),
+						"read-only": "true",
+					}
+				}),
 		},
 	}
 	if t.ConnectionId == "" {
 		t.SessionId = uuid.New().String()
+	}
+	if gateway != nil && connectionId == "" {
+		t.g, err = gatewayManager.Open(t.SessionId, asset.Ip, cast.ToInt(port), gateway)
+		if err != nil {
+			return t, err
+		}
+		t.Config.Parameters["hostname"] = t.g.LocalIp
+		t.Config.Parameters["port"] = cast.ToString(t.g.LocalPort)
 	}
 
 	err = t.handshake()
@@ -149,7 +173,7 @@ func (t *Tunnel) Write(p []byte) (n int, err error) {
 }
 
 func (t *Tunnel) WriteInstruction(instruction *Instruction) (n int, err error) {
-	n, err = t.Write([]byte(instruction.String()))
+	n, err = t.Write(instruction.Bytes())
 	return
 }
 
@@ -180,4 +204,8 @@ func (t *Tunnel) assert(opcode string) (instruction *Instruction, err error) {
 	}
 
 	return
+}
+
+func (t *Tunnel) Close() {
+	t.g.Close()
 }

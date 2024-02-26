@@ -1,8 +1,13 @@
 package model
 
 import (
+	"fmt"
+	"io"
+	"net"
+	"sync"
 	"time"
 
+	"golang.org/x/crypto/ssh"
 	"gorm.io/plugin/soft_delete"
 )
 
@@ -55,4 +60,144 @@ func (m *Gateway) GetId() int {
 type GatewayCount struct {
 	Id    int   `gorm:"column:id"`
 	Count int64 `gorm:"column:count"`
+}
+
+type GatewayTunnel struct {
+	LocalIp           string
+	LocalPort         int
+	listener          net.Listener
+	localConnections  map[string]net.Conn
+	remoteConnections map[string]net.Conn
+	sshClient         *ssh.Client
+}
+
+func (gt *GatewayTunnel) Open(sessionId, remoteIp string, remotePort int) error {
+	for {
+		lc, err := gt.listener.Accept()
+		if err != nil {
+			return err
+		}
+		gt.localConnections[sessionId] = lc
+
+		remoteAddr := fmt.Sprintf("%s:%d", remoteIp, remotePort)
+		rc, err := gt.sshClient.Dial("tcp", remoteAddr)
+		if err != nil {
+			return err
+		}
+		gt.remoteConnections[sessionId] = rc
+
+		go io.Copy(lc, rc)
+		go io.Copy(rc, lc)
+	}
+}
+
+func (gt *GatewayTunnel) Close(sessionId string) {
+	if c, ok := gt.remoteConnections[sessionId]; ok {
+		c.Close()
+	}
+	if c, ok := gt.localConnections[sessionId]; ok {
+		c.Close()
+	}
+	
+}
+
+type GateWayManager struct {
+	gateways map[int]*GatewayTunnel
+	mtx      sync.Mutex
+}
+
+func (gm *GateWayManager) Open(sessionId, remoteIp string, remotePort int, gateway *Gateway) (g *GatewayTunnel, err error) {
+	gm.mtx.Lock()
+	defer gm.mtx.Unlock()
+
+	g, ok := gm.gateways[gateway.Id]
+	if ok {
+		return
+	}
+	g = &GatewayTunnel{}
+
+	auth, err := gm.getAuth(gateway)
+	if err != nil {
+		return
+	}
+	sshClient, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", gateway.Host, gateway.Port), &ssh.ClientConfig{
+		User:            gateway.Account,
+		Auth:            []ssh.AuthMethod{auth},
+		Timeout:         time.Second * 3,
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+	})
+	if err != nil {
+		return
+	}
+
+	localPort, err := getAvailablePort()
+	if err != nil {
+		return
+	}
+	listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", localPort))
+	if err != nil {
+		return
+	}
+	g = &GatewayTunnel{
+		LocalIp:           "127.0.0.1",
+		LocalPort:         localPort,
+		listener:          listener,
+		localConnections:  map[string]net.Conn{},
+		remoteConnections: map[string]net.Conn{},
+		sshClient:         sshClient,
+	}
+	err = g.Open(sessionId, remoteIp, remotePort)
+
+	return
+}
+
+func (gm *GateWayManager) Close(id int) {
+	gm.mtx.Lock()
+	defer gm.mtx.Unlock()
+
+	g, ok := gm.gateways[id]
+	if ok {
+		g.Close()
+	}
+	delete(gm.gateways, id)
+}
+
+func (gm *GateWayManager) getAuth(gateway *Gateway) (ssh.AuthMethod, error) {
+	switch gateway.AccountType {
+	case AUTHMETHOD_PASSWORD:
+		return ssh.Password(gateway.Password), nil
+	case AUTHMETHOD_PUBLICKEY:
+		if gateway.Phrase == "" {
+			pk, err := ssh.ParsePrivateKey([]byte(gateway.Pk))
+			if err != nil {
+				return nil, err
+			}
+			return ssh.PublicKeys(pk), nil
+		} else {
+			pk, err := ssh.ParsePrivateKeyWithPassphrase([]byte(gateway.Pk), []byte(gateway.Phrase))
+			if err != nil {
+				return nil, err
+			}
+			return ssh.PublicKeys(pk), nil
+		}
+	default:
+		return nil, fmt.Errorf("invalid authmethod %d", gateway.AccountType)
+	}
+}
+
+func getAvailablePort() (int, error) {
+	addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
+	if err != nil {
+		return 0, err
+	}
+
+	l, err := net.ListenTCP("tcp", addr)
+	if err != nil {
+		return 0, err
+	}
+
+	defer func(l *net.TCPListener) {
+		_ = l.Close()
+	}(l)
+	return l.Addr().(*net.TCPAddr).Port, nil
 }

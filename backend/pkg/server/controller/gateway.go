@@ -136,9 +136,9 @@ func (c *Controller) GetGateways(ctx *gin.Context) {
 	info := cast.ToBool(ctx.Query("info"))
 
 	db := mysql.DB.Model(&model.Gateway{})
-	db = filterEqual(ctx, db, "id","type")
+	db = filterEqual(ctx, db, "id", "type")
 	db = filterLike(ctx, db, "name")
-	db = filterSearch(ctx, db, "name", "host", "account","port")
+	db = filterSearch(ctx, db, "name", "host", "account", "port")
 	if q, ok := ctx.GetQuery("ids"); ok {
 		db = db.Where("id IN ?", lo.Map(strings.Split(q, ","), func(s string, _ int) int { return cast.ToInt(s) }))
 	}

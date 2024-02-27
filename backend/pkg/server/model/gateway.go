@@ -7,6 +7,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/veops/oneterm/pkg/conf"
+	"github.com/veops/oneterm/pkg/logger"
+	"go.uber.org/zap"
 	"golang.org/x/crypto/ssh"
 	"gorm.io/plugin/soft_delete"
 )
@@ -63,18 +66,21 @@ type GatewayCount struct {
 }
 
 type GatewayTunnel struct {
+	Id                int
 	LocalIp           string
 	LocalPort         int
 	listener          net.Listener
 	localConnections  map[string]net.Conn
 	remoteConnections map[string]net.Conn
 	sshClient         *ssh.Client
+	using             bool
 }
 
 func (gt *GatewayTunnel) Open(sessionId, remoteIp string, remotePort int) error {
 	for {
 		lc, err := gt.listener.Accept()
 		if err != nil {
+			logger.L.Error("accept failed", zap.Error(err))
 			return err
 		}
 		gt.localConnections[sessionId] = lc
@@ -82,6 +88,7 @@ func (gt *GatewayTunnel) Open(sessionId, remoteIp string, remotePort int) error 
 		remoteAddr := fmt.Sprintf("%s:%d", remoteIp, remotePort)
 		rc, err := gt.sshClient.Dial("tcp", remoteAddr)
 		if err != nil {
+			logger.L.Error("dial remote failed", zap.Error(err))
 			return err
 		}
 		gt.remoteConnections[sessionId] = rc
@@ -95,15 +102,26 @@ func (gt *GatewayTunnel) Close(sessionId string) {
 	if c, ok := gt.remoteConnections[sessionId]; ok {
 		c.Close()
 	}
+	delete(gt.localConnections, sessionId)
+
 	if c, ok := gt.localConnections[sessionId]; ok {
 		c.Close()
 	}
-	
+	delete(gt.remoteConnections, sessionId)
+
+	gt.using = len(gt.localConnections) > 0 && len(gt.remoteConnections) > 0
 }
 
 type GateWayManager struct {
 	gateways map[int]*GatewayTunnel
 	mtx      sync.Mutex
+}
+
+func NewGateWayManager() *GateWayManager {
+	return &GateWayManager{
+		gateways: map[int]*GatewayTunnel{},
+		mtx:      sync.Mutex{},
+	}
 }
 
 func (gm *GateWayManager) Open(sessionId, remoteIp string, remotePort int, gateway *Gateway) (g *GatewayTunnel, err error) {
@@ -134,32 +152,37 @@ func (gm *GateWayManager) Open(sessionId, remoteIp string, remotePort int, gatew
 	if err != nil {
 		return
 	}
-	listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", localPort))
+	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", conf.Cfg.Guacd.Gateway, localPort))
 	if err != nil {
 		return
 	}
 	g = &GatewayTunnel{
-		LocalIp:           "127.0.0.1",
+		Id:                gateway.Id,
+		LocalIp:           conf.Cfg.Guacd.Gateway,
 		LocalPort:         localPort,
 		listener:          listener,
 		localConnections:  map[string]net.Conn{},
 		remoteConnections: map[string]net.Conn{},
 		sshClient:         sshClient,
+		using:             true,
 	}
-	err = g.Open(sessionId, remoteIp, remotePort)
+	go g.Open(sessionId, remoteIp, remotePort)
 
 	return
 }
 
-func (gm *GateWayManager) Close(id int) {
+func (gm *GateWayManager) Close(id int, sessionId string) {
 	gm.mtx.Lock()
 	defer gm.mtx.Unlock()
 
 	g, ok := gm.gateways[id]
 	if ok {
-		g.Close()
+		g.Close(sessionId)
 	}
-	delete(gm.gateways, id)
+	if !g.using {
+		defer g.sshClient.Close()
+		delete(gm.gateways, id)
+	}
 }
 
 func (gm *GateWayManager) getAuth(gateway *Gateway) (ssh.AuthMethod, error) {
@@ -195,9 +218,7 @@ func getAvailablePort() (int, error) {
 	if err != nil {
 		return 0, err
 	}
+	defer l.Close()
 
-	defer func(l *net.TCPListener) {
-		_ = l.Close()
-	}(l)
 	return l.Addr().(*net.TCPAddr).Port, nil
 }

@@ -131,8 +131,9 @@ type SshServer struct {
 }
 
 type Guacd struct {
-	Ip   string `yaml:"ip"`
-	Port int    `yaml:"port"`
+	Ip      string `yaml:"ip"`
+	Port    int    `yaml:"port"`
+	Gateway string `yaml:"gateway"`
 }
 
 type ConfigYaml struct {

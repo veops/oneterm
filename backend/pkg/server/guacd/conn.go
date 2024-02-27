@@ -16,13 +16,13 @@ import (
 )
 
 const (
-	recordingPath   = "/playback"
+	recordingPath   = "/replay"
 	createRecording = "true"
 	ignoreCert      = "true"
 )
 
 var (
-	gatewayManager = &model.GateWayManager{}
+	gatewayManager = model.NewGateWayManager()
 )
 
 type Configuration struct {
@@ -88,13 +88,14 @@ func NewTunnel(connectionId string, w, h, dpi int, protocol string, asset *model
 	}
 	if t.ConnectionId == "" {
 		t.SessionId = uuid.New().String()
+		t.Config.Parameters["recording-name"] = t.SessionId
 	}
-	if gateway != nil && connectionId == "" {
+	if gateway != nil && gateway.Id != 0 && connectionId == "" {
 		t.g, err = gatewayManager.Open(t.SessionId, asset.Ip, cast.ToInt(port), gateway)
 		if err != nil {
 			return t, err
 		}
-		t.Config.Parameters["hostname"] = t.g.LocalIp
+		t.Config.Parameters["hostname"] = conf.Cfg.Guacd.Gateway
 		t.Config.Parameters["port"] = cast.ToString(t.g.LocalPort)
 	}
 
@@ -207,5 +208,5 @@ func (t *Tunnel) assert(opcode string) (instruction *Instruction, err error) {
 }
 
 func (t *Tunnel) Close() {
-	t.g.Close()
+	gatewayManager.Close(t.g.Id, t.SessionId)
 }

@@ -31,6 +31,7 @@ import (
 	"github.com/veops/oneterm/pkg/server/guacd"
 	"github.com/veops/oneterm/pkg/server/model"
 	"github.com/veops/oneterm/pkg/server/storage/db/mysql"
+	"github.com/veops/oneterm/pkg/util"
 )
 
 var (
@@ -410,7 +411,7 @@ func newSshReq(ctx *gin.Context, action int) *model.SshReq {
 
 func connectGuacd(ctx *gin.Context, protocol string, chs *model.SessionChans) {
 	w, h, dpi := cast.ToInt(ctx.Query("w")), cast.ToInt(ctx.Query("h")), cast.ToInt(ctx.Query("dpi"))
-	w, h, dpi = 731, 929, 96 //TODO
+	w, h, dpi = 746, 929, 96 //TODO
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
 
 	var err error
@@ -419,7 +420,7 @@ func connectGuacd(ctx *gin.Context, protocol string, chs *model.SessionChans) {
 	}()
 
 	asset, account, gateway := &model.Asset{}, &model.Account{}, &model.Gateway{}
-	if err := mysql.DB.Model(&asset).Where("id = ?", ctx.Param("asset_id")).First(asset).Error; err != nil {
+	if err = mysql.DB.Model(&asset).Where("id = ?", ctx.Param("asset_id")).First(asset).Error; err != nil {
 		logger.L.Error("find asset failed", zap.Error(err))
 		return
 	}
@@ -428,15 +429,18 @@ func connectGuacd(ctx *gin.Context, protocol string, chs *model.SessionChans) {
 		logger.L.Error(err.Error())
 		return
 	}
-	if err := mysql.DB.Model(&account).Where("id = ?", ctx.Param("account_id")).First(account).Error; err != nil {
+	if err = mysql.DB.Model(&account).Where("id = ?", ctx.Param("account_id")).First(account).Error; err != nil {
 		logger.L.Error("find account failed", zap.Error(err))
 		return
 	}
 	if asset.GatewayId != 0 {
-		if err := mysql.DB.Model(&gateway).Where("id = ?", asset.GatewayId).First(gateway).Error; err != nil {
+		if err = mysql.DB.Model(&gateway).Where("id = ?", asset.GatewayId).First(gateway).Error; err != nil {
 			logger.L.Error("find gateway failed", zap.Error(err))
 			return
 		}
+		gateway.Password = util.DecryptAES(gateway.Password)
+		gateway.Pk = util.DecryptAES(gateway.Pk)
+		gateway.Phrase = util.DecryptAES(gateway.Phrase)
 	}
 
 	t, err := guacd.NewTunnel("", w, h, dpi, protocol, asset, account, gateway)
@@ -850,7 +854,8 @@ func (c *Controller) TestConnect(ctx *gin.Context) {
 			NickName:    "",
 		},
 	})
-	ctx.Params = append(ctx.Params, gin.Param{Key: "asset_id", Value: "1"}, gin.Param{Key: "account_id", Value: "1"}, gin.Param{Key: "protocol", Value: "rdp:13389"})
+	// ctx.Params = append(ctx.Params, gin.Param{Key: "asset_id", Value: "1"}, gin.Param{Key: "account_id", Value: "1"}, gin.Param{Key: "protocol", Value: "rdp:13389"})
+	ctx.Params = append(ctx.Params, gin.Param{Key: "asset_id", Value: "1"}, gin.Param{Key: "account_id", Value: "3"}, gin.Param{Key: "protocol", Value: "vnc:15901"})
 	c.Connect(ctx)
 }
 
@@ -902,7 +907,7 @@ func handleError(ctx *gin.Context, sessionId string, err error, ws *websocket.Co
 	if err == nil {
 		return
 	}
-	logger.L.Debug("monitor failed", zap.String("session_id", sessionId), zap.Error(err))
+	logger.L.Debug("", zap.String("session_id", sessionId), zap.Error(err))
 	ae, ok := err.(*ApiError)
 	if !ok {
 		return

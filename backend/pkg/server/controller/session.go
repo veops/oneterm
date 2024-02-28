@@ -60,18 +60,21 @@ var (
 
 func Init() (err error) {
 	sessions := make([]*model.Session, 0)
-	err = mysql.DB.
-		Model(&model.Session{}).
+	if err = mysql.DB.
+		Model(sessions).
 		Where("status = ?", model.SESSIONSTATUS_ONLINE).
 		Find(&sessions).
-		Error
-	if err != nil {
+		Error; err != nil {
+		logger.L.Warn("get sessions failed", zap.Error(err))
 		return
 	}
 	ctx := &gin.Context{}
+	now := time.Now()
 	for _, s := range sessions {
 		if s.SessionType == model.SESSIONTYPE_WEB {
-			offlineSession(ctx, s.SessionId, "")
+			s.Status = model.SESSIONSTATUS_OFFLINE
+			s.ClosedAt = &now
+			handleUpsertSession(ctx, s)
 			continue
 		}
 		s.Monitors = &sync.Map{}
@@ -272,6 +275,13 @@ func (c *Controller) CreateSessionReplay(ctx *gin.Context) {
 //	@Router		/session/replay/:session_id [get]
 func (c *Controller) GetSessionReplay(ctx *gin.Context) {
 	sessionId := ctx.Param("session_id")
-	filename := fmt.Sprintf("%s.cast", sessionId)
+	session := &model.Session{}
+	if err := mysql.DB.Model(session).Where("session_id = ?", sessionId).First(session).Error; err != nil {
+		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+	}
+	filename := sessionId
+	if session.IsSsh() {
+		filename += ".cast"
+	}
 	ctx.FileAttachment(filepath.Join("/replay", filename), filename)
 }

@@ -69,7 +69,7 @@ func (c *Controller) Connecting(ctx *gin.Context) {
 		handleError(ctx, sessionId, err, ws)
 	}()
 
-	session, err := loadOnlineSessionById(sessionId)
+	session, err := loadOnlineSessionById(sessionId, false)
 	if err != nil {
 		return
 	}
@@ -121,7 +121,7 @@ func handleSsh(ctx *gin.Context, ws *websocket.Conn, session *model.Session) (er
 			case out := <-chs.OutChan:
 				chs.Buf.Write(out)
 			case <-tk.C:
-				sendMsg(ws, session, chs)
+				sendSshMsg(ws, session, chs)
 			case <-tk1s.C:
 				ws.WriteMessage(websocket.TextMessage, nil)
 				writeToMonitors(session.Monitors, nil)
@@ -137,7 +137,6 @@ func handleGuacd(ctx *gin.Context, ws *websocket.Conn, session *model.Session) (
 	defer func() {
 		close(chs.AwayChan)
 	}()
-	tk := time.NewTicker(time.Millisecond * 100)
 	g := &errgroup.Group{}
 	g.Go(func() error {
 		return readWsMsg(ctx, ws, chs)
@@ -146,18 +145,16 @@ func handleGuacd(ctx *gin.Context, ws *websocket.Conn, session *model.Session) (
 		for {
 			select {
 			case closeBy := <-chs.CloseChan:
-				out := guacd.NewInstruction("disconnect", "closed by admin").Bytes()
-				ws.WriteMessage(websocket.TextMessage, out)
 				err := fmt.Errorf("colse by admin %s", closeBy)
+				out := guacd.NewInstruction("disconnect", err.Error()).Bytes()
+				ws.WriteMessage(websocket.TextMessage, out)
 				logger.L.Warn(err.Error())
 				return err
 			case err := <-chs.ErrChan:
 				logger.L.Error("disconnected", zap.Error(err))
 				return err
 			case out := <-chs.OutChan:
-				chs.Buf.Write(out)
-			case <-tk.C:
-				sendMsg(ws, session, chs)
+				ws.WriteMessage(websocket.TextMessage, out)
 			}
 		}
 	})
@@ -165,7 +162,7 @@ func handleGuacd(ctx *gin.Context, ws *websocket.Conn, session *model.Session) (
 	return
 }
 
-func sendMsg(ws *websocket.Conn, session *model.Session, chs *model.SessionChans) {
+func sendSshMsg(ws *websocket.Conn, session *model.Session, chs *model.SessionChans) {
 	out := chs.Buf.Bytes()
 	if len(out) <= 0 {
 		return
@@ -485,9 +482,10 @@ func connectGuacd(ctx *gin.Context, protocol string, chs *model.SessionChans) {
 					logger.L.Debug("read instruction failed", zap.Error(err))
 					return err
 				}
-				if len(p) <= 0 || bytes.HasPrefix(p, guacd.InternalOpcodeIns) {
+				if len(p) <= 0 {
 					continue
 				}
+
 				chs.OutChan <- p
 			}
 		}
@@ -500,9 +498,7 @@ func connectGuacd(ctx *gin.Context, protocol string, chs *model.SessionChans) {
 			case <-chs.AwayChan:
 				return nil
 			case in := <-chs.InChan:
-				if !bytes.HasPrefix(in, guacd.InternalOpcodeIns) {
-					t.Write(in)
-				}
+				t.Write(in)
 			}
 		}
 	})
@@ -568,7 +564,7 @@ func (c *Controller) ConnectMonitor(ctx *gin.Context) {
 		return
 	}
 
-	session, err := loadOnlineSessionById(sessionId)
+	session, err := loadOnlineSessionById(sessionId, true)
 	if err != nil {
 		return
 	}
@@ -608,6 +604,7 @@ func (c *Controller) ConnectMonitor(ctx *gin.Context) {
 		for {
 			select {
 			case <-gctx.Done():
+				return nil
 			default:
 				_, _, err = ws.ReadMessage()
 				if err != nil {
@@ -654,7 +651,7 @@ func monitSsh(ctx *gin.Context, session *model.Session, chs *model.SessionChans)
 			case out := <-chs.OutChan:
 				chs.Buf.Write(out)
 			case <-tk.C:
-				sendMsg(nil, session, chs)
+				sendSshMsg(nil, session, chs)
 			}
 		}
 	})
@@ -674,7 +671,7 @@ func monitGuacd(ctx *gin.Context, connectionId string, chs *model.SessionChans, 
 		chs.ErrChan <- err
 	}()
 
-	t, err := guacd.NewTunnel(connectionId, w, h, dpi, "", nil, nil, nil)
+	t, err := guacd.NewTunnel(connectionId, w, h, dpi, ":", nil, nil, nil)
 	if err != nil {
 		logger.L.Error("guacd tunnel failed", zap.Error(err))
 		return
@@ -692,30 +689,27 @@ func monitGuacd(ctx *gin.Context, connectionId string, chs *model.SessionChans, 
 					logger.L.Debug("read instruction failed", zap.Error(err))
 					return err
 				}
-				if len(p) <= 0 || bytes.HasPrefix(p, guacd.InternalOpcodeIns) {
+				if len(p) <= 0 {
 					continue
 				}
 				chs.OutChan <- p
 			}
 		}
 	})
-	tk := time.NewTicker(time.Millisecond * 100)
 	g.Go(func() error {
 		for {
 			select {
 			case closeBy := <-chs.CloseChan:
-				out := guacd.NewInstruction("disconnect", "closed by admin").Bytes()
-				ws.WriteMessage(websocket.TextMessage, out)
 				err := fmt.Errorf("colse by admin %s", closeBy)
+				out := guacd.NewInstruction("disconnect", err.Error()).Bytes()
+				ws.WriteMessage(websocket.TextMessage, out)
 				logger.L.Warn(err.Error())
 				return err
 			case err := <-chs.ErrChan:
 				logger.L.Error("disconnected", zap.Error(err))
 				return err
 			case out := <-chs.OutChan:
-				chs.Buf.Write(out)
-			case <-tk.C:
-				sendMsg(ws, nil, chs)
+				ws.WriteMessage(websocket.TextMessage, out)
 			}
 		}
 	})
@@ -756,18 +750,24 @@ func (c *Controller) ConnectClose(ctx *gin.Context) {
 
 	logger.L.Info("closing...", zap.String("sessionId", session.SessionId), zap.Int("type", session.SessionType))
 	defer offlineSession(ctx, session.SessionId, currentUser.GetUserName())
-	chs := makeChans()
-	req := newSshReq(ctx, model.SESSIONACTION_CLOSE)
-	req.SessionId = session.SessionId
-	go connectSsh(ctx, req, chs)
-	if err = <-chs.ErrChan; err != nil {
-		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrConnectServer, Data: map[string]any{"err": err}})
-		return
-	}
-	resp := <-chs.RespChan
-	if resp.Code != 0 {
-		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrBadRequest, Data: map[string]any{"err": resp.Message}})
-		return
+	if session.IsSsh() {
+		chs := makeChans()
+		req := newSshReq(ctx, model.SESSIONACTION_CLOSE)
+		req.SessionId = session.SessionId
+		go connectSsh(ctx, req, chs)
+		if err = <-chs.ErrChan; err != nil {
+			ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrConnectServer, Data: map[string]any{"err": err}})
+			return
+		}
+		resp := <-chs.RespChan
+		if resp.Code != 0 {
+			ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrBadRequest, Data: map[string]any{"err": resp.Message}})
+			return
+		}
+	} else {
+		session.Status = model.SESSIONSTATUS_OFFLINE
+		session.ClosedAt = lo.ToPtr(time.Now())
+		handleUpsertSession(ctx, session)
 	}
 
 	ctx.JSON(http.StatusOK, defaultHttpResponse)
@@ -832,6 +832,42 @@ func checkTime(data *model.AccessAuth) bool {
 	return !has || in == data.Allow
 }
 
+func loadOnlineSessionById(sessionId string, isMonit bool) (session *model.Session, err error) {
+	v, ok := onlineSession.Load(sessionId)
+	if !ok {
+		err = &ApiError{Code: ErrInvalidSessionId, Data: map[string]any{"sessionId": sessionId}}
+		return
+	}
+	session, ok = v.(*model.Session)
+	if !ok {
+		err = &ApiError{Code: ErrLoadSession, Data: map[string]any{"err": "invalid type"}}
+		return
+	}
+	if !isMonit && session.Connected.Load() {
+		err = &ApiError{Code: ErrInvalidSessionId, Data: map[string]any{"sessionId": sessionId}}
+		return
+	}
+
+	return
+}
+
+func handleError(ctx *gin.Context, sessionId string, err error, ws *websocket.Conn) {
+	if err == nil {
+		return
+	}
+	logger.L.Debug("", zap.String("session_id", sessionId), zap.Error(err))
+	ae, ok := err.(*ApiError)
+	if !ok {
+		return
+	}
+	lang := ctx.PostForm("lang")
+	accept := ctx.GetHeader("Accept-Language")
+	localizer := i18n.NewLocalizer(conf.Bundle, lang, accept)
+	ws.WriteMessage(websocket.TextMessage, []byte(ae.Message(localizer)))
+	ctx.AbortWithError(http.StatusBadRequest, err)
+}
+
+// TODO ------------------------------------remove--------------------------------------------
 // Connect godoc
 //
 //	@Tags		connect
@@ -882,39 +918,4 @@ func (c *Controller) TestConnecting(ctx *gin.Context) {
 		},
 	})
 	c.Connecting(ctx)
-}
-
-func loadOnlineSessionById(sessionId string) (session *model.Session, err error) {
-	v, ok := onlineSession.Load(sessionId)
-	if !ok {
-		err = &ApiError{Code: ErrInvalidSessionId, Data: map[string]any{"sessionId": sessionId}}
-		return
-	}
-	session, ok = v.(*model.Session)
-	if !ok {
-		err = &ApiError{Code: ErrLoadSession, Data: map[string]any{"err": "invalid type"}}
-		return
-	}
-	if session.Connected.Load() {
-		err = &ApiError{Code: ErrInvalidSessionId, Data: map[string]any{"sessionId": sessionId}}
-		return
-	}
-
-	return
-}
-
-func handleError(ctx *gin.Context, sessionId string, err error, ws *websocket.Conn) {
-	if err == nil {
-		return
-	}
-	logger.L.Debug("", zap.String("session_id", sessionId), zap.Error(err))
-	ae, ok := err.(*ApiError)
-	if !ok {
-		return
-	}
-	lang := ctx.PostForm("lang")
-	accept := ctx.GetHeader("Accept-Language")
-	localizer := i18n.NewLocalizer(conf.Bundle, lang, accept)
-	ws.WriteMessage(websocket.TextMessage, []byte(ae.Message(localizer)))
-	ctx.AbortWithError(http.StatusBadRequest, err)
 }

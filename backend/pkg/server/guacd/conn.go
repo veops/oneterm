@@ -90,7 +90,7 @@ func NewTunnel(connectionId string, w, h, dpi int, protocol string, asset *model
 		t.SessionId = uuid.New().String()
 		t.Config.Parameters["recording-name"] = t.SessionId
 	}
-	if gateway != nil && gateway.Id != 0 && connectionId == "" {
+	if gateway != nil && gateway.Id != 0 && t.ConnectionId == "" {
 		t.g, err = gatewayManager.Open(t.SessionId, asset.Ip, cast.ToInt(port), gateway)
 		if err != nil {
 			return t, err
@@ -133,7 +133,7 @@ func (t *Tunnel) handshake() (err error) {
 	if _, err = t.WriteInstruction(NewInstruction("size", t.Config.Parameters["width"], t.Config.Parameters["height"], t.Config.Parameters["dpi"])); err != nil {
 		return
 	}
-	if _, err = t.WriteInstruction(NewInstruction("audio", "audio/L16", "rate=44100", "channels=2")); err != nil {
+	if _, err = t.WriteInstruction(NewInstruction("audio", "audio/L8")); err != nil {
 		return
 	}
 	if _, err = t.WriteInstruction(NewInstruction("video")); err != nil {
@@ -208,5 +208,5 @@ func (t *Tunnel) assert(opcode string) (instruction *Instruction, err error) {
 }
 
 func (t *Tunnel) Close() {
-	gatewayManager.Close(t.g.Id, t.SessionId)
+	gatewayManager.Close(t.g.Key, t.SessionId)
 }

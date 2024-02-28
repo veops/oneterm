@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/spf13/cast"
 	"github.com/veops/oneterm/pkg/conf"
 	"github.com/veops/oneterm/pkg/logger"
 	"go.uber.org/zap"
@@ -65,10 +66,14 @@ type GatewayCount struct {
 	Count int64 `gorm:"column:count"`
 }
 
+type gatewayTunnelKey [3]string
+
 type GatewayTunnel struct {
-	Id                int
+	Key               gatewayTunnelKey
 	LocalIp           string
 	LocalPort         int
+	RemoteIp          string
+	RemotePort        int
 	listener          net.Listener
 	localConnections  map[string]net.Conn
 	remoteConnections map[string]net.Conn
@@ -113,13 +118,13 @@ func (gt *GatewayTunnel) Close(sessionId string) {
 }
 
 type GateWayManager struct {
-	gateways map[int]*GatewayTunnel
+	gateways map[gatewayTunnelKey]*GatewayTunnel
 	mtx      sync.Mutex
 }
 
 func NewGateWayManager() *GateWayManager {
 	return &GateWayManager{
-		gateways: map[int]*GatewayTunnel{},
+		gateways: map[gatewayTunnelKey]*GatewayTunnel{},
 		mtx:      sync.Mutex{},
 	}
 }
@@ -128,7 +133,8 @@ func (gm *GateWayManager) Open(sessionId, remoteIp string, remotePort int, gatew
 	gm.mtx.Lock()
 	defer gm.mtx.Unlock()
 
-	g, ok := gm.gateways[gateway.Id]
+	key := gatewayTunnelKey{cast.ToString(gateway.Id), remoteIp, cast.ToString(remotePort)}
+	g, ok := gm.gateways[key]
 	if ok {
 		return
 	}
@@ -157,7 +163,7 @@ func (gm *GateWayManager) Open(sessionId, remoteIp string, remotePort int, gatew
 		return
 	}
 	g = &GatewayTunnel{
-		Id:                gateway.Id,
+		Key:               key,
 		LocalIp:           conf.Cfg.Guacd.Gateway,
 		LocalPort:         localPort,
 		listener:          listener,
@@ -166,22 +172,23 @@ func (gm *GateWayManager) Open(sessionId, remoteIp string, remotePort int, gatew
 		sshClient:         sshClient,
 		using:             true,
 	}
+	gm.gateways[key] = g
 	go g.Open(sessionId, remoteIp, remotePort)
 
 	return
 }
 
-func (gm *GateWayManager) Close(id int, sessionId string) {
+func (gm *GateWayManager) Close(key gatewayTunnelKey, sessionId string) {
 	gm.mtx.Lock()
 	defer gm.mtx.Unlock()
 
-	g, ok := gm.gateways[id]
+	g, ok := gm.gateways[key]
 	if ok {
 		g.Close(sessionId)
 	}
 	if !g.using {
 		defer g.sshClient.Close()
-		delete(gm.gateways, id)
+		delete(gm.gateways, key)
 	}
 }
 

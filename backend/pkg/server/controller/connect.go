@@ -350,7 +350,7 @@ func connectSsh(ctx *gin.Context, req *model.SshReq, chs *model.SessionChans) (e
 			case <-gctx.Done():
 				return nil
 			case <-chs.AwayChan:
-				return nil
+				return fmt.Errorf("away")
 			case s := <-chs.WindowChan:
 				wh := strings.Split(s, ",")
 				if len(wh) < 2 {
@@ -408,7 +408,6 @@ func newSshReq(ctx *gin.Context, action int) *model.SshReq {
 
 func connectGuacd(ctx *gin.Context, protocol string, chs *model.SessionChans) {
 	w, h, dpi := cast.ToInt(ctx.Query("w")), cast.ToInt(ctx.Query("h")), cast.ToInt(ctx.Query("dpi"))
-	w, h, dpi = 746, 929, 96 //TODO
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
 
 	var err error
@@ -419,6 +418,11 @@ func connectGuacd(ctx *gin.Context, protocol string, chs *model.SessionChans) {
 	asset, account, gateway := &model.Asset{}, &model.Account{}, &model.Gateway{}
 	if err = mysql.DB.Model(&asset).Where("id = ?", ctx.Param("asset_id")).First(asset).Error; err != nil {
 		logger.L.Error("find asset failed", zap.Error(err))
+		return
+	}
+	if !checkAuthorization(currentUser, asset, cast.ToInt(ctx.Param("account_id"))) {
+		err = fmt.Errorf("invalid authorization")
+		logger.L.Error(err.Error())
 		return
 	}
 	if !checkTime(asset.AccessAuth) {
@@ -496,7 +500,7 @@ func connectGuacd(ctx *gin.Context, protocol string, chs *model.SessionChans) {
 			case <-gctx.Done():
 				return nil
 			case <-chs.AwayChan:
-				return nil
+				return fmt.Errorf("away")
 			case in := <-chs.InChan:
 				t.Write(in)
 			}
@@ -548,7 +552,9 @@ func (c *Controller) ConnectMonitor(ctx *gin.Context) {
 
 	sessionId := ctx.Param("session_id")
 	key := fmt.Sprintf("%d-%s-%d", currentUser.Uid, sessionId, time.Now().Nanosecond())
-	ws, err := Upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
+	ws, err := Upgrader.Upgrade(ctx.Writer, ctx.Request, http.Header{
+		"sec-websocket-protocol": {ctx.GetHeader("sec-websocket-protocol")},
+	})
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, err)
 		return
@@ -832,6 +838,10 @@ func checkTime(data *model.AccessAuth) bool {
 	return !has || in == data.Allow
 }
 
+func checkAuthorization(user *acl.Session, asset *model.Asset, accountId int) bool {
+	return acl.IsAdmin(user) || lo.Contains(asset.Authorization[accountId], user.GetRid())
+}
+
 func loadOnlineSessionById(sessionId string, isMonit bool) (session *model.Session, err error) {
 	v, ok := onlineSession.Load(sessionId)
 	if !ok {
@@ -865,57 +875,4 @@ func handleError(ctx *gin.Context, sessionId string, err error, ws *websocket.Co
 	localizer := i18n.NewLocalizer(conf.Bundle, lang, accept)
 	ws.WriteMessage(websocket.TextMessage, []byte(ae.Message(localizer)))
 	ctx.AbortWithError(http.StatusBadRequest, err)
-}
-
-// TODO ------------------------------------remove--------------------------------------------
-// Connect godoc
-//
-//	@Tags		connect
-//	@Success	200	{object}	HttpResponse
-//	@Param		w	query		int	false	"width"
-//	@Param		h	query		int	false	"height"
-//	@Param		dpi	query		int	false	"dpi"
-//	@Success	200			{object}	HttpResponse{data=model.Session}
-//	@Router		/connect/:asset_id/:account_id/:protocol [post]
-func (c *Controller) TestConnect(ctx *gin.Context) {
-	ctx.Set("session", &acl.Session{
-		Uid: 916,
-		Acl: acl.Acl{
-			Uid:         916,
-			UserName:    "ruiji.wei",
-			Rid:         729,
-			RoleName:    "",
-			ParentRoles: []string{"admin", "oneterm_admin"},
-			ChildRoles:  []string{},
-			NickName:    "",
-		},
-	})
-	// ctx.Params = append(ctx.Params, gin.Param{Key: "asset_id", Value: "1"}, gin.Param{Key: "account_id", Value: "1"}, gin.Param{Key: "protocol", Value: "rdp:13389"})
-	ctx.Params = append(ctx.Params, gin.Param{Key: "asset_id", Value: "1"}, gin.Param{Key: "account_id", Value: "3"}, gin.Param{Key: "protocol", Value: "vnc:15901"})
-	c.Connect(ctx)
-}
-
-// Connect godoc
-//
-//	@Tags		connect
-//	@Param		w	query		int	false	"width"
-//	@Param		h	query		int	false	"height"
-//	@Param		dpi	query		int	false	"dpi"
-//	@Success	200	{object}	HttpResponse
-//	@Param		session_id	path		int	true	"session id"
-//	@Router		/connect/:session_id [get]
-func (c *Controller) TestConnecting(ctx *gin.Context) {
-	ctx.Set("session", &acl.Session{
-		Uid: 916,
-		Acl: acl.Acl{
-			Uid:         916,
-			UserName:    "ruiji.wei",
-			Rid:         729,
-			RoleName:    "",
-			ParentRoles: []string{"admin", "oneterm_admin"},
-			ChildRoles:  []string{},
-			NickName:    "",
-		},
-	})
-	c.Connecting(ctx)
 }

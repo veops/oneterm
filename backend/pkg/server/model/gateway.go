@@ -173,6 +173,7 @@ func (gm *GateWayManager) Open(sessionId, remoteIp string, remotePort int, gatew
 		using:             true,
 	}
 	gm.gateways[key] = g
+	logger.L.Debug("opening gateway", zap.Any("key", key))
 	go g.Open(sessionId, remoteIp, remotePort)
 
 	return
@@ -187,6 +188,7 @@ func (gm *GateWayManager) Close(key gatewayTunnelKey, sessionId string) {
 		g.Close(sessionId)
 	}
 	if !g.using {
+		logger.L.Debug("closing gateway", zap.Any("key", key))
 		defer g.sshClient.Close()
 		delete(gm.gateways, key)
 	}

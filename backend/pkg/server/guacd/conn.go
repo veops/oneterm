@@ -210,3 +210,8 @@ func (t *Tunnel) assert(opcode string) (instruction *Instruction, err error) {
 func (t *Tunnel) Close() {
 	gatewayManager.Close(t.g.Key, t.SessionId)
 }
+
+func (t *Tunnel) Disconnect(args ...string) {
+	fmt.Println("-----------------------------------dis")
+	t.WriteInstruction(NewInstruction("disconnect", args...))
+}

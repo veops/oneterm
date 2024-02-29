@@ -55,6 +55,7 @@ var (
 //	@Router		/connect/:session_id [get]
 func (c *Controller) Connecting(ctx *gin.Context) {
 	sessionId := ctx.Param("session_id")
+	var session *model.Session
 
 	ws, err := Upgrader.Upgrade(ctx.Writer, ctx.Request, http.Header{
 		"sec-websocket-protocol": {ctx.GetHeader("sec-websocket-protocol")},
@@ -66,11 +67,10 @@ func (c *Controller) Connecting(ctx *gin.Context) {
 	defer ws.Close()
 
 	defer func() {
-		handleError(ctx, sessionId, err, ws)
+		handleError(ctx, session, err, ws)
 	}()
 
-	session, err := loadOnlineSessionById(sessionId, false)
-	if err != nil {
+	if session, err = loadOnlineSessionById(sessionId, false); err != nil {
 		return
 	}
 	session.Connected.CompareAndSwap(false, true)
@@ -83,9 +83,6 @@ func (c *Controller) Connecting(ctx *gin.Context) {
 
 func handleSsh(ctx *gin.Context, ws *websocket.Conn, session *model.Session) (err error) {
 	chs := session.Chans
-	defer func() {
-		close(chs.AwayChan)
-	}()
 	chs.WindowChan <- fmt.Sprintf("%s,%s,%s", ctx.Query("w"), ctx.Query("h"), ctx.Query("dpi"))
 	tk, tk1s := time.NewTicker(time.Millisecond*100), time.NewTicker(time.Second)
 	g, gctx := errgroup.WithContext(ctx)
@@ -134,16 +131,15 @@ func handleSsh(ctx *gin.Context, ws *websocket.Conn, session *model.Session) (er
 
 func handleGuacd(ctx *gin.Context, ws *websocket.Conn, session *model.Session) (err error) {
 	chs := session.Chans
-	defer func() {
-		close(chs.AwayChan)
-	}()
-	g := &errgroup.Group{}
+	g, gctx := errgroup.WithContext(ctx)
 	g.Go(func() error {
-		return readWsMsg(ctx, ws, chs)
+		return readWsMsg(gctx, ws, chs)
 	})
 	g.Go(func() error {
 		for {
 			select {
+			case <-gctx.Done():
+				return nil
 			case closeBy := <-chs.CloseChan:
 				err := fmt.Errorf("colse by admin %s", closeBy)
 				out := guacd.NewInstruction("disconnect", err.Error()).Bytes()
@@ -350,7 +346,7 @@ func connectSsh(ctx *gin.Context, req *model.SshReq, chs *model.SessionChans) (e
 			case <-gctx.Done():
 				return nil
 			case <-chs.AwayChan:
-				return fmt.Errorf("away")
+				return fmt.Errorf("away...")
 			case s := <-chs.WindowChan:
 				wh := strings.Split(s, ",")
 				if len(wh) < 2 {
@@ -454,14 +450,6 @@ func connectGuacd(ctx *gin.Context, protocol string, chs *model.SessionChans) {
 	if err = handleUpsertSession(ctx, session); err != nil {
 		return
 	}
-	defer func() {
-		session.Status = model.SESSIONSTATUS_OFFLINE
-		session.ClosedAt = lo.ToPtr(time.Now())
-		if err = handleUpsertSession(ctx, session); err != nil {
-			logger.L.Error("offline guacd session failed", zap.Error(err))
-			return
-		}
-	}()
 
 	resp := &model.ServerResp{
 		Code:      lo.Ternary(err == nil, 0, -1),
@@ -495,12 +483,21 @@ func connectGuacd(ctx *gin.Context, protocol string, chs *model.SessionChans) {
 		}
 	})
 	g.Go(func() error {
+		defer func() {
+			t.Disconnect()
+			session.Status = model.SESSIONSTATUS_OFFLINE
+			session.ClosedAt = lo.ToPtr(time.Now())
+			if err = handleUpsertSession(ctx, session); err != nil {
+				logger.L.Error("offline guacd session failed", zap.Error(err))
+				return
+			}
+		}()
 		for {
 			select {
 			case <-gctx.Done():
 				return nil
 			case <-chs.AwayChan:
-				return fmt.Errorf("away")
+				return nil
 			case in := <-chs.InChan:
 				t.Write(in)
 			}
@@ -551,7 +548,7 @@ func (c *Controller) ConnectMonitor(ctx *gin.Context) {
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
 
 	sessionId := ctx.Param("session_id")
-	key := fmt.Sprintf("%d-%s-%d", currentUser.Uid, sessionId, time.Now().Nanosecond())
+	var session *model.Session
 	ws, err := Upgrader.Upgrade(ctx.Writer, ctx.Request, http.Header{
 		"sec-websocket-protocol": {ctx.GetHeader("sec-websocket-protocol")},
 	})
@@ -562,7 +559,7 @@ func (c *Controller) ConnectMonitor(ctx *gin.Context) {
 	defer ws.Close()
 
 	defer func() {
-		handleError(ctx, sessionId, err, ws)
+		handleError(ctx, session, err, ws)
 	}()
 
 	if !acl.IsAdmin(currentUser) {
@@ -570,8 +567,7 @@ func (c *Controller) ConnectMonitor(ctx *gin.Context) {
 		return
 	}
 
-	session, err := loadOnlineSessionById(sessionId, true)
-	if err != nil {
+	if session, err = loadOnlineSessionById(sessionId, true); err != nil {
 		return
 	}
 
@@ -594,6 +590,7 @@ func (c *Controller) ConnectMonitor(ctx *gin.Context) {
 		}
 	}
 
+	key := fmt.Sprintf("%d-%s-%d", currentUser.Uid, sessionId, time.Now().Nanosecond())
 	session.Monitors.Store(key, ws)
 	defer func() {
 		session.Monitors.Delete(key)
@@ -861,11 +858,16 @@ func loadOnlineSessionById(sessionId string, isMonit bool) (session *model.Sessi
 	return
 }
 
-func handleError(ctx *gin.Context, sessionId string, err error, ws *websocket.Conn) {
+func handleError(ctx *gin.Context, session *model.Session, err error, ws *websocket.Conn) {
+	defer func() {
+		fmt.Println("clooooooooooooooooooooooooooooooooooooooooo")
+		close(session.Chans.AwayChan)
+	}()
+
 	if err == nil {
 		return
 	}
-	logger.L.Debug("", zap.String("session_id", sessionId), zap.Error(err))
+	logger.L.Debug("", zap.String("session_id", session.SessionId), zap.Error(err))
 	ae, ok := err.(*ApiError)
 	if !ok {
 		return

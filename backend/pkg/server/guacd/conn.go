@@ -21,10 +21,6 @@ const (
 	ignoreCert      = "true"
 )
 
-var (
-	gatewayManager = model.NewGateWayManager()
-)
-
 type Configuration struct {
 	Protocol   string
 	Parameters map[string]string
@@ -43,7 +39,7 @@ type Tunnel struct {
 	reader       *bufio.Reader
 	writer       *bufio.Writer
 	Config       *Configuration
-	g            *model.GatewayTunnel
+	g            *gatewayTunnel
 }
 
 func NewTunnel(connectionId string, w, h, dpi int, protocol string, asset *model.Asset, account *model.Account, gateway *model.Gateway) (t *Tunnel, err error) {
@@ -91,7 +87,7 @@ func NewTunnel(connectionId string, w, h, dpi int, protocol string, asset *model
 		t.Config.Parameters["recording-name"] = t.SessionId
 	}
 	if gateway != nil && gateway.Id != 0 && t.ConnectionId == "" {
-		t.g, err = gatewayManager.Open(t.SessionId, asset.Ip, cast.ToInt(port), gateway)
+		t.g, err = GlobalGatewayManager.Open(t.SessionId, asset.Ip, cast.ToInt(port), gateway)
 		if err != nil {
 			return t, err
 		}
@@ -179,7 +175,7 @@ func (t *Tunnel) WriteInstruction(instruction *Instruction) (n int, err error) {
 }
 
 func (t *Tunnel) Read() (p []byte, err error) {
-	p, err = t.reader.ReadBytes(Delimiter)
+	p, err = t.reader.ReadBytes(delimiter)
 	return
 }
 
@@ -208,10 +204,9 @@ func (t *Tunnel) assert(opcode string) (instruction *Instruction, err error) {
 }
 
 func (t *Tunnel) Close() {
-	gatewayManager.Close(t.g.Key, t.SessionId)
+	GlobalGatewayManager.Close(t.g.Key, t.SessionId)
 }
 
 func (t *Tunnel) Disconnect(args ...string) {
-	fmt.Println("-----------------------------------dis")
 	t.WriteInstruction(NewInstruction("disconnect", args...))
 }

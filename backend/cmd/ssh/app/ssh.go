@@ -17,7 +17,6 @@ import (
 	sshproto "github.com/veops/oneterm/pkg/proto/ssh"
 	cfg "github.com/veops/oneterm/pkg/proto/ssh/config"
 	"github.com/veops/oneterm/pkg/proto/ssh/handler"
-	"github.com/veops/oneterm/pkg/proto/ssh/tasks"
 )
 
 const (
@@ -87,15 +86,6 @@ func Run() {
 			return nil
 		}, func(err error) {
 			close(cancel)
-		})
-	}
-	{
-		ctx, cancel := context.WithCancel(context.Background())
-		gr.Add(func() error {
-			tasks.LoopCheck(ctx, cfg.SSHConfig.Api, cfg.SSHConfig.Token)
-			return nil
-		}, func(err error) {
-			cancel()
 		})
 	}
 

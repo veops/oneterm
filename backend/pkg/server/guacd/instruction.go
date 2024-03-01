@@ -6,12 +6,12 @@ import (
 )
 
 const (
-	InternalDataOpcode = ""
-	Delimiter          = ';'
+	internalDataOpcode = ""
+	delimiter          = ';'
 )
 
 var (
-	InternalOpcodeIns = []byte(fmt.Sprint(len(InternalDataOpcode), ".", InternalDataOpcode))
+	InternalOpcodeIns = []byte(fmt.Sprint(len(internalDataOpcode), ".", internalDataOpcode))
 )
 
 type Instruction struct {
@@ -36,7 +36,7 @@ func (i *Instruction) String() string {
 	for _, value := range i.Args {
 		i.cache += fmt.Sprintf(",%d.%s", len(value), value)
 	}
-	i.cache += string(Delimiter)
+	i.cache += string(delimiter)
 	return i.cache
 }
 

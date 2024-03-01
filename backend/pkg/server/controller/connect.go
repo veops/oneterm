@@ -317,7 +317,6 @@ func connectSsh(ctx *gin.Context, req *model.SshReq, chs *model.SessionChans) (e
 
 	g, gctx := errgroup.WithContext(context.Background())
 	g.Go(func() error {
-		// TODO
 		return sess.Wait()
 	})
 	g.Go(func() error {
@@ -327,6 +326,9 @@ func connectSsh(ctx *gin.Context, req *model.SshReq, chs *model.SessionChans) (e
 				return nil
 			default:
 				rn, size, err := buf.ReadRune()
+				if isCtxDone(gctx) {
+					return nil
+				}
 				if err != nil {
 					logger.L.Debug("buf ReadRune failed", zap.Error(err))
 					return err
@@ -346,7 +348,7 @@ func connectSsh(ctx *gin.Context, req *model.SshReq, chs *model.SessionChans) (e
 			case <-gctx.Done():
 				return nil
 			case <-chs.AwayChan:
-				return fmt.Errorf("away...")
+				return fmt.Errorf("away")
 			case s := <-chs.WindowChan:
 				wh := strings.Split(s, ",")
 				if len(wh) < 2 {
@@ -470,6 +472,9 @@ func connectGuacd(ctx *gin.Context, protocol string, chs *model.SessionChans) {
 				return nil
 			default:
 				p, err := t.Read()
+				if isCtxDone(gctx) {
+					return nil
+				}
 				if err != nil {
 					logger.L.Debug("read instruction failed", zap.Error(err))
 					return err
@@ -497,7 +502,7 @@ func connectGuacd(ctx *gin.Context, protocol string, chs *model.SessionChans) {
 			case <-gctx.Done():
 				return nil
 			case <-chs.AwayChan:
-				return nil
+				return fmt.Errorf("away")
 			case in := <-chs.InChan:
 				t.Write(in)
 			}
@@ -624,8 +629,6 @@ func (c *Controller) ConnectMonitor(ctx *gin.Context) {
 func monitSsh(ctx *gin.Context, session *model.Session, chs *model.SessionChans) (err error) {
 	req := newSshReq(ctx, model.SESSIONACTION_MONITOR)
 	req.SessionId = session.SessionId
-	chs = makeChans()
-	session.Chans = chs
 	logger.L.Debug("connect to monitor client", zap.String("sessionId", session.SessionId))
 	go connectSsh(ctx, req, chs)
 	if err = <-chs.ErrChan; err != nil {
@@ -668,7 +671,6 @@ func monitSsh(ctx *gin.Context, session *model.Session, chs *model.SessionChans)
 
 func monitGuacd(ctx *gin.Context, connectionId string, chs *model.SessionChans, ws *websocket.Conn) (err error) {
 	w, h, dpi := cast.ToInt(ctx.Query("w")), cast.ToInt(ctx.Query("h")), cast.ToInt(ctx.Query("dpi"))
-	w, h, dpi = 731, 929, 96 //TODO
 
 	defer func() {
 		chs.ErrChan <- err
@@ -860,7 +862,6 @@ func loadOnlineSessionById(sessionId string, isMonit bool) (session *model.Sessi
 
 func handleError(ctx *gin.Context, session *model.Session, err error, ws *websocket.Conn) {
 	defer func() {
-		fmt.Println("clooooooooooooooooooooooooooooooooooooooooo")
 		close(session.Chans.AwayChan)
 	}()
 
@@ -877,4 +878,13 @@ func handleError(ctx *gin.Context, session *model.Session, err error, ws *websoc
 	localizer := i18n.NewLocalizer(conf.Bundle, lang, accept)
 	ws.WriteMessage(websocket.TextMessage, []byte(ae.Message(localizer)))
 	ctx.AbortWithError(http.StatusBadRequest, err)
+}
+
+func isCtxDone(ctx context.Context) bool {
+	select {
+	case _, ok := <-ctx.Done():
+		return !ok
+	default:
+		return false
+	}
 }

@@ -16,9 +16,10 @@ import (
 
 	"github.com/veops/oneterm/pkg/conf"
 	"github.com/veops/oneterm/pkg/logger"
-	"github.com/veops/oneterm/pkg/server/cmdb"
 	"github.com/veops/oneterm/pkg/server/controller"
 	"github.com/veops/oneterm/pkg/server/router"
+	"github.com/veops/oneterm/pkg/server/schedule/cmdb"
+	"github.com/veops/oneterm/pkg/server/schedule/connectable"
 	"github.com/veops/oneterm/pkg/server/storage/cache/local"
 	"github.com/veops/oneterm/pkg/server/storage/cache/redis"
 	"github.com/veops/oneterm/pkg/server/storage/db/mysql"
@@ -108,6 +109,7 @@ func Run() {
 			close(cancel)
 		})
 		gr.Add(cmdb.Run, cmdb.Stop)
+		gr.Add(connectable.Run, connectable.Stop)
 	}
 
 	if err := gr.Run(); err != nil {

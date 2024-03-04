@@ -13,6 +13,7 @@ import (
 	"github.com/veops/oneterm/pkg/logger"
 	"github.com/veops/oneterm/pkg/server/auth/acl"
 	"github.com/veops/oneterm/pkg/server/model"
+	"github.com/veops/oneterm/pkg/server/schedule/connectable"
 	"github.com/veops/oneterm/pkg/server/storage/db/mysql"
 )
 
@@ -73,7 +74,9 @@ var (
 //	@Success	200		{object}	HttpResponse
 //	@Router		/asset [post]
 func (c *Controller) CreateAsset(ctx *gin.Context) {
-	doCreate(ctx, true, &model.Asset{}, conf.RESOURCE_ASSET)
+	asset := &model.Asset{}
+	doCreate(ctx, true, asset, conf.RESOURCE_ASSET)
+	go connectable.CheckUpdate(asset.Id)
 }
 
 // DeleteAsset godoc
@@ -95,6 +98,7 @@ func (c *Controller) DeleteAsset(ctx *gin.Context) {
 //	@Router		/asset/:id [put]
 func (c *Controller) UpdateAsset(ctx *gin.Context) {
 	doUpdate(ctx, true, &model.Asset{})
+	go connectable.CheckUpdate(cast.ToInt(ctx.Param("id")))
 }
 
 // GetAssets godoc

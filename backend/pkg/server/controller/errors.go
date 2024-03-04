@@ -19,6 +19,8 @@ const (
 	ErrWrongPk          = 4007
 	ErrWrongMac         = 4008
 	ErrInvalidSessionId = 4009
+	ErrLogin            = 4010
+	ErrAccessTime       = 4011
 	ErrInternal         = 5000
 	ErrRemoteServer     = 5001
 	ErrConnectServer    = 5002
@@ -40,6 +42,8 @@ var (
 		ErrRemoteServer:     myi18n.MsgRemoteServer,
 		ErrConnectServer:    myi18n.MsgConnectServer,
 		ErrLoadSession:      myi18n.MsgLoadSession,
+		ErrLogin:            myi18n.MsgLoginError,
+		ErrAccessTime:       myi18n.MsgAccessTime,
 	}
 )
 

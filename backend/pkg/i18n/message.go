@@ -61,6 +61,16 @@ var (
 		One:   "\n----------Session {{.sessionId}} has been ended----------\n",
 		Other: "\n----------Session {{.sessionId}} has been ended----------\n",
 	}
+	MsgLoginError = &goi18n.Message{
+		ID:    "MsgLoginError",
+		One:   "Bad Request: Invalid account",
+		Other: "Bad Request: Invalid account",
+	}
+	MsgAccessTime = &goi18n.Message{
+		ID:    "MsgAccessTime",
+		One:   "Bad Request: current time is not allowed to access",
+		Other: "Bad Request: current time is not allowed to access",
+	}
 	//
 	MsgInternalError = &goi18n.Message{
 		ID:    "MsgInternalError",
@@ -119,38 +129,39 @@ var (
 	MsgSshShowAssetResults = &goi18n.Message{
 		ID:    "MsgSshShowAssetResults",
 		One:   "Total host count is:\033[0;32m {{.Count}} \033[0m \r\n{{.Msg}}\r\n",
-		Other: "ShowAssetResultsOther",
+		Other: "Total host count is:\033[0;32m {{.Count}} \033[0m \r\n{{.Msg}}\r\n",
 	}
 	MsgSshAccountLoginError = &goi18n.Message{
 		ID: "MsgSshAccountLoginError",
 		One: "\x1b[1;30;32m failed login \x1b[0m \x1b[1;30;3m {{.User}}\x1b[0m\n" +
 			"\x1b[0;33m you need to choose asset again \u001B[0m\n",
-		Other: "AccountLoginErrorOther",
+		Other: "\x1b[1;30;32m failed login \x1b[0m \x1b[1;30;3m {{.User}}\x1b[0m\n" +
+			"\x1b[0;33m you need to choose asset again \u001B[0m\n",
 	}
 	MsgSshNoAssetPermission = &goi18n.Message{
 		ID:    "MsgSshNoAssetPermission",
 		One:   "\r\n\u001B[0;33mNo permission for[0m:\033[0;31m {{.Host}} \033[0m\r\n",
-		Other: "NoAssetPermissionOther",
+		Other: "\r\n\u001B[0;33mNo permission for[0m:\033[0;31m {{.Host}} \033[0m\r\n",
 	}
 	MsgSshNoMatchingAsset = &goi18n.Message{
 		ID:    "MsgSshNoMatchingAsset",
 		One:   "\x1b[0;33mNo matching asset for :\x1b[0m  \x1b[0;94m{{.Host}} \x1b[0m\r\n",
-		Other: "MsgSshNoMatchingAsset",
+		Other: "\x1b[0;33mNo matching asset for :\x1b[0m  \x1b[0;94m{{.Host}} \x1b[0m\r\n",
 	}
 	MsgSshNoSshAccessMethod = &goi18n.Message{
 		ID:    "MsgSshNoSshAccessMethod",
 		One:   "No ssh access method for :\033[0;31m {{.Host}} \033[0m\r\n",
-		Other: "NoSshAccessMethodOther",
+		Other: "No ssh access method for :\033[0;31m {{.Host}} \033[0m\r\n",
 	}
 	MsgSshNoSshAccountForAsset = &goi18n.Message{
 		ID:    "MsgSshNoSshAccountForAsset",
 		One:   "No ssh account for :\033[0;31m {{.Host}} \033[0m\r\n",
-		Other: "NoSshAccountForAssetOther",
+		Other: "No ssh account for :\033[0;31m {{.Host}} \033[0m\r\n",
 	}
 	MsgSshMultiSshAccountForAsset = &goi18n.Message{
 		ID:    "MsgSshMultiSshAccountForAsset",
 		One:   "choose account: \n\033[0;31m {{.Accounts}} \033[0m\n",
-		Other: "MultiSshAccountForAssetOther",
+		Other: "choose account: \n\033[0;31m {{.Accounts}} \033[0m\n",
 	}
 	MsgSshWelcome = &goi18n.Message{
 		ID: "MsgSshWelcomeMsg",
@@ -160,28 +171,33 @@ var (
 			"\x1b[1;30;32m IP/hostname \x1b[0m to search and login if only one, eg. 192\r\n" +
 			"\x1b[1;30;32m /q \x1b[0m to exit\r\n" +
 			"\x1b[1;30;32m /? \x1b[0m for help\r\n",
-		Other: "WelcomeMsgOther",
+		Other: "\x1b[0;47m Welcome: {{.User}} \x1b[0m\r\n" +
+			" \x1b[1;30;32m /s \x1b[0m to switch language between english and 中文\r\n" +
+			"\x1b[1;30;32m /* \x1b[0m to list all host which you have permission\r\n" +
+			"\x1b[1;30;32m IP/hostname \x1b[0m to search and login if only one, eg. 192\r\n" +
+			"\x1b[1;30;32m /q \x1b[0m to exit\r\n" +
+			"\x1b[1;30;32m /? \x1b[0m for help\r\n",
 	}
 	MsgSshCommandRefused = &goi18n.Message{
 		ID:    "MsgSshCommandRefused",
 		One:   "\x1b[0;31m you have no permission to execute command: \x1b[0m  \x1b[0;33m{{.Command}} \x1b[0m\r\n",
-		Other: "MsgSshCommandRefusedOther",
+		Other: "\x1b[0;31m you have no permission to execute command: \x1b[0m  \x1b[0;33m{{.Command}} \x1b[0m\r\n",
 	}
 	MsgSShHostIdleTimeout = &goi18n.Message{
 		ID:    "MsgSShHostIdleTimeout",
 		One:   "\r\n\x1b[0;31m disconnect since idle more than\x1b[0m \x1b[0;33m {{.Idle}} \x1b[0m\r\n",
-		Other: "MsgSShHostIdleTimeoutOther",
+		Other: "\r\n\x1b[0;31m disconnect since idle more than\x1b[0m \x1b[0;33m {{.Idle}} \x1b[0m\r\n",
 	}
 
 	MsgSshAccessRefusedInTimespan = &goi18n.Message{
 		ID:    "MsgSshAccessRefusedInTimespan",
 		One:   "\r\n\x1b[0;31m disconnect since current time is not allowed \x1b[0m\r\n",
-		Other: "MsgSshAccessRefusedInTimespanOther",
+		Other: "\r\n\x1b[0;31m disconnect since current time is not allowed \x1b[0m\r\n",
 	}
 
 	MsgSShWelcomeForHelp = &goi18n.Message{
 		ID:    "MsgSShWelcomeForHelp",
 		One:   "\x1b[31;47m Welcome: {{.User}}",
-		Other: "MsgSShWelcomeForHelp",
+		Other: "\x1b[31;47m Welcome: {{.User}}",
 	}
 )

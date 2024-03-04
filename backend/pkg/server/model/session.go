@@ -1,11 +1,7 @@
 package model
 
 import (
-	"bytes"
-	"io"
 	"strings"
-	"sync"
-	"sync/atomic"
 	"time"
 )
 
@@ -47,27 +43,10 @@ type Session struct {
 	UpdatedAt time.Time `json:"updated_at" gorm:"column:updated_at"`
 
 	CmdCount int64 `json:"cmd_count" gorm:"-"`
-
-	Monitors     *sync.Map     `json:"-" gorm:"-"`
-	Chans        *SessionChans `json:"-" gorm:"-"`
-	Connected    atomic.Bool   `json:"-" gorm:"-"`
-	ConnectionId string        `json:"-" gorm:"-"`
 }
 
 func (m *Session) TableName() string {
 	return "session"
-}
-
-func (m *Session) IsSsh() bool {
-	return strings.HasPrefix(m.Protocol, "ssh")
-}
-
-func (m *Session) HasMonitors() (has bool) {
-	m.Monitors.Range(func(key, value any) bool {
-		has = true
-		return false
-	})
-	return
 }
 
 type SessionCmd struct {
@@ -84,6 +63,10 @@ func (m *SessionCmd) TableName() string {
 	return "session_cmd"
 }
 
+func (m *Session) IsSsh() bool {
+	return strings.HasPrefix(m.Protocol, "ssh")
+}
+
 type CmdCount struct {
 	SessionId string `gorm:"column:session_id"`
 	Count     int64  `gorm:"column:count"`
@@ -92,41 +75,4 @@ type CmdCount struct {
 type SessionOptionAsset struct {
 	Id   int    `json:"id" gorm:"column:id;primarykey"`
 	Name string `json:"name" gorm:"column:name"`
-}
-
-type SshReq struct {
-	Uid            int    `json:"uid"`
-	UserName       string `json:"username"`
-	Cookie         string `json:"cookie"`
-	AcceptLanguage string `json:"accept_language"`
-	ClientIp       string `json:"client_ip"`
-	AssetId        int    `json:"asset_id"`
-	AccountId      int    `json:"account_id"`
-	Protocol       string `json:"protocol"`
-	Action         int    `json:"action"`
-	SessionId      string `json:"session_id"`
-}
-
-type ServerResp struct {
-	Code      int    `json:"code"`
-	Message   string `json:"message"`
-	SessionId string `json:"session_id"`
-	Uid       int    `json:"uid"`
-	UserName  string `json:"username"`
-}
-
-type SessionChans struct {
-	Rin        io.Reader
-	Win        io.Writer
-	ErrChan    chan error
-	RespChan   chan *ServerResp
-	InChan     chan []byte
-	OutChan    chan []byte
-	Buf        *bytes.Buffer
-	WindowChan chan string
-	AwayChan   chan struct{}
-	CloseChan  chan string
-}
-
-type SessionManager struct {
 }

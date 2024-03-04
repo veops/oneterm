@@ -11,14 +11,17 @@ import (
 	"github.com/samber/lo"
 	"github.com/spf13/cast"
 	"github.com/veops/oneterm/pkg/conf"
+	"github.com/veops/oneterm/pkg/logger"
+	ggateway "github.com/veops/oneterm/pkg/server/global/gateway"
 	"github.com/veops/oneterm/pkg/server/model"
 	"github.com/veops/oneterm/pkg/util"
 )
 
 const (
-	recordingPath   = "/replay"
-	createRecording = "true"
-	ignoreCert      = "true"
+	VERSION          = "VERSION_1_5_0"
+	RECORDING_PATH   = "/replay"
+	CREATE_RECORDING = "true"
+	IGNORE_CERT      = "true"
 )
 
 type Configuration struct {
@@ -39,7 +42,7 @@ type Tunnel struct {
 	reader       *bufio.Reader
 	writer       *bufio.Writer
 	Config       *Configuration
-	g            *gatewayTunnel
+	g            *ggateway.GatewayTunnel
 }
 
 func NewTunnel(connectionId string, w, h, dpi int, protocol string, asset *model.Asset, account *model.Account, gateway *model.Gateway) (t *Tunnel, err error) {
@@ -60,9 +63,10 @@ func NewTunnel(connectionId string, w, h, dpi int, protocol string, asset *model
 				connectionId == "",
 				func() map[string]string {
 					return map[string]string{
-						"recording-path":        recordingPath,
-						"create-recording-path": createRecording,
-						"ignore-cert":           ignoreCert,
+						"version":               VERSION,
+						"recording-path":        RECORDING_PATH,
+						"create-recording-path": CREATE_RECORDING,
+						"ignore-cert":           IGNORE_CERT,
 						"width":                 cast.ToString(w),
 						"height":                cast.ToString(h),
 						"dpi":                   cast.ToString(dpi),
@@ -87,7 +91,7 @@ func NewTunnel(connectionId string, w, h, dpi int, protocol string, asset *model
 		t.Config.Parameters["recording-name"] = t.SessionId
 	}
 	if gateway != nil && gateway.Id != 0 && t.ConnectionId == "" {
-		t.g, err = GlobalGatewayManager.Open(t.SessionId, asset.Ip, cast.ToInt(port), gateway)
+		t.g, err = ggateway.GetGatewayManager().Open(t.SessionId, asset.Ip, cast.ToInt(port), gateway)
 		if err != nil {
 			return t, err
 		}
@@ -204,9 +208,10 @@ func (t *Tunnel) assert(opcode string) (instruction *Instruction, err error) {
 }
 
 func (t *Tunnel) Close() {
-	GlobalGatewayManager.Close(t.g.Key, t.SessionId)
+	ggateway.GetGatewayManager().Close(t.g.Key, t.SessionId)
 }
 
 func (t *Tunnel) Disconnect(args ...string) {
+	logger.L.Debug("client disconnect")
 	t.WriteInstruction(NewInstruction("disconnect", args...))
 }

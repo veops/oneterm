@@ -1,4 +1,4 @@
-package guacd
+package gateway
 
 import (
 	"fmt"
@@ -17,15 +17,23 @@ import (
 )
 
 var (
-	GlobalGatewayManager = &gateWayManager{
-		gateways: map[GatewayTunnelKey]*gatewayTunnel{},
-		mtx:      sync.Mutex{},
-	}
+	gatewayManagerOnce = &sync.Once{}
+	manager            *GateWayManager
 )
+
+func GetGatewayManager() *GateWayManager {
+	gatewayManagerOnce.Do(func() {
+		manager = &GateWayManager{
+			gateways: map[GatewayTunnelKey]*GatewayTunnel{},
+			mtx:      sync.Mutex{},
+		}
+	})
+	return manager
+}
 
 type GatewayTunnelKey [3]string
 
-type gatewayTunnel struct {
+type GatewayTunnel struct {
 	Key               GatewayTunnelKey
 	LocalIp           string
 	LocalPort         int
@@ -38,7 +46,7 @@ type gatewayTunnel struct {
 	using             bool
 }
 
-func (gt *gatewayTunnel) Open(sessionId, remoteIp string, remotePort int) error {
+func (gt *GatewayTunnel) Open(sessionId, remoteIp string, remotePort int) error {
 	for {
 		lc, err := gt.listener.Accept()
 		if err != nil {
@@ -60,7 +68,7 @@ func (gt *gatewayTunnel) Open(sessionId, remoteIp string, remotePort int) error 
 	}
 }
 
-func (gt *gatewayTunnel) Close(sessionId string) {
+func (gt *GatewayTunnel) Close(sessionId string) {
 	if c, ok := gt.remoteConnections[sessionId]; ok {
 		c.Close()
 	}
@@ -74,12 +82,12 @@ func (gt *gatewayTunnel) Close(sessionId string) {
 	gt.using = len(gt.localConnections) > 0 && len(gt.remoteConnections) > 0
 }
 
-type gateWayManager struct {
-	gateways map[GatewayTunnelKey]*gatewayTunnel
+type GateWayManager struct {
+	gateways map[GatewayTunnelKey]*GatewayTunnel
 	mtx      sync.Mutex
 }
 
-func (gm *gateWayManager) Open(sessionId, remoteIp string, remotePort int, gateway *model.Gateway) (g *gatewayTunnel, err error) {
+func (gm *GateWayManager) Open(sessionId, remoteIp string, remotePort int, gateway *model.Gateway) (g *GatewayTunnel, err error) {
 	if gateway == nil {
 		err = fmt.Errorf("gateway is nil")
 		return
@@ -92,7 +100,7 @@ func (gm *gateWayManager) Open(sessionId, remoteIp string, remotePort int, gatew
 	if ok {
 		return
 	}
-	g = &gatewayTunnel{}
+	g = &GatewayTunnel{}
 
 	auth, err := gm.getAuth(gateway)
 	if err != nil {
@@ -116,7 +124,7 @@ func (gm *gateWayManager) Open(sessionId, remoteIp string, remotePort int, gatew
 	if err != nil {
 		return
 	}
-	g = &gatewayTunnel{
+	g = &GatewayTunnel{
 		Key:               key,
 		LocalIp:           conf.Cfg.Guacd.Gateway,
 		LocalPort:         localPort,
@@ -133,7 +141,7 @@ func (gm *gateWayManager) Open(sessionId, remoteIp string, remotePort int, gatew
 	return
 }
 
-func (gm *gateWayManager) Close(key GatewayTunnelKey, sessionIds ...string) {
+func (gm *GateWayManager) Close(key GatewayTunnelKey, sessionIds ...string) {
 	gm.mtx.Lock()
 	defer gm.mtx.Unlock()
 
@@ -150,7 +158,7 @@ func (gm *gateWayManager) Close(key GatewayTunnelKey, sessionIds ...string) {
 	}
 }
 
-func (gm *gateWayManager) getAuth(gateway *model.Gateway) (ssh.AuthMethod, error) {
+func (gm *GateWayManager) getAuth(gateway *model.Gateway) (ssh.AuthMethod, error) {
 	switch gateway.AccountType {
 	case model.AUTHMETHOD_PASSWORD:
 		return ssh.Password(gateway.Password), nil

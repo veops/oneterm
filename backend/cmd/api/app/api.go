@@ -16,7 +16,7 @@ import (
 
 	"github.com/veops/oneterm/pkg/conf"
 	"github.com/veops/oneterm/pkg/logger"
-	"github.com/veops/oneterm/pkg/server/controller"
+	gsession "github.com/veops/oneterm/pkg/server/global/session"
 	"github.com/veops/oneterm/pkg/server/router"
 	"github.com/veops/oneterm/pkg/server/schedule/cmdb"
 	"github.com/veops/oneterm/pkg/server/schedule/connectable"
@@ -80,7 +80,7 @@ func Run() {
 		os.Exit(1)
 	}
 
-	if err := controller.Init(); err != nil {
+	if err := gsession.Init(); err != nil {
 		logger.L.Error("local init failed: " + err.Error())
 		os.Exit(1)
 	}

@@ -6,23 +6,20 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/samber/lo"
 	"go.uber.org/zap"
-	"gorm.io/gorm/clause"
 
 	"github.com/veops/oneterm/pkg/logger"
 	"github.com/veops/oneterm/pkg/server/auth/acl"
+	gsession "github.com/veops/oneterm/pkg/server/global/session"
 	"github.com/veops/oneterm/pkg/server/model"
 	"github.com/veops/oneterm/pkg/server/storage/db/mysql"
 )
 
 var (
-	onlineSession = &sync.Map{}
-
 	sessionPostHooks = []postHook[*model.Session]{
 		func(ctx *gin.Context, data []*model.Session) {
 			sessionIds := lo.Map(data, func(d *model.Session, _ int) string { return d.SessionId })
@@ -58,32 +55,6 @@ var (
 	}
 )
 
-func Init() (err error) {
-	sessions := make([]*model.Session, 0)
-	if err = mysql.DB.
-		Model(sessions).
-		Where("status = ?", model.SESSIONSTATUS_ONLINE).
-		Find(&sessions).
-		Error; err != nil {
-		logger.L.Warn("get sessions failed", zap.Error(err))
-		return
-	}
-	ctx := &gin.Context{}
-	now := time.Now()
-	for _, s := range sessions {
-		if s.SessionType == model.SESSIONTYPE_WEB {
-			s.Status = model.SESSIONSTATUS_OFFLINE
-			s.ClosedAt = &now
-			handleUpsertSession(ctx, s)
-			continue
-		}
-		s.Monitors = &sync.Map{}
-		onlineSession.LoadOrStore(s.SessionId, s)
-	}
-
-	return
-}
-
 // UpsertSession godoc
 //
 //	@Tags		session
@@ -91,43 +62,17 @@ func Init() (err error) {
 //	@Success	200		{object}	HttpResponse
 //	@Router		/session [post]
 func (c *Controller) UpsertSession(ctx *gin.Context) {
-	data := &model.Session{}
+	data := &gsession.Session{}
 	if err := ctx.BindJSON(data); err != nil {
 		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
 		return
 	}
-	if err := handleUpsertSession(ctx, data); err != nil {
+	if err := gsession.HandleUpsertSession(ctx, data); err != nil {
 		logger.L.Error("upsert session failed", zap.Error(err))
 		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
 	}
 
 	ctx.JSON(http.StatusOK, defaultHttpResponse)
-}
-
-func handleUpsertSession(ctx *gin.Context, data *model.Session) (err error) {
-	if err = mysql.DB.
-		Clauses(clause.OnConflict{
-			DoUpdates: clause.AssignmentColumns([]string{"status", "closed_at"}),
-		}).
-		Create(data).
-		Error; err != nil {
-		return
-	}
-
-	switch data.Status {
-	case model.SESSIONSTATUS_ONLINE:
-		if data.Monitors == nil {
-			data.Monitors = &sync.Map{}
-		}
-		_, ok := onlineSession.LoadOrStore(data.SessionId, data)
-		if ok {
-			err = fmt.Errorf("failed to loadstore online session")
-		}
-	case model.SESSIONSTATUS_OFFLINE:
-		// doOfflineOnlineSession(ctx, data.SessionId, "")
-	}
-
-	return
 }
 
 // CreateSessionCommand godoc

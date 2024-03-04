@@ -37,6 +37,7 @@ import (
 	"github.com/veops/oneterm/pkg/proto/ssh/config"
 	"github.com/veops/oneterm/pkg/server/model"
 	"github.com/veops/oneterm/pkg/util"
+	gsession "github.com/veops/oneterm/pkg/server/global/session"
 )
 
 type InteractiveHandler struct {
@@ -64,7 +65,7 @@ type InteractiveHandler struct {
 	GatewayCloseChan chan struct{}
 
 	SelectedAsset *model.Asset
-	SessionReq    *model.SshReq
+	SessionReq    *gsession.SshReq
 
 	AccountInfo *model.Account
 	NeedAccount bool
@@ -123,7 +124,7 @@ func NewInteractiveHandler(s gossh.Session, ss *sshdServer, pty gossh.Pty) *Inte
 		Session: s,
 		Sshd:    ss,
 
-		SessionReq:  &model.SshReq{},
+		SessionReq:  &gsession.SshReq{},
 		SshSession:  map[string]*client.Connection{},
 		Pty:         pty,
 		MessageChan: make(chan string, 128),
@@ -350,7 +351,7 @@ func (i *InteractiveHandler) Schedule(pty *gossh.Pty) {
 			logger.L.Debug("connection closed", zap.String("msg", err.Error()))
 			return
 		}
-		var r *model.SshReq
+		var r *gsession.SshReq
 		err = json.Unmarshal([]byte(line), &r)
 		if err != nil {
 			logger.L.Warn(err.Error())
@@ -745,7 +746,7 @@ func (i *InteractiveHandler) wrapJsonResponse(sessionId string, code int, messag
 	if st, ok := i.Session.Context().Value("sshType").(int); ok && st != model.SESSIONTYPE_WEB {
 		return
 	}
-	res, er := json.Marshal(model.ServerResp{
+	res, er := json.Marshal(gsession.ServerResp{
 		Code:      code,
 		Message:   message,
 		SessionId: sessionId,

@@ -71,6 +71,11 @@ var (
 		One:   "Bad Request: current time is not allowed to access",
 		Other: "Bad Request: current time is not allowed to access",
 	}
+	MsgIdleTimeout = &goi18n.Message{
+		ID:    "MsgIdleTimeout",
+		One:   "Bad Request: idle timeout more than {.second} seconds",
+		Other: "Bad Request: idle timeout more than {.second} seconds",
+	}
 	//
 	MsgInternalError = &goi18n.Message{
 		ID:    "MsgInternalError",

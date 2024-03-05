@@ -88,7 +88,7 @@ func handleSsh(ctx *gin.Context, ws *websocket.Conn, session *gsession.Session) 
 	tk, tk1s := time.NewTicker(time.Millisecond*100), time.NewTicker(time.Second)
 	g, gctx := errgroup.WithContext(ctx)
 	g.Go(func() error {
-		return readWsMsg(gctx, ws, chs)
+		return readWsMsg(gctx, ws, session)
 	})
 	g.Go(func() error {
 		for {
@@ -133,10 +133,12 @@ func handleSsh(ctx *gin.Context, ws *websocket.Conn, session *gsession.Session) 
 func handleGuacd(ctx *gin.Context, ws *websocket.Conn, session *gsession.Session) (err error) {
 	chs := session.Chans
 	g, gctx := errgroup.WithContext(ctx)
+	session.IdleTimout = idleTime()
+	session.IdleTk = time.NewTicker(session.IdleTimout)
 	tk := time.NewTicker(time.Minute)
 	asset := &model.Asset{}
 	g.Go(func() error {
-		return readWsMsg(gctx, ws, chs)
+		return readWsMsg(gctx, ws, session)
 	})
 	g.Go(func() error {
 		for {
@@ -145,7 +147,7 @@ func handleGuacd(ctx *gin.Context, ws *websocket.Conn, session *gsession.Session
 				return nil
 			case closeBy := <-chs.CloseChan:
 				err := fmt.Errorf("colse by admin %s", closeBy)
-				session.GuacdTunnel.Write(guacd.NewInstruction("disconnect", err.Error()).Bytes())
+				session.GuacdTunnel.Disconnect(err.Error())
 				return err
 			case err := <-chs.ErrChan:
 				logger.L.Error("disconnected", zap.Error(err))
@@ -158,7 +160,13 @@ func handleGuacd(ctx *gin.Context, ws *websocket.Conn, session *gsession.Session
 					continue
 				}
 				err := fmt.Errorf("invalid access time")
-				session.GuacdTunnel.Write(guacd.NewInstruction("disconnect", err.Error()).Bytes())
+				ws.WriteMessage(websocket.TextMessage, guacd.NewInstruction("disconnect", (&ApiError{Code: ErrAccessTime}).Error()).Bytes())
+				session.GuacdTunnel.Disconnect(err.Error())
+				return err
+			case <-session.IdleTk.C:
+				err := fmt.Errorf("idle more than %d", int64(session.IdleTimout.Seconds()))
+				ws.WriteMessage(websocket.TextMessage, guacd.NewInstruction("disconnect").Bytes())
+				session.GuacdTunnel.Disconnect(err.Error())
 				return err
 			case out := <-chs.OutChan:
 				ws.WriteMessage(websocket.TextMessage, out)
@@ -244,9 +252,11 @@ func (c *Controller) Connect(ctx *gin.Context) {
 	session.Chans = chs
 
 	ctx.JSON(http.StatusOK, NewHttpResponseWithData(session))
+	// go connectable.CheckUpdate(cast.ToInt(ctx.Param("asset_id")))
 }
 
-func readWsMsg(ctx context.Context, ws *websocket.Conn, chs *gsession.SessionChans) error {
+func readWsMsg(ctx context.Context, ws *websocket.Conn, session *gsession.Session) error {
+	chs := session.Chans
 	for {
 		select {
 		case <-ctx.Done():
@@ -263,6 +273,9 @@ func readWsMsg(ctx context.Context, ws *websocket.Conn, chs *gsession.SessionCha
 			switch t {
 			case websocket.TextMessage:
 				chs.InChan <- msg
+				if !session.IsSsh() && guacd.IsActive(msg) {
+					session.IdleTk.Reset(session.IdleTimout)
+				}
 			}
 		}
 	}
@@ -723,8 +736,7 @@ func monitGuacd(ctx *gin.Context, connectionId string, chs *gsession.SessionChan
 			select {
 			case closeBy := <-chs.CloseChan:
 				err := fmt.Errorf("colse by admin %s", closeBy)
-				out := guacd.NewInstruction("disconnect", err.Error()).Bytes()
-				ws.WriteMessage(websocket.TextMessage, out)
+				ws.WriteMessage(websocket.TextMessage, guacd.NewInstruction("disconnect", err.Error()).Bytes())
 				logger.L.Warn(err.Error())
 				return err
 			case err := <-chs.ErrChan:

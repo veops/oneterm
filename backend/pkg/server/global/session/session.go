@@ -66,6 +66,8 @@ type Session struct {
 	Connected    atomic.Bool   `json:"-" gorm:"-"`
 	ConnectionId string        `json:"-" gorm:"-"`
 	GuacdTunnel  *guacd.Tunnel `json:"-" gorm:"-"`
+	IdleTimout   time.Duration `json:"-" gorm:"-"`
+	IdleTk       *time.Ticker  `json:"-" gorm:"-"`
 }
 
 func (m *Session) HasMonitors() (has bool) {

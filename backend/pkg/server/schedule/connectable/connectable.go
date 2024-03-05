@@ -45,10 +45,11 @@ func CheckUpdate(ids ...int) (err error) {
 	}()
 	assets := make([]*model.Asset, 0)
 	db := mysql.DB.
-		Model(assets).
-		Where("updated_at <= ?", time.Now().Add(-d).Unix())
+		Model(assets)
 	if len(ids) > 0 {
 		db = db.Where("id IN ?", ids)
+	} else {
+		db = db.Where("updated_at <= ?", time.Now().Add(-d).Unix())
 	}
 	if err = db.
 		Find(&assets).Error; err != nil {
@@ -79,12 +80,12 @@ func CheckUpdate(ids ...int) (err error) {
 		ggateway.GetGatewayManager().Close(k, v...)
 	}
 	if len(oks) > 0 {
-		if err := mysql.DB.Where("id IN ?", oks).Update("connectable", true).Error; err != nil {
+		if err := mysql.DB.Model(assets).Where("id IN ?", oks).Update("connectable", true).Error; err != nil {
 			logger.L.Debug("update connectable to ok failed", zap.Error(err))
 		}
 	}
 	if len(oks) < len(all) {
-		if err := mysql.DB.Where("id IN ?", lo.Without(all, oks...)).Update("connectable", false).Error; err != nil {
+		if err := mysql.DB.Model(assets).Where("id IN ?", lo.Without(all, oks...)).Update("connectable", false).Error; err != nil {
 			logger.L.Debug("update connectable to fail failed", zap.Error(err))
 		}
 	}

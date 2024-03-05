@@ -26,6 +26,10 @@ other = "Bad Request: This folder has sub folder or assert, cannot be deleted"
 one = "Bad Request: Asset {{.name}} dependens on this, cannot be deleted"
 other = "Bad Request: Asset {{.name}} dependens on this, cannot be deleted"
 
+[MsgIdleTimeout]
+one = "Bad Request: idle timeout more than {.second} seconds"
+other = "Bad Request: idle timeout more than {.second} seconds"
+
 [MsgInternalError]
 one = "Server Error: {{.err}}"
 other = "Server Error: {{.err}}"

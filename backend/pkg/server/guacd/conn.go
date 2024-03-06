@@ -211,7 +211,7 @@ func (t *Tunnel) Close() {
 	ggateway.GetGatewayManager().Close(t.g.Key, t.SessionId)
 }
 
-func (t *Tunnel) Disconnect(args ...string) {
+func (t *Tunnel) Disconnect() {
 	logger.L.Debug("client disconnect")
-	t.WriteInstruction(NewInstruction("disconnect", args...))
+	t.WriteInstruction(NewInstruction("disconnect"))
 }

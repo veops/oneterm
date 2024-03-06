@@ -1,10 +1,13 @@
 package controller
 
 import (
+	"encoding/base64"
 	"fmt"
 
+	"github.com/gin-gonic/gin"
 	"github.com/nicksnyder/go-i18n/v2/i18n"
 
+	"github.com/veops/oneterm/pkg/conf"
 	myi18n "github.com/veops/oneterm/pkg/i18n"
 )
 
@@ -21,10 +24,12 @@ const (
 	ErrInvalidSessionId = 4009
 	ErrLogin            = 4010
 	ErrAccessTime       = 4011
+	ErrIdleTimeout      = 4012
 	ErrInternal         = 5000
 	ErrRemoteServer     = 5001
 	ErrConnectServer    = 5002
 	ErrLoadSession      = 5003
+	ErrAdminClose       = 5004
 )
 
 var (
@@ -38,12 +43,14 @@ var (
 		ErrRemoteClient:     myi18n.MsgRemoteClient,
 		ErrWrongPk:          myi18n.MsgWrongPk,
 		ErrInvalidSessionId: myi18n.MsgInvalidSessionId,
+		ErrLogin:            myi18n.MsgLoginError,
+		ErrAccessTime:       myi18n.MsgAccessTime,
+		ErrIdleTimeout:      myi18n.MsgIdleTimeout,
 		ErrInternal:         myi18n.MsgInternalError,
 		ErrRemoteServer:     myi18n.MsgRemoteServer,
 		ErrConnectServer:    myi18n.MsgConnectServer,
 		ErrLoadSession:      myi18n.MsgLoadSession,
-		ErrLogin:            myi18n.MsgLoginError,
-		ErrAccessTime:       myi18n.MsgAccessTime,
+		ErrAdminClose:       myi18n.MsgAdminClose,
 	}
 )
 
@@ -69,4 +76,16 @@ func (ae *ApiError) Message(localizer *i18n.Localizer) (msg string) {
 	msg, _ = localizer.Localize(cfg)
 
 	return
+}
+
+func (ae *ApiError) MessageWithCtx(ctx *gin.Context) string {
+	lang := ctx.PostForm("lang")
+	accept := ctx.GetHeader("Accept-Language")
+	localizer := i18n.NewLocalizer(conf.Bundle, lang, accept)
+	return ae.Message(localizer)
+}
+
+func (ae *ApiError) MessageBase64(ctx *gin.Context) string {
+	s := ae.MessageWithCtx(ctx)
+	return base64.StdEncoding.EncodeToString([]byte(s))
 }

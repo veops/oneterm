@@ -59,5 +59,5 @@ func (i *Instruction) Parse(content string) *Instruction {
 
 func IsActive(p []byte) bool {
 	i := (&Instruction{}).Parse(string(p))
-	return i.Opcode == "mouse" || i.Opcode == "keyboard"
+	return i.Opcode == "mouse" || i.Opcode == "key"
 }

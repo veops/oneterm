@@ -97,6 +97,11 @@ var (
 		One:   "Connect Server Error",
 		Other: "Connect Server Error",
 	}
+	MsgAdminClose = &goi18n.Message{
+		ID:    "MsgAdminClose",
+		One:   "Sessoin has been closed by admin {{.admin}}",
+		Other: "Sessoin has been closed by admin {{.admin}}",
+	}
 
 	// others
 	MsgTypeMappingAccount = &goi18n.Message{

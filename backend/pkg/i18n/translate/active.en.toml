@@ -2,6 +2,10 @@
 one = "Bad Request: current time is not allowed to access"
 other = "Bad Request: current time is not allowed to access"
 
+[MsgAdminClose]
+one = "Sessoin has been closed by admin {{.admin}}"
+other = "Sessoin has been closed by admin {{.admin}}"
+
 [MsgArgumentError]
 one = "Bad Request: Argument is invalid, {{.err}}"
 other = "Bad Request: Argument is invalid, {{.err}}"

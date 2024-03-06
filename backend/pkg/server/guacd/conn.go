@@ -139,7 +139,7 @@ func (t *Tunnel) handshake() (err error) {
 	if _, err = t.WriteInstruction(NewInstruction("video")); err != nil {
 		return
 	}
-	if _, err = t.WriteInstruction(NewInstruction("image")); err != nil {
+	if _, err = t.WriteInstruction(NewInstruction("image", "image/jpeg", "image/png", "image/webp")); err != nil {
 		return
 	}
 

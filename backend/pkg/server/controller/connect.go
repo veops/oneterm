@@ -74,7 +74,7 @@ func (c *Controller) Connecting(ctx *gin.Context) {
 	if session, err = loadOnlineSessionById(sessionId, false); err != nil {
 		return
 	}
-	session.Connected.CompareAndSwap(false, true)
+	session.Connected.Store(true)
 	if session.IsSsh() {
 		err = handleSsh(ctx, ws, session)
 	} else {
@@ -131,6 +131,7 @@ func handleSsh(ctx *gin.Context, ws *websocket.Conn, session *gsession.Session) 
 }
 
 func handleGuacd(ctx *gin.Context, ws *websocket.Conn, session *gsession.Session) (err error) {
+	defer session.GuacdTunnel.Disconnect()
 	chs := session.Chans
 	g, gctx := errgroup.WithContext(ctx)
 	session.IdleTimout = idleTime()
@@ -146,9 +147,7 @@ func handleGuacd(ctx *gin.Context, ws *websocket.Conn, session *gsession.Session
 			case <-gctx.Done():
 				return nil
 			case closeBy := <-chs.CloseChan:
-				err := fmt.Errorf("colse by admin %s", closeBy)
-				session.GuacdTunnel.Disconnect(err.Error())
-				return err
+				return &ApiError{Code: ErrAdminClose, Data: map[string]any{"admin": closeBy}}
 			case err := <-chs.ErrChan:
 				logger.L.Error("disconnected", zap.Error(err))
 				return err
@@ -159,15 +158,9 @@ func handleGuacd(ctx *gin.Context, ws *websocket.Conn, session *gsession.Session
 				if checkTime(asset.AccessAuth) {
 					continue
 				}
-				err := fmt.Errorf("invalid access time")
-				ws.WriteMessage(websocket.TextMessage, guacd.NewInstruction("disconnect", (&ApiError{Code: ErrAccessTime}).Error()).Bytes())
-				session.GuacdTunnel.Disconnect(err.Error())
-				return err
+				return &ApiError{Code: ErrAccessTime}
 			case <-session.IdleTk.C:
-				err := fmt.Errorf("idle more than %d", int64(session.IdleTimout.Seconds()))
-				ws.WriteMessage(websocket.TextMessage, guacd.NewInstruction("disconnect").Bytes())
-				session.GuacdTunnel.Disconnect(err.Error())
-				return err
+				return &ApiError{Code: ErrIdleTimeout, Data: map[string]any{"second": int64(session.IdleTimout.Seconds())}}
 			case out := <-chs.OutChan:
 				ws.WriteMessage(websocket.TextMessage, out)
 			}
@@ -490,6 +483,19 @@ func connectGuacd(ctx *gin.Context, asset *model.Asset, protocol string, chs *gs
 	chs.RespChan <- resp
 
 	g, gctx := errgroup.WithContext(context.Background())
+	g.Go(func() error {
+		for {
+			select {
+			case <-gctx.Done():
+				return nil
+			case <-time.After(time.Minute):
+				if !session.Connected.Load() {
+					session.Chans.AwayChan <- struct{}{}
+				}
+				return nil
+			}
+		}
+	})
 	g.Go(func() error {
 		for {
 			select {
@@ -904,11 +910,12 @@ func handleError(ctx *gin.Context, session *gsession.Session, err error, ws *web
 	if !ok {
 		return
 	}
-	lang := ctx.PostForm("lang")
-	accept := ctx.GetHeader("Accept-Language")
-	localizer := i18n.NewLocalizer(conf.Bundle, lang, accept)
-	ws.WriteMessage(websocket.TextMessage, []byte(ae.Message(localizer)))
-	ctx.AbortWithError(http.StatusBadRequest, err)
+	if session.IsSsh() {
+		ws.WriteMessage(websocket.TextMessage, []byte(ae.MessageWithCtx(ctx)))
+	} else {
+		ws.WriteMessage(websocket.TextMessage, guacd.NewInstruction("error", (ae).MessageBase64(ctx), cast.ToString(ErrAdminClose)).Bytes())
+	}
+	// ctx.AbortWithError(http.StatusBadRequest, err)
 }
 
 func isCtxDone(ctx context.Context) bool {

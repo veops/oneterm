@@ -1,3 +1,3 @@
-[MsgIdleTimeout]
-hash = "sha1-6c4e9527b5f5d4e5e1af1160fe3eeec9ece04275"
-other = "请求错误: 空闲时间超过 {.second} 秒"
+[MsgAdminClose]
+hash = "sha1-2ad64c7e0fc95c7ba4f6e4b2bb39898421cec19a"
+other = "会话已被管理员 {{.admin}} 关闭"

@@ -2,7 +2,7 @@ version: "3.0"
 
 services:
   oneterm-api:
-    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-api:1.24.1
+    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-api:24.3
     container_name: oneterm-api
     volumes:
       - file-data:/replay
@@ -10,6 +10,7 @@ services:
     depends_on:
       - mysql
       - redis
+      - oneterm-guacd
     restart: always
     networks:
       new:
@@ -17,7 +18,7 @@ services:
           - oneterm-api
 
   oneterm-ssh:
-    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-ssh:1.24.2
+    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-ssh:24.3
     container_name: oneterm-ssh
     ports:
       - "12229:12228"
@@ -34,6 +35,17 @@ services:
       new:
         aliases:
           - oneterm-ssh
+
+  oneterm-guacd:
+    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-guacd:24.3
+    container_name: oneterm-guacd
+    restart: always
+    volumes:
+      - file-data:/replay
+    networks:
+      new:
+        aliases:
+          - oneterm-guacd
 
   mysql:
     image: registry.cn-hangzhou.aliyuncs.com/veops/mysql:latest

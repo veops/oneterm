@@ -140,6 +140,14 @@ const oneterm_en = {
         param: 'Param',
         before: 'Before',
         after: 'After',
+    },
+    guacamole: {
+        play: 'click to play',
+        idle: 'Initializing...',
+        connecting: 'Connecting...',
+        waiting: 'Waiting...',
+        connected: 'Connected',
+        disconnect: 'Disconnect'
     }
 }
 export default oneterm_en

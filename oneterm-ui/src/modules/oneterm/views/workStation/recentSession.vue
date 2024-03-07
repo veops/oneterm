@@ -19,13 +19,13 @@
         <vxe-column :title="$t(`oneterm.sessionTable.clientIp`)" field="client_ip"> </vxe-column>
         <vxe-column :title="$t(`oneterm.protocol`)" field="protocol"> </vxe-column>
         <vxe-column :title="$t(`operation`)" width="80" align="center">
-          <template #default="{ row }">
+          <template #default="{row}">
             <a-space>
               <a-tooltip :title="$t(`login`)">
-                <a @click="openTerminal(row)"><ops-icon type="oneterm-login" /></a>
+                <a @click="openTerminal(row)"><ops-icon type="oneterm-login"/></a>
               </a-tooltip>
               <a-tooltip :title="$t(`oneterm.switchAccount`)">
-                <a @click="openLogin(row)"><ops-icon type="oneterm-switch" /></a>
+                <a @click="openLogin(row)"><ops-icon type="oneterm-switch"/></a>
               </a-tooltip>
             </a-space>
           </template>

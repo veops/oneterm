@@ -118,15 +118,13 @@ export default {
       return this.$t(`oneterm.assetList.editAsset`)
     },
   },
-  mounted() {
-    getNodeList().then((res) => {
-      this.nodeList = res?.data?.list || []
-    })
-  },
   methods: {
     setAsset(asset, type) {
       this.visible = true
       this.type = type
+      getNodeList().then((res) => {
+        this.nodeList = res?.data?.list || []
+      })
       this.$nextTick(() => {
         const {
           id = null,

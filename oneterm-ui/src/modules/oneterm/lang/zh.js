@@ -140,6 +140,14 @@ const oneterm_zh = {
         param: '属性',
         before: '操作前',
         after: '操作后',
+    },
+    guacamole: {
+        play: '点击播放',
+        idle: '正在初始化中...',
+        connecting: '正在努力连接中...',
+        waiting: '正在等待服务器响应...',
+        connected: '连接成功',
+        disconnect: '连接已关闭'
     }
 }
 export default oneterm_zh

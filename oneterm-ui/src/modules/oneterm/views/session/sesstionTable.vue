@@ -230,10 +230,22 @@ export default {
       return time
     },
     openReplay(row) {
-      window.open(`/oneterm/replay/${row.session_id}`, '_blank')
+      if (row.protocol.includes('rdp') || row.protocol.includes('vnc')) {
+        window.open(`/oneterm/replay/guacamole/${row.session_id}`, '_blank')
+      } else {
+        window.open(`/oneterm/replay/${row.session_id}`, '_blank')
+      }
     },
     openMonitor(row) {
-      window.open(`/oneterm/terminal?session_id=${row.session_id}&&is_monitor=true`, '_blank')
+      if (row.protocol.includes('rdp') || row.protocol.includes('vnc')) {
+        const { asset_id, account_id, protocol } = row
+        window.open(
+          `/oneterm/guacamole/${asset_id}/${account_id}/${protocol}?session_id=${row.session_id}&&is_monitor=true`,
+          '_blank'
+        )
+      } else {
+        window.open(`/oneterm/terminal?session_id=${row.session_id}&&is_monitor=true`, '_blank')
+      }
     },
     disconnect(row) {
       this.loading = true

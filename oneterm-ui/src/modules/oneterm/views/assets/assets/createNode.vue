@@ -60,7 +60,7 @@
         prop="type_id"
         :style="{ display: 'flex', alignItems: 'center' }"
       >
-        <CMDBTypeSelect v-model="syncForm.type_id" selectType="ci_type" @select="changeTypeId" />
+        <CMDBTypeSelect v-model="syncForm.type_id" selectType="ci_type" @change="changeTypeId" />
       </a-form-model-item>
       <a-form-model-item :label="$t('oneterm.fieldMap')">
         <div v-for="item in fieldMap" :key="item.id">
@@ -105,7 +105,7 @@
               </treeselect>
             </div>
           </div>
-          <span v-if="item.error" style="color:red">{{ `${$t(`placeholder2`)}` }}</span>
+          <span v-if="item.error" style="color: red">{{ `${$t(`placeholder2`)}` }}</span>
         </div>
       </a-form-model-item>
       <a-form-model-item :label="$t('oneterm.filter')" class="cmdb-value-filter">
@@ -215,7 +215,7 @@ export default {
     setNode(node, type) {
       this.visible = true
       this.type = type
-      this.$nextTick(() => {
+      this.$nextTick(async () => {
         const params = {}
         if (node?.id) {
           params.no_self_child = node.id
@@ -247,26 +247,26 @@ export default {
           enable,
           frequency,
         }
-
-        this.changeTypeId({ id: type_id })
-        this.fieldMap =
-          JSON.stringify(mapping) === '{}'
-            ? [
-                {
-                  field_name: undefined,
-                  attribute: { value: 'name', label: this.$t('oneterm.name') },
-                },
-                {
-                  field_name: undefined,
-                  attribute: { value: 'ip', label: 'IP' },
-                },
-              ]
-            : Object.keys(mapping).map((key) => {
-                return {
-                  field_name: mapping[key],
-                  attribute: { value: key, label: this.fieldMapObj[key] },
-                }
-              })
+        this.$nextTick(() => {
+          this.fieldMap =
+            JSON.stringify(mapping) === '{}'
+              ? [
+                  {
+                    field_name: undefined,
+                    attribute: { value: 'name', label: this.$t('oneterm.name') },
+                  },
+                  {
+                    field_name: undefined,
+                    attribute: { value: 'ip', label: 'IP' },
+                  },
+                ]
+              : Object.keys(mapping).map((key) => {
+                  return {
+                    field_name: mapping[key],
+                    attribute: { value: key, label: this.fieldMapObj[key] },
+                  }
+                })
+        })
         this.filterExp = filters
         this.$nextTick(() => {
           this.$refs.filterComp.visibleChange(true, false)
@@ -276,12 +276,24 @@ export default {
         this.$refs.accessAuth.setValues(access_auth)
       })
     },
-    async changeTypeId({ id }) {
+    async changeTypeId(id) {
+      this.fieldMap = [
+        {
+          field_name: undefined,
+          attribute: { value: 'name', label: this.$t('oneterm.name') },
+        },
+        {
+          field_name: undefined,
+          attribute: { value: 'ip', label: 'IP' },
+        },
+      ]
       if (id) {
         await getCITypeAttributesById(id).then((res) => {
           const { attributes } = res
           this.attributes = attributes
         })
+      } else {
+        this.attributes = []
       }
     },
     setExpFromFilter(filterExp) {

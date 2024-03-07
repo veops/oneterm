@@ -98,11 +98,25 @@ const genOnetermRoutes = () => {
                 meta: { title: '终端', keepAlive: false }
             },
             {
+                path: '/oneterm/guacamole/:asset_id/:account_id/:protocol',
+                name: 'oneterm_guacamole',
+                hidden: true,
+                component: () => import('../views/terminal/guacamoleClient.vue'),
+                meta: { title: '终端', keepAlive: false }
+            },
+            {
                 path: '/oneterm/replay/:session_id',
                 name: 'oneterm_replay',
                 hidden: true,
                 component: () => import('../views/replay'),
-                meta: { title: '回放', icon: 'ops-itsm-servicedesk', selectedIcon: 'ops-itsm-servicedesk-selected', keepAlive: false }
+                meta: { title: '回放', keepAlive: false }
+            },
+            {
+                path: '/oneterm/replay/guacamole/:session_id',
+                name: 'oneterm_replay_guacamole',
+                hidden: true,
+                component: () => import('../views/replay/guacamoleReplay.vue'),
+                meta: { title: '回放', keepAlive: false }
             },
         ]
     }

@@ -63,7 +63,8 @@ export default {
       this.websocket = new WebSocket(
         is_monitor
           ? `${protocol}://${document.location.host}/api/oneterm/v1/connect/monitor/${session_id}?w=${this.term.cols}&h=${this.term.rows}`
-          : `${protocol}://${document.location.host}/api/oneterm/v1/connect/${session_id}?w=${this.term.cols}&h=${this.term.rows}`
+          : `${protocol}://${document.location.host}/api/oneterm/v1/connect/${session_id}?w=${this.term.cols}&h=${this.term.rows}`,
+        ['Sec-WebSocket-Protocol']
       )
       this.websocket.onopen = this.websocketOpen()
       this.websocket.onmessage = this.getMessage

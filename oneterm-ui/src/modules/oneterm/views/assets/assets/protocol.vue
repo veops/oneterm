@@ -3,12 +3,22 @@
     <a-form-model-item :label="$t('oneterm.protocol')">
       <div class="protocol-box" v-for="(pro, index) in protocols" :key="pro.id">
         <a-input-group compact>
-          <a-select v-model="pro.value" style="width: 100px">
+          <a-select v-model="pro.value" style="width: 100px" @change="(value) => changeProValue(value, index)">
             <a-select-option value="ssh">
               ssh
             </a-select-option>
+            <a-select-option value="rdp">
+              rdp
+            </a-select-option>
+            <a-select-option value="vnc">
+              vnc
+            </a-select-option>
           </a-select>
-          <a-input :placeholder="$t('oneterm.assetList.protocolPlaceholder')" v-model="pro.label" style="width: calc(100% - 100px)" />
+          <a-input
+            :placeholder="$t('oneterm.assetList.protocolPlaceholder')"
+            v-model="pro.label"
+            style="width: calc(100% - 100px)"
+          />
         </a-input-group>
         <a-space>
           <a @click="addPro"><a-icon type="plus-circle"/></a>
@@ -64,6 +74,7 @@
 </template>
 
 <script>
+import _ from 'lodash'
 import { v4 as uuidv4 } from 'uuid'
 import { getGatewayList } from '../../../api/gateway'
 export default {
@@ -104,6 +115,19 @@ export default {
             label: p.split(':')[1],
           }))
         : [{ id: uuidv4(), value: 'ssh', label: '22' }]
+    },
+    changeProValue(value, index) {
+      const _pro = _.cloneDeep(this.protocols[index])
+      if (value === 'rdp') {
+        _pro.label = '3389'
+      }
+      if (value === 'vnc') {
+        _pro.label = '5900'
+      }
+      if (value === 'ssh') {
+        _pro.label = '22'
+      }
+      this.$set(this.protocols, index, _pro)
     },
   },
 }

@@ -94,11 +94,15 @@ export default {
         if (valid) {
           this.handleCancel()
           const { account_id, protocol } = this.loginForm
-          postConnectIsRight(this.asset_id, account_id, protocol).then((res) => {
-            if (res?.data?.session_id) {
-              window.open(`/oneterm/terminal?session_id=${res?.data?.session_id}`, '_blank')
-            }
-          })
+          if (protocol.includes('rdp') || protocol.includes('vnc')) {
+            window.open(`/oneterm/guacamole/${this.asset_id}/${account_id}/${protocol}`, '_blank')
+          } else {
+            postConnectIsRight(this.asset_id, account_id, protocol).then((res) => {
+              if (res?.data?.session_id) {
+                window.open(`/oneterm/terminal?session_id=${res?.data?.session_id}`, '_blank')
+              }
+            })
+          }
         }
       })
     },

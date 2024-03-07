@@ -80,8 +80,9 @@ doc link：https://veops.cn/docs/docs/oneterm/onterm_design
 
 ## 🎯TODO
 
-- [ ] RDP
-- [ ] VNC
+- [x] RDP
+- [x] VNC
+- [ ] Remove CTE to compatible with mysql5.7
 
 ## 🔗Releated Projects
 

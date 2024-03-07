@@ -38,7 +38,13 @@ export default {
       return enUS
     },
     isOpsFullScreen() {
-      return ['cmdb_screen', 'oneterm_terminal', 'oneterm_replay'].includes(this.$route.name)
+      return [
+        'cmdb_screen',
+        'oneterm_terminal',
+        'oneterm_replay',
+        'oneterm_guacamole',
+        'oneterm_replay_guacamole',
+      ].includes(this.$route.name)
     },
     isOpsOnlyTopMenu() {
       return ['fullscreen_index', 'setting_person', 'notice_center'].includes(this.$route.name)

@@ -113,6 +113,10 @@ export default {
         this.playBtnIcon = 'play-circle'
       }
 
+      recordingDisplay.onresize = () => {
+        this.onWindowResize()
+      }
+
       recording.onseek = (millis) => {
         this.percent = millis
         this.position = times.formatTime(millis)
@@ -237,5 +241,11 @@ export default {
   left: 0;
   width: 100vw;
   height: 100vh;
+}
+</style>
+
+<style lang="less">
+.oneterm-guacamole-replay > div {
+  margin: 0 auto;
 }
 </style>

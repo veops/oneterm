@@ -18,6 +18,11 @@
         <vxe-column :title="$t(`oneterm.account`)" field="account_info"> </vxe-column>
         <vxe-column :title="$t(`oneterm.sessionTable.clientIp`)" field="client_ip"> </vxe-column>
         <vxe-column :title="$t(`oneterm.protocol`)" field="protocol"> </vxe-column>
+        <vxe-column :title="$t(`oneterm.workStation.loginTime`)" field="created_at">
+          <template #default="{row}">
+            {{ moment(row.created_at).format('YYYY-MM-DD HH:mm:ss') }}
+          </template>
+        </vxe-column>
         <vxe-column :title="$t(`operation`)" width="80" align="center">
           <template #default="{row}">
             <a-space>
@@ -57,6 +62,7 @@
 </template>
 
 <script>
+import moment from 'moment'
 import { mapGetters } from 'vuex'
 import { getSessionList } from '../../api/session'
 import { getAssetList } from '../../api/asset'
@@ -83,6 +89,7 @@ export default {
     this.updateTableData()
   },
   methods: {
+    moment,
     updateTableData(currentPage = 1, pageSize = this.tablePage.pageSize) {
       this.loading = true
       getSessionList({

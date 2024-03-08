@@ -221,8 +221,6 @@ export default {
 
 <style lang="less">
 .oneterm-guacamole > div {
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
+  margin: 0 auto;
 }
 </style>

@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -18,53 +19,7 @@ import (
 )
 
 var (
-	assetPostHooks = []postHook[*model.Asset]{
-		func(ctx *gin.Context, data []*model.Asset) {
-			post := make([]*model.AssetNodeChain, 0)
-			if err := mysql.DB.
-				Model(&model.Node{}).
-				Raw(`
-				WITH RECURSIVE cte AS(
-					SELECT id, name AS chain
-					FROM node
-					WHERE
-						deleted_at = 0
-						AND parent_id = 0
-					UNION ALL
-					SELECT
-						t.id,
-						CONCAT(cte.chain, '/', t.name)
-					FROM cte
-						INNER JOIN node t on cte.id = t.parent_id
-					WHERE deleted_at = 0
-				)
-				SELECT *
-				FROM cte
-				`).
-				Find(&post).
-				Error; err != nil {
-				logger.L.Error("asset posthookfailed", zap.Error(err))
-				return
-			}
-			m := lo.SliceToMap(post, func(p *model.AssetNodeChain) (int, string) { return p.NodeId, p.Chain })
-			for _, d := range data {
-				d.NodeChain = m[d.ParentId]
-			}
-		}, func(ctx *gin.Context, data []*model.Asset) {
-			currentUser, _ := acl.GetSessionFromCtx(ctx)
-			if acl.IsAdmin(currentUser) {
-				return
-			}
-			for _, a := range data {
-				for k, v := range a.Authorization {
-					if lo.Contains(v, currentUser.GetRid()) {
-						continue
-					}
-					delete(a.Authorization, k)
-				}
-			}
-		},
-	}
+	assetPostHooks = []postHook[*model.Asset]{assetPostHookCount, assetPostHookAuth}
 )
 
 // CreateAsset godoc
@@ -127,30 +82,11 @@ func (c *Controller) GetAssets(ctx *gin.Context) {
 		db = db.Where("id IN ?", lo.Map(strings.Split(q, ","), func(s string, _ int) int { return cast.ToInt(s) }))
 	}
 	if q, ok := ctx.GetQuery("parent_id"); ok {
-		parentIds := make([]int, 0)
-		if err := mysql.DB.
-			Model(&model.Node{}).
-			Raw(`
-				WITH RECURSIVE cte AS(
-				SELECT id
-				FROM node 
-				WHERE deleted_at = 0
-				AND parent_id = ?
-				UNION ALL
-				SELECT t.id
-				FROM cte
-					INNER JOIN node t on cte.id = t.parent_id
-				WHERE deleted_at = 0
-				)
-				SELECT id
-				FROM cte;
-				`, q).
-			Find(&parentIds).
-			Error; err != nil {
+		parentIds, err := handleParentId(cast.ToInt(q))
+		if err != nil {
 			logger.L.Error("parent id found failed", zap.Error(err))
 			return
 		}
-		parentIds = append(parentIds, cast.ToInt(q))
 		db = db.Where("parent_id IN ?", parentIds)
 	}
 
@@ -219,4 +155,68 @@ func (c *Controller) UpdateByServer(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, defaultHttpResponse)
+}
+
+func assetPostHookCount(ctx *gin.Context, data []*model.Asset) {
+	nodes := make([]*model.NodeIdPidName, 0)
+	if err := mysql.DB.
+		Model(nodes).
+		Find(&nodes).
+		Error; err != nil {
+		logger.L.Error("asset posthookfailed", zap.Error(err))
+		return
+	}
+	g := make(map[int][]model.Pair[int, string])
+	for _, n := range nodes {
+		g[n.ParentId] = append(g[n.ParentId], model.Pair[int, string]{First: n.Id, Second: n.Name})
+	}
+	m := make(map[int]string)
+	var dfs func(int, string)
+	dfs = func(x int, s string) {
+		m[x] = s
+		for _, node := range g[x] {
+			dfs(node.First, fmt.Sprintf("%s/%s", s, node.Second))
+		}
+	}
+	dfs(0, "")
+
+	for _, d := range data {
+		d.NodeChain = m[d.ParentId]
+	}
+}
+
+func assetPostHookAuth(ctx *gin.Context, data []*model.Asset) {
+	currentUser, _ := acl.GetSessionFromCtx(ctx)
+	if acl.IsAdmin(currentUser) {
+		return
+	}
+	for _, a := range data {
+		for k, v := range a.Authorization {
+			if lo.Contains(v, currentUser.GetRid()) {
+				continue
+			}
+			delete(a.Authorization, k)
+		}
+	}
+}
+
+func handleParentId(parentId int) (pids []int, err error) {
+	nodes := make([]*model.NodeIdPid, 0)
+	if err = mysql.DB.Model(nodes).Find(&nodes).Error; err != nil {
+		return
+	}
+	g := make(map[int][]int)
+	for _, n := range nodes {
+		g[n.ParentId] = append(g[n.ParentId], n.Id)
+	}
+	var dfs func(int)
+	dfs = func(x int) {
+		pids = append(pids, x)
+		for _, y := range g[x] {
+			dfs(y)
+		}
+	}
+	dfs(parentId)
+
+	return
 }

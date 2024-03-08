@@ -29,36 +29,21 @@ func (c *Controller) StatAssetType(ctx *gin.Context) {
 		return
 	}
 
-	t := mysql.DB.
-		Model(&model.Asset{}).
-		Raw(`
-		WITH RECURSIVE cte AS(
-			SELECT parent_id
-			FROM asset
-			WHERE deleted_at = 0
-			UNION ALL
-			SELECT t.parent_id
-			FROM cte
-				INNER JOIN node t on cte.parent_id = t.id
-			WHERE deleted_at = 0
-		)
-		SELECT
-			parent_id,
-			COUNT(*) AS count
-		FROM cte
-		GROUP BY parent_id
-		`)
-
-	err := mysql.DB.
-		Model(&model.Node{}).
-		Select("node.name, t.count").
-		Joins("LEFT JOIN (?) t ON node.id = t.parent_id", t).
-		Where("node.parent_id = 0").
-		Find(&stat).
-		Error
+	m, err := nodeCountAsset()
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, err)
 		return
+	}
+	if err = mysql.DB.
+		Model(stat).
+		Where("parent_id = 0").
+		Find(&stat).
+		Error; err != nil {
+		ctx.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+	for _, s := range stat {
+		s.Count = m[s.Id]
 	}
 
 	redis.SetEx(ctx, key, stat, time.Minute)
@@ -297,4 +282,25 @@ func toListData[T any](data []T) *ListData {
 		Count: int64(len(data)),
 		List:  lo.Map(data, func(d T, _ int) any { return d }),
 	}
+}
+
+func nodeCountAsset() (res map[int]int64, err error) {
+	assets := make([]*model.AssetIdPid, 0)
+	if err = mysql.DB.Model(assets).Find(&assets).Error; err != nil {
+		return
+	}
+	g := make(map[int][]int)
+	for _, n := range assets {
+		g[n.ParentId] = append(g[n.ParentId], n.Id)
+	}
+	var dfs func(int) int64
+	dfs = func(x int) int64 {
+		res[x] += 1
+		for _, y := range g[x] {
+			res[x] += dfs(y)
+		}
+		return res[x]
+	}
+
+	return
 }

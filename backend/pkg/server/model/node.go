@@ -6,6 +6,10 @@ import (
 	"gorm.io/plugin/soft_delete"
 )
 
+const (
+	TABLE_NAME_NODE = "node"
+)
+
 type Node struct {
 	Id            int                  `json:"id" gorm:"column:id;primarykey"`
 	Name          string               `json:"name" gorm:"column:name"`
@@ -37,7 +41,7 @@ type Sync struct {
 }
 
 func (m *Node) TableName() string {
-	return "node"
+	return TABLE_NAME_NODE
 }
 func (m *Node) SetId(id int) {
 	m.Id = id
@@ -61,7 +65,21 @@ func (m *Node) GetId() int {
 	return m.Id
 }
 
-type NodeCount struct {
-	ParentId int   `gorm:"column:parent_id"`
-	Count    int64 `gorm:"column:count"`
+type NodeIdPid struct {
+	Id       int `gorm:"column:id"`
+	ParentId int `gorm:"column:parent_id"`
+}
+
+func (m *NodeIdPid) TableName() string {
+	return TABLE_NAME_NODE
+}
+
+type NodeIdPidName struct {
+	Id       int    `gorm:"column:id"`
+	ParentId int    `gorm:"column:parent_id"`
+	Name     string `gorm:"column:name"`
+}
+
+func (m *NodeIdPidName) TableName() string {
+	return TABLE_NAME_NODE
 }

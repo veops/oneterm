@@ -42,3 +42,8 @@ type Model interface {
 	GetId() int
 	GetName() string
 }
+
+type Pair[T1, T2 any] struct {
+	First  T1
+	Second T2
+}

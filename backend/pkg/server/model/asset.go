@@ -6,6 +6,10 @@ import (
 	"gorm.io/plugin/soft_delete"
 )
 
+const (
+	TABLE_NAME_ASSET = "asset"
+)
+
 type Asset struct {
 	Id            int                  `json:"id" gorm:"column:id;primarykey"`
 	Ciid          int                  `json:"ci_id" gorm:"column:ci_id"`
@@ -42,7 +46,7 @@ type Range struct {
 }
 
 func (m *Asset) TableName() string {
-	return "asset"
+	return TABLE_NAME_ASSET
 }
 func (m *Asset) SetId(id int) {
 	m.Id = id
@@ -66,7 +70,11 @@ func (m *Asset) GetId() int {
 	return m.Id
 }
 
-type AssetNodeChain struct {
-	NodeId int    `gorm:"column:id"`
-	Chain  string `gorm:"column:chain"`
+type AssetIdPid struct {
+	Id       int `gorm:"column:id"`
+	ParentId int `gorm:"column:parent_id"`
+}
+
+func (m *AssetIdPid) TableName() string {
+	return TABLE_NAME_ASSET
 }

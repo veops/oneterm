@@ -5,8 +5,13 @@ import (
 )
 
 type StatAssetType struct {
+	Id    int    `json:"id" gorm:"column:id"`
 	Name  string `json:"name" gorm:"column:name"`
-	Count int    `json:"count" gorm:"column:count"`
+	Count int64  `json:"count" gorm:"column:count"`
+}
+
+func (m *StatAssetType) TableName() string {
+	return TABLE_NAME_NODE
 }
 
 type StatCount struct {

@@ -39,6 +39,7 @@ services:
   oneterm-guacd:
     image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-guacd:24.3
     container_name: oneterm-guacd
+    user: root
     restart: always
     volumes:
       - file-data:/replay
@@ -83,7 +84,7 @@ services:
           - redis
 
   oneterm-ui:
-    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-ui:1.24.1
+    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-ui:24.3
     container_name: oneterm-ui
     depends_on:
       - oneterm-api

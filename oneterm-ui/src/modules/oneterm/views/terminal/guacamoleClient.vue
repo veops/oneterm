@@ -54,10 +54,11 @@ export default {
   methods: {
     init() {
       const { session_id, is_monitor } = this
+      const protocol = document.location.protocol.startsWith('https') ? 'wss' : 'ws'
       const tunnel = new Guacamole.WebSocketTunnel(
         is_monitor
-          ? `ws://${document.location.host}/api/oneterm/v1/connect/monitor/${session_id}`
-          : `ws://${document.location.host}/api/oneterm/v1/connect/${session_id}`
+          ? `${protocol}://${document.location.host}/api/oneterm/v1/connect/monitor/${session_id}`
+          : `${protocol}://${document.location.host}/api/oneterm/v1/connect/${session_id}`
       )
       const client = new Guacamole.Client(tunnel)
 

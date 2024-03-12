@@ -56,3 +56,8 @@ sshServer:
   account: test
   password: 135790
   xtoken: 123456
+
+guacd:
+  ip: oneterm-guacd
+  port: 4822
+  gateway: oneterm-api

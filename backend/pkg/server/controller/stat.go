@@ -289,13 +289,16 @@ func nodeCountAsset() (res map[int]int64, err error) {
 	if err = mysql.DB.Model(assets).Find(&assets).Error; err != nil {
 		return
 	}
+	res = make(map[int]int64)
+	for _, a := range assets {
+		res[a.ParentId] += 1
+	}
 	g := make(map[int][]int)
 	for _, n := range assets {
 		g[n.ParentId] = append(g[n.ParentId], n.Id)
 	}
 	var dfs func(int) int64
 	dfs = func(x int) int64 {
-		res[x] += 1
 		for _, y := range g[x] {
 			res[x] += dfs(y)
 		}

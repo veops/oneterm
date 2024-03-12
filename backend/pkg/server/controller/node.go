@@ -135,14 +135,21 @@ func nodePostHookCountAsset(ctx *gin.Context, data []*model.Node) {
 		logger.L.Error("node posthookfailed asset count", zap.Error(err))
 		return
 	}
+	nodes := make([]*model.NodeIdPid, 0)
+	if err := mysql.DB.Model(nodes).Find(&nodes).Error; err != nil {
+		logger.L.Error("node posthookfailed node", zap.Error(err))
+		return
+	}
 	m := make(map[int]int64)
+	for _, a := range assets {
+		m[a.ParentId] += 1
+	}
 	g := make(map[int][]int)
-	for _, n := range assets {
+	for _, n := range nodes {
 		g[n.ParentId] = append(g[n.ParentId], n.Id)
 	}
 	var dfs func(int) int64
 	dfs = func(x int) int64 {
-		m[x] += 1
 		for _, y := range g[x] {
 			m[x] += dfs(y)
 		}

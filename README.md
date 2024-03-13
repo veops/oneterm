@@ -14,7 +14,7 @@
 ---
 [English](README.md) / [中文](README_cn.md)
 - Product document：https://veops.cn/docs/
-- Preview online: <a href="https://term.veops.cn/oneterm/workstation" target="_blank">OneOTerm</a>
+- Preview online: <a href="https://term.veops.cn/oneterm/workstation" target="_blank">OneTerm</a>
    - username: **`demo`**   or   **`admin`**
    - password: 123456
 

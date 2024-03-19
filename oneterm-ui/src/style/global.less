@@ -32,10 +32,25 @@ body {
   &.userLayout {
     overflow: auto;
   }
+  .text-color-1 {
+    color: @text-color_1;
+  }
+  .text-color-2 {
+    color: @text-color_2;
+  }
+  .text-color-3 {
+    color: @text-color_3;
+  }
+  .text-color-4 {
+    color: @text-color_4;
+  }
+  .border-radius-box {
+    border-radius: @border-radius-box;
+  }
 }
 
 .ant-layout {
-  background-color: #custom_colors() [color_2];
+  background-color: #f7f8fa;
 }
 
 .layout.ant-layout {
@@ -802,13 +817,13 @@ body {
 .el-button.is-plain:hover,
 .el-input.is-active .el-input__inner,
 .el-input__inner:focus {
-  border-color: #custom_colors() [color_1] !important;
+  border-color: @primary-color !important;
 }
 .el-button--text,
 .el-select-dropdown__item.selected,
 .el-button.is-plain:focus,
 .el-button.is-plain:hover {
-  color: #custom_colors() [color_1] !important;
+  color: @primary-color !important;
 }
 
 .ant-tabs-nav .ant-tabs-tab {
@@ -837,7 +852,7 @@ body {
   .ant-layout-sider {
     box-shadow: none;
     .ant-layout-sider-children {
-      background: #custom_colors[color_2];
+      background: @primary-color_5;
       .ant-menu {
         display: none;
       }
@@ -868,7 +883,7 @@ body {
   }
 }
 
-.custom-vue-treeselect__control(@bgColor:#custom_colors()[color_2],@border:none) {
+.custom-vue-treeselect__control(@bgColor:@primary-color_5,@border:none) {
   background-color: @bgColor;
   border: @border;
 }
@@ -911,119 +926,30 @@ body {
 }
 .vue-treeselect__option--highlight,
 .vue-treeselect__option--selected {
-  color: #custom_colors[color_1];
-  background-color: #custom_colors() [color_2] !important;
+  color: @primary-color;
+  background-color: @primary-color_5 !important;
 }
 .vue-treeselect__checkbox--checked,
 .vue-treeselect__checkbox--indeterminate {
-  border-color: #custom_colors() [color_1] !important;
-  background: #custom_colors() [color_1] !important;
+  border-color: @primary-color !important;
+  background: @primary-color !important;
 }
 .vue-treeselect__label-container:hover {
   .vue-treeselect__checkbox--checked,
   .vue-treeselect__checkbox--indeterminate {
-    border-color: #custom_colors() [color_1] !important;
-    background: #custom_colors() [color_1] !important;
+    border-color: @primary-color !important;
+    background: @primary-color !important;
   }
 }
 .vue-treeselect__multi-value-item {
-  background: #custom_colors() [color_2] !important;
-  color: #custom_colors() [color_1] !important;
+  background: @primary-color_5 !important;
+  color: @primary-color !important;
 }
 .vue-treeselect__value-remove {
-  color: #custom_colors() [color_1] !important;
+  color: @primary-color !important;
 }
 .vue-treeselect__label-container:hover .vue-treeselect__checkbox--unchecked {
-  border-color: #custom_colors() [color_1] !important;
-}
-
-//ticket 实习生考勤组件样式
-@calendarWidth: 637px; // 90 * 7 + 7 * 1
-.calendar-box {
-  width: 400px;
-  height: 560px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  position: relative;
-  .calendar-wrapper {
-    position: absolute;
-    top: 0;
-    left: 0;
-    .calendar-toolbar {
-      width: @calendarWidth;
-      height: 50px;
-      display: flex;
-      justify-content: space-around;
-      align-items: center;
-      .current {
-        font-size: 20px;
-        font-weight: 700;
-      }
-    }
-    .calendar-week {
-      width: @calendarWidth;
-      border-left: 1px solid #eee;
-      display: flex;
-      flex-wrap: wrap;
-      .week-item {
-        width: 90px;
-        height: 50px;
-        border-top: 1px solid #eee;
-        color: black;
-        font-weight: bold;
-        background-color: #fafafa;
-      }
-    }
-    .calendar-inner {
-      width: @calendarWidth;
-      border-left: 1px solid #eee;
-      display: flex;
-      flex-wrap: wrap;
-      .calendar-item {
-        width: 90px;
-        height: 60px;
-      }
-      .calendar-item-hover {
-        cursor: pointer;
-        &:hover {
-          background-color: #e6f7ff;
-          .calendar-item-date {
-            border-color: #e6f7ff;
-          }
-        }
-      }
-      .calendar-item-disabled {
-        color: #e5e5e5;
-        cursor: not-allowed;
-      }
-    }
-    .calendar-item-date {
-      display: inline-block;
-      border-radius: 50%;
-      border: 2px solid #fff;
-      height: 28px;
-      width: 28px;
-      text-align: center;
-      line-height: 24px;
-    }
-    .calendar-item-oneClick {
-      border-color: #096dd9 !important;
-    }
-    .calendar-item-twoClick {
-      border-color: #91d5ff !important;
-    }
-    .calendar-item-threeClick {
-      border-color: grey !important;
-    }
-    .calendarBorder {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      border-bottom: 1px solid #eee;
-      border-right: 1px solid #eee;
-    }
-  }
+  border-color: @primary-color !important;
 }
 
 //表格样式
@@ -1033,7 +959,7 @@ body {
     border: none !important;
   }
   .vxe-table--header-wrapper {
-    background-color: #custom_colors() [color_2] !important;
+    background-color: @primary-color_5 !important;
   }
   .vxe-header--row .vxe-header--column:hover {
     background: #2f54eb1f !important;
@@ -1057,7 +983,7 @@ body {
     border: none !important;
   }
   .vxe-table--header-wrapper {
-    background-color: #custom_colors() [color_2] !important;
+    background-color: @primary-color_5 !important;
   }
   // .vxe-table--header-wrapper.body--wrapper {
   //   border-radius: 8px !important;
@@ -1091,12 +1017,12 @@ body {
 .ops-input {
   .ant-input,
   .ant-time-picker-input {
-    background-color: #custom_colors[color_2];
+    background-color: @primary-color_5;
     border: none;
   }
 }
 .ops-input.ant-input {
-  background-color: #custom_colors[color_2];
+  background-color: @primary-color_5;
   border: none;
 }
 .ops-input.ant-input[disabled] {
@@ -1167,7 +1093,7 @@ body {
 .vxe-pager .vxe-pager--prev-btn:not(.is--disabled):focus,
 .vxe-button.type--text:not(.is--disabled):hover,
 .vxe-table--filter-footer > button:hover {
-  color: #custom_colors() [color_1] !important;
+  color: @primary-color !important;
 }
 
 .vxe-cell .vxe-default-input:focus,
@@ -1178,13 +1104,13 @@ body {
 .vxe-table--filter-wrapper .vxe-default-textarea:focus,
 .vxe-select.is--active:not(.is--filter) > .vxe-input .vxe-input--inner,
 .vxe-input:not(.is--disabled).is--active .vxe-input--inner {
-  border-color: #custom_colors() [color_1] !important;
+  border-color: @primary-color !important;
 }
 
 //批量操作
 .ops-list-batch-action {
   display: inline-block;
-  background-color: #custom_colors[color_2];
+  background-color: @primary-color_5;
   font-size: 12px;
   color: rgba(0, 0, 0, 0.55);
   > span {
@@ -1192,11 +1118,11 @@ body {
     padding: 4px 8px;
     cursor: pointer;
     &:hover {
-      color: #custom_colors[color_1];
+      color: @primary-color;
     }
   }
   > span:last-child {
-    color: #custom_colors[color_1];
+    color: @primary-color;
     cursor: default;
   }
 }
@@ -1223,9 +1149,10 @@ body {
 
 //button
 .ops-button-primary {
-  background-color: #custom_colors[color_2];
-  border-color: #custom_colors[color_2];
-  color: #custom_colors[color_1];
+  background-color: @primary-color_4;
+  border-color: @primary-color_4;
+  color: @primary-color;
+  box-shadow: none;
 }
 
 //select
@@ -1247,8 +1174,8 @@ body {
     }
   }
   .ant-select-selection {
-    background-color: #custom_colors[color_2];
-    border-color: #custom_colors[color_2];
+    background-color: @primary-color_5;
+    border-color: @primary-color_5;
   }
 }
 
@@ -1256,8 +1183,8 @@ body {
 .ops-dropdown {
   .ant-dropdown-menu-item:hover,
   .ant-dropdown-menu-submenu-title:hover {
-    background-color: #custom_colors[color_2];
-    color: #custom_colors[color_1];
+    background-color: @primary-color_5;
+    color: @primary-color;
   }
 }
 
@@ -1269,7 +1196,7 @@ body {
     border-bottom: none;
     .ant-modal-title {
       padding-left: 10px;
-      border-left: 4px solid #custom_colors[color_1];
+      border-left: 4px solid @primary-color;
     }
   }
   .ant-modal-footer {
@@ -1282,7 +1209,7 @@ body {
     width: 276px;
   }
   .ant-tooltip-inner {
-    background-color: #custom_colors[color_3];
+    background-color: @primary-color_3;
     border-radius: '4px';
     display: flex;
     align-items: flex-start;
@@ -1297,7 +1224,7 @@ body {
   .ant-tooltip-arrow::before {
     width: 7px;
     height: 7px;
-    background-color: #custom_colors[color_3];
+    background-color: @primary-color_3;
   }
 }
 
@@ -1307,7 +1234,7 @@ body {
 
   .el-tabs__header {
     border-bottom: none;
-    background-color: #custom_colors[color_2];
+    background-color: @primary-color_5;
     border-radius: 8px 8px 0px 0px;
   }
 
@@ -1318,7 +1245,7 @@ body {
 
   .el-tabs__header .el-tabs__item.is-active {
     background-color: white;
-    color: #custom_colors[color_1];
+    color: @primary-color;
   }
   .el-tabs__header .el-tabs__item:first-child.is-active {
     border-top-left-radius: 8px;
@@ -1329,12 +1256,12 @@ body {
   }
 
   .el-radio__input.is-checked .el-radio__inner {
-    background-color: #custom_colors[color_1];
-    border-color: #custom_colors[color_1];
+    background-color: @primary-color;
+    border-color: @primary-color;
   }
 
   .el-radio__input.is-checked + .el-radio__label {
-    color: #custom_colors[color_1];
+    color: @primary-color;
   }
 
   .el-tab-pane {
@@ -1372,14 +1299,14 @@ body {
 
 // a-drop-down
 .ant-dropdown-menu-item-active {
-  color: #custom_colors[color_1];
+  color: @primary-color;
 }
 
 .ant-tag {
   &.ops-perm-tag {
     border: none;
-    background-color: #custom_colors[color_2];
-    color: #custom_colors[color_1];
+    background-color: @primary-color_5;
+    color: @primary-color;
   }
 }
 
@@ -1398,7 +1325,7 @@ body {
     border: none;
   }
   div.jsoneditor-menu {
-    border-bottom-color: #custom_colors[color_1];
+    border-bottom-color: @primary-color;
   }
 }
 // .ant-menu.ant-menu-light {

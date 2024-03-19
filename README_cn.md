@@ -87,11 +87,6 @@ Host oneterm
 
 文档地址：https://veops.cn/docs/docs/oneterm/onterm_design
 
-## 🎯计划
-
-- [x] RDP
-- [x] VNC
-- [ ] 移除CTE以兼容mysql5.7
 
 ## 🔗相关项目
 

@@ -15,6 +15,7 @@
     v-bind="$attrs"
     appendToBody
     :zIndex="1050"
+    :flat="flat"
   >
   </treeselect>
 </template>
@@ -63,6 +64,10 @@ export default {
     limit: {
       type: Number,
       default: 20,
+    },
+    flat: {
+      type: Boolean,
+      default: false,
     },
   },
   data() {

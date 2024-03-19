@@ -157,7 +157,7 @@ const user = {
             promises.push(promise2)
           }
           Promise.all(promises).then(([res1, res2]) => {
-            commit('SET_DETAIL_PERMISSIONS', { backend: res1.resources, oneterm: res2.resources })
+            commit('SET_DETAIL_PERMISSIONS', { backend: res1.resources, oneterm: res2?.resources })
             resolve(response)
           })
 

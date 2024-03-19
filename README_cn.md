@@ -75,6 +75,13 @@ Host oneterm
     User admin # 此处替换为您oneterm上的平台用户
 ```
 
+## VNC/RDP
+![rdp.png](docs/images/rdp.png)
+
+## 🎯下一步计划
+- [ ] The asset list is associated with the CMDB authorization service tree.
+- [ ] The web terminal page supports multiple sessions with tabs, etc.
+
 ## 📚产品文档
 
 文档地址：https://veops.cn/docs/docs/oneterm/onterm_design

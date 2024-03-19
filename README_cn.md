@@ -79,8 +79,9 @@ Host oneterm
 ![rdp.png](docs/images/rdp.png)
 
 ## 🎯下一步计划
-- [ ] The asset list is associated with the CMDB authorization service tree.
-- [ ] The web terminal page supports multiple sessions with tabs, etc.
+- [ ] 资产列表关联CMDB授权服务树
+- [ ] web终端页面多个session支持tab等
+
 
 ## 📚产品文档
 

@@ -74,15 +74,16 @@ Host oneterm
     User admin # Replace with your platform user on oneterm
 ```
 
+## VNC/RDP
+![rdp.png](docs/images/rdp.png)
+
+## 🎯TODO
+- [ ] The asset list is associated with the CMDB authorization service tree.
+- [ ] The web terminal page supports multiple sessions with tabs, etc.
+
 ## 📚Docs
 
 doc link：https://veops.cn/docs/docs/oneterm/onterm_design
-
-## 🎯TODO
-
-- [x] RDP
-- [x] VNC
-- [ ] Remove CTE to compatible with mysql5.7
 
 ## 🔗Releated Projects
 

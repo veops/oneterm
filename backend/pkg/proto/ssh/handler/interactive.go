@@ -35,9 +35,9 @@ import (
 	"github.com/veops/oneterm/pkg/logger"
 	"github.com/veops/oneterm/pkg/proto/ssh/client"
 	"github.com/veops/oneterm/pkg/proto/ssh/config"
+	gsession "github.com/veops/oneterm/pkg/server/global/session"
 	"github.com/veops/oneterm/pkg/server/model"
 	"github.com/veops/oneterm/pkg/util"
-	gsession "github.com/veops/oneterm/pkg/server/global/session"
 )
 
 type InteractiveHandler struct {
@@ -291,7 +291,7 @@ func (i *InteractiveHandler) generateSessionRecord(conn *client.Connection, stat
 	res = &model.Session{
 		SessionType: cast.ToInt(i.Session.Context().Value("sshType")),
 	}
-	if i.SessionReq != nil && i.SessionReq.SessionId != "" {
+	if i.SessionReq != nil && i.SessionReq.Uid != 0 {
 		err = util.DecodeStruct(&res, i.SessionReq)
 		if err != nil {
 			return
@@ -299,11 +299,11 @@ func (i *InteractiveHandler) generateSessionRecord(conn *client.Connection, stat
 		res.Uid = i.SessionReq.Uid
 	} else {
 		res.ClientIp = i.Session.RemoteAddr().String()
-		res.UserName = i.Session.Context().User()
-		res.AccountInfo = fmt.Sprintf("%s(%s)", i.AccountInfo.Name, i.AccountInfo.Account)
-		res.Protocol = i.SessionReq.Protocol
-
 	}
+
+	res.UserName = i.Session.Context().User()
+	res.AccountInfo = fmt.Sprintf("%s(%s)", i.AccountInfo.Name, i.AccountInfo.Account)
+
 	s, er := i.Sshd.Core.Auth.AclInfo(i.Session.Context().Value("cookie").(string))
 	if er != nil {
 		logger.L.Warn(er.Error(), zap.String("session", "add"))

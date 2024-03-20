@@ -1,25 +1,28 @@
-FROM golang:1.21.3-alpine3.17
+FROM golang:1.21.3-alpine3.17 AS builder
+
 WORKDIR /oneterm
+
+COPY go.mod go.sum ./
+RUN go env -w GOPROXY=https://goproxy.cn,direct && go mod download
 COPY . .
-RUN go env -w GOPROXY=https://goproxy.cn,direct \
-    && go build --ldflags "-s -w" -o ./build/ssh ./cmd/ssh/ssh.go
+RUN go build --ldflags "-s -w" -o ./build/ssh ./cmd/ssh/ssh.go
 
-
+# Final stage
 FROM alpine:latest
-
-RUN set -eux && sed -i 's/dl-cdn.alpinelinux.org/mirrors.ustc.edu.cn/g' /etc/apk/repositories && \
-    apk add tzdata && \
-    apk add --update openssh && \
-    mkdir -p '~/.ssh' && \
-    echo "./ssh ssh -c config.yaml" > entrypoint.sh
+WORKDIR /oneterm
+RUN set -eux && \
+    sed -i 's/dl-cdn.alpinelinux.org/mirrors.ustc.edu.cn/g' /etc/apk/repositories && \
+    apk add --no-cache tzdata openssh && \
+    mkdir -p $HOME/.ssh
 
 ENV TZ=Asia/Shanghai
-ENV TERM=xterm-color256
-WORKDIR /oneterm
+ENV TERM=xterm-256color
 
-COPY  ./cmd/ssh/config.example.yaml config.yaml
-COPY  ./pkg/i18n/translate ./translate
-COPY --from=0 /oneterm/build/ssh .
+COPY --from=builder /oneterm/build/ssh .
+#COPY ./cmd/ssh/config.example.yaml config.yaml
+COPY ./cmd/ssh/config.yaml config.yaml
+COPY ./pkg/i18n/translate ./translate
+COPY ./docs/entrypoint.sh .
 
 ENTRYPOINT ["sh", "./entrypoint.sh"]
 

@@ -106,7 +106,7 @@ func doCreate[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType 
 		}
 
 		if err = tx.Create(&model.History{
-			RemoteIp:   ctx.ClientIP(),
+			RemoteIp:   ctx.RemoteIP(),
 			Type:       md.TableName(),
 			TargetId:   md.GetId(),
 			ActionType: model.ACTION_CREATE,

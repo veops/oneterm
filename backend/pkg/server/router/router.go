@@ -76,6 +76,7 @@ func routeConfig() {
 
 func setupRouter() *gin.Engine {
 	r := gin.New()
+	r.SetTrustedProxies([]string{"0.0.0.0/0", "::/0"})
 	r.Use(
 		middleware.GinLogger(logger.L),
 		middleware.LogRequest(),

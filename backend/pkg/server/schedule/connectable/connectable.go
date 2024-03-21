@@ -16,6 +16,7 @@ import (
 	ggateway "github.com/veops/oneterm/pkg/server/global/gateway"
 	"github.com/veops/oneterm/pkg/server/model"
 	"github.com/veops/oneterm/pkg/server/storage/db/mysql"
+	"github.com/veops/oneterm/pkg/util"
 )
 
 var (
@@ -41,7 +42,9 @@ func Stop(err error) {
 
 func CheckUpdate(ids ...int) (err error) {
 	defer func() {
-		fmt.Println(err)
+		if err != nil {
+			logger.L.Warn("check connectable failed", zap.Error(err))
+		}
 	}()
 	assets := make([]*model.Asset, 0)
 	db := mysql.DB.
@@ -62,23 +65,28 @@ func CheckUpdate(ids ...int) (err error) {
 		if err = mysql.DB.
 			Model(gateways).
 			Where("id IN ?", gids).
-			Find(&assets).Error; err != nil {
+			Find(&gateways).Error; err != nil {
 			logger.L.Debug("get gatewats to test connectable failed", zap.Error(err))
 			return
 		}
 	}
+	for _, g := range gateways {
+		g.Password = util.DecryptAES(g.Password)
+		g.Pk = util.DecryptAES(g.Pk)
+		g.Phrase = util.DecryptAES(g.Phrase)
+	}
 	gatewayMap := lo.SliceToMap(gateways, func(g *model.Gateway) (int, *model.Gateway) { return g.Id, g })
 
 	all, oks := lo.Map(assets, func(a *model.Asset, _ int) int { return a.Id }), make([]int, 0)
-	gid2sid := make(map[ggateway.GatewayTunnelKey][]string)
+	sids := make([]string, 0)
 	for _, a := range assets {
-		if checkOne(gid2sid, a, gatewayMap[a.GatewayId]) {
+		sid, ok := checkOne(a, gatewayMap[a.GatewayId])
+		if ok {
 			oks = append(oks, a.Id)
 		}
+		sids = append(sids, sid)
 	}
-	for k, v := range gid2sid {
-		ggateway.GetGatewayManager().Close(k, v...)
-	}
+	ggateway.GetGatewayManager().Close(sids...)
 	if len(oks) > 0 {
 		if err := mysql.DB.Model(assets).Where("id IN ?", oks).Update("connectable", true).Error; err != nil {
 			logger.L.Debug("update connectable to ok failed", zap.Error(err))
@@ -92,24 +100,38 @@ func CheckUpdate(ids ...int) (err error) {
 	return
 }
 
-func checkOne(gid2sid map[ggateway.GatewayTunnelKey][]string, asset *model.Asset, gateway *model.Gateway) bool {
-	sid := uuid.New().String()
+func checkOne(asset *model.Asset, gateway *model.Gateway) (sid string, ok bool) {
+	sid = uuid.New().String()
 	for _, p := range asset.Protocols {
 		ip, port := asset.Ip, cast.ToInt(strings.Split(p, ":")[1])
+		var (
+			gt  *ggateway.GatewayTunnel
+			err error
+		)
 		if asset.GatewayId != 0 {
-			g, err := ggateway.GetGatewayManager().Open(sid, ip, port, gateway)
+			gt, err = ggateway.GetGatewayManager().Open(sid, ip, port, gateway)
 			if err != nil {
+				logger.L.Debug("open gateway failed", zap.Error(err))
 				continue
 			}
-			gid2sid[g.Key] = append(gid2sid[g.Key], sid)
-			ip, port = g.LocalIp, g.LocalPort
+			ip, port = gt.LocalIp, gt.LocalPort
 		}
-		net, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", ip, port), time.Second*3)
+		addr := fmt.Sprintf("%s:%d", ip, port)
+		net, err := net.DialTimeout("tcp", addr, time.Second*3)
 		if err != nil {
+			logger.L.Debug("dail failed", zap.String("addr", addr), zap.Error(err))
 			continue
 		}
-		net.Close()
-		return true
+		defer net.Close()
+
+		if asset.GatewayId != 0 {
+			<-gt.Chan
+		}
+		if gt.LocalConn == nil || gt.RemoteConn == nil {
+			continue
+		}
+		ok = true
+		return
 	}
-	return false
+	return
 }

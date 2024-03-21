@@ -208,7 +208,7 @@ func (t *Tunnel) assert(opcode string) (instruction *Instruction, err error) {
 }
 
 func (t *Tunnel) Close() {
-	ggateway.GetGatewayManager().Close(t.g.Key, t.SessionId)
+	ggateway.GetGatewayManager().Close(t.SessionId)
 }
 
 func (t *Tunnel) Disconnect() {

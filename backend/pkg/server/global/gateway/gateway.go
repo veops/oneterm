@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/spf13/cast"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/ssh"
 
@@ -17,74 +16,62 @@ import (
 )
 
 var (
-	gatewayManagerOnce = &sync.Once{}
-	manager            *GateWayManager
+	manager = &GateWayManager{
+		gateways:        map[string]*GatewayTunnel{},
+		sshClients:      map[int]*ssh.Client{},
+		sshClientsCount: map[int]int{},
+		mtx:             sync.Mutex{},
+	}
 )
 
 func GetGatewayManager() *GateWayManager {
-	gatewayManagerOnce.Do(func() {
-		manager = &GateWayManager{
-			gateways: map[GatewayTunnelKey]*GatewayTunnel{},
-			mtx:      sync.Mutex{},
-		}
-	})
 	return manager
 }
 
-type GatewayTunnelKey [3]string
-
 type GatewayTunnel struct {
-	Key               GatewayTunnelKey
-	LocalIp           string
-	LocalPort         int
-	RemoteIp          string
-	RemotePort        int
-	listener          net.Listener
-	localConnections  map[string]net.Conn
-	remoteConnections map[string]net.Conn
-	sshClient         *ssh.Client
-	using             bool
+	listener   net.Listener
+	GatewayId  int
+	SessionId  string
+	LocalIp    string
+	LocalPort  int
+	RemoteIp   string
+	RemotePort int
+	LocalConn  net.Conn
+	RemoteConn net.Conn
+	Chan       chan struct{}
 }
 
-func (gt *GatewayTunnel) Open(sessionId, remoteIp string, remotePort int) error {
-	for {
-		lc, err := gt.listener.Accept()
-		if err != nil {
-			logger.L.Error("accept failed", zap.Error(err))
-			return err
-		}
-		gt.localConnections[sessionId] = lc
-
-		remoteAddr := fmt.Sprintf("%s:%d", remoteIp, remotePort)
-		rc, err := gt.sshClient.Dial("tcp", remoteAddr)
-		if err != nil {
-			logger.L.Error("dial remote failed", zap.Error(err))
-			return err
-		}
-		gt.remoteConnections[sessionId] = rc
-
-		go io.Copy(lc, rc)
-		go io.Copy(rc, lc)
+func (gt *GatewayTunnel) Open() (err error) {
+	defer close(gt.Chan)
+	go func() {
+		<-time.After(time.Second * 5)
+		logger.L.Debug("timeout 5 second close listener", zap.String("sessionId", gt.SessionId))
+		gt.listener.Close()
+	}()
+	gt.LocalConn, err = gt.listener.Accept()
+	if err != nil {
+		logger.L.Error("accept failed", zap.String("sessionId", gt.SessionId), zap.Error(err))
+		return err
 	}
-}
 
-func (gt *GatewayTunnel) Close(sessionId string) {
-	if c, ok := gt.remoteConnections[sessionId]; ok {
-		c.Close()
+	remoteAddr := fmt.Sprintf("%s:%d", gt.RemoteIp, gt.RemotePort)
+	gt.RemoteConn, err = manager.sshClients[gt.GatewayId].Dial("tcp", remoteAddr)
+	if err != nil {
+		logger.L.Error("dial remote failed", zap.String("sessionId", gt.SessionId), zap.Error(err))
+		return err
 	}
-	delete(gt.localConnections, sessionId)
 
-	if c, ok := gt.localConnections[sessionId]; ok {
-		c.Close()
-	}
-	delete(gt.remoteConnections, sessionId)
+	go io.Copy(gt.LocalConn, gt.RemoteConn)
+	go io.Copy(gt.RemoteConn, gt.LocalConn)
 
-	gt.using = len(gt.localConnections) > 0 && len(gt.remoteConnections) > 0
+	return
 }
 
 type GateWayManager struct {
-	gateways map[GatewayTunnelKey]*GatewayTunnel
-	mtx      sync.Mutex
+	gateways        map[string]*GatewayTunnel
+	sshClients      map[int]*ssh.Client
+	sshClientsCount map[int]int
+	mtx             sync.Mutex
 }
 
 func (gm *GateWayManager) Open(sessionId, remoteIp string, remotePort int, gateway *model.Gateway) (g *GatewayTunnel, err error) {
@@ -95,27 +82,25 @@ func (gm *GateWayManager) Open(sessionId, remoteIp string, remotePort int, gatew
 	gm.mtx.Lock()
 	defer gm.mtx.Unlock()
 
-	key := GatewayTunnelKey{cast.ToString(gateway.Id), remoteIp, cast.ToString(remotePort)}
-	g, ok := gm.gateways[key]
-	if ok {
-		return
+	sshCli, ok := gm.sshClients[gateway.Id]
+	if !ok {
+		var auth ssh.AuthMethod
+		auth, err = gm.getAuth(gateway)
+		if err != nil {
+			return
+		}
+		sshCli, err = ssh.Dial("tcp", fmt.Sprintf("%s:%d", gateway.Host, gateway.Port), &ssh.ClientConfig{
+			User:            gateway.Account,
+			Auth:            []ssh.AuthMethod{auth},
+			Timeout:         time.Second * 3,
+			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		})
+		if err != nil {
+			return
+		}
 	}
-	g = &GatewayTunnel{}
-
-	auth, err := gm.getAuth(gateway)
-	if err != nil {
-		return
-	}
-	sshClient, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", gateway.Host, gateway.Port), &ssh.ClientConfig{
-		User:            gateway.Account,
-		Auth:            []ssh.AuthMethod{auth},
-		Timeout:         time.Second * 3,
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-	})
-	if err != nil {
-		return
-	}
-
+	gm.sshClients[gateway.Id] = sshCli
+	gm.sshClientsCount[gateway.Id] += 1
 	localPort, err := getAvailablePort()
 	if err != nil {
 		return
@@ -125,36 +110,36 @@ func (gm *GateWayManager) Open(sessionId, remoteIp string, remotePort int, gatew
 		return
 	}
 	g = &GatewayTunnel{
-		Key:               key,
-		LocalIp:           conf.Cfg.Guacd.Gateway,
-		LocalPort:         localPort,
-		listener:          listener,
-		localConnections:  map[string]net.Conn{},
-		remoteConnections: map[string]net.Conn{},
-		sshClient:         sshClient,
-		using:             true,
+		listener:   listener,
+		GatewayId:  gateway.Id,
+		SessionId:  sessionId,
+		LocalIp:    conf.Cfg.Guacd.Gateway,
+		LocalPort:  localPort,
+		RemoteIp:   remoteIp,
+		RemotePort: remotePort,
+		Chan:       make(chan struct{}),
 	}
-	gm.gateways[key] = g
-	logger.L.Debug("opening gateway", zap.Any("key", key))
-	go g.Open(sessionId, remoteIp, remotePort)
+	gm.gateways[sessionId] = g
+	logger.L.Debug("opening gateway", zap.Any("sessionId", sessionId))
+	go g.Open()
 
 	return
 }
 
-func (gm *GateWayManager) Close(key GatewayTunnelKey, sessionIds ...string) {
+func (gm *GateWayManager) Close(sessionIds ...string) {
 	gm.mtx.Lock()
 	defer gm.mtx.Unlock()
-
-	g, ok := gm.gateways[key]
-	if ok {
-		for _, sid := range sessionIds {
-			g.Close(sid)
+	for _, sid := range sessionIds {
+		gt, ok := gm.gateways[sid]
+		if !ok {
+			return
 		}
-	}
-	if !g.using {
-		logger.L.Debug("closing gateway", zap.Any("key", key))
-		defer g.sshClient.Close()
-		delete(gm.gateways, key)
+		gm.sshClientsCount[gt.GatewayId] -= 1
+		if gm.sshClientsCount[gt.GatewayId] <= 0 {
+			gm.sshClients[gt.GatewayId].Close()
+			delete(gm.sshClients, gt.GatewayId)
+			delete(gm.sshClientsCount, gt.GatewayId)
+		}
 	}
 }
 

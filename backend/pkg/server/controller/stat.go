@@ -304,6 +304,7 @@ func nodeCountAsset() (res map[int]int64, err error) {
 		}
 		return res[x]
 	}
+	dfs(0)
 
 	return
 }

@@ -155,6 +155,7 @@ func nodePostHookCountAsset(ctx *gin.Context, data []*model.Node) {
 		}
 		return m[x]
 	}
+	dfs(0)
 
 	for _, d := range data {
 		d.AssetCount = m[d.Id]

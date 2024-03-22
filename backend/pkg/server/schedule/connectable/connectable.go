@@ -126,9 +126,9 @@ func checkOne(asset *model.Asset, gateway *model.Gateway) (sid string, ok bool) 
 
 		if asset.GatewayId != 0 {
 			<-gt.Chan
-		}
-		if gt.LocalConn == nil || gt.RemoteConn == nil {
-			continue
+			if gt.LocalConn == nil || gt.RemoteConn == nil {
+				continue
+			}
 		}
 		ok = true
 		return

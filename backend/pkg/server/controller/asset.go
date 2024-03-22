@@ -92,7 +92,7 @@ func (c *Controller) GetAssets(ctx *gin.Context) {
 
 	if info && !acl.IsAdmin(currentUser) {
 		//rs := make([]*acl.Resource, 0)
-		rs, err := acl.GetRoleResources(ctx, currentUser.Acl.Rid, acl.GetResourceTypeName(conf.RESOURCE_AUTHORIZATION))
+		authorizationResourceIds, err := GetAutorizationResourceIds(ctx)
 		if err != nil {
 			handleRemoteErr(ctx, err)
 			return
@@ -100,7 +100,7 @@ func (c *Controller) GetAssets(ctx *gin.Context) {
 		ids := make([]int, 0)
 		if err = mysql.DB.
 			Model(&model.Authorization{}).
-			Where("resource_id IN ?", lo.Map(rs, func(r *acl.Resource, _ int) int { return r.ResourceId })).
+			Where("resource_id IN ?", authorizationResourceIds).
 			Distinct().
 			Pluck("asset_id", &ids).
 			Error; err != nil {

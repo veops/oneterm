@@ -129,7 +129,17 @@ func nodePostHookCountAsset(ctx *gin.Context, data []*model.Node) {
 			ctx.AbortWithError(http.StatusInternalServerError, err)
 			return
 		}
-		db = db.Where("resource_id IN ?", authorizationResourceIds)
+		ids := make([]int, 0)
+		if err = mysql.DB.
+			Model(&model.Authorization{}).
+			Where("resource_id IN ?", authorizationResourceIds).
+			Distinct().
+			Pluck("asset_id", &ids).
+			Error; err != nil {
+			ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+			return
+		}
+		db = db.Where("id IN ?", ids)
 	}
 	if err := db.Find(&assets).Error; err != nil {
 		logger.L.Error("node posthookfailed asset count", zap.Error(err))

@@ -73,8 +73,8 @@ var (
 	}
 	MsgIdleTimeout = &goi18n.Message{
 		ID:    "MsgIdleTimeout",
-		One:   "Bad Request: idle timeout more than {.second} seconds",
-		Other: "Bad Request: idle timeout more than {.second} seconds",
+		One:   "Bad Request: idle timeout more than {{.second}} seconds",
+		Other: "Bad Request: idle timeout more than {{.second}} seconds",
 	}
 	//
 	MsgInternalError = &goi18n.Message{

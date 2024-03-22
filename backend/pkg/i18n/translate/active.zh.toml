@@ -32,7 +32,7 @@ other = "请求错误: 资产 {{.name}} 依赖该项，无法删除"
 
 [MsgIdleTimeout]
 hash = "sha1-6c4e9527b5f5d4e5e1af1160fe3eeec9ece04275"
-other = "请求错误: 空闲时间超过 {.second} 秒"
+other = "请求错误: 空闲时间超过 {{.second}} 秒"
 
 [MsgInternalError]
 hash = "sha1-a52fb3157738021674255481e2e949e83064dd2b"

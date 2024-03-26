@@ -100,6 +100,7 @@ func authMethod(account *model.Account) (gssh.AuthMethod, error) {
 
 func NewSShSession(con *gssh.Client, pty gossh.Pty, gatewayCloseChan chan struct{}) (conn *Connection, err error) {
 	sess, er := con.NewSession()
+
 	if er != nil {
 		err = er
 		return
@@ -124,6 +125,7 @@ func NewSShSession(con *gssh.Client, pty gossh.Pty, gatewayCloseChan chan struct
 	if err := sess.Shell(); err != nil {
 		_ = sess.Close()
 	}
+
 	conn = &Connection{
 		Stdin:            stdin,
 		Stdout:           stdout,

@@ -29,7 +29,6 @@ import (
 )
 
 func (i *InteractiveHandler) Proxy(line string, accountId int) (step int, err error) {
-	fmt.Println("Proxy....")
 	step = 1
 	if accountId > 0 {
 		var accountName string
@@ -433,7 +432,6 @@ func (i *InteractiveHandler) Command() string {
 
 func (i *InteractiveHandler) HandleData(src string, data []byte, hostConn *client.Connection,
 	targetOutputChan chan<- []byte) (err error) {
-	fmt.Printf("data:%#v\n", data)
 	switch src {
 	case "input": // input from user
 		if hostConn.Parser.State(data) {
@@ -444,13 +442,48 @@ func (i *InteractiveHandler) HandleData(src string, data []byte, hostConn *clien
 			return
 		}
 		var write bool
-		if bytes.LastIndex(data, []byte{13}) != 0 {
+
+		//if bytes.LastIndex(data, []byte{13}) != 0 {
+		//	fmt.Println("send....", data)
+		//	_, err = hostConn.Stdin.Write(data)
+		//	if err != nil {
+		//		logger.L.Error(err.Error())
+		//	}
+		//
+		//	write = true
+		//}
+
+		if bytes.LastIndex(data, []byte{0x0d}) == -1 {
 			_, err = hostConn.Stdin.Write(data)
 			if err != nil {
 				logger.L.Error(err.Error())
 			}
+
 			write = true
+		} else {
+			if len(data) > 1 {
+				var tmp []byte
+				for _, d := range data {
+					if d != 0x0d {
+						tmp = append(tmp, d)
+						continue
+					}
+					if len(tmp) > 0 {
+						err = i.HandleData(src, tmp, hostConn, targetOutputChan)
+						if err != nil {
+							return err
+						}
+
+					}
+					err = i.HandleData(src, []byte{0x0d}, hostConn, targetOutputChan)
+					if err != nil {
+						return err
+					}
+				}
+				return
+			}
 		}
+
 		if len(i.Parser.InputData) == 0 && i.Parser.Ps2 == "" {
 			i.Parser.Ps1 = i.Output()
 		}
@@ -461,6 +494,7 @@ func (i *InteractiveHandler) HandleData(src string, data []byte, hostConn *clien
 			i.Parser.OutputData = nil
 			i.Parser.InputData = nil
 			i.Parser.Ps2 = ""
+
 			if _, valid := i.CommandCheck(command); valid {
 				if strings.TrimSpace(command) != "" {
 					go i.Sshd.Core.Audit.AddCommand(model.SessionCmd{Cmd: command, Level: i.CommandLevel(command), SessionId: hostConn.SessionId})
@@ -477,8 +511,14 @@ func (i *InteractiveHandler) HandleData(src string, data []byte, hostConn *clien
 					TemplateData:   map[string]string{"Command": command},
 					PluralCount:    1,
 				})
+				_, err = hostConn.Stdin.Write([]byte{0x15})
+				if err != nil {
+					logger.L.Warn(err.Error())
+				}
+
 				i.Parser.Ps2 = i.Parser.Ps1 + command
-				targetOutputChan <- []byte("\r\n" + tips + i.Parser.Ps1 + command)
+				targetOutputChan <- []byte("\r\n" + tips + i.Parser.Ps2)
+
 				break
 			}
 		}

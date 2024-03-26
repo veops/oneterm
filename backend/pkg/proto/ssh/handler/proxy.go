@@ -478,7 +478,7 @@ func (i *InteractiveHandler) HandleData(src string, data []byte, hostConn *clien
 					PluralCount:    1,
 				})
 				i.Parser.Ps2 = i.Parser.Ps1 + command
-				targetOutputChan <- []byte("\r\n" + tips + i.Parser.Ps2)
+				targetOutputChan <- []byte("\r\n" + tips + i.Parser.Ps1 + command)
 				break
 			}
 		}

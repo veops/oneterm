@@ -393,6 +393,42 @@ var (
 			HandlerFunc: c.ConnectClose,
 			Middleware:  gin.HandlersChain{middleware.Auth()},
 		},
+		//file
+		{
+			Name:        "query file history",
+			Method:      "GET",
+			Pattern:     "file/history",
+			HandlerFunc: c.GetFileHistory,
+			Middleware:  gin.HandlersChain{middleware.Auth()},
+		},
+		{
+			Name:        "file action ls",
+			Method:      "GET",
+			Pattern:     "file/ls/:asset_id:/:account_id",
+			HandlerFunc: c.FileLS,
+			Middleware:  gin.HandlersChain{middleware.Auth()},
+		},
+		{
+			Name:        "file action mkdir",
+			Method:      "POST",
+			Pattern:     "file/mkdir/:asset_id:/:account_id",
+			HandlerFunc: c.FileMkdir,
+			Middleware:  gin.HandlersChain{middleware.Auth()},
+		},
+		{
+			Name:        "file action upload",
+			Method:      "POST",
+			Pattern:     "file/upload/:asset_id:/:account_id",
+			HandlerFunc: c.FileUpload,
+			Middleware:  gin.HandlersChain{middleware.Auth()},
+		},
+		{
+			Name:        "file action download",
+			Method:      "Get",
+			Pattern:     "file/upload/:asset_id:/:account_id",
+			HandlerFunc: c.FileUpload,
+			Middleware:  gin.HandlersChain{middleware.Auth()},
+		},
 	}
 )
 

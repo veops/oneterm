@@ -23,7 +23,7 @@ import (
 //	@Param		action_type	query		int		false	"create=1 delete=2 update=3"
 //	@Param		start		query		string	false	"start time, RFC3339"
 //	@Param		end			query		string	false	"end time, RFC3339"
-//	@Param		search		query		string	false	""
+//	@Param		search		query		string	false	"search"
 //	@Success	200			{object}	HttpResponse{data=ListData{list=[]model.History}}
 //	@Router		/history [get]
 func (c *Controller) GetHistories(ctx *gin.Context) {

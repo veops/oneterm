@@ -110,33 +110,21 @@ export default {
     line-height: @layout-header-icon-height;
     border-radius: 4px !important;
     display: inline-flex;
-    align-items: flex-end;
+    align-items: center;
   }
   > span {
     cursor: pointer;
     padding: 4px 10px;
     margin: 0 5px;
-    border-radius: 4px;
     color: @layout-header-font-color;
     height: @layout-header-height;
     display: inline-flex;
     align-items: center;
-    &:hover {
-      background: linear-gradient(0deg, rgba(0, 80, 201, 0.2) 0%, rgba(174, 207, 255, 0.06) 86.76%);
-      color: @layout-header-font-selected-color;
-      border-radius: 3px 3px 0px 0px;
-    }
   }
+  > span:hover,
   .top-menu-selected {
-    background: linear-gradient(0deg, rgba(0, 80, 201, 0.2) 0%, rgba(174, 207, 255, 0.06) 86.76%);
+    font-weight: bold;
     color: @layout-header-font-selected-color;
-    border-radius: 3px 3px 0px 0px;
-    border-bottom: 3px solid @layout-header-font-selected-color;
-    &:hover {
-      background: linear-gradient(0deg, rgba(0, 80, 201, 0.2) 0%, rgba(174, 207, 255, 0.06) 86.76%);
-      color: @layout-header-font-selected-color;
-      border-radius: 3px 3px 0px 0px;
-    }
   }
 }
 

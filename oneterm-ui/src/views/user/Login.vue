@@ -5,13 +5,7 @@
     </div>
     <div class="ops-login-right">
       <img src="../../assets/logo_oneterm.png" />
-      <a-form
-        id="formLogin"
-        ref="formLogin"
-        :form="form"
-        @submit="handleSubmit"
-        hideRequiredMark
-        :colon="false">
+      <a-form id="formLogin" ref="formLogin" :form="form" @submit="handleSubmit" hideRequiredMark :colon="false">
         <a-form-item label="用户名/邮箱">
           <a-input
             size="large"
@@ -51,15 +45,20 @@
             class="login-button"
             :loading="state.loginBtn"
             :disabled="state.loginBtn"
-          >登录</a-button
+            >登录</a-button
+          >
+          <a-checkbox
+            v-if="enable_list && enable_list.length === 1 && enable_list[0].auth_type === 'LDAP'"
+            v-model="auth_with_ldap"
+            >LDAP</a-checkbox
           >
         </a-form-item>
       </a-form>
       <template v-if="_enable_list && _enable_list.length >= 1">
-        <a-divider style="font-size:14px">其他登录方式</a-divider>
-        <div style="text-align:center">
+        <a-divider style="font-size: 14px">其他登录方式</a-divider>
+        <div style="text-align: center">
           <span v-for="(item, index) in _enable_list" :key="item.auth_type">
-            <ops-icon :type="item.auth_type"/>
+            <ops-icon :type="item.auth_type" />
             <a @click="otherLogin(item.auth_type)">{{ item.auth_type }}</a>
             <a-divider v-if="index < _enable_list.length - 1" type="vertical" />
           </span>
@@ -93,6 +92,7 @@ export default {
         loginType: 0,
         smsSendBtn: false,
       },
+      auth_with_ldap: false,
     }
   },
   computed: {
@@ -102,6 +102,18 @@ export default {
     },
     _enable_list() {
       return this.enable_list.filter((en) => en.auth_type !== 'LDAP')
+    },
+  },
+  watch: {
+    enable_list: {
+      immediate: true,
+      handler(newVal) {
+        if (newVal && newVal.length === 1 && newVal[0].auth_type === 'LDAP') {
+          this.auth_with_ldap = true
+        } else {
+          this.auth_with_ldap = false
+        }
+      },
     },
   },
   created() {},
@@ -124,10 +136,12 @@ export default {
     handleSubmit(e) {
       e.preventDefault()
       const {
+        enable_list,
         form: { validateFields },
         state,
         customActiveKey,
         Login,
+        auth_with_ldap,
       } = this
 
       state.loginBtn = true
@@ -141,6 +155,11 @@ export default {
           delete loginParams.username
           loginParams.username = values.username
           loginParams.password = appConfig.useEncryption ? md5(values.password) : values.password
+          loginParams.auth_with_ldap =
+            enable_list && enable_list.length === 1 && enable_list[0].auth_type === 'LDAP'
+              ? Number(auth_with_ldap)
+              : undefined
+
           localStorage.setItem('ops_auth_type', '')
           Login({ userInfo: loginParams })
             .then((res) => this.loginSuccess(res))

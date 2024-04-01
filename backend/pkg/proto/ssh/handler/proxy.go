@@ -28,6 +28,11 @@ import (
 	"github.com/veops/oneterm/pkg/server/model"
 )
 
+var (
+	IdleTimeout = time.Minute * 5
+	ReturnKey   = []byte{0x0d}
+)
+
 func (i *InteractiveHandler) Proxy(line string, accountId int) (step int, err error) {
 	step = 1
 	if accountId > 0 {
@@ -205,19 +210,79 @@ func getSshPort(protocol string) (sshPort string) {
 	return sshPort
 }
 
+func (i *InteractiveHandler) handleUserInput(userConn gossh.Session, targetInChan chan<- []byte,
+	done chan struct{}) {
+	buffer := bytes.NewBuffer(make([]byte, 0, 1024*2))
+	maxLen := 1024
+	for {
+		buf := make([]byte, maxLen)
+		nr, err := userConn.Read(buf)
+
+		if nr > 0 {
+			validBytes := buf[:nr]
+			bufferLen := buffer.Len()
+			if bufferLen > 0 || nr == maxLen {
+				buffer.Write(buf[:nr])
+				validBytes = validBytes[:0]
+			}
+			remainBytes := buffer.Bytes()
+			for len(remainBytes) > 0 {
+				r, size := utf8.DecodeRune(remainBytes)
+				if r == utf8.RuneError {
+					if len(remainBytes) <= 3 {
+						break
+					}
+				}
+				validBytes = append(validBytes, remainBytes[:size]...)
+				remainBytes = remainBytes[size:]
+			}
+			buffer.Reset()
+			if len(remainBytes) > 0 {
+				buffer.Write(remainBytes)
+			}
+			select {
+			case targetInChan <- validBytes:
+			case <-done:
+				break
+			}
+		}
+		if err != nil {
+			break
+		}
+	}
+	close(targetInChan)
+}
+
+func (i *InteractiveHandler) handleHostOutput(hostConn *client.Connection, userConn gossh.Session,
+	done chan struct{}, ticker *time.Ticker) {
+
+	for {
+		buf := make([]byte, 1024)
+		n, err := hostConn.Stdout.Read(buf)
+		if err != nil {
+			logger.L.Warn(err.Error())
+		}
+
+		ticker.Reset(IdleTimeout)
+		i.handleOutput(buf[:n], hostConn, userConn)
+		if err == io.EOF {
+			close(done)
+			break
+		}
+	}
+}
+
 func (i *InteractiveHandler) bind(userConn gossh.Session, hostConn *client.Connection) error {
-	maxIdelTimeout := time.Hour * 2
-	idleTimeout := time.Second * 60 * 5
+	maxIdleTimeout := time.Hour * 2
 	mConfig, _ := i.AcquireConfig()
 	if mConfig != nil && mConfig.Timeout > 0 {
-		idleTimeout = time.Second * time.Duration(mConfig.Timeout)
+		IdleTimeout = time.Second * time.Duration(mConfig.Timeout)
 	}
-	if idleTimeout > maxIdelTimeout {
-		idleTimeout = maxIdelTimeout
+	if IdleTimeout > maxIdleTimeout {
+		IdleTimeout = maxIdleTimeout
 	}
 
 	targetInChan := make(chan []byte, 1)
-	targetOutChan := make(chan []byte, 1)
 	done := make(chan struct{})
 	var (
 		exit             bool
@@ -226,131 +291,26 @@ func (i *InteractiveHandler) bind(userConn gossh.Session, hostConn *client.Conne
 	)
 	waitRead.Store(true)
 	i.wrapJsonResponse(hostConn.SessionId, 0, "success")
-	tk, tkAccess, readReset := time.NewTicker(idleTimeout), time.NewTicker(accessUpdateStep), time.NewTicker(time.Second)
-	go func() {
-		buffer := bytes.NewBuffer(make([]byte, 0, 1024*2))
-		maxLen := 1024
-		for {
-			if !waitRead.Load() {
-				if exit {
-					return
-				}
-				time.Sleep(time.Millisecond * 100)
-				continue
-			}
-
-			buf := make([]byte, maxLen)
-			nr, err := userConn.Read(buf)
-			waitRead.Store(config.SSHConfig.PlainMode)
-			if err != nil {
-				logger.L.Info(err.Error())
-			}
-
-			if nr > 0 {
-				validBytes := buf[:nr]
-				bufferLen := buffer.Len()
-				if bufferLen > 0 || nr == maxLen {
-					buffer.Write(buf[:nr])
-					validBytes = validBytes[:0]
-				}
-				remainBytes := buffer.Bytes()
-				for len(remainBytes) > 0 {
-					r, size := utf8.DecodeRune(remainBytes)
-					if r == utf8.RuneError {
-						if len(remainBytes) <= 3 {
-							break
-						}
-					}
-					validBytes = append(validBytes, remainBytes[:size]...)
-					remainBytes = remainBytes[size:]
-				}
-				buffer.Reset()
-				if len(remainBytes) > 0 {
-					buffer.Write(remainBytes)
-				}
-				select {
-				case targetInChan <- validBytes:
-				case <-done:
-					break
-				}
-			}
-			if exit {
-				return
-			}
-			if err != nil {
-				break
-			}
-		}
-		close(targetInChan)
-	}()
-	go func() {
-		defer func() {
-			waitRead.Store(config.SSHConfig.PlainMode)
-		}()
-		for {
-			buf := make([]byte, 1024)
-			n, err := hostConn.Stdout.Read(buf)
-			if err != nil {
-				if err == io.EOF {
-					close(done)
-					exit = true
-				} else {
-					logger.L.Warn(err.Error())
-				}
-			}
-
-			if exit {
-				waitRead.Store(config.SSHConfig.PlainMode)
-			} else {
-				waitRead.Store(true)
-			}
-
-			select {
-			case targetOutChan <- buf[:n]:
-			case <-done:
-				break
-			}
-			if exit || err != nil {
-				break
-			}
-		}
-	}()
-	defer func() {
-		exit = true
-
-		waitRead.Store(config.SSHConfig.PlainMode)
-	}()
+	tk, tkAccess, readReset := time.NewTicker(IdleTimeout), time.NewTicker(accessUpdateStep), time.NewTicker(time.Second)
+	go i.handleUserInput(userConn, targetInChan, done)
+	go i.handleHostOutput(hostConn, userConn, done, tk)
 	for {
 		select {
-		case p, ok := <-targetOutChan:
-			if !ok {
-				return nil
-			}
-			_, err := userConn.Write(p)
-			if err != nil {
-				logger.L.Info(err.Error())
-			}
-
-			err = i.HandleData("output", p, hostConn, targetOutChan)
-			if err != nil {
-				logger.L.Error(err.Error())
-			}
-			tk.Reset(idleTimeout)
 		case p, ok := <-targetInChan:
 			if !ok {
 				return nil
 			}
-			tk.Reset(idleTimeout)
+			tk.Reset(IdleTimeout)
 			//readL.WriteStdin(p)
-			err := i.HandleData("input", p, hostConn, targetOutChan)
+			err, _ := i.HandleData(p, hostConn, userConn)
 			if err != nil {
 				logger.L.Error(err.Error())
 			}
 			readReset.Reset(time.Second)
 		case <-done:
-			break
+			exit = true
 		case <-tk.C:
-			_, err := userConn.Write([]byte(i.Message(myi18n.MsgSShHostIdleTimeout, map[string]any{"Idle": idleTimeout})))
+			_, err := userConn.Write([]byte(i.Message(myi18n.MsgSShHostIdleTimeout, map[string]any{"Idle": IdleTimeout})))
 
 			if err != nil {
 				logger.L.Warn(err.Error())
@@ -402,12 +362,31 @@ func (i *InteractiveHandler) bind(userConn gossh.Session, hostConn *client.Conne
 	}
 }
 
+func (i *InteractiveHandler) handleOutput(data []byte, hostConn *client.Connection, userConn gossh.Session) {
+	_, err := userConn.Write(data)
+	if err != nil {
+		logger.L.Info(err.Error())
+	}
+	if !hostConn.Parser.State(data) {
+		fmt.Println("old:", i.Parser.OutputData)
+		fmt.Println("new", data)
+
+		i.Parser.OutputData = append(i.Parser.OutputData, data...)
+	}
+	err = hostConn.Record.Write(data)
+	if err != nil {
+		logger.L.Error(err.Error())
+	}
+	Monitor(hostConn.SessionId, data)
+}
+
 func (i *InteractiveHandler) CommandLevel(cmd string) int {
 	// TODO
 	return 0
 }
 
 func parseOutput(data []string) (output []string) {
+	fmt.Printf("data:%#v\n", data)
 	for _, line := range data {
 		if strings.TrimSpace(line) != "" {
 			output = append(output, line)
@@ -427,112 +406,97 @@ func (i *InteractiveHandler) Output() string {
 }
 func (i *InteractiveHandler) Command() string {
 	s := i.Output()
-	return strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(s), strings.TrimSpace(i.Parser.Ps1)))
+	return strings.TrimPrefix(s, i.Parser.Ps1)
 }
 
-func (i *InteractiveHandler) HandleData(src string, data []byte, hostConn *client.Connection,
-	targetOutputChan chan<- []byte) (err error) {
-	switch src {
-	case "input": // input from user
-		if hostConn.Parser.State(data) {
-			_, err = hostConn.Stdin.Write(data)
-			if err != nil {
-				logger.L.Error(err.Error())
-			}
-			return
-		}
-		var write bool
-
-		//if bytes.LastIndex(data, []byte{13}) != 0 {
-		//	fmt.Println("send....", data)
-		//	_, err = hostConn.Stdin.Write(data)
-		//	if err != nil {
-		//		logger.L.Error(err.Error())
-		//	}
-		//
-		//	write = true
-		//}
-
-		if bytes.LastIndex(data, []byte{0x0d}) == -1 {
-			_, err = hostConn.Stdin.Write(data)
-			if err != nil {
-				logger.L.Error(err.Error())
-			}
-
-			write = true
-		} else {
-			if len(data) > 1 {
-				var tmp []byte
-				for _, d := range data {
-					if d != 0x0d {
-						tmp = append(tmp, d)
-						continue
-					}
-					if len(tmp) > 0 {
-						err = i.HandleData(src, tmp, hostConn, targetOutputChan)
-						if err != nil {
-							return err
-						}
-
-					}
-					err = i.HandleData(src, []byte{0x0d}, hostConn, targetOutputChan)
-					if err != nil {
-						return err
-					}
-				}
-				return
-			}
-		}
-
-		if len(i.Parser.InputData) == 0 && i.Parser.Ps2 == "" {
-			i.Parser.Ps1 = i.Output()
-		}
-		i.Parser.InputData = append(i.Parser.InputData, data...)
-		if bytes.LastIndex(data, []byte{13}) == 0 {
-			command := i.Command()
-			i.Parser.Output.Listener.Reset()
-			i.Parser.OutputData = nil
-			i.Parser.InputData = nil
-			i.Parser.Ps2 = ""
-
-			if _, valid := i.CommandCheck(command); valid {
-				if strings.TrimSpace(command) != "" {
-					go i.Sshd.Core.Audit.AddCommand(model.SessionCmd{Cmd: command, Level: i.CommandLevel(command), SessionId: hostConn.SessionId})
-				}
-				if !write {
-					_, err = hostConn.Stdin.Write(data)
-					if err != nil {
-						logger.L.Warn(err.Error())
-					}
-				}
-			} else {
-				tips, _ := i.Localizer.Localize(&i18n.LocalizeConfig{
-					DefaultMessage: myi18n.MsgSshCommandRefused,
-					TemplateData:   map[string]string{"Command": command},
-					PluralCount:    1,
-				})
-				_, err = hostConn.Stdin.Write([]byte{0x15})
-				if err != nil {
-					logger.L.Warn(err.Error())
-				}
-
-				i.Parser.Ps2 = i.Parser.Ps1 + command
-				targetOutputChan <- []byte("\r\n" + tips + i.Parser.Ps2)
-
-				break
-			}
-		}
-	case "output": // output from target
-		if !hostConn.Parser.State(data) {
-			i.Parser.OutputData = append(i.Parser.OutputData, data...)
-		}
-		err = hostConn.Record.Write(data)
+func (i *InteractiveHandler) HandleData(data []byte, hostConn *client.Connection, userConn gossh.Session) (err error, exit bool) {
+	if hostConn.Parser.State(data) {
+		_, err = hostConn.Stdin.Write(data)
 		if err != nil {
 			logger.L.Error(err.Error())
 		}
-		Monitor(hostConn.SessionId, data)
+		return
+	}
+	var write bool
+
+	if bytes.LastIndex(data, []byte{0x0d}) == -1 {
+		_, err = hostConn.Stdin.Write(data)
+		if err != nil {
+			logger.L.Error(err.Error())
+		}
+
+		write = true
+	} else {
+		if len(data) > 1 {
+			var tmp []byte
+			for _, d := range data {
+				if d != 0x0d {
+					tmp = append(tmp, d)
+					continue
+				}
+				if len(tmp) > 0 {
+					err1, stop := i.HandleData(tmp, hostConn, userConn)
+					if err1 != nil {
+						return err1, stop
+					}
+					if stop {
+						break
+					}
+
+				}
+				err1, stop := i.HandleData(ReturnKey, hostConn, userConn)
+				if err != nil {
+					return err1, stop
+				}
+				if stop {
+					break
+				}
+			}
+			return
+		}
+	}
+	if bytes.LastIndex(data, ReturnKey) == 0 {
+		time.Sleep(time.Millisecond * 100)
 	}
 
+	if len(i.Parser.InputData) == 0 && i.Parser.Ps2 == "" {
+		i.Parser.Ps1 = i.Output()
+	}
+	i.Parser.InputData = append(i.Parser.InputData, data...)
+	if bytes.LastIndex(data, ReturnKey) == 0 {
+		command := i.Command()
+		i.Parser.Output.Listener.Reset()
+		i.Parser.OutputData = nil
+		i.Parser.InputData = nil
+		i.Parser.Ps2 = ""
+
+		if _, valid := i.CommandCheck(command); valid {
+			if strings.TrimSpace(command) != "" {
+				go i.Sshd.Core.Audit.AddCommand(model.SessionCmd{Cmd: command, Level: i.CommandLevel(command), SessionId: hostConn.SessionId})
+			}
+			if !write {
+				_, err = hostConn.Stdin.Write(data)
+				if err != nil {
+					logger.L.Warn(err.Error())
+				}
+			}
+		} else {
+			tips, _ := i.Localizer.Localize(&i18n.LocalizeConfig{
+				DefaultMessage: myi18n.MsgSshCommandRefused,
+				TemplateData:   map[string]string{"Command": command},
+				PluralCount:    1,
+			})
+			_, err = hostConn.Stdin.Write([]byte{0x15})
+			if err != nil {
+				logger.L.Warn(err.Error())
+			}
+
+			i.Parser.Ps2 = i.Parser.Ps1 + command
+			i.handleOutput([]byte("\r\n"+tips+i.Parser.Ps2), hostConn, userConn)
+			_, err = hostConn.Stdin.Write([]byte{0x15})
+			return err, true
+		}
+	}
 	return
 }
 

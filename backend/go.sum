@@ -395,8 +395,8 @@ github.com/twitchyliquid64/golang-asm v0.15.1 h1:SU5vSMR7hnwNxj24w34ZyCi/FmDZTkS
 github.com/twitchyliquid64/golang-asm v0.15.1/go.mod h1:a1lVb/DtPvCB8fslRZhAngC2+aY1QWCk3Cedj/Gdt08=
 github.com/ugorji/go/codec v1.2.11 h1:BMaWp1Bb6fHwEtbplGBGJ498wD+LKlNSl25MjdZY4dU=
 github.com/ugorji/go/codec v1.2.11/go.mod h1:UNopzCgEMSXjBc6AOMqYvWC1ktqTAfzJZUZgYf6w6lg=
-github.com/veops/go-ansiterm v0.0.3 h1:JeSlhAg7kPO5SutcNcSD1hj/LdSDkc7oxP18uVOOZYs=
-github.com/veops/go-ansiterm v0.0.3/go.mod h1:ydBaqvRRi5lOTT0dMyYcJjQ1rfJSai/7uNveoT/uRLU=
+github.com/veops/go-ansiterm v0.0.4 h1:+WfRU3wC0VjEmyDq/GXJc0Wr7EkI4kc0Xgpcwd5e0E0=
+github.com/veops/go-ansiterm v0.0.4/go.mod h1:ydBaqvRRi5lOTT0dMyYcJjQ1rfJSai/7uNveoT/uRLU=
 github.com/yuin/goldmark v1.1.25/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.32/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=

@@ -368,9 +368,6 @@ func (i *InteractiveHandler) handleOutput(data []byte, hostConn *client.Connecti
 		logger.L.Info(err.Error())
 	}
 	if !hostConn.Parser.State(data) {
-		fmt.Println("old:", i.Parser.OutputData)
-		fmt.Println("new", data)
-
 		i.Parser.OutputData = append(i.Parser.OutputData, data...)
 	}
 	err = hostConn.Record.Write(data)
@@ -386,7 +383,6 @@ func (i *InteractiveHandler) CommandLevel(cmd string) int {
 }
 
 func parseOutput(data []string) (output []string) {
-	fmt.Printf("data:%#v\n", data)
 	for _, line := range data {
 		if strings.TrimSpace(line) != "" {
 			output = append(output, line)

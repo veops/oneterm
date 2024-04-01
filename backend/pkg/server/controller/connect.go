@@ -48,10 +48,10 @@ var (
 // Connect godoc
 //
 //	@Tags		connect
-//	@Param		w	query		int	false	"width"
-//	@Param		h	query		int	false	"height"
-//	@Param		dpi	query		int	false	"dpi"
-//	@Success	200	{object}	HttpResponse
+//	@Param		w			query		int	false	"width"
+//	@Param		h			query		int	false	"height"
+//	@Param		dpi			query		int	false	"dpi"
+//	@Success	200			{object}	HttpResponse
 //	@Param		session_id	path		int	true	"session id"
 //	@Router		/connect/:session_id [get]
 func (c *Controller) Connecting(ctx *gin.Context) {
@@ -191,7 +191,7 @@ func sendSshMsg(ws *websocket.Conn, session *gsession.Session, chs *gsession.Ses
 //	@Param		w	query		int	false	"width"
 //	@Param		h	query		int	false	"height"
 //	@Param		dpi	query		int	false	"dpi"
-//	@Success	200			{object}	HttpResponse{data=gsession.Session}
+//	@Success	200	{object}	HttpResponse{data=gsession.Session}
 //	@Router		/connect/:asset_id/:account_id/:protocol [post]
 func (c *Controller) Connect(ctx *gin.Context) {
 	protocol, chs := ctx.Param("protocol"), makeChans()

@@ -215,3 +215,20 @@ CREATE TABLE
     ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 
 INSERT INTO oneterm.config (timeout) VALUES (7200);
+
+
+CREATE TABLE
+    IF NOT EXISTS oneterm.file_history(
+        `id` INT NOT NULL AUTO_INCREMENT,
+        `uid` INT NOT NULL DEFAULT 0,
+        `user_name` VARCHAR(64) NOT NULL DEFAULT '',
+        `asset_id` INT NOT NULL DEFAULT 0,
+        `account_id` INT NOT NULL DEFAULT 0,
+        `client_ip` VARCHAR(64) NOT NULL DEFAULT '',
+        `action` INT NOT NULL DEFAULT 0,
+        `dir` VARCHAR(256) NOT NULL DEFAULT '',
+        `filename` VARCHAR(256) NOT NULL DEFAULT '',
+        `created_at` TIMESTAMP NOT NULL,
+        `updated_at` TIMESTAMP NOT NULL,
+        PRIMARY KEY(`id`)
+    ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;

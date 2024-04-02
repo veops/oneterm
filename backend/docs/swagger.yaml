@@ -372,6 +372,8 @@ definitions:
     properties:
       count:
         type: integer
+      id:
+        type: integer
       name:
         type: string
     type: object
@@ -417,6 +419,47 @@ definitions:
       type_id:
         type: integer
     type: object
+  session.Session:
+    properties:
+      account_id:
+        type: integer
+      account_info:
+        type: string
+      asset_id:
+        type: integer
+      asset_info:
+        type: string
+      client_ip:
+        type: string
+      closed_at:
+        type: string
+      cmd_count:
+        type: integer
+      created_at:
+        type: string
+      duration:
+        type: integer
+      gateway_id:
+        type: integer
+      gateway_info:
+        type: string
+      id:
+        type: integer
+      protocol:
+        type: string
+      session_id:
+        type: string
+      session_type:
+        type: integer
+      status:
+        type: integer
+      uid:
+        type: integer
+      updated_at:
+        type: string
+      user_name:
+        type: string
+    type: object
 info:
   contact: {}
 paths:
@@ -436,7 +479,7 @@ paths:
       - description: name or account
         in: query
         name: search
-        type: integer
+        type: string
       - description: account id
         in: query
         name: id
@@ -542,7 +585,7 @@ paths:
       - description: name or ip
         in: query
         name: search
-        type: integer
+        type: string
       - description: asset id
         in: query
         name: id
@@ -708,7 +751,7 @@ paths:
       - description: name or cmds
         in: query
         name: search
-        type: integer
+        type: string
       - description: command id
         in: query
         name: id
@@ -847,6 +890,10 @@ paths:
         in: query
         name: h
         type: integer
+      - description: dpi
+        in: query
+        name: dpi
+        type: integer
       responses:
         "200":
           description: OK
@@ -855,13 +902,25 @@ paths:
             - $ref: '#/definitions/controller.HttpResponse'
             - properties:
                 data:
-                  $ref: '#/definitions/model.Session'
+                  $ref: '#/definitions/session.Session'
               type: object
       tags:
       - connect
   /connect/:session_id:
     get:
       parameters:
+      - description: width
+        in: query
+        name: w
+        type: integer
+      - description: height
+        in: query
+        name: h
+        type: integer
+      - description: dpi
+        in: query
+        name: dpi
+        type: integer
       - description: session id
         in: path
         name: session_id
@@ -892,6 +951,175 @@ paths:
             $ref: '#/definitions/controller.HttpResponse'
       tags:
       - connect
+  /file/download/:asset_id/:account_id:
+    get:
+      parameters:
+      - description: asset_id
+        in: path
+        name: asset_id
+        required: true
+        type: integer
+      - description: account_id
+        in: path
+        name: account_id
+        required: true
+        type: integer
+      - description: dir
+        in: query
+        name: dir
+        required: true
+        type: string
+      - description: filename
+        in: query
+        name: filename
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - file
+  /file/history:
+    get:
+      parameters:
+      - description: page_index
+        in: query
+        name: page_index
+        required: true
+        type: integer
+      - description: page_size
+        in: query
+        name: page_size
+        required: true
+        type: integer
+      - description: search
+        in: query
+        name: search
+        type: string
+      - description: saction
+        in: query
+        name: action
+        type: integer
+      - description: start, RFC3339
+        in: query
+        name: start
+        type: string
+      - description: end, RFC3339
+        in: query
+        name: end
+        type: string
+      - description: uid
+        in: query
+        name: uid
+        type: integer
+      - description: asset id
+        in: query
+        name: asset_id
+        type: integer
+      - description: account id
+        in: query
+        name: accout_id
+        type: integer
+      - description: client_ip
+        in: query
+        name: client_ip
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/controller.HttpResponse'
+            - properties:
+                data:
+                  allOf:
+                  - $ref: '#/definitions/controller.ListData'
+                  - properties:
+                      list:
+                        items:
+                          $ref: '#/definitions/model.Session'
+                        type: array
+                    type: object
+              type: object
+      tags:
+      - file
+  /file/ls/:asset_id/:account_id:
+    post:
+      parameters:
+      - description: asset_id
+        in: path
+        name: asset_id
+        required: true
+        type: integer
+      - description: account_id
+        in: path
+        name: account_id
+        required: true
+        type: integer
+      - description: dir
+        in: query
+        name: dir
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - file
+  /file/mkdir/:asset_id/:account_id:
+    post:
+      parameters:
+      - description: asset_id
+        in: path
+        name: asset_id
+        required: true
+        type: integer
+      - description: account_id
+        in: path
+        name: account_id
+        required: true
+        type: integer
+      - description: 'dir '
+        in: query
+        name: dir
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - account
+  /file/upload/:asset_id/:account_id:
+    post:
+      parameters:
+      - description: asset_id
+        in: path
+        name: asset_id
+        required: true
+        type: integer
+      - description: account_id
+        in: path
+        name: account_id
+        required: true
+        type: integer
+      - description: path
+        in: query
+        name: path
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - file
   /gateway:
     get:
       parameters:
@@ -908,7 +1136,7 @@ paths:
       - description: name or host or account or port
         in: query
         name: search
-        type: integer
+        type: string
       - description: gateway id
         in: query
         name: id
@@ -1041,6 +1269,10 @@ paths:
       - description: end time, RFC3339
         in: query
         name: end
+        type: string
+      - description: search
+        in: query
+        name: search
         type: string
       responses:
         "200":
@@ -1199,7 +1431,7 @@ paths:
       - description: name or mac
         in: query
         name: search
-        type: integer
+        type: string
       - description: publicKey id
         in: query
         name: id

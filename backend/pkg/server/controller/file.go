@@ -22,7 +22,7 @@ import (
 
 // GetFileHistory godoc
 //
-//	@Tags		session
+//	@Tags		file
 //	@Param		page_index	query		int		true	"page_index"
 //	@Param		page_size	query		int		true	"page_size"
 //	@Param		search		query		string	false	"search"
@@ -53,21 +53,27 @@ func (c *Controller) GetFileHistory(ctx *gin.Context) {
 
 // FileLS godoc
 //
-//	@Tags		account
+//	@Tags		file
 //	@Param		asset_id	path		int		true	"asset_id"
 //	@Param		account_id	path		int		true	"account_id"
 //	@Param		dir			query		string	true	"dir"
 //	@Success	200			{object}	HttpResponse
 //	@Router		/file/ls/:asset_id/:account_id [post]
 func (c *Controller) FileLS(ctx *gin.Context) {
+	currentUser, _ := acl.GetSessionFromCtx(ctx)
+	if !acl.IsAdmin(currentUser) && !HasAuthorization(ctx) {
+		ctx.AbortWithError(http.StatusForbidden, &ApiError{Code: ErrNoPerm, Data: map[string]any{}})
+		return
+	}
+
 	cli, err := file.GetFileManager().GetFileClient(cast.ToInt(ctx.Param("asset_id")), cast.ToInt(ctx.Param("account_id")))
 	if err != nil {
-		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{}})
+		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
 	info, err := cli.ReadDir(ctx.Query("dir"))
 	if err != nil {
-		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
+		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
 		return
 	}
 
@@ -85,7 +91,7 @@ func (c *Controller) FileLS(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, NewHttpResponseWithData(res))
 }
 
-// FileMkdir godoc
+// FileMkdir file
 //
 //	@Tags		account
 //	@Param		asset_id	path		int		true	"asset_id"
@@ -95,6 +101,10 @@ func (c *Controller) FileLS(ctx *gin.Context) {
 //	@Router		/file/mkdir/:asset_id/:account_id [post]
 func (c *Controller) FileMkdir(ctx *gin.Context) {
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
+	if !acl.IsAdmin(currentUser) && !HasAuthorization(ctx) {
+		ctx.AbortWithError(http.StatusForbidden, &ApiError{Code: ErrNoPerm, Data: map[string]any{}})
+		return
+	}
 
 	cli, err := file.GetFileManager().GetFileClient(cast.ToInt(ctx.Param("asset_id")), cast.ToInt(ctx.Param("account_id")))
 	if err != nil {
@@ -123,7 +133,7 @@ func (c *Controller) FileMkdir(ctx *gin.Context) {
 
 // FileUpload godoc
 //
-//	@Tags		account
+//	@Tags		file
 //	@Param		asset_id	path		int		true	"asset_id"
 //	@Param		account_id	path		int		true	"account_id"
 //	@Param		path		query		string	true	"path"
@@ -131,6 +141,10 @@ func (c *Controller) FileMkdir(ctx *gin.Context) {
 //	@Router		/file/upload/:asset_id/:account_id [post]
 func (c *Controller) FileUpload(ctx *gin.Context) {
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
+	if !acl.IsAdmin(currentUser) && !HasAuthorization(ctx) {
+		ctx.AbortWithError(http.StatusForbidden, &ApiError{Code: ErrNoPerm, Data: map[string]any{}})
+		return
+	}
 
 	f, fh, err := ctx.Request.FormFile("file")
 	if err != nil {
@@ -178,15 +192,19 @@ func (c *Controller) FileUpload(ctx *gin.Context) {
 
 // FileDownload godoc
 //
-//	@Tags		account
+//	@Tags		file
 //	@Param		asset_id	path		int		true	"asset_id"
 //	@Param		account_id	path		int		true	"account_id"
 //	@Param		dir			query		string	true	"dir"
-//	@Param		failename	query		string	true	"filename"
+//	@Param		filename	query		string	true	"filename"
 //	@Success	200			{object}	HttpResponse
-//	@Router		/file/ls/:asset_id/:account_id [get]
+//	@Router		/file/download/:asset_id/:account_id [get]
 func (c *Controller) FileDownload(ctx *gin.Context) {
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
+	if !acl.IsAdmin(currentUser) && !HasAuthorization(ctx) {
+		ctx.AbortWithError(http.StatusForbidden, &ApiError{Code: ErrNoPerm, Data: map[string]any{}})
+		return
+	}
 
 	cli, err := file.GetFileManager().GetFileClient(cast.ToInt(ctx.Param("asset_id")), cast.ToInt(ctx.Param("account_id")))
 	if err != nil {

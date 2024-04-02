@@ -10,10 +10,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/samber/lo"
+	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"gorm.io/gorm"
 
 	"github.com/veops/oneterm/pkg/conf"
+	"github.com/veops/oneterm/pkg/logger"
 	"github.com/veops/oneterm/pkg/server/auth/acl"
 	"github.com/veops/oneterm/pkg/server/model"
 	"github.com/veops/oneterm/pkg/server/storage/db/mysql"
@@ -149,5 +151,17 @@ func GetAutorizationResourceIds(ctx *gin.Context) (resourceIds []int, err error)
 	}
 	resourceIds = lo.Map(rs, func(r *acl.Resource, _ int) int { return r.ResourceId })
 
+	return
+}
+
+func HasAuthorization(ctx *gin.Context) (ok bool) {
+	currentUser, _ := acl.GetSessionFromCtx(ctx)
+	rs, err := acl.GetRoleResources(ctx, currentUser.Acl.Rid, conf.RESOURCE_AUTHORIZATION)
+	if err != nil {
+		logger.L.Error("check authorization failed", zap.Error(err))
+		return
+	}
+	k := fmt.Sprintf("%d-%d", ctx.Param("asset_id"), ctx.Param("account_id"))
+	_, ok = lo.Find(rs, func(r *acl.Resource) bool { return k == r.Name })
 	return
 }

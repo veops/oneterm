@@ -14,6 +14,7 @@ import (
 	ggateway "github.com/veops/oneterm/pkg/server/global/gateway"
 	"github.com/veops/oneterm/pkg/server/model"
 	"github.com/veops/oneterm/pkg/server/storage/db/mysql"
+	"github.com/veops/oneterm/pkg/util"
 )
 
 var (
@@ -80,18 +81,33 @@ func (fm *FileManager) GetFileClient(assetId, accountId int) (cli *sftp.Client, 
 	if err = mysql.DB.Model(account).Where("id = ?", accountId).First(account).Error; err != nil {
 		return
 	}
+	account.Password = util.DecryptAES(account.Password)
+	account.Pk = util.DecryptAES(account.Pk)
+	account.Phrase = util.DecryptAES(account.Phrase)
 	if asset.GatewayId != 0 {
 		if err = mysql.DB.Model(gateway).Where("id = ?", asset.GatewayId).First(gateway).Error; err != nil {
 			return
 		}
+		gateway.Password = util.DecryptAES(gateway.Password)
+		gateway.Pk = util.DecryptAES(gateway.Pk)
+		gateway.Phrase = util.DecryptAES(gateway.Phrase)
 	}
-	ip, port := asset.Ip, 22
+	ip, port := asset.Ip, 0
 	for _, p := range asset.Protocols {
 		if strings.HasPrefix(p, "sftp") {
 			port = cast.ToInt(strings.Split(p, ":")[1])
 			break
 		}
 	}
+	if port == 0 {
+		for _, p := range asset.Protocols {
+			if strings.HasPrefix(p, "ssh") {
+				port = cast.ToInt(strings.Split(p, ":")[1])
+				break
+			}
+		}
+	}
+
 	if asset.GatewayId != 0 {
 		sid, _ := uuid.NewUUID()
 		var g *ggateway.GatewayTunnel
@@ -106,7 +122,7 @@ func (fm *FileManager) GetFileClient(assetId, accountId int) (cli *sftp.Client, 
 		return
 	}
 	sshCli, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", ip, port), &ssh.ClientConfig{
-		User:            gateway.Account,
+		User:            account.Account,
 		Auth:            []ssh.AuthMethod{auth},
 		Timeout:         time.Second * 3,
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),

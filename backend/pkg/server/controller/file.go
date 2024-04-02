@@ -197,6 +197,7 @@ func (c *Controller) FileUpload(ctx *gin.Context) {
 //	@Param		account_id	path		int		true	"account_id"
 //	@Param		dir			query		string	true	"dir"
 //	@Param		filename	query		string	true	"filename"
+//	@Param		file		formData	string	true	"file field name"
 //	@Success	200			{object}	HttpResponse
 //	@Router		/file/download/:asset_id/:account_id [get]
 func (c *Controller) FileDownload(ctx *gin.Context) {

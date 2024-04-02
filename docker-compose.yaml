@@ -18,7 +18,7 @@ services:
           - oneterm-api
 
   oneterm-ssh:
-    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-ssh:24.3
+    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-ssh:24.3.1
     container_name: oneterm-ssh
     ports:
       - "12229:12228"

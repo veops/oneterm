@@ -974,6 +974,11 @@ paths:
         name: filename
         required: true
         type: string
+      - description: file field name
+        in: formData
+        name: file
+        required: true
+        type: string
       responses:
         "200":
           description: OK

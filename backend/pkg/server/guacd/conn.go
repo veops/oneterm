@@ -75,6 +75,8 @@ func NewTunnel(connectionId string, w, h, dpi int, protocol string, asset *model
 						"port":                  port,
 						"username":              account.Account,
 						"password":              util.DecryptAES(account.Password),
+						"disable-copy":          "false",
+						"disable-paste":         "false",
 					}
 				}, func() map[string]string {
 					return map[string]string{

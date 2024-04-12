@@ -437,7 +437,6 @@ export default {
 }
 </style>
 <style lang="less">
-@import '~@/style/static.less';
 .asset-create-node-container {
   .ant-form-item {
     margin-bottom: 8px;

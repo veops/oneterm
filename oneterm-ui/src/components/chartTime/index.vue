@@ -280,7 +280,6 @@ export default {
 </script>
 
 <style lang="less" scoped>
-@import '~@/style/static.less';
 .chart-time-display-time {
   .ops_display_wrapper(#fff);
 }

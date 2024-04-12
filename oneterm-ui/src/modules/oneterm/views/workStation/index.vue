@@ -137,7 +137,6 @@ export default {
 </script>
 
 <style lang="less" scoped>
-@import '~@/style/static.less';
 .oneterm-workstation {
   width: 100%;
   height: 100%;

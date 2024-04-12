@@ -384,7 +384,6 @@ export default {
 </script>
 
 <style lang="less" scoped>
-@import '~@/style/static.less';
 @import '../../../style/index.less';
 .asset-list-sidebar-header {
   font-size: 14px;

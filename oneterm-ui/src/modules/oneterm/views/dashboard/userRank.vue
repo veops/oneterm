@@ -62,7 +62,6 @@ export default {
 </script>
 
 <style lang="less" scoped>
-@import '~@/style/static.less';
 .user-rank {
   display: flex;
   flex-direction: column;

@@ -62,7 +62,6 @@ export default {
 </script>
 
 <style lang="less" scoped>
-@import '~@/style/static.less';
 .dashboard-timeradio-item {
   cursor: pointer;
   padding: 5px 10px;

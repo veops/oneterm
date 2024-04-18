@@ -6,7 +6,7 @@
       :max="500"
       :paneLengthPixel.sync="paneLengthPixel"
       appName="setting-structure"
-      triggerColor="#F0F5FF"
+      triggerColor="#f7f8fa"
       :triggerLength="18"
     >
       <template #one>

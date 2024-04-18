@@ -5,11 +5,9 @@ import Vuex from 'vuex'
 import app from './global/app'
 import user from './global/user'
 import routes from './global/routes'
-import logo from './global/logo'
 import notice from './global/notice'
 import getters from './global/getters'
 import appConfig from '@/config/app'
-console.log(appConfig)
 
 Vue.use(Vuex)
 
@@ -18,7 +16,6 @@ const store = new Vuex.Store({
     app,
     user,
     routes,
-    logo,
     notice
   },
   state: {
@@ -54,13 +51,11 @@ const store = new Vuex.Store({
 })
 
 appConfig.buildModules.forEach(appName => {
-  if (appName !== 'fullscreen') {
     import(`@/modules/${appName}/index.js`).then(m => {
       if (m.default.store) {
         store.registerModule(m.default.store.name || m.deault.name, m.default.store)
       }
     })
-  }
 })
 
 export default store

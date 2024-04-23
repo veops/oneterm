@@ -4,7 +4,7 @@
       @click="jumpTo"
       v-if="showTitle && !collapsed"
       style="width: 100%; height: 100%; cursor: pointer"
-      :src="require('@/assets/logo_VECMDB.png')"
+      :src="require('@/assets/logo_oneterm.png')"
     />
     <img
       @click="jumpTo"

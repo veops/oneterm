@@ -5,7 +5,13 @@
     </div>
     <div class="ops-login-right">
       <img src="../../assets/logo_oneterm.png" />
-      <a-form id="formLogin" ref="formLogin" :form="form" @submit="handleSubmit" hideRequiredMark :colon="false">
+      <a-form
+        id="formLogin"
+        ref="formLogin"
+        :form="form"
+        @submit="handleSubmit"
+        hideRequiredMark
+        :colon="false">
         <a-form-item label="用户名/邮箱">
           <a-input
             size="large"
@@ -37,7 +43,7 @@
           <a-checkbox v-decorator="['rememberMe', { valuePropName: 'checked' }]">自动登录</a-checkbox>
         </a-form-item>
 
-        <a-form-item style="margin-top: 24px">
+        <a-form-item style="margin-top:24px">
           <a-button
             size="large"
             type="primary"
@@ -45,18 +51,18 @@
             class="login-button"
             :loading="state.loginBtn"
             :disabled="state.loginBtn"
-            >登录</a-button
+          >登录</a-button
           >
           <a-checkbox
             v-if="enable_list && enable_list.length === 1 && enable_list[0].auth_type === 'LDAP'"
             v-model="auth_with_ldap"
-            >LDAP</a-checkbox
+          >LDAP</a-checkbox
           >
         </a-form-item>
       </a-form>
       <template v-if="_enable_list && _enable_list.length >= 1">
-        <a-divider style="font-size: 14px">其他登录方式</a-divider>
-        <div style="text-align: center">
+        <a-divider style="font-size:14px">其他登录方式</a-divider>
+        <div style="text-align:center">
           <span v-for="(item, index) in _enable_list" :key="item.auth_type">
             <ops-icon :type="item.auth_type" />
             <a @click="otherLogin(item.auth_type)">{{ item.auth_type }}</a>
@@ -150,7 +156,6 @@ export default {
 
       validateFields(validateFieldsKey, { force: true }, (err, values) => {
         if (!err) {
-          console.log('login form', values)
           const loginParams = { ...values }
           delete loginParams.username
           loginParams.username = values.username
@@ -203,6 +208,13 @@ export default {
     background: url('../../assets/login_bg.png') no-repeat;
     background-position: center;
     background-size: cover;
+    > img {
+      width: 80%;
+      position: absolute;
+      top: 60%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
     > span {
       color: white;
       position: absolute;
@@ -210,7 +222,6 @@ export default {
       left: 50%;
       transform: translateX(-50%);
       font-size: 1.75vw;
-      text-align: center;
     }
   }
   .ops-login-right {
@@ -220,6 +231,14 @@ export default {
     > img {
       width: 70%;
       margin-left: 15%;
+    }
+    .ops-login-right-welcome {
+      text-align: center;
+      color: rgba(29, 57, 196, 1);
+      font-family: 'Inter';
+      font-style: normal;
+      font-weight: 600;
+      font-size: 1.25vw;
     }
     .login-button {
       width: 100%;

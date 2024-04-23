@@ -286,11 +286,11 @@ export default {
 
 .blue {
   .chart-time-display-time {
-    background-color: #custom_colors[color_2];
+    background-color: @primary-color_5;
   }
 }
 .chart-time-display-icon {
-  color: #custom_colors[color_1];
+  color: @primary-color;
   font-size: 12px;
 }
 .chart-time {

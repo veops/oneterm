@@ -125,7 +125,8 @@ func getNodes() (res map[int]*model.Node, err error) {
 func getCis(typeId int, filters string) (res []map[string]any, err error) {
 	url := fmt.Sprintf("%s/ci/s", conf.Cfg.Cmdb.Url)
 	params := map[string]any{
-		"q": fmt.Sprintf("_type:(%d),%s", typeId, filters),
+		"q":     fmt.Sprintf("_type:(%d),%s", typeId, filters),
+		"count": 100000,
 	}
 	params["_secret"] = buildAPIKey(url, params)
 	params["_key"] = conf.Cfg.Worker.Key

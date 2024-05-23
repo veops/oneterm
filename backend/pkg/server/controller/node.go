@@ -122,7 +122,7 @@ func nodePostHookCountAsset(ctx *gin.Context, data []*model.Node) {
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
 	isAdmin := acl.IsAdmin(currentUser)
 	assets := make([]*model.AssetIdPid, 0)
-	db := mysql.DB.Model(assets)
+	db := mysql.DB.Model(&model.Asset{})
 	if !isAdmin {
 		authorizationResourceIds, err := GetAutorizationResourceIds(ctx)
 		if err != nil {

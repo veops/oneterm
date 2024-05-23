@@ -202,7 +202,7 @@ func assetPostHookAuth(ctx *gin.Context, data []*model.Asset) {
 
 func handleParentId(parentId int) (pids []int, err error) {
 	nodes := make([]*model.NodeIdPid, 0)
-	if err = mysql.DB.Model(nodes).Find(&nodes).Error; err != nil {
+	if err = mysql.DB.Model(&model.Node{}).Find(&nodes).Error; err != nil {
 		return
 	}
 	g := make(map[int][]int)

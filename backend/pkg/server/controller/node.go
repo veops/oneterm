@@ -99,7 +99,7 @@ func (c *Controller) GetNodes(ctx *gin.Context) {
 
 func nodePreHookCheckCycle(ctx *gin.Context, data *model.Node) {
 	nodes := make([]*model.NodeIdPid, 0)
-	err := mysql.DB.Model(nodes).Find(&nodes).Error
+	err := mysql.DB.Model(&model.Node{}).Find(&nodes).Error
 	g := make(map[int][]int)
 	for _, n := range nodes {
 		g[n.ParentId] = append(g[n.ParentId], n.Id)
@@ -146,7 +146,7 @@ func nodePostHookCountAsset(ctx *gin.Context, data []*model.Node) {
 		return
 	}
 	nodes := make([]*model.NodeIdPid, 0)
-	if err := mysql.DB.Model(nodes).Find(&nodes).Error; err != nil {
+	if err := mysql.DB.Model(&model.Node{}).Find(&nodes).Error; err != nil {
 		logger.L.Error("node posthookfailed node", zap.Error(err))
 		return
 	}
@@ -202,7 +202,7 @@ func nodeDelHook(ctx *gin.Context, id int) {
 
 func handleNoSelfChild(id int) (ids []int, err error) {
 	nodes := make([]*model.NodeIdPid, 0)
-	if err = mysql.DB.Model(nodes).Find(&nodes).Error; err != nil {
+	if err = mysql.DB.Model(&model.Node{}).Find(&nodes).Error; err != nil {
 		return
 	}
 	g := make(map[int][]int)
@@ -223,7 +223,7 @@ func handleNoSelfChild(id int) (ids []int, err error) {
 
 func handleSelfParent(id int) (ids []int, err error) {
 	nodes := make([]*model.NodeIdPid, 0)
-	if err = mysql.DB.Model(nodes).Find(&nodes).Error; err != nil {
+	if err = mysql.DB.Model(&model.Node{}).Find(&nodes).Error; err != nil {
 		return
 	}
 	g := make(map[int][]int)

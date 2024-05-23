@@ -286,7 +286,7 @@ func toListData[T any](data []T) *ListData {
 
 func nodeCountAsset() (res map[int]int64, err error) {
 	assets := make([]*model.AssetIdPid, 0)
-	if err = mysql.DB.Model(assets).Find(&assets).Error; err != nil {
+	if err = mysql.DB.Model(&model.Asset{}).Find(&assets).Error; err != nil {
 		return
 	}
 	res = make(map[int]int64)

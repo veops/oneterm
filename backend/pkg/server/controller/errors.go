@@ -42,6 +42,7 @@ var (
 		ErrNoPerm:           myi18n.MsgNoPerm,
 		ErrRemoteClient:     myi18n.MsgRemoteClient,
 		ErrWrongPk:          myi18n.MsgWrongPk,
+		ErrWrongMac:         myi18n.MsgWrongMac,
 		ErrInvalidSessionId: myi18n.MsgInvalidSessionId,
 		ErrLogin:            myi18n.MsgLoginError,
 		ErrAccessTime:       myi18n.MsgAccessTime,

@@ -379,11 +379,11 @@ func connectSsh(ctx *gin.Context, req *gsession.SshReq, chs *gsession.SessionCha
 	chs.RespChan <- resp
 
 	g, gctx := errgroup.WithContext(context.Background())
+	waitCh := make(chan error)
+	go func() {
+		waitCh <- sess.Wait()
+	}()
 	g.Go(func() error {
-		return sess.Wait()
-	})
-	g.Go(func() error {
-		defer sess.Close()
 		for {
 			select {
 			case <-gctx.Done():
@@ -407,11 +407,12 @@ func connectSsh(ctx *gin.Context, req *gsession.SshReq, chs *gsession.SessionCha
 		}
 	})
 	g.Go(func() error {
-		defer sess.Close()
 		for {
 			select {
 			case <-gctx.Done():
 				return nil
+			case err = <-waitCh:
+				return err
 			case <-chs.AwayChan:
 				return fmt.Errorf("away")
 			case s := <-chs.WindowChan:

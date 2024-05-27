@@ -331,10 +331,7 @@ func connectSsh(ctx *gin.Context, req *gsession.SshReq, chs *gsession.SessionCha
 		logger.L.Error("ssh session create failed", zap.Error(err))
 		return
 	}
-	defer func() {
-		logger.L.Debug("close ssh session")
-		sess.Close()
-	}()
+	defer sess.Close()
 
 	rout, wout := io.Pipe()
 	sess.Stdout = wout
@@ -386,6 +383,7 @@ func connectSsh(ctx *gin.Context, req *gsession.SshReq, chs *gsession.SessionCha
 		return sess.Wait()
 	})
 	g.Go(func() error {
+		defer sess.Close()
 		for {
 			select {
 			case <-gctx.Done():
@@ -409,6 +407,7 @@ func connectSsh(ctx *gin.Context, req *gsession.SshReq, chs *gsession.SessionCha
 		}
 	})
 	g.Go(func() error {
+		defer sess.Close()
 		for {
 			select {
 			case <-gctx.Done():
@@ -431,8 +430,9 @@ func connectSsh(ctx *gin.Context, req *gsession.SshReq, chs *gsession.SessionCha
 			}
 		}
 	})
-	err = g.Wait()
-	logger.L.Warn("doSsh stopped", zap.Error(err))
+	if err = g.Wait(); err != nil {
+		logger.L.Warn("doSsh stopped", zap.Error(err))
+	}
 
 	return
 }

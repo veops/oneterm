@@ -331,7 +331,10 @@ func connectSsh(ctx *gin.Context, req *gsession.SshReq, chs *gsession.SessionCha
 		logger.L.Error("ssh session create failed", zap.Error(err))
 		return
 	}
-	defer sess.Close()
+	defer func() {
+		logger.L.Debug("close ssh session")
+		sess.Close()
+	}()
 
 	rout, wout := io.Pipe()
 	sess.Stdout = wout

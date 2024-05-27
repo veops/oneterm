@@ -407,6 +407,7 @@ func connectSsh(ctx *gin.Context, req *gsession.SshReq, chs *gsession.SessionCha
 		}
 	})
 	g.Go(func() error {
+		defer rout.Close()
 		for {
 			select {
 			case <-gctx.Done():
@@ -414,6 +415,7 @@ func connectSsh(ctx *gin.Context, req *gsession.SshReq, chs *gsession.SessionCha
 			case err = <-waitCh:
 				return err
 			case <-chs.AwayChan:
+				logger.L.Debug("doSsh away")
 				return fmt.Errorf("away")
 			case s := <-chs.WindowChan:
 				wh := strings.Split(s, ",")

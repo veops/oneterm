@@ -428,9 +428,8 @@ func connectSsh(ctx *gin.Context, req *gsession.SshReq, chs *gsession.SessionCha
 			}
 		}
 	})
-	if err = g.Wait(); err != nil {
-		logger.L.Warn("doSsh stopped", zap.Error(err))
-	}
+	err = g.Wait()
+	logger.L.Warn("doSsh stopped", zap.Error(err))
 
 	return
 }

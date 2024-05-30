@@ -318,6 +318,7 @@ func connectSsh(ctx *gin.Context, req *gsession.SshReq, chs *gsession.SessionCha
 			ssh.Password(conf.Cfg.SshServer.Password),
 		},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		Timeout:         time.Second * 3,
 	}
 	conn, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", conf.Cfg.SshServer.Ip, conf.Cfg.SshServer.Port), cfg)
 	if err != nil {

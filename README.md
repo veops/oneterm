@@ -93,4 +93,6 @@ doc link：https://veops.cn/docs/docs/oneterm/onterm_design
 
 **Welcome to follow our WeChat official account and join our group channels**
 
-![Wechat Official Account: 维易科技OneOps](docs/images/wechat.jpg)
+<p align="center">
+  <img src="docs/images/wechat.png" alt="公众号: 维易科技OneOps" />
+</p>

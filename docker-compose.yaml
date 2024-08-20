@@ -138,17 +138,6 @@ services:
         aliases:
           - acl-api
 
-volumes:
-  db-data:
-    driver: local
-    name: oneterm_db-data
-  file-data:
-    driver: local
-    name: oneterm_file-data
-  ssh-data:
-    driver: local
-    name: oneterm_ssh
-
 networks:
   new:
     driver: bridge

@@ -1,0 +1,60 @@
+mode: debug
+
+http:
+  ip: 0.0.0.0
+  port: 8888
+
+ssh:
+  ip: 0.0.0.0
+  port: 2222
+
+guacd:
+  ip: oneterm-guacd
+  port: 4822
+  gateway: oneterm-api 
+
+mysql:
+  ip: mysql
+  port: 3306
+  user: root
+  password: root
+
+redis:
+  addr: redis:6379
+  password: root
+
+log:
+  level: debug
+  format: json
+  maxSize: 1
+  consoleEnable: true
+
+auth:
+  acl:
+    appId: acl app id
+    secretKey: acl app secret key
+    url: http://host/api/v1
+    resourceNames:
+      - key: account
+        value: account
+      - key: asset
+        value: asset
+      - key: command
+        value: command
+      - key: gateway
+        value: gateway
+      - key: authorization
+        value: authorization
+
+cmdb:
+  url: http://host/api/v0.1
+
+secretKey: acl secret key
+
+worker:
+  uid: 123
+  rid: 456
+  key: acl key
+  secret: acl secret
+
+

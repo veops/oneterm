@@ -42,7 +42,7 @@ type Tunnel struct {
 	reader       *bufio.Reader
 	writer       *bufio.Writer
 	Config       *Configuration
-	g            *ggateway.GatewayTunnel
+	gw            *ggateway.GatewayTunnel
 }
 
 func NewTunnel(connectionId string, w, h, dpi int, protocol string, asset *model.Asset, account *model.Account, gateway *model.Gateway) (t *Tunnel, err error) {
@@ -93,12 +93,12 @@ func NewTunnel(connectionId string, w, h, dpi int, protocol string, asset *model
 		t.Config.Parameters["recording-name"] = t.SessionId
 	}
 	if gateway != nil && gateway.Id != 0 && t.ConnectionId == "" {
-		t.g, err = ggateway.GetGatewayManager().Open(t.SessionId, asset.Ip, cast.ToInt(port), gateway)
+		t.gw, err = ggateway.GetGatewayManager().Open(t.SessionId, asset.Ip, cast.ToInt(port), gateway)
 		if err != nil {
 			return t, err
 		}
 		t.Config.Parameters["hostname"] = conf.Cfg.Guacd.Gateway
-		t.Config.Parameters["port"] = cast.ToString(t.g.LocalPort)
+		t.Config.Parameters["port"] = cast.ToString(t.gw.LocalPort)
 	}
 
 	err = t.handshake()

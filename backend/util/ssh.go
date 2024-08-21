@@ -62,15 +62,16 @@ func Proxy(sessionId string, protocol string, asset *model.Asset, gateway *model
 	ip, port = asset.Ip, 0
 	for _, tp := range strings.Split(protocol, ",") {
 		for _, p := range asset.Protocols {
-			if strings.ToLower(p) == tp {
-				port = cast.ToInt(strings.Split(p, ":")[1])
-				break
+			if strings.HasPrefix(strings.ToLower(p), tp) {
+				if port = cast.ToInt(strings.Split(p, ":")[1]); port != 0 {
+					break
+				}
 			}
 		}
 	}
 
 	if asset.GatewayId == 0 || gateway == nil {
-		return ip, port, nil
+		return
 	}
 
 	var g *ggateway.GatewayTunnel

@@ -35,20 +35,26 @@ func auth() gin.HandlerFunc {
 		session := &acl.Session{}
 
 		sess, err := ctx.Cookie("session")
-		if err == nil && sess != "" {
-			s := acl.NewSignature(conf.Cfg.SecretKey, "cookie-session", "", "hmac", nil, nil)
-			content, err := s.Unsign(sess)
-			if err != nil {
-				ctx.AbortWithStatus(http.StatusUnauthorized)
-				return
-			}
-			err = json.Unmarshal(content, &session)
-			if err != nil {
-				ctx.AbortWithStatus(http.StatusUnauthorized)
-				return
-			}
-			ctx.Set("session", session)
+		if err != nil || sess == "" {
+			logger.L().Error("cannot get cookie.session", zap.Error(err))
+			ctx.AbortWithStatus(http.StatusUnauthorized)
+			return
 		}
+
+		s := acl.NewSignature(conf.Cfg.SecretKey, "cookie-session", "", "hmac", nil, nil)
+		content, err := s.Unsign(sess)
+		if err != nil {
+			logger.L().Error("cannot unsign", zap.Error(err))
+			ctx.AbortWithStatus(http.StatusUnauthorized)
+			return
+		}
+		err = json.Unmarshal(content, &session)
+		if err != nil {
+			logger.L().Error("cannot unmarshal to session", zap.Error(err))
+			ctx.AbortWithStatus(http.StatusUnauthorized)
+			return
+		}
+		ctx.Set("session", session)
 
 		ctx.Next()
 	}

@@ -1,12 +1,11 @@
 package conf
 
 import (
-	"github.com/spf13/pflag"
-)
+	"fmt"
 
-func init() {
-	pflag.Parse()
-}
+	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
+)
 
 const (
 	RESOURCE_ACCOUNT       = "account"
@@ -39,6 +38,25 @@ var (
 		Worker: Worker{},
 	}
 )
+
+func init() {
+	path := pflag.StringP("config", "c", "config.yaml", "config path")
+	pflag.Parse()
+
+	viper.SetConfigName("config")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath(*path)
+	viper.AddConfigPath(".")
+
+	err := viper.ReadInConfig()
+	if err != nil {
+		panic(fmt.Errorf("fatal error config file: %s", err))
+	}
+
+	if err = viper.Unmarshal(Cfg); err != nil {
+		panic(fmt.Sprintf("parse config from config.yaml failed:%s", err))
+	}
+}
 
 type HttpConfig struct {
 	Host string `yaml:"host"`

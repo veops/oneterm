@@ -42,11 +42,11 @@ type Tunnel struct {
 	reader       *bufio.Reader
 	writer       *bufio.Writer
 	Config       *Configuration
-	gw            *ggateway.GatewayTunnel
+	gw           *ggateway.GatewayTunnel
 }
 
 func NewTunnel(connectionId string, w, h, dpi int, protocol string, asset *model.Asset, account *model.Account, gateway *model.Gateway) (t *Tunnel, err error) {
-	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", conf.Cfg.Guacd.Ip, conf.Cfg.Guacd.Port), time.Second*3)
+	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", conf.Cfg.Guacd.Host, conf.Cfg.Guacd.Port), time.Second*3)
 	if err != nil {
 		return
 	}

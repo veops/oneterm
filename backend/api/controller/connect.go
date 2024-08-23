@@ -197,6 +197,10 @@ func sendSshMsg(ws *websocket.Conn, sess *gsession.Session) {
 func (c *Controller) Connect(ctx *gin.Context) {
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
 
+	func DoConnect(protocol string, assetId int,accountId int) *gsession.Session  {
+
+	}
+
 	assetId, accountId := cast.ToInt(ctx.Param("asset_id")), cast.ToInt(ctx.Param("account_id"))
 	asset, account, gateway, err := util.GetAAG(assetId, accountId)
 	if err != nil {

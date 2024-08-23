@@ -2,12 +2,14 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 
 	"github.com/veops/oneterm/api/controller"
+	"github.com/veops/oneterm/conf"
 	"github.com/veops/oneterm/logger"
 )
 
@@ -89,9 +91,6 @@ func RunApi() error {
 			session.GET("/option/asset", c.GetSessionOptionAsset)
 			session.GET("/option/clientip", c.GetSessionOptionClientIp)
 			session.GET("/replay/:session_id", c.GetSessionReplay)
-			session.POST("/replay/:session_id", c.CreateSessionReplay)
-			session.POST("", c.UpsertSession)
-			session.POST("/cmd", c.CreateSessionCmd)
 		}
 
 		connect := v1.Group("connect")
@@ -118,7 +117,7 @@ func RunApi() error {
 		}
 	}
 
-	srv.Addr = ":8888"
+	srv.Addr = fmt.Sprintf("%s:%d", conf.Cfg.Http.Host, conf.Cfg.Http.Port)
 	srv.Handler = r
 	err := srv.ListenAndServe()
 	if err != nil {

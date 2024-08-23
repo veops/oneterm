@@ -69,7 +69,7 @@ type RedisConfig struct {
 }
 
 type MysqlConfig struct {
-	Ip       string `yaml:"ip"`
+	Host     string `yaml:"host"`
 	Port     string `yaml:"port"`
 	User     string `yaml:"user"`
 	Password string `yaml:"password"`
@@ -121,7 +121,7 @@ type Worker struct {
 }
 
 type SshServer struct {
-	Ip       string `yaml:"ip"`
+	Host     string `yaml:"host"`
 	Port     int    `yaml:"port"`
 	Account  string `yaml:"account"`
 	Password string `yaml:"account"`
@@ -129,7 +129,7 @@ type SshServer struct {
 }
 
 type Guacd struct {
-	Ip      string `yaml:"ip"`
+	Host    string `yaml:"host"`
 	Port    int    `yaml:"port"`
 	Gateway string `yaml:"gateway"`
 }

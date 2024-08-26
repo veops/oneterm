@@ -113,48 +113,7 @@ func (c *Controller) GetAssets(ctx *gin.Context) {
 
 	db = db.Order("name")
 
-	doGet[*model.Asset](ctx, !info, db, acl.GetResourceTypeName(conf.RESOURCE_AUTHORIZATION), assetPostHooks...)
-}
-
-// QueryByServer godoc
-//
-//	@Tags		asset
-//	@Param		page_index	query		int	true	"page index"
-//	@Param		page_size	query		int	true	"page size"
-//	@Success	200			{object}	HttpResponse{data=ListData{list=[]model.Asset}}
-//	@Router		/asset/query_by_server [get]
-func (c *Controller) QueryByServer(ctx *gin.Context) {
-	db := mysql.DB.Model(&model.Asset{})
-
-	doGet[*model.Asset](ctx, false, db, acl.GetResourceTypeName(conf.RESOURCE_ASSET), nil)
-}
-
-// UpdateByServer godoc
-//
-//	@Tags		asset
-//	@Param		id	path		int						true	"asset id"
-//	@Param		req	body		map[int]map[string]any	true	"asset update request"
-//	@Success	200	{object}	HttpResponse
-//	@Router		/asset/update_by_server [put]
-func (c *Controller) UpdateByServer(ctx *gin.Context) {
-	updates := make(map[int]map[string]any)
-	if err := ctx.BindJSON(&updates); err != nil {
-		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
-		return
-	}
-
-	for k, v := range updates {
-		if err := mysql.DB.
-			Model(&model.Asset{}).
-			Where("id = ?", k).
-			Updates(v).
-			Error; err != nil {
-			ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
-			return
-		}
-	}
-
-	ctx.JSON(http.StatusOK, defaultHttpResponse)
+	doGet(ctx, !info, db, acl.GetResourceTypeName(conf.RESOURCE_AUTHORIZATION), assetPostHooks...)
 }
 
 func assetPostHookCount(ctx *gin.Context, data []*model.Asset) {

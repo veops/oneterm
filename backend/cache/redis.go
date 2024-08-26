@@ -3,6 +3,7 @@ package redis
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -20,7 +21,7 @@ var (
 func init() {
 	ctx := context.Background()
 	RC = redis.NewClient(&redis.Options{
-		Addr:     conf.Cfg.Redis.Addr,
+		Addr:     fmt.Sprintf("%s:%d", conf.Cfg.Redis.Host, conf.Cfg.Redis.Port),
 		Password: conf.Cfg.Redis.Password,
 	})
 

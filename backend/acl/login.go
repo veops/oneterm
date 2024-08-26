@@ -1,18 +1,21 @@
 package acl
 
 import (
-	"bytes"
-	"compress/zlib"
 	"context"
-	"encoding/base64"
+	"crypto/md5"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
 
+	"github.com/samber/lo"
 	"github.com/veops/oneterm/conf"
+	"github.com/veops/oneterm/logger"
 	"github.com/veops/oneterm/remote"
+	"go.uber.org/zap"
 )
 
-func LoginByPassword(ctx context.Context, username string, password string) (cookie string, err error) {
+func LoginByPassword(ctx context.Context, username string, password string) (sess *Session, err error) {
 	url := fmt.Sprintf("%s/acl/login", conf.Cfg.Auth.Acl.Url)
 	data := make(map[string]any)
 	resp, err := remote.RC.R().
@@ -25,20 +28,23 @@ func LoginByPassword(ctx context.Context, username string, password string) (coo
 		SetResult(&data).
 		SetBody(map[string]any{
 			"username": username,
-			// "password": fmt.Sprintf("%x", md5.Sum([]byte(password))),
-			"password": password,
+			"password": fmt.Sprintf("%x", md5.Sum([]byte(password))),
+			// "password": password,
 		}).
 		Post(url)
 	if err = remote.HandleErr(err, resp, func(dt map[string]any) bool { return true }); err != nil {
 		return
 	}
 
-	cookie = resp.Header().Get("Set-Cookie")
-
-	return
+	cookie, ok := lo.Find(resp.Cookies(), func(c *http.Cookie) bool { return c.Name == "session" })
+	if !ok {
+		err = errors.New("empty cookie")
+		return
+	}
+	return ParseCookie(cookie.Value)
 }
 
-func LoginByPublicKey(ctx context.Context, username string) (cookie string, err error) {
+func LoginByPublicKey(ctx context.Context, username string) (sess *Session, err error) {
 	token, err := remote.GetAclToken(ctx)
 	if err != nil {
 		return
@@ -60,7 +66,7 @@ func LoginByPublicKey(ctx context.Context, username string) (cookie string, err 
 	if err = remote.HandleErr(err, resp, func(dt map[string]any) bool { return true }); err != nil {
 		return
 	}
-	sess := &Session{
+	sess = &Session{
 		Uid: data.Result.UID,
 		Acl: Acl{
 			Uid:         data.Result.UID,
@@ -71,19 +77,38 @@ func LoginByPublicKey(ctx context.Context, username string) (cookie string, err 
 		},
 	}
 
-	bs, _ := json.Marshal(sess)
+	return
 
+	// bs, _ := json.Marshal(sess)
+
+	// s := NewSignature(conf.Cfg.SecretKey, "cookie-session", "", "hmac", nil, nil)
+	// buf := &bytes.Buffer{}
+	// zw := zlib.NewWriter(buf)
+	// _, _ = zw.Write(bs)
+	// _ = zw.Close()
+	// value := "." + base64.RawURLEncoding.EncodeToString(buf.Bytes())
+	// dk, _ := s.DeriveKey()
+	// sign := s.Algorithm.GetSignature(dk, value)
+	// vs := value + "." + base64.RawURLEncoding.EncodeToString(sign)
+
+	// cookie = "session=" + vs
+
+	// return
+}
+
+func ParseCookie(cookie string) (sess *Session, err error) {
 	s := NewSignature(conf.Cfg.SecretKey, "cookie-session", "", "hmac", nil, nil)
-	buf := &bytes.Buffer{}
-	zw := zlib.NewWriter(buf)
-	_, _ = zw.Write(bs)
-	_ = zw.Close()
-	value := "." + base64.RawURLEncoding.EncodeToString(buf.Bytes())
-	dk, _ := s.DeriveKey()
-	sign := s.Algorithm.GetSignature(dk, value)
-	vs := value + "." + base64.RawURLEncoding.EncodeToString(sign)
-
-	cookie = "session=" + vs
+	content, err := s.Unsign(cookie)
+	if err != nil {
+		logger.L().Error("cannot unsign", zap.Error(err))
+		return
+	}
+	sess = &Session{}
+	err = json.Unmarshal(content, &sess)
+	if err != nil {
+		logger.L().Error("cannot unmarshal to session", zap.Error(err))
+		return
+	}
 
 	return
 }

@@ -96,7 +96,6 @@ func RunApi() error {
 		connect := v1.Group("connect")
 		{
 			connect.POST("/:asset_id/:account_id/:protocol", c.Connect)
-			connect.GET("/:session_id", c.Connecting)
 			connect.GET("/monitor/:session_id", c.ConnectMonitor)
 			connect.POST("/close/:session_id", c.ConnectClose)
 		}

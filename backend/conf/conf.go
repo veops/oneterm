@@ -64,7 +64,8 @@ type HttpConfig struct {
 }
 
 type RedisConfig struct {
-	Addr     string `yaml:"addr"`
+	Host     string `yaml:"host"`
+	Port     int    `yaml:"port"`
 	Password string `yaml:"password"`
 }
 
@@ -120,15 +121,12 @@ type Worker struct {
 	Secret string `yaml:"secret"`
 }
 
-type SshServer struct {
-	Host     string `yaml:"host"`
-	Port     int    `yaml:"port"`
-	Account  string `yaml:"account"`
-	Password string `yaml:"account"`
-	Xtoken   string `yaml:"xtoken"`
+type SshConfig struct {
+	Host string `yaml:"host"`
+	Port int    `yaml:"port"`
 }
 
-type Guacd struct {
+type GuacdConfig struct {
 	Host    string `yaml:"host"`
 	Port    int    `yaml:"port"`
 	Gateway string `yaml:"gateway"`
@@ -140,9 +138,9 @@ type ConfigYaml struct {
 	Log       LogConfig   `yaml:"log"`
 	Redis     RedisConfig `yaml:"redis"`
 	Mysql     MysqlConfig `yaml:"mysql"`
-	Guacd     Guacd       `yaml:"guacd"`
+	Guacd     GuacdConfig `yaml:"guacd"`
 	Http      HttpConfig  `yaml:"http"`
-	Ssh       SshServer   `yaml:"ssh"`
+	Ssh       SshConfig   `yaml:"ssh"`
 	Auth      Auth        `yaml:"auth"`
 	SecretKey string      `yaml:"secretKey"`
 	Cmdb      Cmdb        `yaml:"cmdb"`

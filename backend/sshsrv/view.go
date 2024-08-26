@@ -3,15 +3,23 @@ package sshsrv
 import (
 	"fmt"
 	"io"
-	"log"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/gin-gonic/gin"
 	"github.com/gliderlabs/ssh"
 	"github.com/samber/lo"
+	"github.com/spf13/cast"
+	"github.com/veops/oneterm/acl"
+	"github.com/veops/oneterm/api/controller"
+	"github.com/veops/oneterm/conf"
+	mysql "github.com/veops/oneterm/db"
+	"github.com/veops/oneterm/logger"
+	"github.com/veops/oneterm/model"
+	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -25,41 +33,46 @@ var (
 )
 
 type view struct {
-	cmds        []string
-	id          string
-	textinput   textinput.Model
-	senderStyle lipgloss.Style
-	err         error
-	Sess        ssh.Session
-	cmdsIdx     int
+	Ctx       *gin.Context
+	Sess      ssh.Session
+	Pty       *ssh.Pty
+	cmds      []string
+	id        string
+	textinput textinput.Model
+	err       error
+	cmdsIdx   int
+	combines  map[string][2]int
 }
 
-func initialView(s ssh.Session, pty ssh.Pty, winCh chan<- ssh.Window) view {
-	//todo combine hint
+func initialView(ctx *gin.Context, sess ssh.Session) view {
+	pty, _, _ := sess.Pty()
 	ti := textinput.New()
 	ti.Placeholder = "ssh"
 	ti.Focus()
-	ti.Width = 30
+	ti.Width = pty.Window.Width
 	ti.Prompt = "> "
 	ti.ShowSuggestions = true
 	ti.PromptStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("63"))
 	ti.Cursor.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("63"))
-	return view{
-		textinput:   ti,
-		cmds:        []string{},
-		senderStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("5")),
-		err:         nil,
-		Sess:        s,
+	v := view{
+		Ctx:       ctx,
+		Sess:      sess,
+		textinput: ti,
+		cmds:      []string{},
+		err:       nil,
 	}
+	v.refresh(ctx)
+
+	return v
 }
 
 func (m view) Init() tea.Cmd {
-	return textarea.Blink
+	return tea.Batch(tea.Println(banner()))
 }
 
 func (m view) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var (
-		hisCmd tea.Cmd
+		// hisCmd tea.Cmd
 		tiCmd  tea.Cmd
 	)
 
@@ -69,38 +82,44 @@ func (m view) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyCtrlC, tea.KeyEsc:
 			return m, tea.Quit
 		case tea.KeyEnter:
-			if m.textinput.Value() == "" {
+			cmd := m.textinput.Value()
+			m.textinput.Reset()
+			if cmd == "" {
 				return m, tea.Batch(tea.Printf("> "))
 			}
-			hisCmd = tea.Printf("> %s", m.textinput.Value())
-			m.cmds = append(m.cmds, m.textinput.Value())
-			m.textinput.Reset()
+			// hisCmd = tea.Printf("> %s", cmd)
+			m.cmds = append(m.cmds, cmd)
 			m.cmdsIdx = len(m.cmds) - 1
-			return m, tea.Exec(&connector{}, func(err error) tea.Msg { return err })
+			if strings.HasPrefix(cmd, "ssh") {
+				k := strings.TrimSpace(strings.TrimPrefix(cmd, "ssh"))
+				m.Ctx.Request.URL.RawQuery = fmt.Sprintf("w=%d&h=%d", m.Pty.Window.Width, m.Pty.Window.Height)
+				m.Ctx.Params = nil
+				m.Ctx.Params = append(m.Ctx.Params, gin.Param{Key: "account_id", Value: cast.ToString(m.combines[k][0])})
+				m.Ctx.Params = append(m.Ctx.Params, gin.Param{Key: "account_id", Value: cast.ToString(m.combines[k][1])})
+				m.Ctx = m.Ctx.Copy()
+				return m, tea.Exec(&connector{Ctx: m.Ctx, Sess: m.Sess}, func(err error) tea.Msg { return err })
+			}
 		case tea.KeyUp:
 			ln := len(m.cmds)
-			if ln <= 0 || m.cmdsIdx < 0 {
+			if ln <= 0 {
 				return m, nil
 			}
-			m.cmdsIdx--
+			m.cmdsIdx = max(0, m.cmdsIdx-1)
 			m.textinput.SetValue(m.cmds[m.cmdsIdx])
 		case tea.KeyDown:
 			ln := len(m.cmds)
-			if ln <= 0 || m.cmdsIdx == ln-1 {
+			if ln <= 0 {
 				return m, nil
 			}
-			m.cmdsIdx++
+			m.cmdsIdx = min(ln-1, m.cmdsIdx+1)
 			m.textinput.SetValue(m.cmds[m.cmdsIdx])
 		}
-
-		// We handle errors just like any other message
 	case error:
-		m.err = msg
-		return m, nil
+		return m, tea.Batch(tea.Printf(msg.Error()))
 	}
 	m.textinput, tiCmd = m.textinput.Update(msg)
 
-	return m, tea.Batch(hisCmd, tiCmd)
+	return m, tea.Batch(tiCmd)
 }
 
 func (m view) View() string {
@@ -119,29 +138,116 @@ func (m *view) possible() string {
 	return lo.Ternary(len(res) == 0, "", fmt.Sprintf("%s", res))
 }
 
+func (m *view) refresh(ctx *gin.Context) {
+	currentUser, _ := acl.GetSessionFromCtx(ctx)
+
+	auths := make([]*model.Authorization, 0)
+	assets := make([]*model.Asset, 0)
+	accounts := make([]*model.Account, 0)
+	dbAuth := mysql.DB.Model(auths)
+	dbAsset := mysql.DB.Model(assets)
+	dbAccount := mysql.DB.Model(accounts)
+
+	if !acl.IsAdmin(currentUser) {
+		rs, err := acl.GetRoleResources(ctx, currentUser.Acl.Rid, conf.GetResourceTypeName(conf.RESOURCE_AUTHORIZATION))
+		if err != nil {
+			logger.L().Error("auths", zap.Error(err))
+			return
+		}
+		dbAuth = dbAuth.Where("resource_id IN ?", lo.Map(rs, func(r *acl.Resource, _ int) int { return r.ResourceId }))
+	}
+	if err := dbAuth.Find(&auths).Error; err != nil {
+		logger.L().Error("auths", zap.Error(err))
+		return
+	}
+	dbAccount = dbAccount.Where("id IN ?", lo.Map(auths, func(a *model.Authorization, _ int) int { return a.AccountId }))
+	dbAsset = dbAsset.Where("id IN ?", lo.Map(auths, func(a *model.Authorization, _ int) int { return a.AssetId }))
+
+	eg := &errgroup.Group{}
+	eg.Go(func() error {
+		return dbAsset.Find(&assets).Error
+	})
+	eg.Go(func() error {
+		return dbAccount.Find(&accounts).Error
+	})
+	if err := eg.Wait(); err != nil {
+		logger.L().Error("refresh failed", zap.Error(err))
+		return
+	}
+
+	assetMap := lo.SliceToMap(assets, func(a *model.Asset) (int, *model.Asset) { return a.Id, a })
+	accountMap := lo.SliceToMap(accounts, func(a *model.Account) (int, *model.Account) { return a.Id, a })
+
+	combines := make(map[string][2]int)
+	for _, auth := range auths {
+		asset, ok := assetMap[auth.AssetId]
+		if !ok || !lo.ContainsBy(asset.Protocols, func(p string) bool { return strings.HasPrefix(p, "ssh") }) {
+			continue
+		}
+		account, ok := accountMap[auth.AccountId]
+		if !ok {
+			continue
+		}
+		combines[fmt.Sprintf("ssh %s@%s", account.Name, asset.Name)] = [2]int{account.Id, asset.Id}
+	}
+	m.combines = combines
+
+	fmt.Println(lo.Keys(m.combines))
+
+	m.textinput.SetSuggestions(lo.Keys(m.combines))
+}
+
 type connector struct {
-	stdin          io.Reader
-	stdout, stderr io.Writer
+	Ctx  *gin.Context
+	Sess ssh.Session
+
+	stdin  io.Reader
+	stdout io.Writer
+	stderr io.Writer
 }
 
-func (s *connector) SetStdin(r io.Reader) {
-	s.stdin = r
+func (conn *connector) SetStdin(r io.Reader) {
+	conn.stdin = r
 }
 
-func (s *connector) SetStdout(w io.Writer) {
-	s.stdout = w
+func (conn *connector) SetStdout(w io.Writer) {
+	conn.stdout = w
 }
 
-func (s *connector) SetStderr(w io.Writer) {
-	s.stderr = w
+func (conn *connector) SetStderr(w io.Writer) {
+	conn.stderr = w
 }
 
-func (s *connector) Run() error {
+func (conn *connector) Run() error {
+	gsess, err := controller.DoConnect(conn.Ctx)
+	if err != nil {
+		return err
+	}
 
+	eg := errgroup.Group{}
+	eg.Go(func() error {
+		_, err := io.Copy(gsess.Chans.Win, conn.stdin)
+		return err
+	})
+	eg.Go(func() error {
+		_, ch, _ := conn.Sess.Pty()
+		for {
+			select {
+			case <-conn.Ctx.Done():
+				return nil
+			case w := <-ch:
+				gsess.Chans.WindowChan <- w
+			}
+		}
+	})
+	eg.Go(func() error {
+		_, err := io.Copy(conn.stdout, gsess.Chans.Rout)
+		return err
+	})
 
-	// sess.Stdout = s.stdout
-	// sess.Stderr = s.stdout
-	// sess.Stdin = s.stdin
+	if err = eg.Wait(); err != nil {
+		logger.L().Error("connector run failed", zap.Error(err))
+	}
 
-
+	return err
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/oklog/run"
 	"github.com/veops/oneterm/api"
 	"github.com/veops/oneterm/logger"
+	"github.com/veops/oneterm/sshsrv"
 	"go.uber.org/zap"
 )
 
@@ -27,6 +28,13 @@ func main() {
 			return api.RunApi()
 		}, func(err error) {
 			api.StopApi()
+		})
+	}
+	{
+		rg.Add(func() error {
+			return sshsrv.RunSsh()
+		}, func(err error) {
+			sshsrv.StopSsh()
 		})
 	}
 

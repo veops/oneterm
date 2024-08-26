@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
 	"time"
 
@@ -9,7 +8,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/veops/oneterm/acl"
-	"github.com/veops/oneterm/conf"
 	"github.com/veops/oneterm/logger"
 )
 
@@ -32,29 +30,19 @@ func ginLogger() gin.HandlerFunc {
 
 func auth() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		session := &acl.Session{}
-
-		sess, err := ctx.Cookie("session")
-		if err != nil || sess == "" {
+		cookie, err := ctx.Cookie("session")
+		if err != nil || cookie == "" {
 			logger.L().Error("cannot get cookie.session", zap.Error(err))
 			ctx.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
 
-		s := acl.NewSignature(conf.Cfg.SecretKey, "cookie-session", "", "hmac", nil, nil)
-		content, err := s.Unsign(sess)
+		sess, err := acl.ParseCookie(cookie)
 		if err != nil {
-			logger.L().Error("cannot unsign", zap.Error(err))
 			ctx.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
-		err = json.Unmarshal(content, &session)
-		if err != nil {
-			logger.L().Error("cannot unmarshal to session", zap.Error(err))
-			ctx.AbortWithStatus(http.StatusUnauthorized)
-			return
-		}
-		ctx.Set("session", session)
+		ctx.Set("session", sess)
 
 		ctx.Next()
 	}

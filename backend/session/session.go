@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"io"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gliderlabs/ssh"
 	"go.uber.org/zap"
 	"gorm.io/gorm/clause"
 
@@ -50,12 +50,14 @@ type ServerResp struct {
 type SessionChans struct {
 	Rin        io.Reader
 	Win        io.Writer
+	Rout       io.Reader
+	Wout       io.Writer
 	ErrChan    chan error
 	RespChan   chan *ServerResp
 	InChan     chan []byte
 	OutChan    chan []byte
 	Buf        *bytes.Buffer
-	WindowChan chan string
+	WindowChan chan ssh.Window
 	AwayChan   chan struct{}
 	CloseChan  chan string
 }
@@ -64,7 +66,6 @@ type Session struct {
 	*model.Session
 	Monitors     *sync.Map     `json:"-" gorm:"-"`
 	Chans        *SessionChans `json:"-" gorm:"-"`
-	Connected    atomic.Bool   `json:"-" gorm:"-"`
 	ConnectionId string        `json:"-" gorm:"-"`
 	GuacdTunnel  *guacd.Tunnel `json:"-" gorm:"-"`
 	IdleTimout   time.Duration `json:"-" gorm:"-"`

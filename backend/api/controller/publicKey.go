@@ -95,46 +95,5 @@ func (c *Controller) GetPublicKeys(ctx *gin.Context) {
 
 	db = db.Where("uid = ?", currentUser.Uid)
 
-	doGet[*model.PublicKey](ctx, false, db, "", publicKeyPostHooks...)
-}
-
-// Auth godoc
-//
-//	@Tags		public_key
-//	@Param		req	body		model.ReqAuth	false	"method 1password 2publickey"
-//	@Success	200	{object}	HttpResponse{}
-//	@Router		/public_key/auth [post]
-func (c *Controller) Auth(ctx *gin.Context) {
-	data := &model.ReqAuth{}
-	if err := ctx.BindJSON(data); err != nil {
-		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
-		return
-	}
-
-	switch data.Method {
-	case model.AUTHMETHOD_PASSWORD:
-		cookie, err := acl.LoginByPassword(ctx, data.UserName, data.Password)
-		if err != nil {
-			ctx.AbortWithError(http.StatusUnauthorized, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
-			return
-		}
-		ctx.JSON(http.StatusOK, NewHttpResponseWithData(map[string]any{"cookie": cookie}))
-	case model.AUTHMETHOD_PUBLICKEY:
-		pk := &model.PublicKey{}
-		if err := mysql.DB.
-			Where("username = ? AND pk = ?", data.UserName, util.EncryptAES(data.Pk)).
-			First(pk).Error; err != nil {
-			ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
-			return
-		}
-		cookie, err := acl.LoginByPublicKey(ctx, data.UserName)
-		if err != nil {
-			ctx.AbortWithError(http.StatusUnauthorized, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
-			return
-		}
-		ctx.JSON(http.StatusOK, NewHttpResponseWithData(map[string]any{"cookie": cookie}))
-	default:
-		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": "invalid auth method"}})
-		return
-	}
+	doGet(ctx, false, db, "", publicKeyPostHooks...)
 }

@@ -10,8 +10,10 @@ import (
 
 	"github.com/samber/lo"
 	"github.com/veops/oneterm/conf"
+	mysql "github.com/veops/oneterm/db"
 	"github.com/veops/oneterm/logger"
 	"github.com/veops/oneterm/remote"
+	"github.com/veops/oneterm/util"
 	"go.uber.org/zap"
 )
 
@@ -44,7 +46,15 @@ func LoginByPassword(ctx context.Context, username string, password string) (ses
 	return ParseCookie(cookie.Value)
 }
 
-func LoginByPublicKey(ctx context.Context, username string) (sess *Session, err error) {
+func LoginByPublicKey(ctx context.Context, username string, pk string) (sess *Session, err error) {
+	enc := util.EncryptAES(pk)
+	cnt := int64(0)
+	if err = mysql.DB.Where("usernmae = ? AND pk = ?", username, enc).Count(&cnt).Error; err != nil || cnt == 0 {
+		err = fmt.Errorf("%w", err)
+		logger.L().Warn("no pk", zap.Error(err))
+		return
+	}
+
 	token, err := remote.GetAclToken(ctx)
 	if err != nil {
 		return

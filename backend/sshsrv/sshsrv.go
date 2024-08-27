@@ -25,7 +25,7 @@ func init() {
 			return err == nil
 		},
 		PublicKeyHandler: func(ctx ssh.Context, key ssh.PublicKey) bool {
-			sess, err := acl.LoginByPublicKey(ctx, ctx.User())
+			sess, err := acl.LoginByPublicKey(ctx, ctx.User(), string(key.Marshal()))
 			ctx.SetValue("session", sess)
 			return err == nil
 		},

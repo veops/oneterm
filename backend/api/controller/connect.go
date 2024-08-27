@@ -208,7 +208,7 @@ func DoConnect(ctx *gin.Context) (sess *gsession.Session, err error) {
 			AccountInfo: fmt.Sprintf("%s(%s)", account.Name, account.Account),
 			GatewayId:   asset.GatewayId,
 			GatewayInfo: lo.Ternary(asset.GatewayId == 0, "", fmt.Sprintf("%s(%s)", gateway.Name, gateway.Host)),
-			ClientIp:    ctx.ClientIP(),
+			ClientIp:    ctx.RemoteIP(),
 			Protocol:    ctx.Param("protocol"),
 			Status:      model.SESSIONSTATUS_ONLINE,
 		},
@@ -251,7 +251,7 @@ func (c *Controller) Connect(ctx *gin.Context) {
 		return
 	}
 
-	if sess.SessionType != model.SESSIONTYPE_CLIENT {
+	if sess.SessionType == model.SESSIONTYPE_WEB {
 		c.Connecting(ctx, sess)
 	}
 }
@@ -284,9 +284,12 @@ func readWsMsg(ctx context.Context, ws *websocket.Conn, session *gsession.Sessio
 
 func makeChans() *gsession.SessionChans {
 	rin, win := io.Pipe()
+	rout, wout := io.Pipe()
 	return &gsession.SessionChans{
 		Rin:        rin,
 		Win:        win,
+		Rout:       rout,
+		Wout:       wout,
 		ErrChan:    make(chan error),
 		RespChan:   make(chan *gsession.ServerResp),
 		InChan:     make(chan []byte),
@@ -301,9 +304,9 @@ func makeChans() *gsession.SessionChans {
 func connectSsh(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, account *model.Account, gateway *model.Gateway) (err error) {
 	chs := sess.Chans
 	w, h := cast.ToInt(ctx.Query("w")), cast.ToInt(ctx.Query("h"))
-	defer func() {
-		chs.ErrChan <- err
-	}()
+	// defer func() {
+	// 	chs.ErrChan <- err
+	// }()
 
 	ip, port, err := util.Proxy(uuid.New().String(), "ssh", asset, gateway)
 	if err != nil {
@@ -332,10 +335,9 @@ func connectSsh(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, ac
 	}
 	defer sshSess.Close()
 
-	rout, wout := io.Pipe()
-	sshSess.Stdout = wout
-	sshSess.Stderr = wout
 	sshSess.Stdin = chs.Rin
+	sshSess.Stdout = chs.Wout
+	sshSess.Stderr = chs.Wout
 
 	modes := gossh.TerminalModes{
 		gossh.ECHO:          1,
@@ -353,42 +355,47 @@ func connectSsh(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, ac
 
 	chs.ErrChan <- nil
 
-	buf := bufio.NewReader(rout)
-	g, gctx := errgroup.WithContext(context.Background())
-	waitCh := make(chan error)
+	buf := bufio.NewReader(chs.Rout)
+	g, gctx := errgroup.WithContext(ctx)
 	go func() {
-		waitCh <- sshSess.Wait()
+		err = sshSess.Wait()
+		logger.L().Info("shell wait end", zap.Error(err))
+		close(chs.ErrChan)
 	}()
-	g.Go(func() error {
-		for {
-			select {
-			case <-gctx.Done():
-				return nil
-			default:
-				rn, size, err := buf.ReadRune()
-				if isCtxDone(gctx) {
+	if sess.SessionType == model.SESSIONTYPE_CLIENT {
+		g.Go(func() error {
+			for {
+				select {
+				case <-gctx.Done():
 					return nil
+				default:
+					rn, size, err := buf.ReadRune()
+					if isCtxDone(gctx) {
+						return nil
+					}
+					if err != nil {
+						logger.L().Debug("buf ReadRune failed", zap.Error(err))
+						return err
+					}
+					if size <= 0 || rn == utf8.RuneError {
+						continue
+					}
+					p := make([]byte, utf8.RuneLen(rn))
+					utf8.EncodeRune(p, rn)
+					chs.OutChan <- p
 				}
-				if err != nil {
-					logger.L().Debug("buf ReadRune failed", zap.Error(err))
-					return err
-				}
-				if size <= 0 || rn == utf8.RuneError {
-					continue
-				}
-				p := make([]byte, utf8.RuneLen(rn))
-				utf8.EncodeRune(p, rn)
-				chs.OutChan <- p
 			}
-		}
-	})
+		})
+	}
+
 	g.Go(func() error {
-		defer rout.Close()
+		defer chs.Rin.Close()
+		defer chs.Rout.Close()
 		for {
 			select {
 			case <-gctx.Done():
 				return nil
-			case err = <-waitCh:
+			case err = <-chs.ErrChan:
 				return err
 			case <-chs.AwayChan:
 				logger.L().Debug("doSsh away")
@@ -400,6 +407,7 @@ func connectSsh(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, ac
 			}
 		}
 	})
+
 	if err = g.Wait(); err != nil {
 		logger.L().Warn("doSsh stopped", zap.Error(err))
 	}

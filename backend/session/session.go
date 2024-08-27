@@ -48,10 +48,10 @@ type ServerResp struct {
 }
 
 type SessionChans struct {
-	Rin        io.Reader
-	Win        io.Writer
-	Rout       io.Reader
-	Wout       io.Writer
+	Rin        io.ReadCloser
+	Win        io.WriteCloser
+	Rout       io.ReadCloser
+	Wout       io.WriteCloser
 	ErrChan    chan error
 	RespChan   chan *ServerResp
 	InChan     chan []byte

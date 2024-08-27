@@ -25,7 +25,7 @@ func handler(sess ssh.Session) {
 
 	ctx := &gin.Context{
 		Request: &http.Request{
-			RemoteAddr: sess.RemoteAddr().Network(),
+			RemoteAddr: sess.RemoteAddr().String(),
 			URL: &url.URL{
 				RawQuery: fmt.Sprintf("w=%d&h=%d", pty.Window.Width, pty.Window.Height),
 			},

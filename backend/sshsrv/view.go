@@ -1,6 +1,7 @@
 package sshsrv
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"strings"
@@ -23,14 +24,17 @@ import (
 	mysql "github.com/veops/oneterm/db"
 	"github.com/veops/oneterm/logger"
 	"github.com/veops/oneterm/model"
+	"github.com/veops/oneterm/session"
 )
 
 const (
+	prompt   = "> "
 	hotPink  = lipgloss.Color("#FF06B7")
 	darkGray = lipgloss.Color("#767676")
 )
 
 var (
+	errStyle  = lipgloss.NewStyle().Foreground(hotPink)
 	hintStyle = lipgloss.NewStyle().Foreground(darkGray)
 )
 
@@ -66,7 +70,7 @@ func initialView(ctx *gin.Context, sess ssh.Session) *view {
 	ti := textinput.New()
 	ti.Placeholder = "ssh"
 	ti.Focus()
-	ti.Prompt = "> "
+	ti.Prompt = prompt
 	ti.ShowSuggestions = true
 	ti.PromptStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("63"))
 	ti.Cursor.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("63"))
@@ -103,12 +107,18 @@ func (m *view) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmd := m.textinput.Value()
 			m.textinput.Reset()
 			if cmd == "" {
-				return m, tea.Batch(tea.Printf("> "))
+				return m, tea.Batch(tea.Printf(prompt))
 			}
 			hisCmd = tea.Printf("> %s", cmd)
 			m.cmds = append(m.cmds, cmd)
+			ln := len(m.cmds)
+			if ln > 100 {
+				m.cmds = m.cmds[ln-100 : ln]
+			}
 			m.cmdsIdx = len(m.cmds) - 1
-			if strings.HasPrefix(cmd, "ssh") {
+			if cmd == "exit" {
+				return m, tea.Sequence(hisCmd, tea.Quit)
+			} else if strings.HasPrefix(cmd, "ssh") {
 				pty, _, _ := m.Sess.Pty()
 				m.Ctx.Request.URL.RawQuery = fmt.Sprintf("w=%d&h=%d", pty.Window.Width, pty.Window.Height)
 				m.Ctx.Params = nil
@@ -122,7 +132,7 @@ func (m *view) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.connecting = false
 					}()
 					return err
-				}), tea.Printf("> "))
+				}), tea.Printf(prompt))
 			}
 		case tea.KeyUp:
 			ln := len(m.cmds)
@@ -142,7 +152,7 @@ func (m *view) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 	case error:
-		return m, tea.Batch(tea.Printf("  %s", msg.Error()))
+		return m, tea.Batch(tea.Printf("  %s", errStyle.Render(msg.Error())))
 	}
 	m.textinput, tiCmd = m.textinput.Update(msg)
 
@@ -227,7 +237,7 @@ func (m *view) refresh(ctx *gin.Context) {
 				if len(ss) != 2 || port == 0 {
 					continue
 				}
-				m.combines[fmt.Sprintf("%s:%s", k, ss[1])] = [3]int{account.Id, asset.Id, port}
+				m.combines[lo.Ternary(port == 22, k, fmt.Sprintf("%s:%s", k, ss[1]))] = [3]int{account.Id, asset.Id, port}
 			}
 		}
 	}
@@ -257,40 +267,29 @@ func (conn *connector) SetStderr(w io.Writer) {
 }
 
 func (conn *connector) Run() error {
-	defer fmt.Println("stop view run")
-	defer conn.SetStdin(nil)
-	defer conn.SetStdout(nil)
-	defer conn.SetStderr(nil)
 	gsess, err := controller.DoConnect(conn.Ctx)
 	if err != nil {
 		return err
 	}
 
-	go func() {
-		eg := errgroup.Group{}
-		eg.Go(func() error {
-			_, err := io.Copy(gsess.Chans.Win, conn.stdin)
-			return err
-		})
-		eg.Go(func() error {
-			_, err := io.Copy(conn.stdout, gsess.Chans.Rout)
-			return err
-		})
-		if err = eg.Wait(); err != nil {
-			logger.L().Error("connector run failed", zap.Error(err))
-		}
-	}()
-
-	_, ch, _ := conn.Sess.Pty()
-	for {
-		select {
-		case <-conn.Ctx.Done():
-			return nil
-		case <-gsess.Chans.ErrChan:
-			return nil
-		case w := <-ch:
-			gsess.Chans.WindowChan <- w
-		}
+	gsess.CliRw = &session.CliRW{
+		Reader: bufio.NewReader(conn.stdin),
+		Writer: conn.stdout,
 	}
 
+	_, ch, _ := conn.Sess.Pty()
+	gsess.G.Go(func() error {
+		for {
+			select {
+			case <-gsess.Gctx.Done():
+				gsess.CliRw.Reader = nil
+				gsess.CliRw.Writer = nil
+				return nil
+			case w := <-ch:
+				gsess.Chans.WindowChan <- w
+			}
+		}
+	})
+	controller.HandleSsh(gsess)
+	return nil
 }

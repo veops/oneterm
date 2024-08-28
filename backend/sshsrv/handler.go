@@ -14,6 +14,7 @@ import (
 	gossh "golang.org/x/crypto/ssh"
 
 	"github.com/veops/oneterm/logger"
+	"github.com/veops/oneterm/model"
 )
 
 func handler(sess ssh.Session) {
@@ -31,6 +32,7 @@ func handler(sess ssh.Session) {
 			},
 		},
 	}
+	ctx.Set("sessionType", model.SESSIONTYPE_CLIENT)
 	ctx.Set("session", sess.Context().Value("session"))
 
 	p := tea.NewProgram(initialView(ctx, sess), tea.WithInput(sess), tea.WithOutput(sess))

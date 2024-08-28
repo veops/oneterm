@@ -162,5 +162,5 @@ func (c *Controller) GetGateways(ctx *gin.Context) {
 
 	db = db.Order("name")
 
-	doGet[*model.Gateway](ctx, !info, db, acl.GetResourceTypeName(conf.RESOURCE_GATEWAY), gatewayPostHooks...)
+	doGet(ctx, !info, db, acl.GetResourceTypeName(conf.RESOURCE_GATEWAY), gatewayPostHooks...)
 }

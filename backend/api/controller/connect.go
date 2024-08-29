@@ -48,7 +48,6 @@ func read(sess *gsession.Session) error {
 	for {
 		select {
 		case <-sess.Gctx.Done():
-			fmt.Println("done3")
 			return nil
 		default:
 			if sess.SessionType == model.SESSIONTYPE_WEB {
@@ -95,10 +94,12 @@ func HandleSsh(sess *gsession.Session) (err error) {
 		return read(sess)
 	})
 	sess.G.Go(func() error {
+		defer sess.Chans.Rin.Close()
+		defer sess.Chans.Wout.Close()
 		for {
 			select {
 			case <-sess.Gctx.Done():
-				fmt.Println("done2")
+				write(sess)
 				return nil
 			case closeBy := <-chs.CloseChan:
 				out := []byte("\r\n \033[31m closed by admin")
@@ -308,7 +309,7 @@ func connectSsh(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, ac
 	sess.G.Go(func() error {
 		err = sshSess.Wait()
 		fmt.Println(fmt.Errorf("ssh session wait end %w", err))
-		<-time.After(time.Second)
+		// <-time.After(time.Second)
 		return fmt.Errorf("ssh session wait end %w", err)
 	})
 
@@ -320,12 +321,10 @@ func connectSsh(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, ac
 			select {
 			case <-sess.Gctx.Done():
 				fmt.Println("done")
-
 				return nil
 			default:
 				rn, size, err := buf.ReadRune()
 				if err != nil {
-					logger.L().Debug("buf ReadRune failed", zap.Error(err))
 					return err
 				}
 				if size <= 0 || rn == utf8.RuneError {
@@ -343,7 +342,6 @@ func connectSsh(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, ac
 		for {
 			select {
 			case <-sess.Gctx.Done():
-				fmt.Println("done1")
 				return nil
 			case window := <-chs.WindowChan:
 				if err := sshSess.WindowChange(window.Height, window.Width); err != nil {
@@ -353,9 +351,7 @@ func connectSsh(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, ac
 		}
 	})
 
-	if err = sess.G.Wait(); err != nil {
-		logger.L().Debug("sess wait end", zap.String("id", sess.SessionId), zap.Error(err))
-	}
+	sess.G.Wait()
 
 	return
 }

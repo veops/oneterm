@@ -59,6 +59,7 @@ func (rw *CliRW) Read() []byte {
 
 func (rw *CliRW) Write(p []byte) {
 	rw.Writer.Write(p)
+	fmt.Println("----------", string(p))
 }
 
 type SessionChans struct {

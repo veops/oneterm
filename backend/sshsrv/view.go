@@ -38,6 +38,8 @@ var (
 	hintStyle = lipgloss.NewStyle().Foreground(darkGray)
 )
 
+type errMsg error
+
 type keymap struct{}
 
 func (k keymap) ShortHelp() []key.Binding {
@@ -128,11 +130,9 @@ func (m *view) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.Ctx = m.Ctx.Copy()
 				m.connecting = true
 				return m, tea.Sequence(hisCmd, tea.Exec(&connector{Ctx: m.Ctx, Sess: m.Sess}, func(err error) tea.Msg {
-					defer func() {
-						m.connecting = false
-					}()
+					m.connecting = false
 					return err
-				}), tea.Printf(prompt))
+				}), tea.Printf("%s", prompt))
 			}
 		case tea.KeyUp:
 			ln := len(m.cmds)
@@ -151,8 +151,11 @@ func (m *view) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.textinput.SetValue(m.cmds[m.cmdsIdx])
 			}
 		}
-	case error:
-		return m, tea.Batch(tea.Printf("  %s", errStyle.Render(msg.Error())))
+	case errMsg:
+		if msg != nil {
+			return m, tea.Printf("  %s", errStyle.Render(msg.Error()))
+		}
+		return m, nil
 	}
 	m.textinput, tiCmd = m.textinput.Update(msg)
 
@@ -272,18 +275,24 @@ func (conn *connector) Run() error {
 		return err
 	}
 
+	r, w := io.Pipe()
+	go func() {
+		_, err := io.Copy(w, conn.stdin)
+		gsess.Chans.ErrChan <- err
+	}()
+
 	gsess.CliRw = &session.CliRW{
-		Reader: bufio.NewReader(conn.stdin),
+		Reader: bufio.NewReader(r),
 		Writer: conn.stdout,
 	}
 
 	_, ch, _ := conn.Sess.Pty()
 	gsess.G.Go(func() error {
+		defer r.Close()
+		defer w.Close()
 		for {
 			select {
 			case <-gsess.Gctx.Done():
-				gsess.CliRw.Reader = nil
-				gsess.CliRw.Writer = nil
 				return nil
 			case w := <-ch:
 				gsess.Chans.WindowChan <- w
@@ -291,5 +300,10 @@ func (conn *connector) Run() error {
 		}
 	})
 	controller.HandleSsh(gsess)
+
+	gsess.G.Wait()
+
+	conn.stdout.Write([]byte("\n\n"))
+
 	return nil
 }

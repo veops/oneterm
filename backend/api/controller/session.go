@@ -16,7 +16,6 @@ import (
 	mysql "github.com/veops/oneterm/db"
 	"github.com/veops/oneterm/logger"
 	"github.com/veops/oneterm/model"
-	gsession "github.com/veops/oneterm/session"
 )
 
 var (
@@ -54,26 +53,6 @@ var (
 		},
 	}
 )
-
-// UpsertSession godoc
-//
-//	@Tags		session
-//	@Param		sessino	body		model.Session	true	"session"
-//	@Success	200		{object}	HttpResponse
-//	@Router		/session [post]
-func (c *Controller) UpsertSession(ctx *gin.Context) {
-	data := &gsession.Session{}
-	if err := ctx.BindJSON(data); err != nil {
-		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
-		return
-	}
-	if err := gsession.HandleUpsertSession(ctx, data); err != nil {
-		logger.L().Error("upsert session failed", zap.Error(err))
-		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
-	}
-
-	ctx.JSON(http.StatusOK, defaultHttpResponse)
-}
 
 // CreateSessionCommand godoc
 //

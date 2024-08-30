@@ -4,13 +4,11 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"fmt"
 	"io"
 	"sync"
 	"time"
 	"unicode/utf8"
 
-	"github.com/gin-gonic/gin"
 	"github.com/gliderlabs/ssh"
 	"github.com/gorilla/websocket"
 	"go.uber.org/zap"
@@ -26,6 +24,23 @@ import (
 var (
 	onlineSession = &sync.Map{}
 )
+
+func init() {
+	sessions := make([]*Session, 0)
+	if err := mysql.DB.
+		Model(sessions).
+		Where("status = ?", model.SESSIONSTATUS_ONLINE).
+		Find(&sessions).
+		Error; err != nil {
+		logger.L().Fatal("get sessions failed", zap.Error(err))
+	}
+	now := time.Now()
+	for _, s := range sessions {
+		s.Status = model.SESSIONSTATUS_OFFLINE
+		s.ClosedAt = &now
+		UpsertSession(s)
+	}
+}
 
 func GetOnlineSession() *sync.Map {
 	return onlineSession
@@ -59,7 +74,6 @@ func (rw *CliRW) Read() []byte {
 
 func (rw *CliRW) Write(p []byte) {
 	rw.Writer.Write(p)
-	fmt.Println("----------", string(p))
 }
 
 type SessionChans struct {
@@ -106,12 +120,14 @@ type Session struct {
 	GuacdTunnel  *guacd.Tunnel   `json:"-" gorm:"-"`
 	IdleTimout   time.Duration   `json:"-" gorm:"-"`
 	IdleTk       *time.Ticker    `json:"-" gorm:"-"`
+	SshRecoder   *Asciinema      `json:"-" gorm:"-"`
 }
 
 func NewSession(ctx context.Context) *Session {
 	s := &Session{}
 	s.G, s.Gctx = errgroup.WithContext(ctx)
 	s.Chans = NewSessionChans()
+	s.Monitors = &sync.Map{}
 	return s
 }
 
@@ -123,54 +139,11 @@ func (m *Session) HasMonitors() (has bool) {
 	return
 }
 
-func Init() (err error) {
-	sessions := make([]*Session, 0)
-	if err = mysql.DB.
-		Model(sessions).
-		Where("status = ?", model.SESSIONSTATUS_ONLINE).
-		Find(&sessions).
-		Error; err != nil {
-		logger.L().Warn("get sessions failed", zap.Error(err))
-		return
-	}
-	ctx := &gin.Context{}
-	now := time.Now()
-	for _, s := range sessions {
-		if s.SessionType == model.SESSIONTYPE_WEB {
-			s.Status = model.SESSIONSTATUS_OFFLINE
-			s.ClosedAt = &now
-			HandleUpsertSession(ctx, s)
-			continue
-		}
-		s.Monitors = &sync.Map{}
-		onlineSession.LoadOrStore(s.SessionId, s)
-	}
-
-	return
-}
-
-func HandleUpsertSession(ctx *gin.Context, data *Session) (err error) {
-	if err = mysql.DB.
+func UpsertSession(data *Session) (err error) {
+	return mysql.DB.
 		Clauses(clause.OnConflict{
 			DoUpdates: clause.AssignmentColumns([]string{"status", "closed_at"}),
 		}).
 		Create(data).
-		Error; err != nil {
-		return
-	}
-
-	switch data.Status {
-	case model.SESSIONSTATUS_ONLINE:
-		if data.Monitors == nil {
-			data.Monitors = &sync.Map{}
-		}
-		_, ok := onlineSession.LoadOrStore(data.SessionId, data)
-		if ok {
-			err = fmt.Errorf("failed to loadstore online session")
-		}
-	case model.SESSIONSTATUS_OFFLINE:
-		// doOfflineOnlineSession(ctx, data.SessionId, "")
-	}
-
-	return
+		Error
 }

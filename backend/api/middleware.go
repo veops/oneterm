@@ -30,20 +30,36 @@ func ginLogger() gin.HandlerFunc {
 
 func auth() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		cookie, err := ctx.Cookie("session")
-		if err != nil || cookie == "" {
-			logger.L().Error("cannot get cookie.session", zap.Error(err))
-			ctx.AbortWithStatus(http.StatusUnauthorized)
-			return
+		var (
+			sess   *acl.Session
+			err    error
+			cookie string
+		)
+
+		m := make(map[string]any)
+		ctx.ShouldBindBodyWithJSON(&m)
+		if _, ok := m["key"]; ok {
+			sess, err = acl.AuthWithKey(ctx.Request.URL.Path, m)
+			if err != nil {
+				logger.L().Error("cannot authwithkey", zap.Error(err))
+				ctx.AbortWithStatus(http.StatusUnauthorized)
+				return
+			}
+		} else {
+			cookie, err = ctx.Cookie("session")
+			if err != nil || cookie == "" {
+				logger.L().Error("cannot get cookie.session", zap.Error(err))
+				ctx.AbortWithStatus(http.StatusUnauthorized)
+				return
+			}
+			sess, err = acl.ParseCookie(cookie)
 		}
 
-		sess, err := acl.ParseCookie(cookie)
 		if err != nil {
 			ctx.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
 		ctx.Set("session", sess)
-
 		ctx.Next()
 	}
 }

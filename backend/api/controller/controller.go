@@ -60,7 +60,7 @@ func NewHttpResponseWithData(data any) *HttpResponse {
 func doCreate[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType string, preHooks ...preHook[T]) (err error) {
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
 
-	if err = ctx.BindJSON(md); err != nil {
+	if err = ctx.ShouldBindBodyWithJSON(md); err != nil {
 		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
 		return
 	}
@@ -213,7 +213,7 @@ func doUpdate[T model.Model](ctx *gin.Context, needAcl bool, md T, preHooks ...p
 		return
 	}
 
-	if err = ctx.BindJSON(md); err != nil {
+	if err = ctx.ShouldBindBodyWithJSON(md); err != nil {
 		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
 		return
 	}

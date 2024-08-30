@@ -161,7 +161,7 @@ func HasAuthorization(ctx *gin.Context) (ok bool) {
 		logger.L().Error("check authorization failed", zap.Error(err))
 		return
 	}
-	k := fmt.Sprintf("%d-%d", ctx.Param("asset_id"), ctx.Param("account_id"))
+	k := fmt.Sprintf("%s-%s", ctx.Param("asset_id"), ctx.Param("account_id"))
 	_, ok = lo.Find(rs, func(r *acl.Resource) bool { return k == r.Name })
 	return
 }

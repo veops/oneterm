@@ -29,6 +29,7 @@ func NewAsciinema(id string, w, h int) (ret *Asciinema, err error) {
 		"width":     w,
 		"height":    h,
 		"timestamp": ret.ts.Unix(),
+		"title":     id,
 		"env": map[string]any{
 			"SHELL": "/bin/bash",
 			"TERM":  "xterm-256color",

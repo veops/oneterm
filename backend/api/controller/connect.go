@@ -61,11 +61,12 @@ func read(sess *gsession.Session) error {
 				switch t {
 				case websocket.TextMessage:
 					chs.InChan <- msg
-					if !sess.IsSsh() && guacd.IsActive(msg) {
+					if sess.IsSsh() || guacd.IsActive(msg) {
 						sess.IdleTk.Reset(sess.IdleTimout)
 					}
 				}
 			} else if sess.SessionType == model.SESSIONTYPE_CLIENT {
+				sess.IdleTk.Reset(sess.IdleTimout)
 				chs.InChan <- sess.CliRw.Read()
 			}
 		}
@@ -100,11 +101,12 @@ func HandleSsh(sess *gsession.Session) (err error) {
 		}
 	}()
 	chs := sess.Chans
-	tk, tk1s := time.NewTicker(time.Millisecond*100), time.NewTicker(time.Second)
+	tk, tk1s, tk1m := time.NewTicker(time.Millisecond*100), time.NewTicker(time.Second), time.NewTicker(time.Minute)
 	sess.G.Go(func() error {
 		return read(sess)
 	})
 	sess.G.Go(func() error {
+		asset := &model.Asset{}
 		defer sess.Chans.Rin.Close()
 		defer sess.Chans.Wout.Close()
 		for {
@@ -112,6 +114,16 @@ func HandleSsh(sess *gsession.Session) (err error) {
 			case <-sess.Gctx.Done():
 				write(sess)
 				return nil
+			case <-sess.IdleTk.C:
+				return &ApiError{Code: ErrIdleTimeout, Data: map[string]any{"second": int64(sess.IdleTimout.Seconds())}}
+			case <-tk1m.C:
+				if mysql.DB.Model(asset).Where("id = ?", sess.AssetId).First(asset).Error != nil {
+					continue
+				}
+				if checkTime(asset.AccessAuth) {
+					continue
+				}
+				return &ApiError{Code: ErrAccessTime}
 			case closeBy := <-chs.CloseChan:
 				out := []byte("\r\n \033[31m closed by admin")
 				chs.OutBuf.Write(out)
@@ -179,10 +191,8 @@ func handleGuacd(sess *gsession.Session) (err error) {
 			select {
 			case <-sess.Gctx.Done():
 				return nil
-			case closeBy := <-chs.CloseChan:
-				return &ApiError{Code: ErrAdminClose, Data: map[string]any{"admin": closeBy}}
-			case err := <-chs.ErrChan:
-				return err
+			case <-sess.IdleTk.C:
+				return &ApiError{Code: ErrIdleTimeout, Data: map[string]any{"second": int64(sess.IdleTimout.Seconds())}}
 			case <-tk.C:
 				if mysql.DB.Model(asset).Where("id = ?", sess.AssetId).First(asset).Error != nil {
 					continue
@@ -191,8 +201,10 @@ func handleGuacd(sess *gsession.Session) (err error) {
 					continue
 				}
 				return &ApiError{Code: ErrAccessTime}
-			case <-sess.IdleTk.C:
-				return &ApiError{Code: ErrIdleTimeout, Data: map[string]any{"second": int64(sess.IdleTimout.Seconds())}}
+			case closeBy := <-chs.CloseChan:
+				return &ApiError{Code: ErrAdminClose, Data: map[string]any{"admin": closeBy}}
+			case err := <-chs.ErrChan:
+				return err
 			case out := <-chs.OutChan:
 				sess.Ws.WriteMessage(websocket.TextMessage, out)
 			}

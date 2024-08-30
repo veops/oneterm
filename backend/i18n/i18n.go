@@ -5,7 +5,10 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/nicksnyder/go-i18n/v2/i18n"
+	"go.uber.org/zap"
 	"golang.org/x/text/language"
+
+	"github.com/veops/oneterm/logger"
 )
 
 var (
@@ -18,7 +21,7 @@ func init() {
 	for _, lang := range langs {
 		_, err := Bundle.LoadMessageFile(fmt.Sprintf("./translate/active.%s.toml", lang))
 		if err != nil {
-			fmt.Println("load i18n message failed", err)
+			logger.L().Error("load i18n message failed", zap.Error(err))
 		}
 	}
 }

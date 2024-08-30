@@ -56,7 +56,6 @@ func read(sess *gsession.Session) error {
 					return err
 				}
 				if len(msg) <= 0 {
-					logger.L().Warn("websocket msg length is zero")
 					continue
 				}
 				switch t {
@@ -83,11 +82,23 @@ func write(sess *gsession.Session) {
 		sess.CliRw.Write(out)
 	}
 
+	if len(out) > 0 && strings.Contains(sess.Protocol, "ssh") {
+		sess.SshRecoder.Write(out)
+	}
+
 	writeToMonitors(sess.Monitors, out)
 	chs.OutBuf.Reset()
 }
 
 func HandleSsh(sess *gsession.Session) (err error) {
+	defer func() {
+		sess.Status = model.SESSIONSTATUS_OFFLINE
+		sess.ClosedAt = lo.ToPtr(time.Now())
+		if err = gsession.UpsertSession(sess); err != nil {
+			logger.L().Error("offline ssh session failed", zap.Error(err))
+			return
+		}
+	}()
 	chs := sess.Chans
 	tk, tk1s := time.NewTicker(time.Millisecond*100), time.NewTicker(time.Second)
 	sess.G.Go(func() error {
@@ -253,7 +264,7 @@ func DoConnect(ctx *gin.Context) (sess *gsession.Session, err error) {
 	}
 
 	gsession.GetOnlineSession().Store(sess.SessionId, sess)
-	gsession.HandleUpsertSession(ctx, sess)
+	gsession.UpsertSession(sess)
 
 	return
 }
@@ -306,10 +317,13 @@ func connectSsh(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, ac
 		logger.L().Error("ssh start shell failed", zap.Error(err))
 		return
 	}
+
+	if sess.SshRecoder, err = gsession.NewAsciinema(sess.SessionId, w, h); err != nil {
+		return
+	}
+
 	sess.G.Go(func() error {
 		err = sshSess.Wait()
-		fmt.Println(fmt.Errorf("ssh session wait end %w", err))
-		// <-time.After(time.Second)
 		return fmt.Errorf("ssh session wait end %w", err)
 	})
 
@@ -320,7 +334,6 @@ func connectSsh(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, ac
 		for {
 			select {
 			case <-sess.Gctx.Done():
-				fmt.Println("done")
 				return nil
 			default:
 				rn, size, err := buf.ReadRune()
@@ -346,7 +359,9 @@ func connectSsh(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, ac
 			case window := <-chs.WindowChan:
 				if err := sshSess.WindowChange(window.Height, window.Width); err != nil {
 					logger.L().Warn("reset window size failed", zap.Error(err))
+					continue
 				}
+				sess.SshRecoder.Resize(window.Width, window.Height)
 			}
 		}
 	})
@@ -392,7 +407,7 @@ func connectGuacd(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, 
 		return
 	}
 	session := newGuacdSession(ctx, t.ConnectionId, t.SessionId, asset, account, gateway)
-	if err = gsession.HandleUpsertSession(ctx, session); err != nil {
+	if err = gsession.UpsertSession(session); err != nil {
 		return
 	}
 	session.GuacdTunnel = t
@@ -438,7 +453,7 @@ func connectGuacd(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, 
 			t.Disconnect()
 			session.Status = model.SESSIONSTATUS_OFFLINE
 			session.ClosedAt = lo.ToPtr(time.Now())
-			if err = gsession.HandleUpsertSession(ctx, session); err != nil {
+			if err = gsession.UpsertSession(session); err != nil {
 				logger.L().Error("offline guacd session failed", zap.Error(err))
 				return
 			}
@@ -663,7 +678,7 @@ func (c *Controller) ConnectClose(ctx *gin.Context) {
 
 	session.Status = model.SESSIONSTATUS_OFFLINE
 	session.ClosedAt = lo.ToPtr(time.Now())
-	gsession.HandleUpsertSession(ctx, session)
+	gsession.UpsertSession(session)
 
 	ctx.JSON(http.StatusOK, defaultHttpResponse)
 }
@@ -671,36 +686,35 @@ func (c *Controller) ConnectClose(ctx *gin.Context) {
 func offlineSession(ctx *gin.Context, sessionId string, closer string) {
 	logger.L().Debug("offline", zap.String("session_id", sessionId), zap.String("closer", closer))
 	defer gsession.GetOnlineSession().Delete(sessionId)
-	v, ok := gsession.GetOnlineSession().Load(sessionId)
-	if ok {
-		if session, ok := v.(*gsession.Session); ok {
-			if closer != "" && session.Chans != nil {
-				select {
-				case session.Chans.CloseChan <- closer:
-					break
-				case <-time.After(time.Second):
-					break
-				}
-
-			}
-			session.Monitors.Range(func(key, value any) bool {
-				ws, ok := value.(*websocket.Conn)
-				if ok && ws != nil {
-					lang := ctx.PostForm("lang")
-					accept := ctx.GetHeader("Accept-Language")
-					localizer := i18n.NewLocalizer(myi18n.Bundle, lang, accept)
-					cfg := &i18n.LocalizeConfig{
-						TemplateData:   map[string]any{"sessionId": sessionId},
-						DefaultMessage: myi18n.MsgSessionEnd,
-					}
-					msg, _ := localizer.Localize(cfg)
-					ws.WriteMessage(websocket.TextMessage, []byte(msg))
-					ws.Close()
-				}
-				return true
-			})
-		}
+	session := gsession.GetOnlineSessionById(sessionId)
+	if session == nil {
+		return
 	}
+	if closer != "" && session.Chans != nil {
+		select {
+		case session.Chans.CloseChan <- closer:
+			break
+		case <-time.After(time.Second):
+			break
+		}
+
+	}
+	session.Monitors.Range(func(key, value any) bool {
+		ws, ok := value.(*websocket.Conn)
+		if ok && ws != nil {
+			lang := ctx.PostForm("lang")
+			accept := ctx.GetHeader("Accept-Language")
+			localizer := i18n.NewLocalizer(myi18n.Bundle, lang, accept)
+			cfg := &i18n.LocalizeConfig{
+				TemplateData:   map[string]any{"sessionId": sessionId},
+				DefaultMessage: myi18n.MsgSessionEnd,
+			}
+			msg, _ := localizer.Localize(cfg)
+			ws.WriteMessage(websocket.TextMessage, []byte(msg))
+			ws.Close()
+		}
+		return true
+	})
 }
 
 func checkTime(data *model.AccessAuth) bool {

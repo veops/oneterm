@@ -2,6 +2,7 @@ package sshsrv
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/gliderlabs/ssh"
 	"go.uber.org/zap"
 	gossh "golang.org/x/crypto/ssh"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/veops/oneterm/logger"
 	"github.com/veops/oneterm/model"
@@ -35,10 +37,24 @@ func handler(sess ssh.Session) {
 	ctx.Set("sessionType", model.SESSIONTYPE_CLIENT)
 	ctx.Set("session", sess.Context().Value("session"))
 
-	p := tea.NewProgram(initialView(ctx, sess), tea.WithInput(sess), tea.WithOutput(sess))
+	eg, gctx := errgroup.WithContext(sess.Context())
+	r, w := io.Pipe()
+	defer r.Close()
+	defer w.Close()
+	eg.Go(func() error {
+		_, err := io.Copy(w, sess)
+		return err
+	})
+	eg.Go(func() error {
+		defer r.Close()
+		defer w.Close()
+		p := tea.NewProgram(initialView(ctx, sess, r, w), tea.WithContext(gctx), tea.WithInput(r), tea.WithOutput(sess))
+		_, err := p.Run()
+		return err
+	})
 
-	if _, err := p.Run(); err != nil {
-		fmt.Printf("Alas, there's been an error: %v", err)
+	if err := eg.Wait(); err != nil {
+		logger.L().Debug("handler stopped", zap.Error(err))
 	}
 }
 

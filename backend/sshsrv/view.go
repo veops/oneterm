@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/lipgloss/table"
 	"github.com/gin-gonic/gin"
 	"github.com/gliderlabs/ssh"
 	"github.com/samber/lo"
@@ -34,9 +35,14 @@ const (
 )
 
 var (
-	errStyle  = lipgloss.NewStyle().Foreground(hotPink)
-	hintStyle = lipgloss.NewStyle().Foreground(darkGray)
+	errStyle     = lipgloss.NewStyle().Foreground(hotPink)
+	hintStyle    = lipgloss.NewStyle().Foreground(darkGray)
+	hiddenBorder = lipgloss.HiddenBorder()
 )
+
+func init() {
+	hiddenBorder.Left = "  "
+}
 
 type errMsg error
 
@@ -49,6 +55,7 @@ func (k keymap) ShortHelp() []key.Binding {
 		// key.NewBinding(key.WithKeys("left"), key.WithHelp("←", "prev")),
 		// key.NewBinding(key.WithKeys("right"), key.WithHelp("→", "next")),
 		key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "complete")),
+		key.NewBinding(key.WithKeys("f5"), key.WithHelp("F5", "refresh")),
 		key.NewBinding(key.WithKeys("esc", "ctrl+c"), key.WithHelp("esc/ctrl+c", "quit")),
 	}
 }
@@ -66,9 +73,11 @@ type view struct {
 	connecting bool
 	help       help.Model
 	keys       keymap
+	r          io.ReadCloser
+	w          io.WriteCloser
 }
 
-func initialView(ctx *gin.Context, sess ssh.Session) *view {
+func initialView(ctx *gin.Context, sess ssh.Session, r io.ReadCloser, w io.WriteCloser) *view {
 	ti := textinput.New()
 	ti.Placeholder = "ssh"
 	ti.Focus()
@@ -82,10 +91,12 @@ func initialView(ctx *gin.Context, sess ssh.Session) *view {
 		textinput: ti,
 		cmds:      []string{},
 		help:      help.New(),
+		r:         r,
+		w:         w,
 	}
 	ti.KeyMap.NextSuggestion = key.NewBinding(key.WithKeys(""))
 	ti.KeyMap.PrevSuggestion = key.NewBinding(key.WithKeys(""))
-	v.refresh(ctx)
+	v.refresh()
 
 	return &v
 }
@@ -129,10 +140,10 @@ func (m *view) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.Ctx.Params = append(m.Ctx.Params, gin.Param{Key: "protocol", Value: fmt.Sprintf("ssh:%d", m.combines[cmd][2])})
 				m.Ctx = m.Ctx.Copy()
 				m.connecting = true
-				return m, tea.Sequence(hisCmd, tea.Exec(&connector{Ctx: m.Ctx, Sess: m.Sess}, func(err error) tea.Msg {
+				return m, tea.Sequence(hisCmd, tea.Exec(&connector{Ctx: m.Ctx, Sess: m.Sess, Vw: m}, func(err error) tea.Msg {
 					m.connecting = false
 					return err
-				}), tea.Printf("%s", prompt))
+				}), tea.Printf("%s", prompt), m.magicn)
 			}
 		case tea.KeyUp:
 			ln := len(m.cmds)
@@ -150,12 +161,13 @@ func (m *view) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				m.textinput.SetValue(m.cmds[m.cmdsIdx])
 			}
+		case tea.KeyF5:
+			m.refresh()
 		}
 	case errMsg:
 		if msg != nil {
-			return m, tea.Printf("  %s", errStyle.Render(msg.Error()))
+			return m, tea.Printf("  [ERROR] %s", errStyle.Render(msg.Error()))
 		}
-		return m, nil
 	}
 	m.textinput, tiCmd = m.textinput.Update(msg)
 
@@ -167,7 +179,7 @@ func (m *view) View() string {
 		return "\n\n"
 	}
 	return fmt.Sprintf(
-		"%s\n  %s\n  %s",
+		"%s\n  %s\n%s",
 		m.textinput.View(),
 		m.help.View(m.keys),
 		hintStyle.Render(m.possible()),
@@ -176,14 +188,32 @@ func (m *view) View() string {
 
 func (m *view) possible() string {
 	cur := m.textinput
-	res := lo.Filter(cur.AvailableSuggestions(), func(s string, _ int) bool {
+	ss := lo.Filter(cur.AvailableSuggestions(), func(s string, _ int) bool {
 		return cur.Value() != "" && strings.HasPrefix(strings.ToLower(s), strings.ToLower(cur.Value()))
 	})
-	return lo.Ternary(len(res) == 0, "", fmt.Sprintf("%s", res))
+	ln := len(ss)
+	if ln == 0 {
+		return ""
+	}
+	ss = append(ss[:min(ln, 15)], lo.Ternary(ln > 15, fmt.Sprintf("%d more...", ln-15), ""))
+	mw := 0
+	for _, s := range ss {
+		mw = max(mw, lipgloss.Width(s))
+	}
+	pty, _, _ := m.Sess.Pty()
+	n := 1
+	for n*mw+(n+1)*1 < pty.Window.Width {
+		n++
+	}
+	tb := table.New().
+		Border(hiddenBorder).
+		StyleFunc(func(row, col int) lipgloss.Style { return hintStyle }).
+		Rows(lo.Chunk(ss, n)...)
+	return tb.Render()
 }
 
-func (m *view) refresh(ctx *gin.Context) {
-	currentUser, _ := acl.GetSessionFromCtx(ctx)
+func (m *view) refresh() {
+	currentUser, _ := acl.GetSessionFromCtx(m.Ctx)
 
 	auths := make([]*model.Authorization, 0)
 	assets := make([]*model.Asset, 0)
@@ -248,10 +278,15 @@ func (m *view) refresh(ctx *gin.Context) {
 	m.textinput.SetSuggestions(lo.Keys(m.combines))
 }
 
-type connector struct {
-	Ctx  *gin.Context
-	Sess ssh.Session
+func (m *view) magicn() tea.Msg {
+	m.w.Write([]byte("\n"))
+	return nil
+}
 
+type connector struct {
+	Ctx    *gin.Context
+	Sess   ssh.Session
+	Vw     *view
 	stdin  io.Reader
 	stdout io.Writer
 	stderr io.Writer
@@ -274,6 +309,8 @@ func (conn *connector) Run() error {
 	if err != nil {
 		return err
 	}
+
+	conn.Vw.magicn()
 
 	r, w := io.Pipe()
 	go func() {

@@ -12,6 +12,9 @@ import (
 	"hash"
 	"io"
 	"strings"
+
+	"github.com/veops/oneterm/conf"
+	"github.com/veops/oneterm/remote"
 )
 
 // SigningAlgorithm provides interfaces to generate and verify signature
@@ -135,4 +138,27 @@ func NewSignature(secret, salt, sep, derivation string, digest func() hash.Hash,
 		DigestMethod:  digest,
 		Algorithm:     algo,
 	}
+}
+
+func AuthWithKey(path string, originData map[string]any) (sess *Session, err error) {
+	originData["path"] = path
+
+	data := &UserInfoRespResult{}
+	resp, err := remote.RC.R().
+		SetBody(originData).
+		SetResult(data).
+		Post(fmt.Sprintf("%s%s", conf.Cfg.Auth.Acl.Url, "/acl/apps/token"))
+	if err = remote.HandleErr(err, resp, nil); err == nil {
+		sess = &Session{
+			Uid: data.UID,
+			Acl: Acl{
+				Uid:         data.UID,
+				UserName:    data.Username,
+				Rid:         data.Rid,
+				NickName:    data.Name,
+				ParentRoles: data.Role.Permissions,
+			},
+		}
+	}
+	return
 }

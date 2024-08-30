@@ -6,10 +6,13 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 	"go.uber.org/zap"
 
 	"github.com/veops/oneterm/api/controller"
 	"github.com/veops/oneterm/conf"
+	"github.com/veops/oneterm/docs"
 	"github.com/veops/oneterm/logger"
 )
 
@@ -24,6 +27,11 @@ func RunApi() error {
 	r.SetTrustedProxies([]string{"0.0.0.0/0", "::/0"})
 	r.MaxMultipartMemory = 128 << 20
 	r.Use(gin.Recovery(), ginLogger())
+
+	docs.SwaggerInfo.Title = "ONETERM API"
+	docs.SwaggerInfo.BasePath = "/api/oneterm/v1"
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+
 	v1 := r.Group("/api/oneterm/v1", auth())
 	{
 		account := v1.Group("account")

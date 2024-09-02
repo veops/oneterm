@@ -122,8 +122,9 @@ type Worker struct {
 }
 
 type SshConfig struct {
-	Host string `yaml:"host"`
-	Port int    `yaml:"port"`
+	Host       string `yaml:"host"`
+	Port       int    `yaml:"port"`
+	PrivateKey string `yaml:"privateKey"`
 }
 
 type GuacdConfig struct {

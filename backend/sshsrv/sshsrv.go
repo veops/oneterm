@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/gliderlabs/ssh"
+	gossh "golang.org/x/crypto/ssh"
 
 	"github.com/veops/oneterm/acl"
 	"github.com/veops/oneterm/conf"
@@ -25,7 +26,7 @@ func init() {
 			return err == nil
 		},
 		PublicKeyHandler: func(ctx ssh.Context, key ssh.PublicKey) bool {
-			sess, err := acl.LoginByPublicKey(ctx, ctx.User(), string(key.Marshal()))
+			sess, err := acl.LoginByPublicKey(ctx, ctx.User(), string(gossh.MarshalAuthorizedKey(key)))
 			ctx.SetValue("session", sess)
 			return err == nil
 		},

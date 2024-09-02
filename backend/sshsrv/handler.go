@@ -15,6 +15,7 @@ import (
 	gossh "golang.org/x/crypto/ssh"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/veops/oneterm/conf"
 	"github.com/veops/oneterm/logger"
 	"github.com/veops/oneterm/model"
 )
@@ -39,17 +40,19 @@ func handler(sess ssh.Session) {
 
 	eg, gctx := errgroup.WithContext(sess.Context())
 	r, w := io.Pipe()
-	defer r.Close()
-	defer w.Close()
 	eg.Go(func() error {
 		_, err := io.Copy(w, sess)
 		return err
 	})
 	eg.Go(func() error {
+		defer sess.Close()
 		defer r.Close()
 		defer w.Close()
-		p := tea.NewProgram(initialView(ctx, sess, r, w), tea.WithContext(gctx), tea.WithInput(r), tea.WithOutput(sess))
+		vw := initialView(ctx, sess, r, w)
+		defer vw.RecordHisCmd()
+		p := tea.NewProgram(vw, tea.WithContext(gctx), tea.WithInput(r), tea.WithOutput(sess))
 		_, err := p.Run()
+
 		return err
 	})
 
@@ -59,15 +62,7 @@ func handler(sess ssh.Session) {
 }
 
 func signer() ssh.Signer {
-	str := `-----BEGIN OPENSSH PRIVATE KEY-----
-b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
-QyNTUxOQAAACBg490b4zqumtizCyM4RWtzJnPEsPIInBFugk8+UCb8XgAAAKCc1yKrnNci
-qwAAAAtzc2gtZWQyNTUxOQAAACBg490b4zqumtizCyM4RWtzJnPEsPIInBFugk8+UCb8Xg
-AAAECvd1Yj+bQxyxJtU3PirLK68CD3MWqBv0/shlFKS6wmbWDj3RvjOq6a2LMLIzhFa3Mm
-c8Sw8gicEW6CTz5QJvxeAAAAGnJvb3RAbG9jYWxob3N0LmxvY2FsZG9tYWluAQID
------END OPENSSH PRIVATE KEY-----
-	`
-	s, err := gossh.ParsePrivateKey([]byte(str))
+	s, err := gossh.ParsePrivateKey([]byte(conf.Cfg.Ssh.PrivateKey))
 	if err != nil {
 		logger.L().Fatal("failed parse signer", zap.Error(err))
 	}

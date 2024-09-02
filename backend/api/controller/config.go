@@ -27,7 +27,7 @@ func (c *Controller) PostConfig(ctx *gin.Context) {
 	}
 
 	cfg := &model.Config{}
-	if err := ctx.BindJSON(cfg); err != nil {
+	if err := ctx.ShouldBindBodyWithJSON(cfg); err != nil {
 		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
 		return
 	}

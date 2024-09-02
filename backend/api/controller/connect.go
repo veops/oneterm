@@ -101,6 +101,8 @@ func HandleSsh(sess *gsession.Session) (err error) {
 		}
 	}()
 	chs := sess.Chans
+	sess.IdleTimout = idleTime()
+	sess.IdleTk = time.NewTicker(sess.IdleTimout)
 	tk, tk1s, tk1m := time.NewTicker(time.Millisecond*100), time.NewTicker(time.Second), time.NewTicker(time.Minute)
 	sess.G.Go(func() error {
 		return read(sess)

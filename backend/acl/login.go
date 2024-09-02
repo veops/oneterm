@@ -7,11 +7,13 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/samber/lo"
 	"github.com/veops/oneterm/conf"
 	mysql "github.com/veops/oneterm/db"
 	"github.com/veops/oneterm/logger"
+	"github.com/veops/oneterm/model"
 	"github.com/veops/oneterm/remote"
 	"github.com/veops/oneterm/util"
 	"go.uber.org/zap"
@@ -47,11 +49,12 @@ func LoginByPassword(ctx context.Context, username string, password string) (ses
 }
 
 func LoginByPublicKey(ctx context.Context, username string, pk string) (sess *Session, err error) {
+	pk = strings.TrimSpace(pk)
 	enc := util.EncryptAES(pk)
 	cnt := int64(0)
-	if err = mysql.DB.Where("usernmae = ? AND pk = ?", username, enc).Count(&cnt).Error; err != nil || cnt == 0 {
+	if err = mysql.DB.Model(&model.PublicKey{}).Where("username = ? AND pk = ?", username, enc).Count(&cnt).Error; err != nil || cnt == 0 {
 		err = fmt.Errorf("%w", err)
-		logger.L().Warn("no pk", zap.Error(err))
+		logger.L().Warn("find pk failed", zap.Int64("cnt", cnt), zap.Error(err))
 		return
 	}
 

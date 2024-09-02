@@ -32,7 +32,7 @@ func RunApi() error {
 	docs.SwaggerInfo.BasePath = "/api/oneterm/v1"
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
-	v1 := r.Group("/api/oneterm/v1", auth())
+	v1 := r.Group("/api/oneterm/v1", Error2Resp(), auth())
 	{
 		account := v1.Group("account")
 		{
@@ -115,6 +115,12 @@ func RunApi() error {
 			file.POST("/mkdir/:asset_id/:account_id", c.FileMkdir)
 			file.POST("/upload/:asset_id/:account_id", c.FileUpload)
 			file.GET("/download/:asset_id/:account_id", c.FileDownload)
+		}
+
+		config := v1.Group("config")
+		{
+			config.GET("", c.GetConfig)
+			config.POST("", c.PostConfig)
 		}
 
 		history := v1.Group("history")

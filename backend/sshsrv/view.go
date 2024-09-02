@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/table"
@@ -21,17 +21,20 @@ import (
 
 	"github.com/veops/oneterm/acl"
 	"github.com/veops/oneterm/api/controller"
+	redis "github.com/veops/oneterm/cache"
 	"github.com/veops/oneterm/conf"
 	mysql "github.com/veops/oneterm/db"
 	"github.com/veops/oneterm/logger"
 	"github.com/veops/oneterm/model"
 	"github.com/veops/oneterm/session"
+	"github.com/veops/oneterm/sshsrv/textinput"
 )
 
 const (
-	prompt   = "> "
-	hotPink  = lipgloss.Color("#FF06B7")
-	darkGray = lipgloss.Color("#767676")
+	prompt     = "> "
+	hotPink    = lipgloss.Color("#FF06B7")
+	darkGray   = lipgloss.Color("#767676")
+	hisCmdsFmt = "hiscmds-%d"
 )
 
 var (
@@ -52,8 +55,6 @@ func (k keymap) ShortHelp() []key.Binding {
 	return []key.Binding{
 		key.NewBinding(key.WithKeys("up"), key.WithHelp("↑", "up")),
 		key.NewBinding(key.WithKeys("down"), key.WithHelp("↓", "down")),
-		// key.NewBinding(key.WithKeys("left"), key.WithHelp("←", "prev")),
-		// key.NewBinding(key.WithKeys("right"), key.WithHelp("→", "next")),
 		key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "complete")),
 		key.NewBinding(key.WithKeys("f5"), key.WithHelp("F5", "refresh")),
 		key.NewBinding(key.WithKeys("esc", "ctrl+c"), key.WithHelp("esc/ctrl+c", "quit")),
@@ -64,20 +65,23 @@ func (k keymap) FullHelp() [][]key.Binding {
 }
 
 type view struct {
-	Ctx        *gin.Context
-	Sess       ssh.Session
-	textinput  textinput.Model
-	cmds       []string
-	cmdsIdx    int
-	combines   map[string][3]int
-	connecting bool
-	help       help.Model
-	keys       keymap
-	r          io.ReadCloser
-	w          io.WriteCloser
+	Ctx         *gin.Context
+	Sess        ssh.Session
+	currentUser *acl.Session
+	textinput   textinput.Model
+	cmds        []string
+	cmdsIdx     int
+	combines    map[string][3]int
+	connecting  bool
+	help        help.Model
+	keys        keymap
+	r           io.ReadCloser
+	w           io.WriteCloser
 }
 
 func initialView(ctx *gin.Context, sess ssh.Session, r io.ReadCloser, w io.WriteCloser) *view {
+	currentUser, _ := acl.GetSessionFromCtx(ctx)
+
 	ti := textinput.New()
 	ti.Placeholder = "ssh"
 	ti.Focus()
@@ -86,16 +90,15 @@ func initialView(ctx *gin.Context, sess ssh.Session, r io.ReadCloser, w io.Write
 	ti.PromptStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("63"))
 	ti.Cursor.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("63"))
 	v := view{
-		Ctx:       ctx,
-		Sess:      sess,
-		textinput: ti,
-		cmds:      []string{},
-		help:      help.New(),
-		r:         r,
-		w:         w,
+		Ctx:         ctx,
+		Sess:        sess,
+		currentUser: currentUser,
+		textinput:   ti,
+		cmds:        []string{},
+		help:        help.New(),
+		r:           r,
+		w:           w,
 	}
-	ti.KeyMap.NextSuggestion = key.NewBinding(key.WithKeys(""))
-	ti.KeyMap.PrevSuggestion = key.NewBinding(key.WithKeys(""))
 	v.refresh()
 
 	return &v
@@ -187,12 +190,9 @@ func (m *view) View() string {
 }
 
 func (m *view) possible() string {
-	cur := m.textinput
-	ss := lo.Filter(cur.AvailableSuggestions(), func(s string, _ int) bool {
-		return cur.Value() != "" && strings.HasPrefix(strings.ToLower(s), strings.ToLower(cur.Value()))
-	})
+	ss := m.textinput.MatchedSuggestions()
 	ln := len(ss)
-	if ln == 0 {
+	if ln <= 0 {
 		return ""
 	}
 	ss = append(ss[:min(ln, 15)], lo.Ternary(ln > 15, fmt.Sprintf("%d more...", ln-15), ""))
@@ -213,8 +213,6 @@ func (m *view) possible() string {
 }
 
 func (m *view) refresh() {
-	currentUser, _ := acl.GetSessionFromCtx(m.Ctx)
-
 	auths := make([]*model.Authorization, 0)
 	assets := make([]*model.Asset, 0)
 	accounts := make([]*model.Account, 0)
@@ -222,8 +220,8 @@ func (m *view) refresh() {
 	dbAsset := mysql.DB.Model(assets)
 	dbAccount := mysql.DB.Model(accounts)
 
-	if !acl.IsAdmin(currentUser) {
-		rs, err := acl.GetRoleResources(ctx, currentUser.Acl.Rid, conf.GetResourceTypeName(conf.RESOURCE_AUTHORIZATION))
+	if !acl.IsAdmin(m.currentUser) {
+		rs, err := acl.GetRoleResources(ctx, m.currentUser.Acl.Rid, conf.GetResourceTypeName(conf.RESOURCE_AUTHORIZATION))
 		if err != nil {
 			logger.L().Error("auths", zap.Error(err))
 			return
@@ -275,12 +273,29 @@ func (m *view) refresh() {
 		}
 	}
 
+	eg.Go(func() error {
+		var err error
+		if len(m.cmds) != 0 {
+			return err
+		}
+		m.cmds, err = redis.RC.LRange(m.Ctx, fmt.Sprintf(hisCmdsFmt, m.currentUser.GetUid()), -100, -1).Result()
+		m.cmdsIdx = len(m.cmds) - 1
+		return err
+	})
+
 	m.textinput.SetSuggestions(lo.Keys(m.combines))
 }
 
 func (m *view) magicn() tea.Msg {
 	m.w.Write([]byte("\n"))
 	return nil
+}
+
+func (m *view) RecordHisCmd() {
+	k := fmt.Sprintf(hisCmdsFmt, m.currentUser.GetUid())
+	redis.RC.RPush(m.Ctx, k, m.cmds)
+	redis.RC.LTrim(m.Ctx, k, -100, -1)
+	redis.RC.Expire(m.Ctx, k, time.Hour*24*30)
 }
 
 type connector struct {

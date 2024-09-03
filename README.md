@@ -1,6 +1,9 @@
 <h3 align="center">OneTerm</h3>
 <p align="center">
   <a href="https://github.com/veops/oneterm/blob/main/LICENSE"><img src="https://img.shields.io/github/license/veops/oneterm" alt="Apache License 2.0"></a>
+  <a href="https://github.com/veops/oneterm/releases">
+    <img alt="the latest release version" src="https://img.shields.io/github/v/release/veops/oneterm?color=75C1C4&include_prereleases&label=Release&logo=github&logoColor=white">
+  </a>
   <a href=""><img src="https://img.shields.io/badge/Go-%3E%3D%201.18-%23007d9c" alt="go>=1.18"></a>
   <a href="https:https://github.com/sendya/ant-design-pro-vue"><img src="https://img.shields.io/badge/UI-Ant%20Design%20Pro%20Vue-brightgreen" alt="UI"></a>
 </p>
@@ -12,7 +15,7 @@
 `Main functions`: role management, authorization approval, resource access control, session audit, etc.
 
 ---
-[English](README.md) / [中文](README_cn.md)
+English / [中文](README_cn.md)
 - Product document：https://veops.cn/docs/
 - Preview online: <a href="https://term.veops.cn/oneterm/workstation" target="_blank">OneTerm</a>
    - username: **`demo`**   or   **`admin`**
@@ -88,6 +91,20 @@ doc link：https://veops.cn/docs/docs/oneterm/onterm_design
 ## 🔗Releated Projects
 
 [go-ansiterm](https://github.com/veops/go-ansiterm)：Linux terminal emulator
+
+## Contributing
+
+<a href="https://github.com/veops/oneterm/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=veops/oneterm" />
+</a>
+
+For those who want to contribute code, see our [Contributing Guidelines](CONTRIBUTING.md).
+In the meantime, please consider supporting Veops open source through social media, events, and sharing.
+
+
+## Thanks to the following users for their support
+[![Stargazers repo roster for @veops/oneterm](https://bytecrank.com/nastyox/reporoster/php/stargazersSVG.php?user=veops&repo=oneterm)](https://github.com/veops/oneterm/stargazers)
+[![Forkers repo roster for @veops/oneterm](https://bytecrank.com/nastyox/reporoster/php/forkersSVG.php?user=veops&repo=oneterm)](https://github.com/veops/oneterm/network/members)
 
 ## 🤝Community
 

@@ -145,3 +145,7 @@ other = "Bad Request: Invalid Mac address"
 [MsgWrongPk]
 one = "Bad Request: Invalid SSH public key"
 other = "Bad Request: Invalid SSH public key"
+
+[MsgWrongPvk]
+one = "Bad Request: Invalid SSH private key"
+other = "Bad Request: Invalid SSH private key"

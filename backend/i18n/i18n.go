@@ -63,6 +63,11 @@ var (
 		One:   "Bad Request: {{.message}}",
 		Other: "Bad Request: {{.message}}",
 	}
+	MsgWrongPvk = &i18n.Message{
+		ID:    "MsgWrongPvk",
+		One:   "Bad Request: Invalid SSH private key",
+		Other: "Bad Request: Invalid SSH private key",
+	}
 	MsgWrongPk = &i18n.Message{
 		ID:    "MsgWrongPk",
 		One:   "Bad Request: Invalid SSH public key",

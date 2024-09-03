@@ -31,8 +31,8 @@ hash = "sha1-742d552bba52b9dedec287d46b70f6bc810dc759"
 other = "请求错误: 资产 {{.name}} 依赖该项，无法删除"
 
 [MsgIdleTimeout]
-hash = "sha1-6c4e9527b5f5d4e5e1af1160fe3eeec9ece04275"
-other = "请求错误: 空闲时间超过 {{.second}} 秒"
+hash = "sha1-001276a8efe351c6bbbb83ea269a5a359a683d95"
+other = "请求错误：空闲超过 {{.second}} 秒"
 
 [MsgInternalError]
 hash = "sha1-a52fb3157738021674255481e2e949e83064dd2b"
@@ -145,3 +145,7 @@ other = "请求错误: 非法MAC地址"
 [MsgWrongPk]
 hash = "sha1-9859553174705cf52d08a18fab79dc3e05a0230f"
 other = "请求错误: 非法SSH公钥"
+
+[MsgWrongPvk]
+hash = "sha1-fd11d7d098d05415f5ed082abdf31223cb2aeda9"
+other = "请求错误: 非法SSH私钥"

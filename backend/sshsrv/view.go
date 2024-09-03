@@ -202,8 +202,8 @@ func (m *view) possible() string {
 	}
 	pty, _, _ := m.Sess.Pty()
 	n := 1
-	for n*mw+(n+1)*1 < pty.Window.Width {
-		n++
+	for i := 2; i*mw+(i+1)*1 < pty.Window.Width; i++ {
+		n = i
 	}
 	tb := table.New().
 		Border(hiddenBorder).

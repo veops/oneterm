@@ -74,8 +74,9 @@ func Proxy(sessionId string, protocol string, asset *model.Asset, gateway *model
 		return
 	}
 
-	var g *ggateway.GatewayTunnel
-	if g, err = ggateway.GetGatewayManager().Open(sessionId, ip, port, gateway); err != nil {
+
+	g, err := ggateway.GetGatewayManager().Open(sessionId, ip, port, gateway)
+	if err != nil {
 		return
 	}
 	ip, port = g.LocalIp, g.LocalPort

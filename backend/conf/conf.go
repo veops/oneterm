@@ -130,7 +130,6 @@ type SshConfig struct {
 type GuacdConfig struct {
 	Host    string `yaml:"host"`
 	Port    int    `yaml:"port"`
-	Gateway string `yaml:"gateway"`
 }
 
 type ConfigYaml struct {

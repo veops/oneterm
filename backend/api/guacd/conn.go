@@ -97,7 +97,7 @@ func NewTunnel(connectionId string, w, h, dpi int, protocol string, asset *model
 		if err != nil {
 			return t, err
 		}
-		t.Config.Parameters["hostname"] = conf.Cfg.Guacd.Gateway
+		t.Config.Parameters["hostname"] = "localhost"
 		t.Config.Parameters["port"] = cast.ToString(t.gw.LocalPort)
 	}
 

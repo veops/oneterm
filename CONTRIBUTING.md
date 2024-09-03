@@ -22,12 +22,14 @@ For new feature additions, please first contact us directly via the contact info
 6. After submitting, watch out for emails and notifications associated with the Pull request. Once it's approved, we'll merge it into the `main` branch as planned. Doing a new round of releases
 
 ## ❖ Development Environment
-
-// TODO
+- go >= 1.21.3
+- node >= 14.17.6
+- docker
 
 ## ❖ Code Style
 
-**API**: // TODO  
+**API**: Please follow the [Go Style](https://google.github.io/styleguide/go/) 
+
 **UI**: Please follow the [node-style-guide](https://github.com/felixge/node-style-guide)
 
 ## ❖ Commit Messages

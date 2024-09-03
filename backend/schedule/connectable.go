@@ -36,7 +36,7 @@ func RunConnectable() (err error) {
 	}
 }
 
-func StopConnectable(err error) {
+func StopConnectable() {
 	defer cancel()
 }
 
@@ -125,7 +125,7 @@ func checkOne(asset *model.Asset, gateway *model.Gateway) (sid string, ok bool) 
 		defer net.Close()
 
 		if asset.GatewayId != 0 {
-			<-gt.Chan
+			<-gt.Opened
 			if gt.LocalConn == nil || gt.RemoteConn == nil {
 				continue
 			}

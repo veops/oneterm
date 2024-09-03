@@ -117,6 +117,9 @@ func HandleSsh(sess *gsession.Session) (err error) {
 				write(sess)
 				return nil
 			case <-sess.IdleTk.C:
+				out := []byte("\r\n \033[31m idle timeout")
+				chs.OutBuf.Write(out)
+				write(sess)
 				return &ApiError{Code: ErrIdleTimeout, Data: map[string]any{"second": int64(sess.IdleTimout.Seconds())}}
 			case <-tk1m.C:
 				if mysql.DB.Model(asset).Where("id = ?", sess.AssetId).First(asset).Error != nil {

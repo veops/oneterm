@@ -25,13 +25,13 @@ var (
 				if data.Phrase == "" {
 					_, err := ssh.ParsePrivateKey([]byte(data.Pk))
 					if err != nil {
-						ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrWrongPk, Data: nil})
+						ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrWrongPvk, Data: nil})
 						return
 					}
 				} else {
 					_, err := ssh.ParsePrivateKeyWithPassphrase([]byte(data.Pk), []byte(data.Phrase))
 					if err != nil {
-						ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrWrongPk, Data: nil})
+						ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrWrongPvk, Data: nil})
 						return
 					}
 				}

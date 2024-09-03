@@ -10,7 +10,6 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/crypto/ssh"
 
-	"github.com/veops/oneterm/conf"
 	"github.com/veops/oneterm/logger"
 	"github.com/veops/oneterm/model"
 )
@@ -38,16 +37,16 @@ type GatewayTunnel struct {
 	RemotePort int
 	LocalConn  net.Conn
 	RemoteConn net.Conn
-	Chan       chan struct{}
+	Opened     chan struct{}
 }
 
 func (gt *GatewayTunnel) Open() (err error) {
-	defer close(gt.Chan)
 	go func() {
 		<-time.After(time.Second * 5)
 		logger.L().Debug("timeout 5 second close listener", zap.String("sessionId", gt.SessionId))
 		gt.listener.Close()
 	}()
+	close(gt.Opened)
 	gt.LocalConn, err = gt.listener.Accept()
 	if err != nil {
 		logger.L().Error("accept failed", zap.String("sessionId", gt.SessionId), zap.Error(err))
@@ -105,7 +104,7 @@ func (gm *GateWayManager) Open(sessionId, remoteIp string, remotePort int, gatew
 	if err != nil {
 		return
 	}
-	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", conf.Cfg.Guacd.Gateway, localPort))
+	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", "localhost", localPort))
 	if err != nil {
 		return
 	}
@@ -113,15 +112,18 @@ func (gm *GateWayManager) Open(sessionId, remoteIp string, remotePort int, gatew
 		listener:   listener,
 		GatewayId:  gateway.Id,
 		SessionId:  sessionId,
-		LocalIp:    conf.Cfg.Guacd.Gateway,
+		LocalIp:    "localhost",
 		LocalPort:  localPort,
 		RemoteIp:   remoteIp,
 		RemotePort: remotePort,
-		Chan:       make(chan struct{}),
+		Opened:     make(chan struct{}),
 	}
 	gm.gateways[sessionId] = g
-	logger.L().Debug("opening gateway", zap.Any("sessionId", sessionId))
 	go g.Open()
+
+	logger.L().Debug("opening gateway", zap.Any("sessionId", sessionId))
+	<-g.Opened
+	logger.L().Debug("opened gateway", zap.Any("sessionId", sessionId))
 
 	return
 }

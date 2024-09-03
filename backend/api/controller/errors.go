@@ -24,6 +24,7 @@ const (
 	ErrLogin            = 4010
 	ErrAccessTime       = 4011
 	ErrIdleTimeout      = 4012
+	ErrWrongPvk         = 4013
 	ErrInternal         = 5000
 	ErrRemoteServer     = 5001
 	ErrConnectServer    = 5002
@@ -40,6 +41,7 @@ var (
 		ErrHasDepency:       myi18n.MsgHasDepdency,
 		ErrNoPerm:           myi18n.MsgNoPerm,
 		ErrRemoteClient:     myi18n.MsgRemoteClient,
+		ErrWrongPvk:         myi18n.MsgWrongPvk,
 		ErrWrongPk:          myi18n.MsgWrongPk,
 		ErrWrongMac:         myi18n.MsgWrongMac,
 		ErrInvalidSessionId: myi18n.MsgInvalidSessionId,

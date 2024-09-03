@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/gin-gonic/gin"
 	"github.com/spf13/cast"
 
 	"github.com/veops/oneterm/conf"
@@ -21,7 +22,8 @@ func AddResource(ctx context.Context, uid int, resourceTypeId string, name strin
 	resp, err := remote.RC.R().
 		SetHeaders(map[string]string{
 			"App-Access-Token": token,
-			"X-User-Id":        cast.ToString(uid)}).
+			"X-User-Id":        cast.ToString(uid),
+			"Accept-Language":  getAcceptLanguage(ctx)}).
 		SetBody(map[string]any{
 			"type_id": resourceTypeId,
 			"name":    name,
@@ -43,7 +45,8 @@ func DeleteResource(ctx context.Context, uid int, resourceId int) (err error) {
 	resp, err := remote.RC.R().
 		SetHeaders(map[string]string{
 			"App-Access-Token": token,
-			"X-User-Id":        cast.ToString(uid)}).
+			"X-User-Id":        cast.ToString(uid),
+			"Accept-Language":  getAcceptLanguage(ctx)}).
 		Delete(url)
 	err = remote.HandleErr(err, resp, func(dt map[string]any) bool { return true })
 	return
@@ -59,7 +62,8 @@ func UpdateResource(ctx context.Context, uid int, resourceId int, updates map[st
 	resp, err := remote.RC.R().
 		SetHeaders(map[string]string{
 			"App-Access-Token": token,
-			"X-User-Id":        cast.ToString(uid)}).
+			"X-User-Id":        cast.ToString(uid),
+			"Accept-Language":  getAcceptLanguage(ctx)}).
 		SetFormData(updates).
 		Put(url)
 	err = remote.HandleErr(err, resp, func(dt map[string]any) bool { return true })
@@ -79,4 +83,12 @@ func GetResourcePermissions(ctx context.Context, resourceId int) (res map[string
 		Get(url)
 	err = remote.HandleErr(err, resp, func(dt map[string]any) bool { return true })
 	return
+}
+
+func getAcceptLanguage(ctx context.Context) string {
+	ginCtx, ok := ctx.(*gin.Context)
+	if !ok {
+		return ""
+	}
+	return ginCtx.GetHeader("Accept-Language")
 }

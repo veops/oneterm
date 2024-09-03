@@ -91,6 +91,13 @@ func write(sess *gsession.Session) {
 	chs.OutBuf.Reset()
 }
 
+func writeErrMsg(sess *gsession.Session, msg string) {
+	chs := sess.Chans
+	out := append([]byte("\r\n \033[31m "), msg...)
+	chs.OutBuf.Write(out)
+	write(sess)
+}
+
 func HandleSsh(sess *gsession.Session) (err error) {
 	defer func() {
 		sess.Status = model.SESSIONSTATUS_OFFLINE
@@ -117,9 +124,7 @@ func HandleSsh(sess *gsession.Session) (err error) {
 				write(sess)
 				return nil
 			case <-sess.IdleTk.C:
-				out := []byte("\r\n \033[31m idle timeout")
-				chs.OutBuf.Write(out)
-				write(sess)
+				writeErrMsg(sess, "idle timeout")
 				return &ApiError{Code: ErrIdleTimeout, Data: map[string]any{"second": int64(sess.IdleTimout.Seconds())}}
 			case <-tk1m.C:
 				if mysql.DB.Model(asset).Where("id = ?", sess.AssetId).First(asset).Error != nil {
@@ -128,13 +133,12 @@ func HandleSsh(sess *gsession.Session) (err error) {
 				if checkTime(asset.AccessAuth) {
 					continue
 				}
+				writeErrMsg(sess, "invalid access time")
 				return &ApiError{Code: ErrAccessTime}
 			case closeBy := <-chs.CloseChan:
-				out := []byte("\r\n \033[31m closed by admin")
-				chs.OutBuf.Write(out)
-				write(sess)
+				writeErrMsg(sess, "closed by admin")
 				logger.L().Info("closed by", zap.String("admin", closeBy))
-				return nil
+				return &ApiError{Code: ErrAdminClose, Data: map[string]any{"admin": closeBy}}
 			case err := <-chs.ErrChan:
 				return err
 			case in := <-chs.InChan:
@@ -177,11 +181,6 @@ func HandleSsh(sess *gsession.Session) (err error) {
 }
 
 func handleGuacd(sess *gsession.Session) (err error) {
-	defer func() {
-		if err = sess.G.Wait(); err != nil {
-			logger.L().Debug("sess wait end", zap.String("id", sess.SessionId), zap.Error(err))
-		}
-	}()
 	defer sess.GuacdTunnel.Disconnect()
 	chs := sess.Chans
 	sess.IdleTimout = idleTime()

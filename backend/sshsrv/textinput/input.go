@@ -839,6 +839,11 @@ func (m *Model) MatchedSuggestions() []string {
 	return suggestions
 }
 
+func (m *Model) ClearMatched() {
+	m.matchedSuggestions = nil
+	m.currentSuggestionIndex = 0
+}
+
 // CurrentSuggestion returns the currently selected suggestion.
 func (m *Model) CurrentSuggestion() string {
 	if m.currentSuggestionIndex >= len(m.matchedSuggestions) {

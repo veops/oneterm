@@ -146,7 +146,10 @@ func (m *view) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Sequence(hisCmd, tea.Exec(&connector{Ctx: m.Ctx, Sess: m.Sess, Vw: m}, func(err error) tea.Msg {
 					m.connecting = false
 					return err
-				}), tea.Printf("%s", prompt), m.magicn)
+				}), tea.Printf("%s", prompt), func() tea.Msg {
+					m.textinput.ClearMatched()
+					return nil
+				}, m.magicn)
 			}
 		case tea.KeyUp:
 			ln := len(m.cmds)

@@ -2,6 +2,7 @@ package acl
 
 import (
 	"fmt"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
@@ -58,8 +59,9 @@ type Acl struct {
 }
 
 type Session struct {
-	Uid int `json:"uid"`
-	Acl Acl `json:"acl"`
+	Uid    int          `json:"uid"`
+	Acl    Acl          `json:"acl"`
+	Cookie *http.Cookie `json:"raw"`
 }
 
 func (s *Session) GetUid() int {

@@ -15,12 +15,14 @@ import (
 	gossh "golang.org/x/crypto/ssh"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/veops/oneterm/acl"
 	"github.com/veops/oneterm/conf"
 	"github.com/veops/oneterm/logger"
 	"github.com/veops/oneterm/model"
 )
 
 func handler(sess ssh.Session) {
+	defer acl.Logout(sess.Context().Value("session").(*acl.Session))
 	pty, _, isPty := sess.Pty()
 	if !isPty {
 		logger.L().Error("not a pty request")
@@ -48,7 +50,7 @@ func handler(sess ssh.Session) {
 		defer sess.Close()
 		defer r.Close()
 		defer w.Close()
-		vw := initialView(ctx, sess, r, w)
+		vw := initialView(ctx, sess, r, w, gctx)
 		defer vw.RecordHisCmd()
 		p := tea.NewProgram(vw, tea.WithContext(gctx), tea.WithInput(r), tea.WithOutput(sess))
 		_, err := p.Run()

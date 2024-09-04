@@ -26,6 +26,7 @@ import (
 	"github.com/veops/oneterm/acl"
 	"github.com/veops/oneterm/api/guacd"
 	mysql "github.com/veops/oneterm/db"
+	ggateway "github.com/veops/oneterm/gateway"
 	myi18n "github.com/veops/oneterm/i18n"
 	"github.com/veops/oneterm/logger"
 	"github.com/veops/oneterm/model"
@@ -48,6 +49,7 @@ func read(sess *gsession.Session) error {
 	for {
 		select {
 		case <-sess.Gctx.Done():
+			fmt.Println("done read-------------------------------")
 			return nil
 		default:
 			if sess.SessionType == model.SESSIONTYPE_WEB {
@@ -78,7 +80,9 @@ func write(sess *gsession.Session) {
 	out := chs.OutBuf.Bytes()
 
 	if sess.SessionType == model.SESSIONTYPE_WEB && sess.Ws != nil {
-		sess.Ws.WriteMessage(websocket.TextMessage, out)
+		if len(out) > 0 || !strings.Contains(sess.Protocol, "ssh") {
+			sess.Ws.WriteMessage(websocket.TextMessage, out)
+		}
 	} else if sess.SessionType == model.SESSIONTYPE_CLIENT && len(out) > 0 {
 		sess.CliRw.Write(out)
 	}
@@ -288,6 +292,12 @@ func DoConnect(ctx *gin.Context) (sess *gsession.Session, err error) {
 func connectSsh(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, account *model.Account, gateway *model.Gateway) (err error) {
 	w, h := cast.ToInt(ctx.Query("w")), cast.ToInt(ctx.Query("h"))
 	chs := sess.Chans
+	defer func() {
+		ggateway.GetGatewayManager().Close(sess.SessionId)
+		if err != nil {
+			chs.ErrChan <- err
+		}
+	}()
 
 	ip, port, err := util.Proxy(uuid.New().String(), "ssh", asset, gateway)
 	if err != nil {
@@ -372,6 +382,9 @@ func connectSsh(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, ac
 			select {
 			case <-sess.Gctx.Done():
 				return nil
+			case <-chs.AwayChan:
+				sshSess.Close()
+				return fmt.Errorf("away")
 			case window := <-chs.WindowChan:
 				if err := sshSess.WindowChange(window.Height, window.Width); err != nil {
 					logger.L().Warn("reset window size failed", zap.Error(err))
@@ -437,7 +450,7 @@ func connectGuacd(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, 
 			case <-gctx.Done():
 				return nil
 			case <-time.After(time.Minute):
-				session.Chans.AwayChan <- struct{}{}
+				close(session.Chans.AwayChan)
 				return nil
 			}
 		}
@@ -502,7 +515,7 @@ func connectGuacd(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, 
 //	@Success	200	{object}	HttpResponse{data=gsession.Session}
 //	@Router		/connect/:asset_id/:account_id/:protocol [post]
 func (c *Controller) Connect(ctx *gin.Context) {
-
+	ctx.Set("sessionType", model.SESSIONTYPE_WEB)
 	sess, err := DoConnect(ctx)
 	if err != nil {
 		return
@@ -516,6 +529,7 @@ func (c *Controller) Connect(ctx *gin.Context) {
 		return
 	}
 	defer ws.Close()
+	sess.Ws = ws
 
 	defer func() {
 		handleError(ctx, sess, err, ws)

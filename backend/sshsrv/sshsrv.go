@@ -9,6 +9,7 @@ import (
 
 	"github.com/veops/oneterm/acl"
 	"github.com/veops/oneterm/conf"
+	"github.com/veops/oneterm/util"
 )
 
 var (
@@ -21,12 +22,13 @@ func init() {
 		Addr:    fmt.Sprintf("%s:%d", conf.Cfg.Ssh.Host, conf.Cfg.Ssh.Port),
 		Handler: handler,
 		PasswordHandler: func(ctx ssh.Context, password string) bool {
-			sess, err := acl.LoginByPassword(ctx, ctx.User(), password)
+			sess, err := acl.LoginByPassword(ctx, ctx.User(), password, util.IpFromNetAddr(ctx.RemoteAddr()))
+
 			ctx.SetValue("session", sess)
 			return err == nil
 		},
 		PublicKeyHandler: func(ctx ssh.Context, key ssh.PublicKey) bool {
-			sess, err := acl.LoginByPublicKey(ctx, ctx.User(), string(gossh.MarshalAuthorizedKey(key)))
+			sess, err := acl.LoginByPublicKey(ctx, ctx.User(), string(gossh.MarshalAuthorizedKey(key)), util.IpFromNetAddr(ctx.RemoteAddr()))
 			ctx.SetValue("session", sess)
 			return err == nil
 		},

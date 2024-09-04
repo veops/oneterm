@@ -19,7 +19,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func LoginByPassword(ctx context.Context, username string, password string) (sess *Session, err error) {
+func LoginByPassword(ctx context.Context, username string, password string, ip string) (sess *Session, err error) {
 	url := fmt.Sprintf("%s/acl/login", conf.Cfg.Auth.Acl.Url)
 	data := make(map[string]any)
 	resp, err := remote.RC.R().
@@ -31,9 +31,10 @@ func LoginByPassword(ctx context.Context, username string, password string) (ses
 		}).
 		SetResult(&data).
 		SetBody(map[string]any{
+			"channel":  "ssh",
 			"username": username,
 			"password": fmt.Sprintf("%x", md5.Sum([]byte(password))),
-			// "password": password,
+			"ip":       ip,
 		}).
 		Post(url)
 	if err = remote.HandleErr(err, resp, func(dt map[string]any) bool { return true }); err != nil {
@@ -45,10 +46,15 @@ func LoginByPassword(ctx context.Context, username string, password string) (ses
 		err = errors.New("empty cookie")
 		return
 	}
-	return ParseCookie(cookie.Value)
+	sess, err = ParseCookie(cookie.Value)
+	if err != nil {
+		return
+	}
+	sess.Cookie = cookie
+	return
 }
 
-func LoginByPublicKey(ctx context.Context, username string, pk string) (sess *Session, err error) {
+func LoginByPublicKey(ctx context.Context, username string, pk string, ip string) (sess *Session, err error) {
 	pk = strings.TrimSpace(pk)
 	enc := util.EncryptAES(pk)
 	cnt := int64(0)
@@ -72,6 +78,7 @@ func LoginByPublicKey(ctx context.Context, username string, pk string) (sess *Se
 		}).
 		SetQueryParams(map[string]string{
 			"channel": "ssh",
+			"ip":      ip,
 		}).
 		SetQueryParam("username", username).
 		SetResult(&data).
@@ -79,6 +86,7 @@ func LoginByPublicKey(ctx context.Context, username string, pk string) (sess *Se
 	if err = remote.HandleErr(err, resp, func(dt map[string]any) bool { return true }); err != nil {
 		return
 	}
+	cookie, _ := lo.Find(resp.Cookies(), func(c *http.Cookie) bool { return c.Name == "session" })
 	sess = &Session{
 		Uid: data.Result.UID,
 		Acl: Acl{
@@ -88,6 +96,7 @@ func LoginByPublicKey(ctx context.Context, username string, pk string) (sess *Se
 			NickName:    data.Result.Name,
 			ParentRoles: data.Result.Role.Permissions,
 		},
+		Cookie: cookie,
 	}
 
 	return
@@ -124,4 +133,17 @@ func ParseCookie(cookie string) (sess *Session, err error) {
 	}
 
 	return
+}
+
+func Logout(sess *Session) {
+	if sess == nil {
+		return
+	}
+	url := fmt.Sprintf("%s/acl/logout", conf.Cfg.Auth.Acl.Url)
+	resp, err := remote.RC.R().
+		SetCookie(sess.Cookie).
+		Post(url)
+	if err = remote.HandleErr(err, resp, func(dt map[string]any) bool { return true }); err != nil {
+		logger.L().Info("logout failed", zap.Error(err))
+	}
 }

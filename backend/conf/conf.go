@@ -34,8 +34,6 @@ var (
 		Auth: Auth{
 			Custom: map[string]string{},
 		},
-		Cmdb:   Cmdb{},
-		Worker: Worker{},
 	}
 )
 
@@ -110,17 +108,6 @@ type Auth struct {
 	Custom map[string]string `yaml:"custom"`
 }
 
-type Cmdb struct {
-	Url string `yaml:"url"`
-}
-
-type Worker struct {
-	Uid    int    `yaml:"uid"`
-	Rid    int    `yaml:"rid"`
-	Key    string `yaml:"key"`
-	Secret string `yaml:"secret"`
-}
-
 type SshConfig struct {
 	Host       string `yaml:"host"`
 	Port       int    `yaml:"port"`
@@ -128,8 +115,8 @@ type SshConfig struct {
 }
 
 type GuacdConfig struct {
-	Host    string `yaml:"host"`
-	Port    int    `yaml:"port"`
+	Host string `yaml:"host"`
+	Port int    `yaml:"port"`
 }
 
 type ConfigYaml struct {
@@ -143,8 +130,6 @@ type ConfigYaml struct {
 	Ssh       SshConfig   `yaml:"ssh"`
 	Auth      Auth        `yaml:"auth"`
 	SecretKey string      `yaml:"secretKey"`
-	Cmdb      Cmdb        `yaml:"cmdb"`
-	Worker    Worker      `yaml:"worker"`
 }
 
 func GetResourceTypeName(key string) (val string) {

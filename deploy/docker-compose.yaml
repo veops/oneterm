@@ -2,11 +2,14 @@ version: "3.0"
 
 services:
   oneterm-api:
-    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-api:24.3
+    # image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-api:24.3
+    build:
+      context: .
+      dockerfile: ../backend/dockerfile
     container_name: oneterm-api
     volumes:
-      - file-data:/replay
-      - ./docs/api.yaml:/oneterm/config.yaml
+      - ./volume/replay:/replay
+      - ./config.yaml:/oneterm/config.yaml
     depends_on:
       - mysql
       - redis
@@ -17,32 +20,13 @@ services:
         aliases:
           - oneterm-api
 
-  oneterm-ssh:
-    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-ssh:24.3.1
-    container_name: oneterm-ssh
-    ports:
-      - "12229:12228"
-    restart: always
-    tty: true
-    volumes:
-      - ./docs/ssh.yaml:/oneterm/config.yaml
-      - ./docs/scripts/entrypoint.sh:/oneterm/entrypoint.sh
-      - ssh-data:/root/.ssh
-    entrypoint: ./entrypoint.sh
-    depends_on:
-      - oneterm-api
-    networks:
-      new:
-        aliases:
-          - oneterm-ssh
-
   oneterm-guacd:
     image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-guacd:24.3
     container_name: oneterm-guacd
     user: root
     restart: always
     volumes:
-      - file-data:/replay
+      - ./volume/replay:/replay
     networks:
       new:
         aliases:
@@ -50,18 +34,17 @@ services:
 
   mysql:
     image: registry.cn-hangzhou.aliyuncs.com/veops/mysql:latest
-    #image: mysql:8.0.30
     container_name: oneterm-mysql
     environment:
       TZ: Asia/Shanghai
       MYSQL_ROOT_PASSWORD: '123456'
       MYSQL_DATABASE: 'oneterm'
     volumes:
-      - db-data:/var/lib/mysql
-      - ./docs/mysqld.cnf:/etc/mysql/conf.d/mysqld.cnf
-      - ./docs/acl.sql:/docker-entrypoint-initdb.d/2-acl.sql
-      - ./docs/api.sql:/docker-entrypoint-initdb.d/3-api.sql
-      - ./docs/create-users.sql:/docker-entrypoint-initdb.d/1-create-users.sql
+      - ./volume/mysql:/var/lib/mysql
+      - ./mysqld.cnf:/etc/mysql/conf.d/mysqld.cnf
+      - ./acl.sql:/docker-entrypoint-initdb.d/2-acl.sql
+      - ./api.sql:/docker-entrypoint-initdb.d/3-api.sql
+      - ./create-users.sql:/docker-entrypoint-initdb.d/1-create-users.sql
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     restart: always
     networks:
@@ -114,9 +97,7 @@ services:
       #TZ: Asia/Shanghai
       WAIT_HOSTS: mysql:3306, redis:6379
     volumes:
-      - ./docs/settings.py:/data/app/acl/settings.py
-      - ./docs/.env:/data/apps/acl/.env
-      - ./docs/nginx.oneterm.conf.example:/etc/nginx/conf.d/nginx.oneterm.conf.example
+      - ./.env:/data/apps/acl/.env
     restart: always
     command:
       - /bin/sh

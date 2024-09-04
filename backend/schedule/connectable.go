@@ -86,7 +86,7 @@ func CheckUpdate(ids ...int) (err error) {
 		}
 		sids = append(sids, sid)
 	}
-	ggateway.GetGatewayManager().Close(sids...)
+	defer ggateway.GetGatewayManager().Close(sids...)
 	if len(oks) > 0 {
 		if err := mysql.DB.Model(assets).Where("id IN ?", oks).Update("connectable", true).Error; err != nil {
 			logger.L().Debug("update connectable to ok failed", zap.Error(err))
@@ -115,6 +115,7 @@ func checkOne(asset *model.Asset, gateway *model.Gateway) (sid string, ok bool) 
 				continue
 			}
 			ip, port = gt.LocalIp, gt.LocalPort
+			<-gt.Opened
 		}
 		addr := fmt.Sprintf("%s:%d", ip, port)
 		net, err := net.DialTimeout("tcp", addr, time.Second*3)
@@ -124,12 +125,6 @@ func checkOne(asset *model.Asset, gateway *model.Gateway) (sid string, ok bool) 
 		}
 		defer net.Close()
 
-		if asset.GatewayId != 0 {
-			<-gt.Opened
-			if gt.LocalConn == nil || gt.RemoteConn == nil {
-				continue
-			}
-		}
 		ok = true
 		return
 	}

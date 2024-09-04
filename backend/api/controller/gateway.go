@@ -60,6 +60,13 @@ var (
 				d.AssetCount = m[d.Id]
 			}
 		},
+		func(ctx *gin.Context, data []*model.Gateway) {
+			for _, d := range data {
+				d.Password = util.DecryptAES(d.Password)
+				d.Pk = util.DecryptAES(d.Pk)
+				d.Phrase = util.DecryptAES(d.Phrase)
+			}
+		},
 	}
 	gatewayDcs = []deleteCheck{
 		func(ctx *gin.Context, id int) {

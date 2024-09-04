@@ -124,7 +124,11 @@ func doCreate[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType 
 		return
 	}
 
-	ctx.JSON(http.StatusOK, defaultHttpResponse)
+	ctx.JSON(http.StatusOK, HttpResponse{
+		Data: map[string]any{
+			"id": md.GetId(),
+		},
+	})
 
 	return
 }
@@ -199,7 +203,11 @@ func doDelete[T model.Model](ctx *gin.Context, needAcl bool, md T, dcs ...delete
 		return
 	}
 
-	ctx.JSON(http.StatusOK, defaultHttpResponse)
+	ctx.JSON(http.StatusOK, HttpResponse{
+		Data: map[string]any{
+			"id": md.GetId(),
+		},
+	})
 
 	return
 }
@@ -285,7 +293,11 @@ func doUpdate[T model.Model](ctx *gin.Context, needAcl bool, md T, preHooks ...p
 		return
 	}
 
-	ctx.JSON(http.StatusOK, defaultHttpResponse)
+	ctx.JSON(http.StatusOK, HttpResponse{
+		Data: map[string]any{
+			"id": md.GetId(),
+		},
+	})
 
 	return
 }

@@ -2,6 +2,7 @@ package sshsrv
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"strings"
@@ -77,9 +78,10 @@ type view struct {
 	keys        keymap
 	r           io.ReadCloser
 	w           io.WriteCloser
+	gctx        context.Context
 }
 
-func initialView(ctx *gin.Context, sess ssh.Session, r io.ReadCloser, w io.WriteCloser) *view {
+func initialView(ctx *gin.Context, sess ssh.Session, r io.ReadCloser, w io.WriteCloser, gctx context.Context) *view {
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
 
 	ti := textinput.New()
@@ -98,6 +100,7 @@ func initialView(ctx *gin.Context, sess ssh.Session, r io.ReadCloser, w io.Write
 		help:        help.New(),
 		r:           r,
 		w:           w,
+		gctx:        gctx,
 	}
 	v.refresh()
 
@@ -143,7 +146,7 @@ func (m *view) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.Ctx.Params = append(m.Ctx.Params, gin.Param{Key: "protocol", Value: fmt.Sprintf("ssh:%d", m.combines[cmd][2])})
 				m.Ctx = m.Ctx.Copy()
 				m.connecting = true
-				return m, tea.Sequence(hisCmd, tea.Exec(&connector{Ctx: m.Ctx, Sess: m.Sess, Vw: m}, func(err error) tea.Msg {
+				return m, tea.Sequence(hisCmd, tea.Exec(&connector{Ctx: m.Ctx, Sess: m.Sess, Vw: m, gctx: m.gctx}, func(err error) tea.Msg {
 					m.connecting = false
 					return err
 				}), tea.Printf("%s", prompt), func() tea.Msg {
@@ -308,6 +311,7 @@ type connector struct {
 	stdin  io.Reader
 	stdout io.Writer
 	stderr io.Writer
+	gctx   context.Context
 }
 
 func (conn *connector) SetStdin(r io.Reader) {
@@ -347,6 +351,9 @@ func (conn *connector) Run() error {
 		defer w.Close()
 		for {
 			select {
+			case <-conn.gctx.Done():
+				close(gsess.Chans.AwayChan)
+				return nil
 			case <-gsess.Gctx.Done():
 				return nil
 			case w := <-ch:

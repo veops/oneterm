@@ -6,6 +6,1392 @@
   "description": "",
   "glyphs": [
     {
+      "icon_id": "41735717",
+      "name": "oneterm-connect",
+      "font_class": "oneterm-connect1",
+      "unicode": "e9c6",
+      "unicode_decimal": 59846
+    },
+    {
+      "icon_id": "41735716",
+      "name": "oneterm-session",
+      "font_class": "oneterm-session1",
+      "unicode": "e9c7",
+      "unicode_decimal": 59847
+    },
+    {
+      "icon_id": "41735703",
+      "name": "oneterm-assets",
+      "font_class": "oneterm-assets",
+      "unicode": "e9c8",
+      "unicode_decimal": 59848
+    },
+    {
+      "icon_id": "41725683",
+      "name": "oneterm-RDP",
+      "font_class": "a-oneterm-ssh1",
+      "unicode": "e9c3",
+      "unicode_decimal": 59843
+    },
+    {
+      "icon_id": "41725684",
+      "name": "oneterm-SSH",
+      "font_class": "a-oneterm-ssh2",
+      "unicode": "e9c4",
+      "unicode_decimal": 59844
+    },
+    {
+      "icon_id": "41725685",
+      "name": "oneterm-VNC",
+      "font_class": "oneterm-rdp",
+      "unicode": "e9c5",
+      "unicode_decimal": 59845
+    },
+    {
+      "icon_id": "41724497",
+      "name": "caise-websphere",
+      "font_class": "caise-websphere",
+      "unicode": "e9c2",
+      "unicode_decimal": 59842
+    },
+    {
+      "icon_id": "41724575",
+      "name": "caise-vps",
+      "font_class": "caise-vps",
+      "unicode": "e9c1",
+      "unicode_decimal": 59841
+    },
+    {
+      "icon_id": "41724631",
+      "name": "caise-F5",
+      "font_class": "caise-F5",
+      "unicode": "e9c0",
+      "unicode_decimal": 59840
+    },
+    {
+      "icon_id": "41724653",
+      "name": "caise-HAProxy",
+      "font_class": "caise-HAProxy",
+      "unicode": "e9bf",
+      "unicode_decimal": 59839
+    },
+    {
+      "icon_id": "41722953",
+      "name": "caise-JBoss",
+      "font_class": "caise-JBoss",
+      "unicode": "e9be",
+      "unicode_decimal": 59838
+    },
+    {
+      "icon_id": "41722960",
+      "name": "caise-dongfangtong",
+      "font_class": "caise-dongfangtong",
+      "unicode": "e9bd",
+      "unicode_decimal": 59837
+    },
+    {
+      "icon_id": "41722681",
+      "name": "caise-kafka",
+      "font_class": "caise-kafka",
+      "unicode": "e9b7",
+      "unicode_decimal": 59831
+    },
+    {
+      "icon_id": "41722680",
+      "name": "caise-weblogic",
+      "font_class": "caise-weblogic",
+      "unicode": "e9b8",
+      "unicode_decimal": 59832
+    },
+    {
+      "icon_id": "41722679",
+      "name": "caise-TDSQL",
+      "font_class": "caise-TDSQL",
+      "unicode": "e9b9",
+      "unicode_decimal": 59833
+    },
+    {
+      "icon_id": "41722678",
+      "name": "caise-kingbase",
+      "font_class": "caise-kingbase",
+      "unicode": "e9ba",
+      "unicode_decimal": 59834
+    },
+    {
+      "icon_id": "41722677",
+      "name": "达梦",
+      "font_class": "caise-dameng",
+      "unicode": "e9bb",
+      "unicode_decimal": 59835
+    },
+    {
+      "icon_id": "41722675",
+      "name": "caise-TIDB",
+      "font_class": "caise-TIDB",
+      "unicode": "e9bc",
+      "unicode_decimal": 59836
+    },
+    {
+      "icon_id": "41681675",
+      "name": "veops-expand",
+      "font_class": "veops-expand",
+      "unicode": "e9b6",
+      "unicode_decimal": 59830
+    },
+    {
+      "icon_id": "41672951",
+      "name": "公有云",
+      "font_class": "caise-public_cloud",
+      "unicode": "e9b1",
+      "unicode_decimal": 59825
+    },
+    {
+      "icon_id": "41672952",
+      "name": "操作系统",
+      "font_class": "caise-system",
+      "unicode": "e9b2",
+      "unicode_decimal": 59826
+    },
+    {
+      "icon_id": "41673309",
+      "name": "IPAM",
+      "font_class": "caise-IPAM",
+      "unicode": "e9b3",
+      "unicode_decimal": 59827
+    },
+    {
+      "icon_id": "41673312",
+      "name": "hyperV",
+      "font_class": "caise-hyperV",
+      "unicode": "e9b4",
+      "unicode_decimal": 59828
+    },
+    {
+      "icon_id": "41673320",
+      "name": "数据中心",
+      "font_class": "caise-data_center2",
+      "unicode": "e9b5",
+      "unicode_decimal": 59829
+    },
+    {
+      "icon_id": "41669141",
+      "name": "硬件设备",
+      "font_class": "caise-hardware",
+      "unicode": "e9ad",
+      "unicode_decimal": 59821
+    },
+    {
+      "icon_id": "41669249",
+      "name": "计算机",
+      "font_class": "caise-computer",
+      "unicode": "e9ae",
+      "unicode_decimal": 59822
+    },
+    {
+      "icon_id": "41669250",
+      "name": "网络设备",
+      "font_class": "caise-network_devices",
+      "unicode": "e9af",
+      "unicode_decimal": 59823
+    },
+    {
+      "icon_id": "41669278",
+      "name": "存储设备",
+      "font_class": "caise-storage_device",
+      "unicode": "e9b0",
+      "unicode_decimal": 59824
+    },
+    {
+      "icon_id": "41659452",
+      "name": "负载均衡",
+      "font_class": "caise-load_balancing",
+      "unicode": "e9ab",
+      "unicode_decimal": 59819
+    },
+    {
+      "icon_id": "41659446",
+      "name": "消息队列",
+      "font_class": "caise-message_queue",
+      "unicode": "e9ac",
+      "unicode_decimal": 59820
+    },
+    {
+      "icon_id": "41659424",
+      "name": "websever",
+      "font_class": "caise-websever",
+      "unicode": "e9aa",
+      "unicode_decimal": 59818
+    },
+    {
+      "icon_id": "41655608",
+      "name": "中间件",
+      "font_class": "caise-middleware",
+      "unicode": "e9a9",
+      "unicode_decimal": 59817
+    },
+    {
+      "icon_id": "41655599",
+      "name": "数据库",
+      "font_class": "caise-database",
+      "unicode": "e9a7",
+      "unicode_decimal": 59815
+    },
+    {
+      "icon_id": "41655591",
+      "name": "业务",
+      "font_class": "caise-business",
+      "unicode": "e9a8",
+      "unicode_decimal": 59816
+    },
+    {
+      "icon_id": "41655550",
+      "name": "虚拟化",
+      "font_class": "caise-virtualization",
+      "unicode": "e9a6",
+      "unicode_decimal": 59814
+    },
+    {
+      "icon_id": "41654680",
+      "name": "存储池",
+      "font_class": "caise-storage_pool",
+      "unicode": "e9a4",
+      "unicode_decimal": 59812
+    },
+    {
+      "icon_id": "41654676",
+      "name": "存储卷",
+      "font_class": "caise-storage_volume1",
+      "unicode": "e9a5",
+      "unicode_decimal": 59813
+    },
+    {
+      "icon_id": "41654608",
+      "name": "aix",
+      "font_class": "ciase-aix",
+      "unicode": "e9a3",
+      "unicode_decimal": 59811
+    },
+    {
+      "icon_id": "41654233",
+      "name": "ip池",
+      "font_class": "caise_pool",
+      "unicode": "e99b",
+      "unicode_decimal": 59803
+    },
+    {
+      "icon_id": "41654237",
+      "name": "ip地址",
+      "font_class": "caise-ip_address",
+      "unicode": "e99c",
+      "unicode_decimal": 59804
+    },
+    {
+      "icon_id": "41654249",
+      "name": "机房",
+      "font_class": "caise-computer_room",
+      "unicode": "e99d",
+      "unicode_decimal": 59805
+    },
+    {
+      "icon_id": "41654271",
+      "name": "机柜",
+      "font_class": "caise-rack",
+      "unicode": "e99e",
+      "unicode_decimal": 59806
+    },
+    {
+      "icon_id": "41654276",
+      "name": "PC",
+      "font_class": "caise-pc",
+      "unicode": "e99f",
+      "unicode_decimal": 59807
+    },
+    {
+      "icon_id": "41654305",
+      "name": "带宽线路",
+      "font_class": "caise-bandwidth_line",
+      "unicode": "e9a0",
+      "unicode_decimal": 59808
+    },
+    {
+      "icon_id": "41654323",
+      "name": "光纤交换机",
+      "font_class": "caise-fiber",
+      "unicode": "e9a1",
+      "unicode_decimal": 59809
+    },
+    {
+      "icon_id": "41654369",
+      "name": "磁盘阵列",
+      "font_class": "caise-disk_array",
+      "unicode": "e9a2",
+      "unicode_decimal": 59810
+    },
+    {
+      "icon_id": "41643869",
+      "name": "veops-group",
+      "font_class": "veops-group",
+      "unicode": "e99a",
+      "unicode_decimal": 59802
+    },
+    {
+      "icon_id": "41637123",
+      "name": "veops-inheritance",
+      "font_class": "veops-inheritance",
+      "unicode": "e999",
+      "unicode_decimal": 59801
+    },
+    {
+      "icon_id": "41570722",
+      "name": "veops-department",
+      "font_class": "veops-department",
+      "unicode": "e998",
+      "unicode_decimal": 59800
+    },
+    {
+      "icon_id": "41437322",
+      "name": "duose-changwenben (1)",
+      "font_class": "duose-changwenben1",
+      "unicode": "e997",
+      "unicode_decimal": 59799
+    },
+    {
+      "icon_id": "41363381",
+      "name": "duose-quote",
+      "font_class": "duose-quote",
+      "unicode": "e995",
+      "unicode_decimal": 59797
+    },
+    {
+      "icon_id": "41363378",
+      "name": "duose-boole",
+      "font_class": "duose-boole",
+      "unicode": "e996",
+      "unicode_decimal": 59798
+    },
+    {
+      "icon_id": "41341306",
+      "name": "veops-rule1",
+      "font_class": "veops-rule1",
+      "unicode": "e994",
+      "unicode_decimal": 59796
+    },
+    {
+      "icon_id": "41337509",
+      "name": "veops-operation_report",
+      "font_class": "veops-operation_report",
+      "unicode": "e993",
+      "unicode_decimal": 59795
+    },
+    {
+      "icon_id": "41335526",
+      "name": "veops-ranking1",
+      "font_class": "veops-ranking1",
+      "unicode": "e992",
+      "unicode_decimal": 59794
+    },
+    {
+      "icon_id": "41335530",
+      "name": "veops-ranking2",
+      "font_class": "veops-ranking2",
+      "unicode": "e98f",
+      "unicode_decimal": 59791
+    },
+    {
+      "icon_id": "41335529",
+      "name": "veops-ranking3",
+      "font_class": "veops-ranking3",
+      "unicode": "e990",
+      "unicode_decimal": 59792
+    },
+    {
+      "icon_id": "41335528",
+      "name": "veops-ranking4",
+      "font_class": "veops-ranking4",
+      "unicode": "e991",
+      "unicode_decimal": 59793
+    },
+    {
+      "icon_id": "41334746",
+      "name": "veops-title5",
+      "font_class": "veops-title5",
+      "unicode": "e98d",
+      "unicode_decimal": 59789
+    },
+    {
+      "icon_id": "41334744",
+      "name": "veops-repair (1)",
+      "font_class": "veops-repair1",
+      "unicode": "e98e",
+      "unicode_decimal": 59790
+    },
+    {
+      "icon_id": "41334753",
+      "name": "veops-ticket",
+      "font_class": "veops-ticket",
+      "unicode": "e988",
+      "unicode_decimal": 59784
+    },
+    {
+      "icon_id": "41334751",
+      "name": "veops-model4",
+      "font_class": "veops-model4",
+      "unicode": "e989",
+      "unicode_decimal": 59785
+    },
+    {
+      "icon_id": "41334752",
+      "name": "veops-resource2 (1)",
+      "font_class": "veops-resource21",
+      "unicode": "e98a",
+      "unicode_decimal": 59786
+    },
+    {
+      "icon_id": "41334750",
+      "name": "veops-relationship3",
+      "font_class": "veops-relationship3",
+      "unicode": "e98b",
+      "unicode_decimal": 59787
+    },
+    {
+      "icon_id": "41334748",
+      "name": "veops-title6",
+      "font_class": "veops-title6",
+      "unicode": "e98c",
+      "unicode_decimal": 59788
+    },
+    {
+      "icon_id": "41334404",
+      "name": "veops-resource1 (1)",
+      "font_class": "veops-resource11",
+      "unicode": "e97a",
+      "unicode_decimal": 59770
+    },
+    {
+      "icon_id": "41334505",
+      "name": "veops-model1 (1)",
+      "font_class": "veops-model11",
+      "unicode": "e97b",
+      "unicode_decimal": 59771
+    },
+    {
+      "icon_id": "41334533",
+      "name": "veops-relationship1",
+      "font_class": "veops-relationship1",
+      "unicode": "e97c",
+      "unicode_decimal": 59772
+    },
+    {
+      "icon_id": "41334535",
+      "name": "veops-title1",
+      "font_class": "veops-title1",
+      "unicode": "e97d",
+      "unicode_decimal": 59773
+    },
+    {
+      "icon_id": "41334572",
+      "name": "veops-title2",
+      "font_class": "veops-title2",
+      "unicode": "e97e",
+      "unicode_decimal": 59774
+    },
+    {
+      "icon_id": "41334579",
+      "name": "veops-model2",
+      "font_class": "veops-model2",
+      "unicode": "e97f",
+      "unicode_decimal": 59775
+    },
+    {
+      "icon_id": "41334590",
+      "name": "veops-resource2",
+      "font_class": "veops-resource2",
+      "unicode": "e980",
+      "unicode_decimal": 59776
+    },
+    {
+      "icon_id": "41334594",
+      "name": "veops-warehousing",
+      "font_class": "veops-warehousing",
+      "unicode": "e981",
+      "unicode_decimal": 59777
+    },
+    {
+      "icon_id": "41334598",
+      "name": "veops-relationship2",
+      "font_class": "veops-relationship2",
+      "unicode": "e982",
+      "unicode_decimal": 59778
+    },
+    {
+      "icon_id": "41334602",
+      "name": "veops-title3",
+      "font_class": "veops-title3",
+      "unicode": "e983",
+      "unicode_decimal": 59779
+    },
+    {
+      "icon_id": "41334603",
+      "name": "veops-rule2",
+      "font_class": "veops-rule2",
+      "unicode": "e984",
+      "unicode_decimal": 59780
+    },
+    {
+      "icon_id": "41334604",
+      "name": "veops-model3",
+      "font_class": "veops-model3",
+      "unicode": "e985",
+      "unicode_decimal": 59781
+    },
+    {
+      "icon_id": "41334725",
+      "name": "veops-title4",
+      "font_class": "veops-title4",
+      "unicode": "e986",
+      "unicode_decimal": 59782
+    },
+    {
+      "icon_id": "41334739",
+      "name": "veops-rule3",
+      "font_class": "veops-rule3",
+      "unicode": "e987",
+      "unicode_decimal": 59783
+    },
+    {
+      "icon_id": "41334004",
+      "name": "veops-decline",
+      "font_class": "veops-decline",
+      "unicode": "e978",
+      "unicode_decimal": 59768
+    },
+    {
+      "icon_id": "41333990",
+      "name": "veops-rise",
+      "font_class": "veops-rise",
+      "unicode": "e979",
+      "unicode_decimal": 59769
+    },
+    {
+      "icon_id": "41143117",
+      "name": "caise-数据中心",
+      "font_class": "caise-data_center",
+      "unicode": "e96f",
+      "unicode_decimal": 59759
+    },
+    {
+      "icon_id": "41143118",
+      "name": "caise-文件夹",
+      "font_class": "caise-folder",
+      "unicode": "e970",
+      "unicode_decimal": 59760
+    },
+    {
+      "icon_id": "41143119",
+      "name": "caise-资源池",
+      "font_class": "caise-resource_pool",
+      "unicode": "e971",
+      "unicode_decimal": 59761
+    },
+    {
+      "icon_id": "41143120",
+      "name": "caise-网络",
+      "font_class": "caise-network",
+      "unicode": "e972",
+      "unicode_decimal": 59762
+    },
+    {
+      "icon_id": "41143121",
+      "name": "caise-分布式交换机",
+      "font_class": "caise-distributed_switch",
+      "unicode": "e973",
+      "unicode_decimal": 59763
+    },
+    {
+      "icon_id": "41143122",
+      "name": "caise-标准式交换机",
+      "font_class": "caise-standard_switch",
+      "unicode": "e974",
+      "unicode_decimal": 59764
+    },
+    {
+      "icon_id": "41143128",
+      "name": "caise-主机集群",
+      "font_class": "caise-host_cluster",
+      "unicode": "e975",
+      "unicode_decimal": 59765
+    },
+    {
+      "icon_id": "41143129",
+      "name": "caise-数据存储集群",
+      "font_class": "caise-storage_cluster",
+      "unicode": "e976",
+      "unicode_decimal": 59766
+    },
+    {
+      "icon_id": "41143143",
+      "name": "caise-数据存储",
+      "font_class": "caise-data_storage",
+      "unicode": "e977",
+      "unicode_decimal": 59767
+    },
+    {
+      "icon_id": "41141857",
+      "name": "veops-account",
+      "font_class": "veops-account",
+      "unicode": "e96e",
+      "unicode_decimal": 59758
+    },
+    {
+      "icon_id": "41128804",
+      "name": "veops-collect",
+      "font_class": "veops-collect",
+      "unicode": "e96d",
+      "unicode_decimal": 59757
+    },
+    {
+      "icon_id": "41128781",
+      "name": "veops-collected",
+      "font_class": "veops-collected",
+      "unicode": "e96c",
+      "unicode_decimal": 59756
+    },
+    {
+      "icon_id": "41106846",
+      "name": "veops-text",
+      "font_class": "veops-text",
+      "unicode": "e96b",
+      "unicode_decimal": 59755
+    },
+    {
+      "icon_id": "40896913",
+      "name": "veops-markdown",
+      "font_class": "veops-markdown",
+      "unicode": "e96a",
+      "unicode_decimal": 59754
+    },
+    {
+      "icon_id": "40896859",
+      "name": "veops-bar_horizontal",
+      "font_class": "veops-bar_horizontal",
+      "unicode": "e860",
+      "unicode_decimal": 59488
+    },
+    {
+      "icon_id": "40896881",
+      "name": "veops-gauge",
+      "font_class": "veops-gauge",
+      "unicode": "e965",
+      "unicode_decimal": 59749
+    },
+    {
+      "icon_id": "40896882",
+      "name": "veops-heatmap",
+      "font_class": "veops-heatmap",
+      "unicode": "e966",
+      "unicode_decimal": 59750
+    },
+    {
+      "icon_id": "40896884",
+      "name": "veops-treemap",
+      "font_class": "veops-treemap",
+      "unicode": "e967",
+      "unicode_decimal": 59751
+    },
+    {
+      "icon_id": "40896887",
+      "name": "veops-radar",
+      "font_class": "veops-radar",
+      "unicode": "e968",
+      "unicode_decimal": 59752
+    },
+    {
+      "icon_id": "40896905",
+      "name": "veops-data",
+      "font_class": "veops-data",
+      "unicode": "e969",
+      "unicode_decimal": 59753
+    },
+    {
+      "icon_id": "40872369",
+      "name": "veops-import",
+      "font_class": "veops-import",
+      "unicode": "e963",
+      "unicode_decimal": 59747
+    },
+    {
+      "icon_id": "40872361",
+      "name": "veops-batch_operation",
+      "font_class": "veops-batch_operation",
+      "unicode": "e964",
+      "unicode_decimal": 59748
+    },
+    {
+      "icon_id": "40834860",
+      "name": "cmdb-enterprise_edition",
+      "font_class": "cmdb-enterprise_edition",
+      "unicode": "e962",
+      "unicode_decimal": 59746
+    },
+    {
+      "icon_id": "40832458",
+      "name": "ops-KVM",
+      "font_class": "ops-KVM",
+      "unicode": "e961",
+      "unicode_decimal": 59745
+    },
+    {
+      "icon_id": "40822644",
+      "name": "cmdb-vcenter",
+      "font_class": "cmdb-vcenter",
+      "unicode": "e960",
+      "unicode_decimal": 59744
+    },
+    {
+      "icon_id": "40795271",
+      "name": "cmdb-manual_warehousing",
+      "font_class": "cmdb-manual_warehousing",
+      "unicode": "e95f",
+      "unicode_decimal": 59743
+    },
+    {
+      "icon_id": "40791408",
+      "name": "cmdb-not_warehousing",
+      "font_class": "cmdb-not_warehousing",
+      "unicode": "e95d",
+      "unicode_decimal": 59741
+    },
+    {
+      "icon_id": "40791401",
+      "name": "cmdb-warehousing",
+      "font_class": "cmdb-warehousing",
+      "unicode": "e95e",
+      "unicode_decimal": 59742
+    },
+    {
+      "icon_id": "40731588",
+      "name": "cmdb-prompt",
+      "font_class": "cmdb-prompt",
+      "unicode": "e95c",
+      "unicode_decimal": 59740
+    },
+    {
+      "icon_id": "40722326",
+      "name": "cmdb-arrow",
+      "font_class": "cmdb-arrow",
+      "unicode": "e95b",
+      "unicode_decimal": 59739
+    },
+    {
+      "icon_id": "40711364",
+      "name": "cmdb-automatic_inventory",
+      "font_class": "cmdb-automatic_inventory",
+      "unicode": "e95a",
+      "unicode_decimal": 59738
+    },
+    {
+      "icon_id": "40711409",
+      "name": "cmdb-week_additions",
+      "font_class": "cmdb-week_additions",
+      "unicode": "e959",
+      "unicode_decimal": 59737
+    },
+    {
+      "icon_id": "40711428",
+      "name": "cmdb-month_additions",
+      "font_class": "cmdb-month_additions",
+      "unicode": "e958",
+      "unicode_decimal": 59736
+    },
+    {
+      "icon_id": "40711344",
+      "name": "cmdb-rule",
+      "font_class": "cmdb-rule",
+      "unicode": "e955",
+      "unicode_decimal": 59733
+    },
+    {
+      "icon_id": "40711349",
+      "name": "cmdb-executing_machine",
+      "font_class": "cmdb-executing_machine",
+      "unicode": "e956",
+      "unicode_decimal": 59734
+    },
+    {
+      "icon_id": "40711356",
+      "name": "cmdb-resource",
+      "font_class": "cmdb-resource",
+      "unicode": "e957",
+      "unicode_decimal": 59735
+    },
+    {
+      "icon_id": "40705423",
+      "name": "cmdb-discovery_resources",
+      "font_class": "cmdb-discovery_resources",
+      "unicode": "e954",
+      "unicode_decimal": 59732
+    },
+    {
+      "icon_id": "40701723",
+      "name": "cmdb-association",
+      "font_class": "cmdb-association",
+      "unicode": "e953",
+      "unicode_decimal": 59731
+    },
+    {
+      "icon_id": "40645466",
+      "name": "ops-is_dynamic-disabled",
+      "font_class": "ops-is_dynamic-disabled",
+      "unicode": "e952",
+      "unicode_decimal": 59730
+    },
+    {
+      "icon_id": "40590472",
+      "name": "itsm-pdf",
+      "font_class": "itsm-pdf",
+      "unicode": "e951",
+      "unicode_decimal": 59729
+    },
+    {
+      "icon_id": "40552176",
+      "name": "monitor-sqlserver",
+      "font_class": "monitor-sqlserver",
+      "unicode": "e950",
+      "unicode_decimal": 59728
+    },
+    {
+      "icon_id": "40548499",
+      "name": "monitor-dig",
+      "font_class": "monitor-dig2",
+      "unicode": "e94d",
+      "unicode_decimal": 59725
+    },
+    {
+      "icon_id": "40548507",
+      "name": "monitor-base",
+      "font_class": "monitor-base2",
+      "unicode": "e94e",
+      "unicode_decimal": 59726
+    },
+    {
+      "icon_id": "40548498",
+      "name": "monitor-foreground",
+      "font_class": "monitor-foreground1",
+      "unicode": "e94f",
+      "unicode_decimal": 59727
+    },
+    {
+      "icon_id": "40548504",
+      "name": "monitor-log",
+      "font_class": "monitor-log2",
+      "unicode": "e945",
+      "unicode_decimal": 59717
+    },
+    {
+      "icon_id": "40548508",
+      "name": "monitor-backgroud",
+      "font_class": "monitor-backgroud1",
+      "unicode": "e946",
+      "unicode_decimal": 59718
+    },
+    {
+      "icon_id": "40548502",
+      "name": "monitor-port",
+      "font_class": "monitor-port1",
+      "unicode": "e947",
+      "unicode_decimal": 59719
+    },
+    {
+      "icon_id": "40548501",
+      "name": "monitor-ipmi",
+      "font_class": "monitor-ipmi2",
+      "unicode": "e948",
+      "unicode_decimal": 59720
+    },
+    {
+      "icon_id": "40548511",
+      "name": "monitor-process",
+      "font_class": "monitor-process2",
+      "unicode": "e949",
+      "unicode_decimal": 59721
+    },
+    {
+      "icon_id": "40548506",
+      "name": "monitor-snmp",
+      "font_class": "monitor-snmp2",
+      "unicode": "e94a",
+      "unicode_decimal": 59722
+    },
+    {
+      "icon_id": "40548500",
+      "name": "monitor-performance",
+      "font_class": "monitor-performance1",
+      "unicode": "e94b",
+      "unicode_decimal": 59723
+    },
+    {
+      "icon_id": "40548510",
+      "name": "monitor-testing",
+      "font_class": "monitor-testing1",
+      "unicode": "e94c",
+      "unicode_decimal": 59724
+    },
+    {
+      "icon_id": "40548503",
+      "name": "monitor-ping",
+      "font_class": "monitor-ping2",
+      "unicode": "e941",
+      "unicode_decimal": 59713
+    },
+    {
+      "icon_id": "40548509",
+      "name": "monitor-prometheus",
+      "font_class": "monitor-prometheus",
+      "unicode": "e942",
+      "unicode_decimal": 59714
+    },
+    {
+      "icon_id": "40548505",
+      "name": "monitor-websocket",
+      "font_class": "monitor-websocket2",
+      "unicode": "e943",
+      "unicode_decimal": 59715
+    },
+    {
+      "icon_id": "40548512",
+      "name": "monitor-traceroute",
+      "font_class": "monitor-traceroute2",
+      "unicode": "e944",
+      "unicode_decimal": 59716
+    },
+    {
+      "icon_id": "40548205",
+      "name": "monitor-port",
+      "font_class": "monitor-port",
+      "unicode": "e93c",
+      "unicode_decimal": 59708
+    },
+    {
+      "icon_id": "40548204",
+      "name": "monitor-base",
+      "font_class": "monitor-base1",
+      "unicode": "e93d",
+      "unicode_decimal": 59709
+    },
+    {
+      "icon_id": "40548203",
+      "name": "monitor-backgroud",
+      "font_class": "monitor-backgroud",
+      "unicode": "e93e",
+      "unicode_decimal": 59710
+    },
+    {
+      "icon_id": "40548202",
+      "name": "monitor-dig",
+      "font_class": "monitor-dig1",
+      "unicode": "e93f",
+      "unicode_decimal": 59711
+    },
+    {
+      "icon_id": "40548201",
+      "name": "monitor-foreground",
+      "font_class": "monitor-foreground",
+      "unicode": "e940",
+      "unicode_decimal": 59712
+    },
+    {
+      "icon_id": "40548213",
+      "name": "monitor-log",
+      "font_class": "monitor-log1",
+      "unicode": "e934",
+      "unicode_decimal": 59700
+    },
+    {
+      "icon_id": "40548212",
+      "name": "monitor-process",
+      "font_class": "monitor-process1",
+      "unicode": "e935",
+      "unicode_decimal": 59701
+    },
+    {
+      "icon_id": "40548211",
+      "name": "monitor-testing",
+      "font_class": "monitor-testing",
+      "unicode": "e936",
+      "unicode_decimal": 59702
+    },
+    {
+      "icon_id": "40548210",
+      "name": "monitor-snmp",
+      "font_class": "monitor-snmp1",
+      "unicode": "e937",
+      "unicode_decimal": 59703
+    },
+    {
+      "icon_id": "40548209",
+      "name": "monitor-performance",
+      "font_class": "monitor-performance",
+      "unicode": "e938",
+      "unicode_decimal": 59704
+    },
+    {
+      "icon_id": "40548208",
+      "name": "monitor-traceroute",
+      "font_class": "monitor-traceroute1",
+      "unicode": "e939",
+      "unicode_decimal": 59705
+    },
+    {
+      "icon_id": "40548207",
+      "name": "monitor-ping",
+      "font_class": "monitor-ping1",
+      "unicode": "e93a",
+      "unicode_decimal": 59706
+    },
+    {
+      "icon_id": "40548206",
+      "name": "monitor-ipmi",
+      "font_class": "monitor-ipmi1",
+      "unicode": "e93b",
+      "unicode_decimal": 59707
+    },
+    {
+      "icon_id": "40548217",
+      "name": "monitor-prometheus (1)",
+      "font_class": "a-monitor-prometheus1",
+      "unicode": "e932",
+      "unicode_decimal": 59698
+    },
+    {
+      "icon_id": "40548214",
+      "name": "monitor-websocket",
+      "font_class": "monitor-websocket1",
+      "unicode": "e933",
+      "unicode_decimal": 59699
+    },
+    {
+      "icon_id": "40521692",
+      "name": "monitor-group_expansion",
+      "font_class": "monitor-group_expansion1",
+      "unicode": "e930",
+      "unicode_decimal": 59696
+    },
+    {
+      "icon_id": "40521691",
+      "name": "monitor-group_collapse",
+      "font_class": "monitor-group_collapse1",
+      "unicode": "e931",
+      "unicode_decimal": 59697
+    },
+    {
+      "icon_id": "40520774",
+      "name": "monitor-group_expansion",
+      "font_class": "monitor-group_expansion",
+      "unicode": "e92e",
+      "unicode_decimal": 59694
+    },
+    {
+      "icon_id": "40520787",
+      "name": "monitor-group_collapse",
+      "font_class": "monitor-group_collapse",
+      "unicode": "e92f",
+      "unicode_decimal": 59695
+    },
+    {
+      "icon_id": "40519707",
+      "name": "monitor-list_view",
+      "font_class": "monitor-list_view",
+      "unicode": "e92d",
+      "unicode_decimal": 59693
+    },
+    {
+      "icon_id": "40519711",
+      "name": "monitor-group_view",
+      "font_class": "monitor-group_view",
+      "unicode": "e92c",
+      "unicode_decimal": 59692
+    },
+    {
+      "icon_id": "40499246",
+      "name": "ops-topology_view",
+      "font_class": "ops-topology_view",
+      "unicode": "e92b",
+      "unicode_decimal": 59691
+    },
+    {
+      "icon_id": "40411336",
+      "name": "monitor-host_analysis",
+      "font_class": "monitor-host_analysis",
+      "unicode": "e92a",
+      "unicode_decimal": 59690
+    },
+    {
+      "icon_id": "40372105",
+      "name": "monitor-add2",
+      "font_class": "monitor-add2",
+      "unicode": "e929",
+      "unicode_decimal": 59689
+    },
+    {
+      "icon_id": "40368097",
+      "name": "monitor-native",
+      "font_class": "monitor-native",
+      "unicode": "e928",
+      "unicode_decimal": 59688
+    },
+    {
+      "icon_id": "40357355",
+      "name": "veops-filter2",
+      "font_class": "veops-filter2",
+      "unicode": "e927",
+      "unicode_decimal": 59687
+    },
+    {
+      "icon_id": "40356229",
+      "name": "ops-cmdb-data_companies-selected",
+      "font_class": "ops-cmdb-data_companies-selected",
+      "unicode": "e601",
+      "unicode_decimal": 58881
+    },
+    {
+      "icon_id": "40343814",
+      "name": "ops-cmdb-data_companies",
+      "font_class": "ops-cmdb-data_companies",
+      "unicode": "e926",
+      "unicode_decimal": 59686
+    },
+    {
+      "icon_id": "40326916",
+      "name": "monitor-threshold_value",
+      "font_class": "monitor-threshold_value",
+      "unicode": "e921",
+      "unicode_decimal": 59681
+    },
+    {
+      "icon_id": "40326913",
+      "name": "monitor-disposition",
+      "font_class": "monitor-disposition",
+      "unicode": "e922",
+      "unicode_decimal": 59682
+    },
+    {
+      "icon_id": "40326911",
+      "name": "monitor-automatic_discovery",
+      "font_class": "monitor-automatic_discovery",
+      "unicode": "e923",
+      "unicode_decimal": 59683
+    },
+    {
+      "icon_id": "40326907",
+      "name": "monitor-grouping_list",
+      "font_class": "monitor-grouping_list",
+      "unicode": "e924",
+      "unicode_decimal": 59684
+    },
+    {
+      "icon_id": "40326906",
+      "name": "monitor-node_list",
+      "font_class": "monitor-node_list",
+      "unicode": "e925",
+      "unicode_decimal": 59685
+    },
+    {
+      "icon_id": "40326667",
+      "name": "monitor-general_view",
+      "font_class": "monitor-general_view",
+      "unicode": "e920",
+      "unicode_decimal": 59680
+    },
+    {
+      "icon_id": "40326683",
+      "name": "monitor-network_topology",
+      "font_class": "monitor-network_topology",
+      "unicode": "e91b",
+      "unicode_decimal": 59675
+    },
+    {
+      "icon_id": "40326682",
+      "name": "monitor-node_management",
+      "font_class": "monitor-node_management",
+      "unicode": "e91c",
+      "unicode_decimal": 59676
+    },
+    {
+      "icon_id": "40326681",
+      "name": "monitor-alarm_policy",
+      "font_class": "monitor-alarm_policy",
+      "unicode": "e91d",
+      "unicode_decimal": 59677
+    },
+    {
+      "icon_id": "40326680",
+      "name": "monitor-alarm",
+      "font_class": "monitor-alarm",
+      "unicode": "e91e",
+      "unicode_decimal": 59678
+    },
+    {
+      "icon_id": "40326679",
+      "name": "monitor-healing",
+      "font_class": "monitor-healing",
+      "unicode": "e91f",
+      "unicode_decimal": 59679
+    },
+    {
+      "icon_id": "40326685",
+      "name": "monitor-data_acquisition",
+      "font_class": "monitor-data_acquisition",
+      "unicode": "e8d4",
+      "unicode_decimal": 59604
+    },
+    {
+      "icon_id": "40326684",
+      "name": "monitor-analysis",
+      "font_class": "monitor-analysis",
+      "unicode": "e91a",
+      "unicode_decimal": 59674
+    },
+    {
+      "icon_id": "40308359",
+      "name": "monitor-index",
+      "font_class": "monitor-index",
+      "unicode": "e89b",
+      "unicode_decimal": 59547
+    },
+    {
+      "icon_id": "40307829",
+      "name": "monitor-user_defined",
+      "font_class": "monitor-user_defined",
+      "unicode": "e867",
+      "unicode_decimal": 59495
+    },
+    {
+      "icon_id": "40307835",
+      "name": "monitor-database",
+      "font_class": "monitor-database",
+      "unicode": "e861",
+      "unicode_decimal": 59489
+    },
+    {
+      "icon_id": "40307833",
+      "name": "monitor-common",
+      "font_class": "monitor-common",
+      "unicode": "e865",
+      "unicode_decimal": 59493
+    },
+    {
+      "icon_id": "40307035",
+      "name": "veops-edit",
+      "font_class": "veops-edit",
+      "unicode": "e866",
+      "unicode_decimal": 59494
+    },
+    {
+      "icon_id": "40307027",
+      "name": "veops-empower",
+      "font_class": "veops-empower",
+      "unicode": "e863",
+      "unicode_decimal": 59491
+    },
+    {
+      "icon_id": "40307026",
+      "name": "veops-share",
+      "font_class": "veops-share",
+      "unicode": "e864",
+      "unicode_decimal": 59492
+    },
+    {
+      "icon_id": "40306997",
+      "name": "veops-export",
+      "font_class": "veops-export",
+      "unicode": "e862",
+      "unicode_decimal": 59490
+    },
+    {
+      "icon_id": "40262335",
+      "name": "monitor-ip (1)",
+      "font_class": "monitor-ip",
+      "unicode": "e807",
+      "unicode_decimal": 59399
+    },
+    {
+      "icon_id": "40262337",
+      "name": "monitor-director",
+      "font_class": "monitor-director",
+      "unicode": "e803",
+      "unicode_decimal": 59395
+    },
+    {
+      "icon_id": "40262336",
+      "name": "monitor-host",
+      "font_class": "monitor-host",
+      "unicode": "e804",
+      "unicode_decimal": 59396
+    },
+    {
+      "icon_id": "40262216",
+      "name": "cmdb-log",
+      "font_class": "a-cmdb-log1",
+      "unicode": "e802",
+      "unicode_decimal": 59394
+    },
+    {
+      "icon_id": "40261712",
+      "name": "monitor-add",
+      "font_class": "monitor-add",
+      "unicode": "e7ff",
+      "unicode_decimal": 59391
+    },
+    {
+      "icon_id": "40248186",
+      "name": "monitor-down",
+      "font_class": "monitor-down",
+      "unicode": "e7fc",
+      "unicode_decimal": 59388
+    },
+    {
+      "icon_id": "40248184",
+      "name": "monitor-up",
+      "font_class": "monitor-up",
+      "unicode": "e7fd",
+      "unicode_decimal": 59389
+    },
+    {
+      "icon_id": "40235502",
+      "name": "itsm-unfold",
+      "font_class": "itsm-unfold",
+      "unicode": "e7f9",
+      "unicode_decimal": 59385
+    },
+    {
+      "icon_id": "40235453",
+      "name": "itsm-shrink",
+      "font_class": "itsm-stretch",
+      "unicode": "e7f8",
+      "unicode_decimal": 59384
+    },
+    {
+      "icon_id": "40217123",
+      "name": "monitor-data_comaparison2",
+      "font_class": "monitor-data_comaparison2",
+      "unicode": "e7a1",
+      "unicode_decimal": 59297
+    },
+    {
+      "icon_id": "40217122",
+      "name": "monitor-data_comaparison1",
+      "font_class": "monitor-data_comaparison1",
+      "unicode": "e7f7",
+      "unicode_decimal": 59383
+    },
+    {
+      "icon_id": "40176936",
+      "name": "monitor-online",
+      "font_class": "a-monitor-online1",
+      "unicode": "e7a0",
+      "unicode_decimal": 59296
+    },
+    {
       "icon_id": "40043662",
       "name": "ops-setting-application-selected",
       "font_class": "ops-setting-application-selected",

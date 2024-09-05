@@ -27,7 +27,7 @@ export default {
     window.addEventListener('resize', this.onWindowResize)
     const guacamoleClient = document.getElementById('display')
     const { asset_id, account_id, protocol } = this.$route.params
-    const { session_id, is_monitor } = this.$route.query
+    const { session_id } = this.$route.query
     if (session_id) {
       this.session_id = session_id
       this.init()

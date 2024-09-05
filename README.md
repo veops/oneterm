@@ -26,13 +26,13 @@
 
 ```bash
 git clone https://github.com/veops/oneterm.git
-cd oneterm
+cd oneterm/deploy
 docker-compose up -d
 ```
 
 ## ✅ Validation
 
-- View: [http://127.0.0.1:8000](http://127.0.0.1:8000)
+- View: [http://127.0.0.1:8666](http://127.0.0.1:8666)
 - username: admin
 - password: 123456
 

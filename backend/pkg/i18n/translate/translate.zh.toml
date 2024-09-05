@@ -1,3 +1,0 @@
-[MsgAdminClose]
-hash = "sha1-2ad64c7e0fc95c7ba4f6e4b2bb39898421cec19a"
-other = "会话已被管理员 {{.admin}} 关闭"

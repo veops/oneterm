@@ -1,0 +1,28 @@
+name: Docker Image CI
+
+on:
+  push:
+    tags:
+    - 'v*'
+
+jobs:
+  build-api:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Build API
+      run: |
+        docker login --username=${{ secrets.ALI_ACCOUNT }} --password=${{ secrets.ALI_PASSWORD }} registry.cn-hangzhou.aliyuncs.com
+        cd backend
+        docker build . --file Dockerfile --tag registry.cn-hangzhou.aliyuncs.com/veops/oneterm-api:latest
+        docker push registry.cn-hangzhou.aliyuncs.com/veops/oneterm-api:latest
+  build-ui:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Build UI
+      run: |
+        docker login --username=${{ secrets.ALI_ACCOUNT }} --password=${{ secrets.ALI_PASSWORD }} registry.cn-hangzhou.aliyuncs.com
+        cd oneterm-ui
+        docker build . --file Dockerfile --tag registry.cn-hangzhou.aliyuncs.com/veops/oneterm-ui:latest
+        docker push registry.cn-hangzhou.aliyuncs.com/veops/oneterm-ui:latest

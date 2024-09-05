@@ -208,11 +208,6 @@ func (c *Controller) StatAsset(ctx *gin.Context) {
 func (c *Controller) StatCountOfUser(ctx *gin.Context) {
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
 	stat := &model.StatCountOfUser{}
-	key := fmt.Sprintf("stat-count-%d-", currentUser.Uid)
-	if redis.Get(ctx, key, stat) == nil {
-		ctx.JSON(http.StatusOK, NewHttpResponseWithData(stat))
-		return
-	}
 
 	eg := &errgroup.Group{}
 	eg.Go(func() error {
@@ -241,8 +236,6 @@ func (c *Controller) StatCountOfUser(ctx *gin.Context) {
 		ctx.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
-
-	redis.SetEx(ctx, key, stat, time.Minute)
 
 	ctx.JSON(http.StatusOK, NewHttpResponseWithData(stat))
 }

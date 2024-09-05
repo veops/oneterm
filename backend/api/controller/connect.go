@@ -184,7 +184,15 @@ func HandleSsh(sess *gsession.Session) (err error) {
 }
 
 func handleGuacd(sess *gsession.Session) (err error) {
-	defer sess.GuacdTunnel.Disconnect()
+	defer func() {
+		sess.GuacdTunnel.Disconnect()
+		sess.Status = model.SESSIONSTATUS_OFFLINE
+		sess.ClosedAt = lo.ToPtr(time.Now())
+		if err = gsession.UpsertSession(sess); err != nil {
+			logger.L().Error("offline ssh session failed", zap.Error(err))
+			return
+		}
+	}()
 	chs := sess.Chans
 	sess.IdleTimout = idleTime()
 	sess.IdleTk = time.NewTicker(sess.IdleTimout)
@@ -399,27 +407,27 @@ func connectSsh(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, ac
 	return
 }
 
-func newGuacdSession(ctx *gin.Context, connectionId, sessionId string, asset *model.Asset, account *model.Account, gateway *model.Gateway) *gsession.Session {
-	currentUser, _ := acl.GetSessionFromCtx(ctx)
-	return &gsession.Session{
-		Session: &model.Session{
-			SessionType: model.SESSIONTYPE_WEB,
-			SessionId:   sessionId,
-			Uid:         currentUser.GetUid(),
-			UserName:    currentUser.GetUserName(),
-			AssetId:     asset.Id,
-			AssetInfo:   fmt.Sprintf("%s(%s)", asset.Name, asset.Ip),
-			AccountId:   account.Id,
-			AccountInfo: fmt.Sprintf("%s(%s)", account.Name, account.Account),
-			GatewayId:   gateway.Id,
-			GatewayInfo: lo.Ternary(gateway.Id == 0, "", fmt.Sprintf("%s:%d", gateway.Host, gateway.Port)),
-			ClientIp:    ctx.ClientIP(),
-			Protocol:    ctx.Param("protocol"),
-			Status:      model.SESSIONSTATUS_ONLINE,
-		},
-		ConnectionId: connectionId,
-	}
-}
+// func newGuacdSession(ctx *gin.Context, connectionId, sessionId string, asset *model.Asset, account *model.Account, gateway *model.Gateway) *gsession.Session {
+// 	currentUser, _ := acl.GetSessionFromCtx(ctx)
+// 	return &gsession.Session{
+// 		Session: &model.Session{
+// 			SessionType: model.SESSIONTYPE_WEB,
+// 			SessionId:   sessionId,
+// 			Uid:         currentUser.GetUid(),
+// 			UserName:    currentUser.GetUserName(),
+// 			AssetId:     asset.Id,
+// 			AssetInfo:   fmt.Sprintf("%s(%s)", asset.Name, asset.Ip),
+// 			AccountId:   account.Id,
+// 			AccountInfo: fmt.Sprintf("%s(%s)", account.Name, account.Account),
+// 			GatewayId:   gateway.Id,
+// 			GatewayInfo: lo.Ternary(gateway.Id == 0, "", fmt.Sprintf("%s:%d", gateway.Host, gateway.Port)),
+// 			ClientIp:    ctx.ClientIP(),
+// 			Protocol:    ctx.Param("protocol"),
+// 			Status:      model.SESSIONSTATUS_ONLINE,
+// 		},
+// 		ConnectionId: connectionId,
+// 	}
+// }
 
 func connectGuacd(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, account *model.Account, gateway *model.Gateway) (err error) {
 	chs := sess.Chans
@@ -436,9 +444,8 @@ func connectGuacd(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, 
 		logger.L().Error("guacd tunnel failed", zap.Error(err))
 		return
 	}
-	session := newGuacdSession(ctx, t.ConnectionId, t.SessionId, asset, account, gateway)
-
-	session.GuacdTunnel = t
+	sess.ConnectionId = t.ConnectionId
+	sess.GuacdTunnel = t
 
 	chs.ErrChan <- nil
 
@@ -464,15 +471,6 @@ func connectGuacd(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, 
 		}
 	})
 	sess.G.Go(func() error {
-		defer func() {
-			t.Disconnect()
-			session.Status = model.SESSIONSTATUS_OFFLINE
-			session.ClosedAt = lo.ToPtr(time.Now())
-			if err = gsession.UpsertSession(session); err != nil {
-				logger.L().Error("offline guacd session failed", zap.Error(err))
-				return
-			}
-		}()
 		for {
 			select {
 			case <-sess.Gctx.Done():
@@ -533,6 +531,7 @@ func (c *Controller) Connect(ctx *gin.Context) {
 //	@Success	200	{object}	HttpResponse
 //	@Router		/connect/monitor/:session_id [get]
 func (c *Controller) ConnectMonitor(ctx *gin.Context) {
+
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
 
 	sessionId := ctx.Param("session_id")
@@ -589,7 +588,6 @@ func (c *Controller) ConnectMonitor(ctx *gin.Context) {
 			default:
 				_, p, err := ws.ReadMessage()
 				if err != nil {
-					logger.L().Warn("end monitor", zap.Error(err))
 					return err
 				}
 				if !sess.IsSsh() {

@@ -109,3 +109,18 @@ type UserInfoRespResult struct {
 	UID      int    `json:"uid"`
 	Username string `json:"username"`
 }
+
+type AuthWithKeyResp struct {
+	User AuthWithKeyResult `json:"user"`
+}
+
+type AuthWithKeyResult struct {
+	Avatar      string   `json:"avatar"`
+	Email       string   `json:"email"`
+	Name        string   `json:"name"`
+	Rid         int      `json:"rid"`
+	Role        Role     `json:"role"`
+	UID         int      `json:"uid"`
+	Username    string   `json:"username"`
+	ParentRoles []string `json:"parentRoles"`
+}

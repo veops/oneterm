@@ -17,6 +17,10 @@ import (
 	"github.com/veops/oneterm/logger"
 )
 
+var (
+	errUnauthorized = &controller.ApiError{Code: controller.ErrUnauthorized}
+)
+
 func ginLogger() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		start := time.Now()
@@ -44,18 +48,25 @@ func auth() gin.HandlerFunc {
 
 		m := make(map[string]any)
 		ctx.ShouldBindBodyWithJSON(&m)
-		if _, ok := m["key"]; ok {
+		if ctx.Request.Method == "GET" {
+			if _, ok := ctx.GetQuery("_key"); ok {
+				m["_key"] = ctx.Query("_key")
+				m["_secret"] = ctx.Query("_secret")
+			}
+		}
+		if _, ok := m["_key"]; ok {
 			sess, err = acl.AuthWithKey(ctx.Request.URL.Path, m)
 			if err != nil {
 				logger.L().Error("cannot authwithkey", zap.Error(err))
-				ctx.AbortWithStatus(http.StatusUnauthorized)
+				ctx.AbortWithError(http.StatusUnauthorized, errUnauthorized)
 				return
 			}
+			ctx.Set("isAuthWithKey", true)
 		} else {
 			cookie, err = ctx.Cookie("session")
 			if err != nil || cookie == "" {
 				logger.L().Error("cannot get cookie.session", zap.Error(err))
-				ctx.AbortWithStatus(http.StatusUnauthorized)
+				ctx.AbortWithError(http.StatusUnauthorized, errUnauthorized)
 				return
 			}
 			sess, err = acl.ParseCookie(cookie)

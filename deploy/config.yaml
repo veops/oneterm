@@ -7,21 +7,30 @@ http:
 ssh:
   host: 0.0.0.0
   port: 2222
-  privateKey: --BEGIN PRIVATE KEY-----END PRIVATE KEY-----
+  privateKey: |
+    -----BEGIN OPENSSH PRIVATE KEY-----
+    b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
+    QyNTUxOQAAACBg490b4zqumtizCyM4RWtzJnPEsPIInBFugk8+UCb8XgAAAKCc1yKrnNci
+    qwAAAAtzc2gtZWQyNTUxOQAAACBg490b4zqumtizCyM4RWtzJnPEsPIInBFugk8+UCb8Xg
+    AAAECvd1Yj+bQxyxJtU3PirLK68CD3MWqBv0/shlFKS6wmbWDj3RvjOq6a2LMLIzhFa3Mm
+    c8Sw8gicEW6CTz5QJvxeAAAAGnJvb3RAbG9jYWxob3N0LmxvY2FsZG9tYWluAQID
+    -----END OPENSSH PRIVATE KEY-----
+
 
 guacd:
   host: oneterm-guacd
   port: 4822
 
 mysql:
-  host: oneterm-mysql
+  host: mysql
   port: 3306
   user: root
-  password: root
+  password: "123456"
 
 redis:
-  addr: oneterm-redis:6379
-  password: root
+  host: redis
+  port: 6379
+  password: ""
 
 log:
   level: debug
@@ -33,7 +42,7 @@ auth:
   acl:
     appId: acl app id
     secretKey: acl app secret key
-    url: http://host/api/v1
+    url: http://acl-api/api/v1
     resourceNames:
       - key: account
         value: account
@@ -46,4 +55,4 @@ auth:
       - key: authorization
         value: authorization
 
-secretKey: acl secret key
+secretKey: xW2FAUfgffjmerTEBXADmURDOQ43ojLN

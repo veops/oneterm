@@ -12,7 +12,6 @@ const (
 
 type Asset struct {
 	Id            int                  `json:"id" gorm:"column:id;primarykey"`
-	Ciid          int                  `json:"ci_id" gorm:"column:ci_id"`
 	Name          string               `json:"name" gorm:"column:name"`
 	Comment       string               `json:"comment" gorm:"column:comment"`
 	ParentId      int                  `json:"parent_id" gorm:"column:parent_id"`

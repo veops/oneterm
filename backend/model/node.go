@@ -17,7 +17,6 @@ type Node struct {
 	ParentId      int                  `json:"parent_id" gorm:"column:parent_id"`
 	Authorization Map[int, Slice[int]] `json:"authorization" gorm:"column:authorization"`
 	*AccessAuth   `json:"access_auth" gorm:"column:access_auth"`
-	*Sync         `json:"sync" gorm:"column:sync"`
 	Protocols     Slice[string] `json:"protocols" gorm:"column:protocols"`
 	GatewayId     int           `json:"gateway_id" gorm:"column:gateway_id"`
 
@@ -30,14 +29,6 @@ type Node struct {
 
 	AssetCount int64 `json:"asset_count" gorm:"-"`
 	HasChild   bool  `json:"has_child" gorm:"-"`
-}
-
-type Sync struct {
-	TypeId    int                 `json:"type_id,omitempty" gorm:"column:type_id"`
-	Mapping   Map[string, string] `json:"mapping" gorm:"column:mapping"`
-	Filters   string              `json:"filters" gorm:"column:filters"`
-	Enable    bool                `json:"enable" gorm:"column:enable"`
-	Frequency float64             `json:"frequency" gorm:"column:frequency"`
 }
 
 func (m *Node) TableName() string {

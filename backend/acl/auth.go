@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"hash"
 	"io"
+	"reflect"
 	"strings"
 
 	"github.com/veops/oneterm/conf"
@@ -141,24 +142,40 @@ func NewSignature(secret, salt, sep, derivation string, digest func() hash.Hash,
 }
 
 func AuthWithKey(path string, originData map[string]any) (sess *Session, err error) {
-	originData["path"] = path
-
-	data := &UserInfoRespResult{}
+	body := map[string]any{
+		"path":             path,
+		"key":              originData["_key"],
+		"secret":           originData["_secret"],
+		"need_parentRoles": true,
+		"app_id":           "oneterm",
+	}
+	payload := make(map[string]any)
+	for k, v := range originData {
+		rv := reflect.ValueOf(v)
+		if rv.Kind() == reflect.Map || rv.Kind() == reflect.Slice || rv.Kind() == reflect.Array {
+			continue
+		}
+		payload[k] = v
+	}
+	body["payload"] = payload
+	url := fmt.Sprintf("%s%s", conf.Cfg.Auth.Acl.Url, "/acl/auth_with_key")
+	data := &AuthWithKeyResp{}
 	resp, err := remote.RC.R().
-		SetBody(originData).
+		SetBody(body).
 		SetResult(data).
-		Post(fmt.Sprintf("%s%s", conf.Cfg.Auth.Acl.Url, "/acl/apps/token"))
+		Post(url)
 	if err = remote.HandleErr(err, resp, nil); err == nil {
 		sess = &Session{
-			Uid: data.UID,
+			Uid: data.User.UID,
 			Acl: Acl{
-				Uid:         data.UID,
-				UserName:    data.Username,
-				Rid:         data.Rid,
-				NickName:    data.Name,
-				ParentRoles: data.Role.Permissions,
+				Uid:         data.User.UID,
+				UserName:    data.User.Username,
+				Rid:         data.User.Rid,
+				NickName:    data.User.Name,
+				ParentRoles: data.User.ParentRoles,
 			},
 		}
 	}
+
 	return
 }

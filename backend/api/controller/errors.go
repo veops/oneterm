@@ -25,6 +25,7 @@ const (
 	ErrAccessTime       = 4011
 	ErrIdleTimeout      = 4012
 	ErrWrongPvk         = 4013
+	ErrUnauthorized     = 4401
 	ErrInternal         = 5000
 	ErrRemoteServer     = 5001
 	ErrConnectServer    = 5002
@@ -48,6 +49,7 @@ var (
 		ErrLogin:            myi18n.MsgLoginError,
 		ErrAccessTime:       myi18n.MsgAccessTime,
 		ErrIdleTimeout:      myi18n.MsgIdleTimeout,
+		ErrUnauthorized:     myi18n.MsgUnauthorized,
 		ErrInternal:         myi18n.MsgInternalError,
 		ErrRemoteServer:     myi18n.MsgRemoteServer,
 		ErrConnectServer:    myi18n.MsgConnectServer,

@@ -19,6 +19,22 @@ import (
 )
 
 var (
+	assetPreHooks = []preHook[*model.Asset]{
+		func(ctx *gin.Context, data *model.Asset) {
+			if data.AccessAuth == nil {
+				data.AccessAuth = &model.AccessAuth{
+					Start:  nil,
+					End:    nil,
+					CmdIds: make(model.Slice[int], 0),
+					Ranges: make(model.Slice[model.Range], 0),
+					Allow:  true,
+				}
+			}
+			if data.Authorization == nil {
+				data.Authorization = make(model.Map[int, model.Slice[int]])
+			}
+		},
+	}
 	assetPostHooks = []postHook[*model.Asset]{assetPostHookCount, assetPostHookAuth}
 )
 
@@ -30,7 +46,8 @@ var (
 //	@Router		/asset [post]
 func (c *Controller) CreateAsset(ctx *gin.Context) {
 	asset := &model.Asset{}
-	doCreate(ctx, true, asset, conf.RESOURCE_ASSET)
+	doCreate(ctx, true, asset, conf.RESOURCE_ASSET, assetPreHooks...)
+
 	schedule.CheckUpdate(asset.Id)
 }
 

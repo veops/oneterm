@@ -20,13 +20,14 @@ var (
 
 func init() {
 	ctx := context.Background()
+	addr := fmt.Sprintf("%s:%d", conf.Cfg.Redis.Host, conf.Cfg.Redis.Port)
 	RC = redis.NewClient(&redis.Options{
-		Addr:     fmt.Sprintf("%s:%d", conf.Cfg.Redis.Host, conf.Cfg.Redis.Port),
+		Addr:     addr,
 		Password: conf.Cfg.Redis.Password,
 	})
 
 	if _, err := RC.Ping(ctx).Result(); err != nil {
-		logger.L().Fatal("ping redis failed", zap.Error(err))
+		logger.L().Fatal("ping redis failed", zap.String("addr", addr), zap.Error(err))
 	}
 }
 

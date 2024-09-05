@@ -2,7 +2,7 @@ version: "3.0"
 
 services:
   oneterm-api:
-    # image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-api:24.3
+    image: oneterm:dev
     build:
       context: .
       dockerfile: ../backend/dockerfile
@@ -51,13 +51,10 @@ services:
       new:
         aliases:
           - mysql
-    ports:
-      - '23306:3306'
 
   redis:
     image: registry.cn-hangzhou.aliyuncs.com/veops/redis:latest
     container_name: oneterm-redis
-    #command: redis-server --requirepass tyrj5QVP9rHs
     restart: always
     environment:
       TZ: Asia/Shanghai
@@ -73,7 +70,7 @@ services:
       - oneterm-api
     environment:
       TZ: Asia/Shanghai
-      ONETERM_API_HOST: oneterm-api:8080
+      ONETERM_API_HOST: oneterm-api:8888
       ACL_API_HOST: acl-api:5000
       NGINX_PORT: 80
     volumes:
@@ -88,13 +85,13 @@ services:
     networks:
       - new
     ports:
-      - "8000:80"
+      - "8666:80"
 
   acl-api:
     image: registry.cn-hangzhou.aliyuncs.com/veops/acl-api:1.1
     container_name: oneterm-acl-api
     environment:
-      #TZ: Asia/Shanghai
+      TZ: Asia/Shanghai
       WAIT_HOSTS: mysql:3306, redis:6379
     volumes:
       - ./.env:/data/apps/acl/.env

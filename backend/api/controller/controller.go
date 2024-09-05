@@ -261,16 +261,23 @@ func doUpdate[T model.Model](ctx *gin.Context, needAcl bool, md T, preHooks ...p
 
 	if err = mysql.DB.Transaction(func(tx *gorm.DB) (err error) {
 		omits := []string{"resource_id", "created_at", "deleted_at"}
+		selects := []string{"*"}
 		switch t := any(md).(type) {
 		case *model.Asset:
 			if err = HandleAuthorization(currentUser, tx, model.ACTION_UPDATE, any(old).(*model.Asset), t); err != nil {
 				handleRemoteErr(ctx, err)
 				return
 			}
-			omits = append(omits, "ci_id")
+			if cast.ToBool(ctx.Value("isAuthWithKey")) {
+				selects = []string{"ip", "protocols", "authorization"}
+			}
+		case *model.Account:
+			if cast.ToBool(ctx.Value("isAuthWithKey")) {
+				selects = []string{"password", "phrase", "pk", "account_type"}
+			}
 		}
 
-		if err = mysql.DB.Omit(omits...).Save(md).Error; err != nil {
+		if err = mysql.DB.Select(selects).Omit(omits...).Save(md).Error; err != nil {
 			return
 		}
 		err = mysql.DB.Create(&model.History{
@@ -306,7 +313,6 @@ func doGet[T any](ctx *gin.Context, needAcl bool, dbFind *gorm.DB, resourceType 
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
 
 	if needAcl && !acl.IsAdmin(currentUser) {
-		//rs := make([]*acl.Resource, 0)
 		var rs []*acl.Resource
 		rs, err = acl.GetRoleResources(ctx, currentUser.Acl.Rid, resourceType)
 		if err != nil {
@@ -330,8 +336,8 @@ func doGet[T any](ctx *gin.Context, needAcl bool, dbFind *gorm.DB, resourceType 
 		if _, ok := ctx.GetQuery("page_index"); ok {
 			dbFind = dbFind.Offset((pi - 1) * ps)
 		}
-		if _, ok := ctx.GetQuery("page_size"); ok {
-			dbFind = dbFind.Limit(ps)
+		if _, ok := ctx.GetQuery("page_size"); ok && ps != -1 {
+			dbFind = dbFind.Limit(lo.Ternary(ps == 0, 20, ps))
 		}
 		return dbFind.
 			Order("id DESC").

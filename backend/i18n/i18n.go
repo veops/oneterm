@@ -103,6 +103,11 @@ var (
 		One:   "Bad Request: idle timeout more than {{.second}} seconds",
 		Other: "Bad Request: idle timeout more than {{.second}} seconds",
 	}
+	MsgUnauthorized = &i18n.Message{
+		ID:    "MsgUnauthorized",
+		One:   "Unauthorized",
+		Other: "Unauthorized",
+	}
 	//
 	MsgInternalError = &i18n.Message{
 		ID:    "MsgInternalError",

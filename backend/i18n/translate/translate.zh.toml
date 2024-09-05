@@ -1,0 +1,7 @@
+[MsgIdleTimeout]
+hash = "sha1-001276a8efe351c6bbbb83ea269a5a359a683d95"
+other = "请求错误：空闲超过 {{.second}} 秒"
+
+[MsgWrongPvk]
+hash = "sha1-fd11d7d098d05415f5ed082abdf31223cb2aeda9"
+other = "请求错误: 非法SSH私钥"

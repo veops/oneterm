@@ -143,7 +143,11 @@ func doDelete[T model.Model](ctx *gin.Context, needAcl bool, md T, dcs ...delete
 
 	if err = mysql.DB.Model(md).Where("id = ?", id).First(md).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			ctx.JSON(http.StatusOK, defaultHttpResponse)
+			ctx.JSON(http.StatusOK, HttpResponse{
+				Data: map[string]any{
+					"id": md.GetId(),
+				},
+			})
 			return
 		}
 		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})

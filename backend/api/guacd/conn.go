@@ -14,7 +14,6 @@ import (
 	ggateway "github.com/veops/oneterm/gateway"
 	"github.com/veops/oneterm/logger"
 	"github.com/veops/oneterm/model"
-	"github.com/veops/oneterm/util"
 )
 
 const (
@@ -74,7 +73,7 @@ func NewTunnel(connectionId string, w, h, dpi int, protocol string, asset *model
 						"hostname":              asset.Ip,
 						"port":                  port,
 						"username":              account.Account,
-						"password":              util.DecryptAES(account.Password),
+						"password":              account.Password,
 						"disable-copy":          "false",
 						"disable-paste":         "false",
 					}
@@ -167,6 +166,9 @@ func (t *Tunnel) handshake() (err error) {
 }
 
 func (t *Tunnel) Write(p []byte) (n int, err error) {
+	if t == nil || t.writer == nil {
+		return
+	}
 	n, err = t.writer.Write(p)
 	if err != nil {
 		return

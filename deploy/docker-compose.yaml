@@ -2,10 +2,7 @@ version: "3.0"
 
 services:
   oneterm-api:
-    image: oneterm:dev
-    build:
-      context: .
-      dockerfile: ../backend/dockerfile
+    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-api:latest
     container_name: oneterm-api
     volumes:
       - ./volume/replay:/replay
@@ -21,7 +18,7 @@ services:
           - oneterm-api
 
   oneterm-guacd:
-    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-guacd:24.3
+    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-guacd:latest
     container_name: oneterm-guacd
     user: root
     restart: always
@@ -64,7 +61,7 @@ services:
           - redis
 
   oneterm-ui:
-    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-ui:24.3
+    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-ui:latest
     container_name: oneterm-ui
     depends_on:
       - oneterm-api
@@ -74,7 +71,7 @@ services:
       ACL_API_HOST: acl-api:5000
       NGINX_PORT: 80
     volumes:
-      - ./docs/nginx.oneterm.conf.example:/etc/nginx/conf.d/nginx.oneterm.conf.example
+      - ./nginx.oneterm.conf.example:/etc/nginx/conf.d/nginx.oneterm.conf.example
     restart: always
     command:
       - /bin/sh

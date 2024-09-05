@@ -175,7 +175,7 @@ func (m *view) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case errMsg:
 		if msg != nil {
-			return m, tea.Printf("  [ERROR] %s", errStyle.Render(msg.Error()))
+			return m, tea.Printf("  [ERROR] %s\n\n", errStyle.Render(msg.Error()))
 		}
 	}
 	m.textinput, tiCmd = m.textinput.Update(msg)

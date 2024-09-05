@@ -49,7 +49,6 @@ func read(sess *gsession.Session) error {
 	for {
 		select {
 		case <-sess.Gctx.Done():
-			fmt.Println("done read-------------------------------")
 			return nil
 		default:
 			if sess.SessionType == model.SESSIONTYPE_WEB {
@@ -128,7 +127,7 @@ func HandleSsh(sess *gsession.Session) (err error) {
 				write(sess)
 				return nil
 			case <-sess.IdleTk.C:
-				writeErrMsg(sess, "idle timeout")
+				writeErrMsg(sess, "idle timeout\n\n")
 				return &ApiError{Code: ErrIdleTimeout, Data: map[string]any{"second": int64(sess.IdleTimout.Seconds())}}
 			case <-tk1m.C:
 				if mysql.DB.Model(asset).Where("id = ?", sess.AssetId).First(asset).Error != nil {
@@ -137,10 +136,10 @@ func HandleSsh(sess *gsession.Session) (err error) {
 				if checkTime(asset.AccessAuth) {
 					continue
 				}
-				writeErrMsg(sess, "invalid access time")
+				writeErrMsg(sess, "invalid access time\n\n")
 				return &ApiError{Code: ErrAccessTime}
 			case closeBy := <-chs.CloseChan:
-				writeErrMsg(sess, "closed by admin")
+				writeErrMsg(sess, "closed by admin\n\n")
 				logger.L().Info("closed by", zap.String("admin", closeBy))
 				return &ApiError{Code: ErrAdminClose, Data: map[string]any{"admin": closeBy}}
 			case err := <-chs.ErrChan:
@@ -376,6 +375,7 @@ func connectSsh(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, ac
 		}
 	})
 	sess.G.Go(func() error {
+		defer sshSess.Close()
 		defer sess.Chans.Rout.Close()
 		defer sess.Chans.Win.Close()
 		for {
@@ -383,7 +383,6 @@ func connectSsh(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, ac
 			case <-sess.Gctx.Done():
 				return nil
 			case <-chs.AwayChan:
-				sshSess.Close()
 				return fmt.Errorf("away")
 			case window := <-chs.WindowChan:
 				if err := sshSess.WindowChange(window.Height, window.Width); err != nil {
@@ -425,7 +424,9 @@ func newGuacdSession(ctx *gin.Context, connectionId, sessionId string, asset *mo
 func connectGuacd(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, account *model.Account, gateway *model.Gateway) (err error) {
 	chs := sess.Chans
 	defer func() {
-		chs.ErrChan <- err
+		if err != nil {
+			chs.ErrChan <- err
+		}
 	}()
 
 	w, h, dpi := cast.ToInt(ctx.Query("w")), cast.ToInt(ctx.Query("h")), cast.ToInt(ctx.Query("dpi"))
@@ -436,37 +437,22 @@ func connectGuacd(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, 
 		return
 	}
 	session := newGuacdSession(ctx, t.ConnectionId, t.SessionId, asset, account, gateway)
-	if err = gsession.UpsertSession(session); err != nil {
-		return
-	}
+
 	session.GuacdTunnel = t
 
 	chs.ErrChan <- nil
 
-	g, gctx := errgroup.WithContext(context.Background())
-	g.Go(func() error {
+	sess.G.Go(func() error {
 		for {
 			select {
-			case <-gctx.Done():
-				return nil
-			case <-time.After(time.Minute):
-				close(session.Chans.AwayChan)
-				return nil
-			}
-		}
-	})
-	g.Go(func() error {
-		for {
-			select {
-			case <-gctx.Done():
+			case <-sess.Gctx.Done():
 				return nil
 			default:
 				p, err := t.Read()
-				if isCtxDone(gctx) {
-					return nil
-				}
+				// if isCtxDone(sess.Gctx) {
+				// 	return nil
+				// }
 				if err != nil {
-					logger.L().Debug("read instruction failed", zap.Error(err))
 					return err
 				}
 				if len(p) <= 0 {
@@ -477,7 +463,7 @@ func connectGuacd(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, 
 			}
 		}
 	})
-	g.Go(func() error {
+	sess.G.Go(func() error {
 		defer func() {
 			t.Disconnect()
 			session.Status = model.SESSIONSTATUS_OFFLINE
@@ -489,7 +475,7 @@ func connectGuacd(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, 
 		}()
 		for {
 			select {
-			case <-gctx.Done():
+			case <-sess.Gctx.Done():
 				return nil
 			case <-chs.AwayChan:
 				return fmt.Errorf("away")
@@ -498,11 +484,10 @@ func connectGuacd(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, 
 			}
 		}
 	})
-	if err = g.Wait(); err != nil {
-		logger.L().Warn("doGuacd stopped", zap.Error(err))
-	}
 
-	return err
+	sess.G.Wait()
+
+	return
 }
 
 // Connect godoc

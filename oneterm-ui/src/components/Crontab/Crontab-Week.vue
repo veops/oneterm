@@ -85,7 +85,7 @@ export default {
           this.$emit('update', 'week', this.average01 + '#' + this.average02)
           break
         case 5:
-          this.$emit('update', 'week', 'L' + this.weekday)
+          this.$emit('update', 'week', this.weekday + 'L')
           break
         case 6:
           this.$emit('update', 'week', this.checkboxString)
@@ -109,7 +109,7 @@ export default {
     // 最近工作日值变化时
     weekdayChange() {
       if (this.radioValue == '5') {
-        this.$emit('update', 'week', 'L' + this.weekday)
+        this.$emit('update', 'week', this.weekday + 'L')
       }
     },
     // checkbox值变化时

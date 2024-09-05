@@ -270,9 +270,13 @@ func DoConnect(ctx *gin.Context) (sess *gsession.Session, err error) {
 		AccountInfo: fmt.Sprintf("%s(%s)", account.Name, account.Account),
 		GatewayId:   asset.GatewayId,
 		GatewayInfo: lo.Ternary(asset.GatewayId == 0, "", fmt.Sprintf("%s(%s)", gateway.Name, gateway.Host)),
-		ClientIp:    ctx.RemoteIP(),
 		Protocol:    ctx.Param("protocol"),
 		Status:      model.SESSIONSTATUS_ONLINE,
+	}
+	if sess.SessionType == model.SESSIONTYPE_WEB {
+		sess.ClientIp = ctx.ClientIP()
+	} else if sess.SessionType == model.SESSIONTYPE_CLIENT {
+		sess.ClientIp = ctx.RemoteIP()
 	}
 
 	switch strings.Split(sess.Protocol, ":")[0] {

@@ -101,11 +101,6 @@ doc link：https://veops.cn/docs/docs/oneterm/onterm_design
 For those who want to contribute code, see our [Contributing Guidelines](CONTRIBUTING.md).
 In the meantime, please consider supporting Veops open source through social media, events, and sharing.
 
-
-## Thanks to the following users for their support
-[![Stargazers repo roster for @veops/oneterm](https://bytecrank.com/nastyox/reporoster/php/stargazersSVG.php?user=veops&repo=oneterm)](https://github.com/veops/oneterm/stargazers)
-[![Forkers repo roster for @veops/oneterm](https://bytecrank.com/nastyox/reporoster/php/forkersSVG.php?user=veops&repo=oneterm)](https://github.com/veops/oneterm/network/members)
-
 ## 🤝Community
 
 **Welcome to follow our WeChat official account and join our group channels**

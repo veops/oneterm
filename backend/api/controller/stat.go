@@ -277,25 +277,29 @@ func toListData[T any](data []T) *ListData {
 	}
 }
 
-func nodeCountAsset() (res map[int]int64, err error) {
+func nodeCountAsset() (m map[int]int64, err error) {
 	assets := make([]*model.AssetIdPid, 0)
 	if err = mysql.DB.Model(&model.Asset{}).Find(&assets).Error; err != nil {
 		return
 	}
-	res = make(map[int]int64)
+	nodes := make([]*model.NodeIdPid, 0)
+	if err = mysql.DB.Model(&model.Node{}).Find(&nodes).Error; err != nil {
+		return
+	}
+	m = make(map[int]int64)
 	for _, a := range assets {
-		res[a.ParentId] += 1
+		m[a.ParentId] += 1
 	}
 	g := make(map[int][]int)
-	for _, n := range assets {
+	for _, n := range nodes {
 		g[n.ParentId] = append(g[n.ParentId], n.Id)
 	}
 	var dfs func(int) int64
 	dfs = func(x int) int64 {
 		for _, y := range g[x] {
-			res[x] += dfs(y)
+			m[x] += dfs(y)
 		}
-		return res[x]
+		return m[x]
 	}
 	dfs(0)
 

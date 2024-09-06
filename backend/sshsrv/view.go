@@ -175,7 +175,11 @@ func (m *view) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case errMsg:
 		if msg != nil {
-			return m, tea.Printf("  [ERROR] %s\n\n", errStyle.Render(msg.Error()))
+			str := msg.Error()
+			if ae, ok := msg.(*controller.ApiError); ok {
+				str = controller.Err2Msg[ae.Code].One
+			}
+			return m, tea.Printf("  [ERROR] %s\n\n", errStyle.Render(str))
 		}
 	}
 	m.textinput, tiCmd = m.textinput.Update(msg)
@@ -327,7 +331,7 @@ func (conn *connector) SetStderr(w io.Writer) {
 }
 
 func (conn *connector) Run() error {
-	gsess, err := controller.DoConnect(conn.Ctx)
+	gsess, err := controller.DoConnect(conn.Ctx, nil)
 	if err != nil {
 		return err
 	}

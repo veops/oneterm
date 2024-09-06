@@ -1,6 +1,9 @@
 <h3 align="center">OneTerm</h3>
 <p align="center">
   <a href="https://github.com/veops/oneterm/blob/main/LICENSE"><img src="https://img.shields.io/github/license/veops/oneterm" alt="Apache License 2.0"></a>
+  <a href="https://github.com/veops/oneterm/releases">
+    <img alt="the latest release version" src="https://img.shields.io/github/v/release/veops/oneterm?color=75C1C4&include_prereleases&label=Release&logo=github&logoColor=white">
+  </a>
   <a href=""><img src="https://img.shields.io/badge/Go-%3E%3D%201.18-%23007d9c" alt="go>=1.18"></a>
   <a href="https:https://github.com/sendya/ant-design-pro-vue"><img src="https://img.shields.io/badge/UI-Ant%20Design%20Pro%20Vue-brightgreen" alt="UI"></a>
 </p>
@@ -12,7 +15,7 @@
 `主要功能`：角色管理、授权审批、资源访问控制、会话审计等。
 
 ---
-[English](README.md) / [中文](README_cn.md)
+[English](README.md) / 中文
 - 产品文档：https://veops.cn/docs/
 - 在线体验: <a href="https://term.veops.cn/oneterm/workstation" target="_blank">OneTerm</a>
     - username: **`demo`**   或者   **`admin`**
@@ -82,7 +85,6 @@ Host oneterm
 - [ ] 资产列表关联CMDB授权服务树
 - [ ] web终端页面多个session支持tab等
 
-
 ## 📚产品文档
 
 文档地址：https://veops.cn/docs/docs/oneterm/onterm_design
@@ -91,6 +93,15 @@ Host oneterm
 ## 🔗相关项目
 
 [go-ansiterm](https://github.com/veops/go-ansiterm)：linux终端仿真器,主要是根据终端输入和服务器回显解析命令
+
+## 如何贡献
+
+<a href="https://github.com/veops/oneterm/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=veops/oneterm" />
+</a>
+
+对于那些想要贡献代码的人，请参阅我们的[贡献指南](CONTRIBUTING.md)。
+同时，请考虑通过社交媒体、活动和分享来支持 Veops 的开源。
 
 ## 🤝社区交流
 

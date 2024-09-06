@@ -9,6 +9,10 @@ body:
     attributes:
       value: |
         Thank you for your feature suggestion; we will evaluate it carefully!
+  - type: markdown
+    attributes:
+      value: |
+        **Note**: Issue 的所有信息务必使用英文, 否则会被关闭. 谢谢! (All messages in Issue must be in English. If not, it will be closed. Thanks!)
   - type: input
     id: contact
     attributes:

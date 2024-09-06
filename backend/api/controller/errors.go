@@ -83,6 +83,9 @@ func (ae *ApiError) Message(localizer *i18n.Localizer) (msg string) {
 }
 
 func (ae *ApiError) MessageWithCtx(ctx *gin.Context) string {
+	if ae == nil {
+		return ""
+	}
 	lang := ctx.PostForm("lang")
 	accept := ctx.GetHeader("Accept-Language")
 	localizer := i18n.NewLocalizer(myi18n.Bundle, lang, accept)

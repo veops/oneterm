@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/samber/lo"
 	"github.com/spf13/cast"
 	"github.com/veops/oneterm/conf"
@@ -44,7 +43,7 @@ type Tunnel struct {
 	gw           *ggateway.GatewayTunnel
 }
 
-func NewTunnel(connectionId string, w, h, dpi int, protocol string, asset *model.Asset, account *model.Account, gateway *model.Gateway) (t *Tunnel, err error) {
+func NewTunnel(connectionId, sessionId string, w, h, dpi int, protocol string, asset *model.Asset, account *model.Account, gateway *model.Gateway) (t *Tunnel, err error) {
 	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", conf.Cfg.Guacd.Host, conf.Cfg.Guacd.Port), time.Second*3)
 	if err != nil {
 		return
@@ -88,7 +87,7 @@ func NewTunnel(connectionId string, w, h, dpi int, protocol string, asset *model
 		},
 	}
 	if t.ConnectionId == "" {
-		t.SessionId = uuid.New().String()
+		t.SessionId = sessionId
 		t.Config.Parameters["recording-name"] = t.SessionId
 	}
 	if gateway != nil && gateway.Id != 0 && t.ConnectionId == "" {

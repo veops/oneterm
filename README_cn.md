@@ -103,11 +103,6 @@ Host oneterm
 对于那些想要贡献代码的人，请参阅我们的[贡献指南](CONTRIBUTING.md)。
 同时，请考虑通过社交媒体、活动和分享来支持 Veops 的开源。
 
-
-## 感谢以下同学的支持
-[![Stargazers repo roster for @veops/oneterm](https://bytecrank.com/nastyox/reporoster/php/stargazersSVG.php?user=veops&repo=oneterm)](https://github.com/veops/oneterm/stargazers)
-[![Forkers repo roster for @veops/oneterm](https://bytecrank.com/nastyox/reporoster/php/forkersSVG.php?user=veops&repo=oneterm)](https://github.com/veops/oneterm/network/members)
-
 ## 🤝社区交流
 
 **欢迎关注公众号(维易科技OneOps)，关注后可加入微信群，进行产品和技术交流。**

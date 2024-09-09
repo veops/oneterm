@@ -16,6 +16,9 @@ services:
       new:
         aliases:
           - oneterm-api
+    tty: true
+    ports:
+      - "2222:2222"
 
   oneterm-guacd:
     image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-guacd:latest
@@ -100,6 +103,7 @@ services:
       - |
         sleep 2
         flask db-setup
+        flask common-check-new-columns
         flask init-acl
         flask init-department
 

@@ -28,7 +28,7 @@
 ```bash
 git clone https://github.com/veops/oneterm.git
 cd oneterm
-docker-compose up -d
+docker compose up -d
 ```
 
 ## ✅验证

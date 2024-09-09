@@ -52,8 +52,8 @@
           :height="tableHeight"
           resizable
         >
-          <vxe-column type="checkbox" width="60px"></vxe-column>
-          <vxe-column type="expand" width="60px">
+          <vxe-column type="checkbox" width="60px" field="checkbox" ></vxe-column>
+          <vxe-column type="expand" width="60px" field="expand">
             <template #content="{ row }">
               <div style="padding: 30px;">
                 <a-row>
@@ -96,17 +96,17 @@
               </div>
             </template>
           </vxe-column>
-          <vxe-column :title="$t('oneterm.log.time')">
+          <vxe-column :title="$t('oneterm.log.time')" field="created_at" >
             <template #default="{row}">
               {{ moment(row.created_at).format('YYYY-MM-DD HH:mm:ss') }}
             </template>
           </vxe-column>
-          <vxe-column :title="$t('user')">
+          <vxe-column :title="$t('user')" field="creator_id" cell-type="string">
             <template #default="{row}">
               {{ findNickname(row.creator_id) }}
             </template>
           </vxe-column>
-          <vxe-column :title="$t(`operation`)" field="action_type">
+          <vxe-column :title="$t(`operation`)" field="action_type" cell-type="string">
             <template #default="{row}">
               <a-tag color="green" v-if="row.action_type === 1">
                 {{ $t('new') }}
@@ -437,23 +437,34 @@ export default {
       this.selectedRowKeys = records.map((i) => i.id)
     },
     toExport() {
+      const actionTypeMap = {
+        1: this.$t('new'),
+        2: this.$t('delete'),
+        3: this.$t('update'),
+      }
+
+      const data = this.$refs.opsTable
+        .getVxetableRef()
+        .getCheckboxRecords()
+        .map((item) => {
+          return {
+            ...item,
+            created_at: moment(item.created_at).format('YYYY-MM-DD HH:mm:ss'),
+            type: this.resourceMap[item.type],
+            creator_id: this.findNickname(item.creator_id),
+            action_type: actionTypeMap[item.action_type]
+          }
+        })
+
       this.$refs.opsTable.getVxetableRef().exportData({
-        data: this.$refs.opsTable
-          .getVxetableRef()
-          .getCheckboxRecords()
-          .map((item) => {
-            return {
-              ...item,
-            }
-          }),
+        data,
         filename: this.$t('oneterm.menu.operationLog'),
         sheetName: 'Sheet1',
         type: 'xlsx',
         types: ['xlsx', 'csv', 'html', 'xml', 'txt'],
-        useStyle: true,
         isFooter: false,
-        columnFilterMethod: function(column, $columnIndex) {
-          return !(column.$columnIndex === 0)
+        columnFilterMethod: function(column) {
+          return ['created_at', 'creator_id', 'action_type', 'type'].includes(column.column.field)
         },
       })
       this.$refs.opsTable.getVxetableRef().clearCheckboxRow()

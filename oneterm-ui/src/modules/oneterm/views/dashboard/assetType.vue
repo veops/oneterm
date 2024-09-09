@@ -35,7 +35,7 @@ export default {
             type: 'pie',
             radius: ['45%', '70%'],
             left: 'center',
-            top: '0',
+            top: '-10%',
             width: '100%',
             height: '100%',
             avoidLabelOverlap: false,
@@ -56,6 +56,18 @@ export default {
             data: data.map((item) => ({ value: item.count, name: item.name })),
           },
         ],
+        graphic: {
+          type: 'text',
+          left: 'center',
+          top: '35%',
+          style: {
+            text: data.reduce((acc, cur) => acc + cur.count, 0),
+            textAlign: 'center',
+            fill: '#000',
+            fontSize: 38,
+            fontWeight: '700',
+          },
+        },
       }
       this.chart = echarts.init(document.getElementById('dashboard-assettype-chart'))
       this.chart.setOption(option)

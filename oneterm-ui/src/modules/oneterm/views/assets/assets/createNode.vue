@@ -51,7 +51,7 @@
         <a-textarea v-model="baseForm.comment" :placeholder="`${$t(`placeholder1`)}`" />
       </a-form-model-item>
     </a-form-model>
-    <p>
+    <!-- <p>
       <strong>{{ $t(`oneterm.assetList.cmdbSync`) }}</strong>
     </p>
     <a-form-model ref="syncForm" :model="syncForm" :label-col="{ span: 5 }" :wrapper-col="{ span: 16 }">
@@ -123,7 +123,7 @@
       <a-form-model-item :label="$t('oneterm.assetList.frequency')" prop="frequency">
         <a-input-number :min="0" v-model="syncForm.frequency" />{{ $t('hour') }}
       </a-form-model-item>
-    </a-form-model>
+    </a-form-model> -->
     <p>
       <strong>{{ $t(`oneterm.protocol`) }}</strong>
     </p>
@@ -268,9 +268,9 @@ export default {
                 })
         })
         this.filterExp = filters
-        this.$nextTick(() => {
-          this.$refs.filterComp.visibleChange(true, false)
-        })
+        // this.$nextTick(() => {
+        //   this.$refs.filterComp.visibleChange(true, false)
+        // })
         this.$refs.protocol.setValues({ gateway_id, protocols })
         this.$refs.account.setValues({ authorization })
         this.$refs.accessAuth.setValues(access_auth)
@@ -296,35 +296,35 @@ export default {
         this.attributes = []
       }
     },
-    setExpFromFilter(filterExp) {
-      if (filterExp) {
-        this.filterExp = `${filterExp}`
-      } else {
-        this.filterExp = ''
-      }
-    },
+    // setExpFromFilter(filterExp) {
+    //   if (filterExp) {
+    //     this.filterExp = `${filterExp}`
+    //   } else {
+    //     this.filterExp = ''
+    //   }
+    // },
     handleSubmit() {
       this.$refs.baseForm.validate((valid) => {
         if (valid) {
           const { name, parent_id, comment } = this.baseForm
-          const { type_id, enable, frequency } = this.syncForm
-          this.$refs.filterComp.handleSubmit()
-          const mapping = {}
-          let flag = true
-          this.fieldMap.forEach((field) => {
-            if (!field.field_name) {
-              this.$set(field, 'error', true)
-              field.error = true
-              flag = false
-            } else {
-              this.$set(field, 'error', false)
-              field.error = false
-              mapping[field.attribute.value] = field.field_name
-            }
-          })
-          if (type_id && !flag) {
-            return
-          }
+          // const { type_id, enable, frequency } = this.syncForm
+          // this.$refs.filterComp.handleSubmit()
+          // const mapping = {}
+          // let flag = true
+          // this.fieldMap.forEach((field) => {
+          //   if (!field.field_name) {
+          //     this.$set(field, 'error', true)
+          //     field.error = true
+          //     flag = false
+          //   } else {
+          //     this.$set(field, 'error', false)
+          //     field.error = false
+          //     mapping[field.attribute.value] = field.field_name
+          //   }
+          // })
+          // if (type_id && !flag) {
+          //   return
+          // }
           const { gateway_id, protocols } = this.$refs.protocol.getValues()
           const { authorization } = this.$refs.account.getValues()
           const access_auth = this.$refs.accessAuth.getValues()
@@ -332,13 +332,13 @@ export default {
             name,
             comment,
             parent_id: parent_id ?? 0,
-            sync: {
-              enable,
-              filters: this.filterExp,
-              frequency,
-              mapping,
-              type_id,
-            },
+            // sync: {
+            //   enable,
+            //   filters: this.filterExp,
+            //   frequency,
+            //   mapping,
+            //   type_id,
+            // },
             protocols,
             gateway_id,
             authorization,

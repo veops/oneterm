@@ -1,6 +1,6 @@
 <template>
   <a-modal :title="title" :visible="visible" @cancel="handleCancel" @ok="handleOk" :confirmLoading="loading">
-    <a-form-model ref="accountForm" :model="form" :rules="rules" :label-col="{ span: 5 }" :wrapper-col="{ span: 16 }">
+    <a-form-model ref="accountForm" :model="form" :rules="rules" :label-col="{ span: 7 }" :wrapper-col="{ span: 14 }">
       <a-form-model-item :label="$t(`oneterm.name`)" prop="name">
         <a-input v-model="form.name" :placeholder="`${$t(`placeholder1`)}`" />
       </a-form-model-item>
@@ -69,9 +69,9 @@ export default {
   computed: {
     title() {
       if (this.form.id) {
-        return this.$t('oneterm.assetList.editCount')
+        return this.$t('oneterm.assetList.editAccount')
       }
-      return this.$t('oneterm.assetList.createCount')
+      return this.$t('oneterm.assetList.createAccount')
     },
   },
   methods: {

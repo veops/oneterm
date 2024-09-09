@@ -530,12 +530,12 @@ export default {
       this.$emit('openTerminalList', data)
     },
 
-    handleRefresh() {
+    async handleRefresh() {
       this.selectedRowKeys = []
       this.$refs.opsTable.getVxetableRef().clearCheckboxRow()
       this.$refs.opsTable.getVxetableRef().clearCheckboxReserve()
+      await this.getAccountList()
       this.getFirstLayout()
-      this.updateTableData()
     }
   },
 }

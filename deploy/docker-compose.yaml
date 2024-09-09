@@ -79,13 +79,14 @@ services:
       - |
         envsubst '$$ONETERM_API_HOST  $$ACL_API_HOST $$NGINX_PORT' < /etc/nginx/conf.d/nginx.oneterm.conf.example > /etc/nginx/conf.d/oneterm.conf
         nginx -g  'daemon off;'
+        nginx -s reload
     networks:
       - new
     ports:
       - "8666:80"
 
   acl-api:
-    image: registry.cn-hangzhou.aliyuncs.com/veops/acl-api:1.1
+    image: registry.cn-hangzhou.aliyuncs.com/veops/acl-api:latest
     container_name: oneterm-acl-api
     environment:
       TZ: Asia/Shanghai

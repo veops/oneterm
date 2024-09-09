@@ -12,8 +12,8 @@
       </a-form-model-item>
       <a-form-model-item label=" " :colon="false">
         <a-space>
-          <a-button :loading="loading" @click="getConfig()">重置</a-button>
-          <a-button :loading="loading" type="primary" @click="handleSave">保存</a-button>
+          <a-button :loading="loading" @click="getConfig()">{{ $t('reset') }}</a-button>
+          <a-button :loading="loading" type="primary" @click="handleSave">{{ $t('save') }}</a-button>
         </a-space>
       </a-form-model-item>
     </a-form-model>

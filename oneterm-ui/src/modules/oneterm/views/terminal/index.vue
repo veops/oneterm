@@ -1,5 +1,8 @@
 <template>
-  <div class="oneterm-terminal" id="oneterm-terminal"></div>
+  <div
+    :class="[isFullScreen ? 'oneterm-terminal-full' : 'oneterm-terminal-panel']"
+    ref="onetermTerminalRef"
+  ></div>
 </template>
 
 <script>
@@ -8,6 +11,24 @@ import { Terminal } from 'xterm'
 import { FitAddon } from 'xterm-addon-fit'
 export default {
   name: 'Terminal',
+  props: {
+    assetId: {
+      type: [String, Number],
+      default: ''
+    },
+    accountId: {
+      type: [String, Number],
+      default: ''
+    },
+    protocol: {
+      type: String,
+      default: ''
+    },
+    isFullScreen: {
+      type: Boolean,
+      default: true,
+    }
+  },
   data() {
     return {
       term: null,
@@ -43,7 +64,7 @@ export default {
       })
 
       this.term.loadAddon(fitAddon)
-      this.term.open(document.getElementById('oneterm-terminal'))
+      this.term.open(this.$refs.onetermTerminalRef)
       this.term.writeln('\x1b[1;1;32mwelcome to oneterm!\x1b[0m')
       if (!disableStdin) {
         this.term.onData((data) => {
@@ -59,11 +80,19 @@ export default {
     },
     initWebsocket() {
       const { session_id, is_monitor } = this.$route.query
+      let { asset_id, account_id, protocol: queryProtocol } = this.$route.query
+
+      if (!this.isFullScreen) {
+        asset_id = this.assetId
+        account_id = this.accountId
+        queryProtocol = this.protocol
+      }
+
       const protocol = document.location.protocol.startsWith('https') ? 'wss' : 'ws'
       this.websocket = new WebSocket(
         is_monitor
           ? `${protocol}://${document.location.host}/api/oneterm/v1/connect/monitor/${session_id}?w=${this.term.cols}&h=${this.term.rows}`
-          : `${protocol}://${document.location.host}/api/oneterm/v1/connect/${session_id}?w=${this.term.cols}&h=${this.term.rows}`,
+          : `${protocol}://${document.location.host}/api/oneterm/v1/connect/${asset_id}/${account_id}/${queryProtocol}?w=${this.term.cols}&h=${this.term.rows}`,
         ['Sec-WebSocket-Protocol']
       )
       this.websocket.onopen = this.websocketOpen()
@@ -79,6 +108,13 @@ export default {
     },
     closeWebSocket(e) {
       console.log(e)
+      if (this.term) {
+        this.term.writeln('\r\n')
+        this.term.writeln('\x1b[31mThe connection is closed!\x1b[0m')
+      }
+
+      this.$emit('close')
+
       if (this.interval) {
         clearInterval(this.interval)
         this.interval = null
@@ -86,6 +122,7 @@ export default {
     },
     errorWebSocket(e) {
       console.log(e)
+      this.$emit('close')
     },
     getMessage(message) {
       this.term.write(message.data)
@@ -98,17 +135,39 @@ export default {
 </script>
 
 <style lang="less" scoped>
-.oneterm-terminal {
+.oneterm-terminal-full {
   position: fixed;
   top: 0;
   left: 0;
   width: 100vw;
   height: 100vh;
+  padding: 5px;
+  background-color: #000;
+}
+
+.oneterm-terminal-panel {
+  width: 100%;
+  height: 100%;
+  background-color: #000 !important;
 }
 </style>
 
-<style>
-.xterm-screen {
-  min-height: calc(100vh);
+<style lang="less">
+.oneterm-terminal-full {
+  .terminal {
+    margin-left: 5px;
+  }
+  .xterm-screen {
+    min-height: 100vh;
+  }
+}
+
+.oneterm-terminal-panel {
+  .terminal {
+    margin-left: 5px;
+  }
+  .xterm-screen {
+    min-height: 100%;
+  }
 }
 </style>

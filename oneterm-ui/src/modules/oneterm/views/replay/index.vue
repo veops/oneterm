@@ -6,6 +6,8 @@
 import { mapState } from 'vuex'
 import * as AsciinemaPlayer from 'asciinema-player'
 import 'asciinema-player/dist/bundle/asciinema-player.css'
+import { getSessionReplayData } from '@/modules/oneterm/api/replay'
+
 export default {
   name: 'Replay',
   data() {
@@ -19,23 +21,35 @@ export default {
       windowWidth: (state) => state.windowWidth,
     }),
   },
-  mounted() {
+  async mounted() {
     console.log(this.$route)
     const { session_id } = this.$route.params
+    const res = await getSessionReplayData(session_id)
+    const regexp = /\{(?:[^{}]*|\{.*?\})*\}/
+    const resConfig = res.match(regexp)
+
+    const config = {
+      markers: [
+        [5.0, 'Installation'], // time in seconds + label
+        [25.0, 'Configuration'],
+        [66.6, 'Usage'],
+        [176.5, 'Tips & Tricks'],
+      ],
+      fit: 'both',
+      terminalFontSize: 'medium',
+      terminalFontFamily: 'monaco, Consolas, "Lucida Console", monospace',
+    }
+
+    if (resConfig?.[0]) {
+      const data = JSON.parse(resConfig?.[0])
+      config.cols = data.width
+      config.rows = data.height
+    }
+
     this.player = AsciinemaPlayer.create(
-      `/api/oneterm/v1/session/replay/${session_id}`,
+      { data: res },
       document.getElementById('oneterm-replay'),
-      {
-        markers: [
-          [5.0, 'Installation'], // time in seconds + label
-          [25.0, 'Configuration'],
-          [66.6, 'Usage'],
-          [176.5, 'Tips & Tricks'],
-        ],
-        cols: this.windowWidth,
-        fit: 'height',
-        terminalFontFamily: 'monaco, Consolas, "Lucida Console", monospace',
-      }
+      config
     )
   },
 }
@@ -48,6 +62,7 @@ export default {
   left: 0;
   width: 100vw;
   height: 100vh;
+  background-color: rgb(27,27,27);
 }
 </style>
 

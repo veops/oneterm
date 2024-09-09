@@ -30,7 +30,7 @@ English / [中文](README_cn.md)
 ```bash
 git clone https://github.com/veops/oneterm.git
 cd oneterm/deploy
-docker-compose up -d
+docker compose up -d
 ```
 
 ## ✅ Validation

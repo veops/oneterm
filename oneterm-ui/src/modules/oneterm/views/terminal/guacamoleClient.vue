@@ -1,11 +1,13 @@
 <template>
-  <div class="oneterm-guacamole" id="display"></div>
+  <div
+    :class="[isFullScreen ? 'oneterm-guacamole-full' : 'oneterm-guacamole-panel']"
+    ref="onetermGuacamoleRef"
+  ></div>
 </template>
 
 <script>
 import _ from 'lodash'
 import Guacamole from 'guacamole-common-js'
-import { postConnectIsRight } from '../../api/connect'
 
 const STATE_IDLE = 0
 const STATE_CONNECTING = 1
@@ -16,36 +18,38 @@ const STATE_DISCONNECTED = 5
 
 export default {
   name: 'GuacamoleClient',
+  props: {
+    assetId: {
+      type: [String, Number],
+      default: ''
+    },
+    accountId: {
+      type: [String, Number],
+      default: ''
+    },
+    protocol: {
+      type: String,
+      default: ''
+    },
+    isFullScreen: {
+      type: Boolean,
+      default: true,
+    }
+  },
   data() {
     return {
       client: null,
       session_id: null,
       is_monitor: this.$route.query.is_monitor,
+      messageKey: 'message'
     }
   },
   mounted() {
     window.addEventListener('resize', this.onWindowResize)
-    const guacamoleClient = document.getElementById('display')
-    const { asset_id, account_id, protocol } = this.$route.params
-    const { session_id } = this.$route.query
-    if (session_id) {
-      this.session_id = session_id
-      this.init()
-    } else {
-      postConnectIsRight(
-        asset_id,
-        account_id,
-        protocol,
-        `w=${guacamoleClient.clientWidth}&h=${guacamoleClient.clientHeight}&dpi=${96}`
-      ).then((res) => {
-        this.session_id = res?.data?.session_id
-        if (this.session_id) {
-          this.init()
-        }
-      })
-    }
+    this.init()
   },
   beforeDestroy() {
+    this.$message.destroy(this.messageKey)
     window.removeEventListener('resize', this.onWindowResize)
     if (this.client) {
       this.client.disconnect()
@@ -53,12 +57,21 @@ export default {
   },
   methods: {
     init() {
-      const { session_id, is_monitor } = this
+      const { session_id, is_monitor } = this.$route.query
+      let { asset_id, account_id, protocol: queryProtocol } = this.$route.params
+
+      if (!this.isFullScreen) {
+        asset_id = this.assetId
+        account_id = this.accountId
+        queryProtocol = this.protocol
+      }
+
       const protocol = document.location.protocol.startsWith('https') ? 'wss' : 'ws'
+
       const tunnel = new Guacamole.WebSocketTunnel(
         is_monitor
           ? `${protocol}://${document.location.host}/api/oneterm/v1/connect/monitor/${session_id}`
-          : `${protocol}://${document.location.host}/api/oneterm/v1/connect/${session_id}`
+          : `${protocol}://${document.location.host}/api/oneterm/v1/connect/${asset_id}/${account_id}/${queryProtocol}`
       )
       const client = new Guacamole.Client(tunnel)
 
@@ -75,7 +88,7 @@ export default {
       tunnel.onerror = this.onError
 
       // Get display div from document
-      const displayEle = document.getElementById('display')
+      const displayEle = this.$refs.onetermGuacamoleRef
 
       // Add client to display div
       const element = client.getDisplay().getElement()
@@ -84,7 +97,7 @@ export default {
       client.connect(`w=${displayEle.clientWidth}&h=${displayEle.clientHeight}&dpi=96`)
       const display = client.getDisplay()
       display.onresize = function(width, height) {
-        display.scale(Math.min(window.innerHeight / display.getHeight(), window.innerWidth / display.getHeight()))
+        display.scale(Math.min(displayEle.clientHeight / display.getHeight(), displayEle.clientWidth / display.getHeight()))
       }
 
       const sink = new Guacamole.InputSink()
@@ -135,35 +148,36 @@ export default {
       this.client = client
     },
     onClientStateChange(state) {
-      console.log(state)
-      const key = 'message'
+      console.log('onClientStateChange', state)
       switch (state) {
         case STATE_IDLE:
-          this.$message.destroy(key)
-          this.$message.loading({ content: this.$t('oneterm.guacamole.idle'), duration: 0, key: key })
+          this.$message.destroy(this.messageKey)
+          this.$message.loading({ content: this.$t('oneterm.guacamole.idle'), duration: 0, key: this.messageKey })
           break
         case STATE_CONNECTING:
-          this.$message.destroy(key)
-          this.$message.loading({ content: this.$t('oneterm.guacamole.connecting'), duration: 0, key: key })
+          this.$message.destroy(this.messageKey)
+          this.$message.loading({ content: this.$t('oneterm.guacamole.connecting'), duration: 0, key: this.messageKey })
           break
         case STATE_WAITING:
-          this.$message.destroy(key)
-          this.$message.loading({ content: this.$t('oneterm.guacamole.waiting'), duration: 0, key: key })
+          this.$message.destroy(this.messageKey)
+          this.$message.loading({ content: this.$t('oneterm.guacamole.waiting'), duration: 0, key: this.messageKey })
           break
         case STATE_CONNECTED:
-          this.$message.destroy(key)
-          this.$message.success({ content: this.$t('oneterm.guacamole.connected'), duration: 3, key: key })
+          this.$message.destroy(this.messageKey)
+          this.$message.success({ content: this.$t('oneterm.guacamole.connected'), duration: 3, key: this.messageKey })
           // 向后台发送请求，更新会话的状态
           //   sessionApi.connect(sessionId)
           break
         case STATE_DISCONNECTING:
           break
         case STATE_DISCONNECTED:
-          if (this.client) {
+        if (this.client) {
             this.client.disconnect()
           }
-          const guacamoleClient = document.getElementById('display')
+          const guacamoleClient = this.$refs.onetermGuacamoleRef
           guacamoleClient.innerHTML = ''
+          this.$message.destroy(this.messageKey)
+          this.$emit('close')
           break
         default:
           break
@@ -187,6 +201,10 @@ export default {
       client.getDisplay().scale(scale)
     },
     onError(status) {
+      console.log('onError', status)
+      this.$message.destroy(this.messageKey)
+      this.$emit('close')
+
       if (status.code > 1000) {
         this.$message.info({
           content: decodeURIComponent(
@@ -203,14 +221,15 @@ export default {
       }
     },
     onDisconnect() {
-      console.log(2222)
+      console.log('onDisconnect')
+      this.$emit('close')
     },
   },
 }
 </script>
 
 <style lang="less" scoped>
-.oneterm-guacamole {
+.oneterm-guacamole-full {
   position: fixed;
   top: 0;
   left: 0;
@@ -218,10 +237,24 @@ export default {
   height: 100vh;
   background-color: black;
 }
+
+.oneterm-guacamole-panel {
+  width: 100%;
+  height: 100%;
+  background-color: black;
+}
 </style>
 
 <style lang="less">
-.oneterm-guacamole > div {
-  margin: 0 auto;
+.oneterm-guacamole-full {
+  & > div {
+    margin: 0 auto;
+  }
+}
+
+.oneterm-guacamole-panel {
+  & > div {
+    margin: 0 auto;
+  }
 }
 </style>

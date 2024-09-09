@@ -103,9 +103,9 @@ export default {
   width: 100%;
   height: calc(100vh - 88px);
   display: grid;
-  grid-gap: 24px 0;
+  grid-gap: 22px 0;
   grid-template-columns: 100%;
-  grid-template-rows: 20vh 1fr 30vh;
+  grid-template-rows: 15vh 1fr 33vh;
   .oneterm-dashboard-top {
     background-color: #fff;
     border-radius: 5px;
@@ -118,11 +118,11 @@ export default {
       &:not(:last-child)::after {
         content: '';
         position: absolute;
-        width: 2px;
-        height: 80%;
+        width: 1px;
+        height: 60%;
         background-color: #f0f1f5;
         right: 0;
-        top: 10%;
+        top: 20%;
       }
       .oneterm-statistic-img {
         width: 40%;
@@ -130,7 +130,8 @@ export default {
         align-items: center;
         justify-content: center;
         img {
-          width: 70%;
+          width: 65%;
+          max-width: 80px;
         }
       }
       .oneterm-statistic-container {
@@ -139,13 +140,14 @@ export default {
         flex-direction: column;
         justify-content: center;
         > div:first-child {
-          font-size: 1vw;
+          font-size: 16px;
           color: #9094a6;
           font-weight: 500;
         }
         strong {
-          font-size: 2vw;
+          font-size: 28px;
           color: #000;
+          font-weight: 700;
         }
       }
     }
@@ -154,7 +156,7 @@ export default {
   .oneterm-dashboard-bottom {
     display: grid;
     grid-gap: 0 24px;
-    grid-template-columns: 1fr 300px;
+    grid-template-columns: 1fr 397px;
     grid-template-rows: 100%;
     > div {
       background-color: #fff;

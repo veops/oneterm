@@ -60,6 +60,7 @@ export default {
               this.$t('oneterm.connectedUsers'),
             ],
             bottom: 0,
+            itemGap: 60
           },
           grid: {
             top: '3%',
@@ -92,7 +93,11 @@ export default {
               emphasis: {
                 focus: 'series',
               },
+              smooth: true,
               color: 'rgba(56, 125, 255, 1)',
+              lineStyle: {
+                width: 1.5
+              },
               data: data.map((item) => item.connect),
             },
             {
@@ -106,7 +111,11 @@ export default {
               emphasis: {
                 focus: 'series',
               },
+              smooth: true,
               color: 'rgba(35, 184, 153, 1)',
+              lineStyle: {
+                width: 1.5
+              },
               data: data.map((item) => item.session),
             },
             {
@@ -120,7 +129,11 @@ export default {
               emphasis: {
                 focus: 'series',
               },
+              smooth: true,
               color: 'rgba(254, 124, 75, 1)',
+              lineStyle: {
+                width: 1.5
+              },
               data: data.map((item) => item.asset),
             },
             {
@@ -134,7 +147,11 @@ export default {
               emphasis: {
                 focus: 'series',
               },
+              smooth: true,
               color: 'rgba(78, 194, 239, 1)',
+              lineStyle: {
+                width: 1.5
+              },
               data: data.map((item) => item.user),
             },
           ],

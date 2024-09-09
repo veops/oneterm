@@ -4,14 +4,13 @@
       <div class="protocol-box" v-for="(pro, index) in protocols" :key="pro.id">
         <a-input-group compact>
           <a-select v-model="pro.value" style="width: 100px" @change="(value) => changeProValue(value, index)">
-            <a-select-option value="ssh">
-              ssh
-            </a-select-option>
-            <a-select-option value="rdp">
-              rdp
-            </a-select-option>
-            <a-select-option value="vnc">
-              vnc
+            <a-select-option
+              v-for="(item) in protocolSelectOption"
+              :key="item.key"
+              :value="item.key"
+              :disabled="protocols.some((protocol) => protocol.value === item.key && protocol.value !== pro.value)"
+            >
+              {{ item.label }}
             </a-select-option>
           </a-select>
           <a-input
@@ -21,14 +20,16 @@
           />
         </a-input-group>
         <a-space>
-          <a @click="addPro"><a-icon type="plus-circle"/></a>
+          <a v-if="protocols.length < 3" @click="addPro">
+            <a-icon type="plus-circle"/>
+          </a>
           <a
             v-if="protocols && protocols.length > 1"
             style="color:red"
             @click="deletePro(index)"
-          ><ops-icon
-            type="icon-xianxing-delete"
-          /></a>
+          >
+            <ops-icon type="icon-xianxing-delete" />
+          </a>
         </a-space>
       </div>
     </a-form-model-item>
@@ -85,6 +86,20 @@ export default {
         gateway_id: undefined,
       },
       rules: {},
+      protocolSelectOption: [
+        {
+          key: 'ssh',
+          label: 'ssh'
+        },
+        {
+          key: 'rdp',
+          label: 'rdp'
+        },
+        {
+          key: 'vnc',
+          label: 'vnc'
+        }
+      ],
       protocols: [{ id: uuidv4(), value: 'ssh', label: '22' }],
       gatewayList: [],
     }
@@ -96,7 +111,15 @@ export default {
   },
   methods: {
     addPro() {
-      this.protocols.push({ id: uuidv4(), value: 'ssh', label: '22' })
+      if (this.protocols.length < 3) {
+        const value = ['ssh', 'rdp', 'vnc'].find((key) => this.protocols.every((protocol) => protocol.value !== key))
+        const labelMap = {
+          'ssh': '22',
+          'rdp': '3389',
+          'vnc': '5900',
+        }
+        this.protocols.push({ id: uuidv4(), value, label: labelMap?.[value] || '' })
+      }
     },
     deletePro(index) {
       this.protocols.splice(index, 1)

@@ -26,8 +26,8 @@
         <vxe-column :title="$t(`operation`)" width="80" align="center">
           <template #default="{row}">
             <a-space>
-              <a-tooltip :title="$t(`login`)">
-                <a @click="openTerminal(row)"><ops-icon type="oneterm-login"/></a>
+              <a-tooltip :title="row.protocolType">
+                <a @click="openTerminal(row)"><ops-icon :type="row.protocolIcon"/></a>
               </a-tooltip>
               <a-tooltip :title="$t(`oneterm.switchAccount`)">
                 <a @click="openLogin(row)"><ops-icon type="oneterm-switch"/></a>
@@ -57,16 +57,18 @@
         @showSizeChange="pageOrSizeChange"
       />
     </div>
-    <LoginModal ref="loginModal" />
+    <LoginModal
+      ref="loginModal"
+      @openTerminal="loginOpenTerminal"
+    />
   </div>
 </template>
 
 <script>
 import moment from 'moment'
-import { mapGetters } from 'vuex'
+import { mapGetters, mapState } from 'vuex'
 import { getSessionList } from '../../api/session'
 import { getAssetList } from '../../api/asset'
-import { postConnectIsRight } from '../../api/connect'
 import LoginModal from '../assets/assets/loginModal.vue'
 export default {
   name: 'RecentSession',
@@ -84,6 +86,10 @@ export default {
   },
   computed: {
     ...mapGetters(['uid']),
+    ...mapState({
+      rid: (state) => state.user.rid,
+      roles: (state) => state.user.roles,
+    }),
   },
   mounted() {
     this.updateTableData()
@@ -98,7 +104,20 @@ export default {
         uid: this.uid,
       })
         .then((res) => {
-          this.tableData = res?.data?.list || []
+          const protocolIconMap = {
+            'ssh': 'a-oneterm-ssh2',
+            'rdp': 'a-oneterm-ssh1',
+            'vnc': 'oneterm-rdp',
+          }
+
+          const tableData = res?.data?.list || []
+          tableData.forEach((item) => {
+            const protocolType = item.protocol.split?.(':')?.[0] || ''
+            item.protocolIcon = protocolIconMap?.[protocolType] || ''
+            item.protocolType = protocolType
+          })
+
+          this.tableData = tableData
           this.tablePage = {
             ...this.tablePage,
             currentPage,
@@ -113,23 +132,71 @@ export default {
     pageOrSizeChange(currentPage, pageSize) {
       this.updateTableData(currentPage, pageSize)
     },
-    openTerminal(row) {
-      postConnectIsRight(row.asset_id, row.account_id, row.protocol).then((res) => {
-        if (res?.data?.session_id) {
-          window.open(`/oneterm/terminal?session_id=${res?.data?.session_id}`, '_blank')
-        }
+    async openTerminal(row) {
+      const res = await getAssetList({
+        id: row.asset_id,
+        info: true
+      })
+      const asset = (res?.data?.list || [])?.[0]
+
+      if (
+        !asset ||
+        !asset.protocols.includes(row.protocol) ||
+        !Object.keys(asset.authorization).flat().includes(String(row.account_id))
+      ) {
+        this.$message.warning(this.$t('oneterm.sessionTable.loginMessage'))
+        return
+      }
+
+      const protocolType = row.protocol.split?.(':')?.[0] || ''
+
+      this.$emit('openTerminal', {
+        assetId: row.asset_id,
+        assetName: asset?.name || '',
+        accountId: row.account_id,
+        protocol: row.protocol,
+        protocolType
       })
     },
+
     openLogin(row) {
-      getAssetList({ id: row.asset_id }).then((res) => {
-        const asset = (res?.data?.list || [])[0]
-        if (asset) {
-          this.$refs.loginModal.open(row.asset_id, asset.authorization, asset.protocols)
+      getAssetList({
+        id: row.asset_id,
+        info: true
+      }).then((res) => {
+        const asset = (res?.data?.list || [])?.[0]
+        const isError = this.validLoginData(asset)
+        if (!isError) {
+          this.$refs.loginModal.open(row.asset_id, asset?.name || '', asset.authorization, asset.protocols)
         } else {
           this.$message.warning(this.$t('oneterm.sessionTable.loginMessage'))
         }
       })
     },
+
+    validLoginData(asset) {
+      if (!asset) {
+        return true
+      }
+
+      const hasAccount = Object.entries(asset.authorization).some(([_, rids]) => {
+        if (
+          rids.includes(this.rid) ||
+          this.roles.permissions.includes('acl_admin') ||
+          this.roles.permissions.includes('oneterm_admin')
+        ) {
+          return true
+        }
+
+        return false
+      })
+
+      return !hasAccount
+    },
+
+    loginOpenTerminal(data) {
+      this.$emit('openTerminal', data)
+    }
   },
 }
 </script>

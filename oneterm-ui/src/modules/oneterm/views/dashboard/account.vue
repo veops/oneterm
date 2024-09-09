@@ -56,6 +56,7 @@ export default {
               data: data.map((item) => item.count),
               type: 'bar',
               color: '#84A4F9',
+              barMaxWidth: '16px'
             },
           ],
         }

@@ -125,9 +125,9 @@ export default {
     getValues() {
       const authorization = {}
       this.countList
-        .filter((count) => typeof count.id === 'number')
+        .filter((count) => count.name)
         .forEach((count) => {
-          authorization[count.id] = count?.rids?.length ? count.rids.map((r) => Number(r.split('-')[1])) : []
+          authorization[count.name] = count?.rids?.length ? count.rids.map((r) => Number(r.split('-')[1])) : []
         })
       return { authorization }
     },
@@ -135,7 +135,7 @@ export default {
       const authorizationList = Object.entries(authorization)
       if (authorizationList.length) {
         this.countList = authorizationList.map(([acc, rids]) => {
-          return { id: Number(acc), name: Number(acc), account: Number(acc), rids: rids.map((r) => `employee-${r}`) }
+          return { id: uuidv4(), name: Number(acc), account: Number(acc), rids: rids.map((r) => `employee-${r}`) }
         })
       } else {
         this.countList = [{ id: uuidv4(), name: undefined, account: undefined, rids: undefined }]

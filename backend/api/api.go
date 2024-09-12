@@ -128,6 +128,14 @@ func RunApi() error {
 			history.GET("", c.GetHistories)
 			history.GET("/type/mapping", c.GetHistoryTypeMapping)
 		}
+
+		share := v1.Group("/share")
+		{
+			share.POST("", c.CreateShare, authAdmin())
+			share.DELETE("/:id", c.DeleteShare, authAdmin())
+			share.GET("", c.GetShare, authAdmin())
+		}
+		r.GET("/api/oneterm/v1/share/connect/:uuid", Error2Resp(),c.ConnectShare)
 	}
 
 	srv.Addr = fmt.Sprintf("%s:%d", conf.Cfg.Http.Host, conf.Cfg.Http.Port)

@@ -5,7 +5,7 @@ import (
 )
 
 type History struct {
-	Id         int              `json:"id" gorm:"column:id;primarykey"`
+	Id         int              `json:"id" gorm:"column:id;primarykey;autoIncrement"`
 	RemoteIp   string           `json:"remote_ip" gorm:"column:remote_ip"`
 	Type       string           `json:"type" gorm:"column:type"`
 	TargetId   int              `json:"target_id" gorm:"column:target_id"`

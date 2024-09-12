@@ -97,6 +97,10 @@ func (gm *GateWayManager) Open(sessionId, remoteIp string, remotePort int, gatew
 		if err != nil {
 			return
 		}
+		go func() {
+			logger.L().Debug("ssh client closed", zap.Int("gatewayId", gateway.Id), zap.Error(sshCli.Wait()))
+			delete(gm.sshClients, gateway.Id)
+		}()
 	}
 	gm.sshClients[gateway.Id] = sshCli
 	gm.sshClientsCount[gateway.Id] += 1

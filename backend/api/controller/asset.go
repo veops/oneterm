@@ -21,15 +21,8 @@ import (
 var (
 	assetPreHooks = []preHook[*model.Asset]{
 		func(ctx *gin.Context, data *model.Asset) {
-			if data.AccessAuth == nil {
-				data.AccessAuth = &model.AccessAuth{
-					Start:  nil,
-					End:    nil,
-					CmdIds: make(model.Slice[int], 0),
-					Ranges: make(model.Slice[model.Range], 0),
-					Allow:  true,
-				}
-			}
+			data.Ip = strings.TrimSpace(data.Ip)
+			data.Protocols = lo.Map(data.Protocols, func(s string, _ int) string { return strings.TrimSpace(s) })
 			if data.Authorization == nil {
 				data.Authorization = make(model.Map[int, model.Slice[int]])
 			}
@@ -48,7 +41,7 @@ func (c *Controller) CreateAsset(ctx *gin.Context) {
 	asset := &model.Asset{}
 	doCreate(ctx, true, asset, conf.RESOURCE_ASSET, assetPreHooks...)
 
-	schedule.CheckUpdate(asset.Id)
+	schedule.UpdateConnectables(asset.Id)
 }
 
 // DeleteAsset godoc
@@ -70,7 +63,7 @@ func (c *Controller) DeleteAsset(ctx *gin.Context) {
 //	@Router		/asset/:id [put]
 func (c *Controller) UpdateAsset(ctx *gin.Context) {
 	doUpdate(ctx, true, &model.Asset{})
-	schedule.CheckUpdate(cast.ToInt(ctx.Param("id")))
+	schedule.UpdateConnectables(cast.ToInt(ctx.Param("id")))
 }
 
 // GetAssets godoc

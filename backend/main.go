@@ -40,9 +40,9 @@ func main() {
 	}
 	{
 		rg.Add(func() error {
-			return schedule.RunConnectable()
+			return schedule.RunSchedule()
 		}, func(err error) {
-			schedule.StopConnectable()
+			schedule.StopSchedule()
 		})
 	}
 

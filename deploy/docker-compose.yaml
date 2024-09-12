@@ -43,7 +43,6 @@ services:
       - ./volume/mysql:/var/lib/mysql
       - ./mysqld.cnf:/etc/mysql/conf.d/mysqld.cnf
       - ./acl.sql:/docker-entrypoint-initdb.d/2-acl.sql
-      - ./api.sql:/docker-entrypoint-initdb.d/3-api.sql
       - ./create-users.sql:/docker-entrypoint-initdb.d/1-create-users.sql
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     restart: always

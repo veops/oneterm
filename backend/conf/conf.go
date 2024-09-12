@@ -31,9 +31,6 @@ var (
 			Path:          "app.log",
 			ConsoleEnable: true,
 		},
-		Auth: Auth{
-			Custom: map[string]string{},
-		},
 	}
 )
 
@@ -86,6 +83,11 @@ type AclConfig struct {
 	ResourceNames []*KV  `yaml:"resourceNames"`
 }
 
+type AesConfig struct {
+	Key []byte `yaml:"key"`
+	Iv  []byte `yaml:"iv"`
+}
+
 type LogConfig struct {
 	Level string `yaml:"level"`
 	Path  string `yaml:"path"`
@@ -104,8 +106,8 @@ type LogConfig struct {
 }
 
 type Auth struct {
-	Acl    *AclConfig        `yaml:"acl"`
-	Custom map[string]string `yaml:"custom"`
+	Acl AclConfig `yaml:"acl"`
+	Aes AesConfig `yaml:"aes"`
 }
 
 type SshConfig struct {

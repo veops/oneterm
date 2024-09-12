@@ -103,7 +103,7 @@ func (c *Controller) GetSessions(ctx *gin.Context) {
 	}
 	db = filterEqual(ctx, db, "status", "uid", "asset_id", "client_ip")
 
-	doGet[*model.Session](ctx, false, db, "", sessionPostHooks...)
+	doGet(ctx, false, db, "", sessionPostHooks...)
 }
 
 // GetSessionCmds godoc

@@ -12,7 +12,7 @@ const (
 )
 
 type FileHistory struct {
-	Id        int    `json:"id" gorm:"column:id;primarykey"`
+	Id        int    `json:"id" gorm:"column:id;primarykey;autoIncrement"`
 	Uid       int    `json:"uid" gorm:"column:uid"`
 	UserName  string `json:"user_name" gorm:"column:user_name"`
 	AssetId   int    `json:"asset_id" gorm:"column:asset_id"`

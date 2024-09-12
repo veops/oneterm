@@ -81,6 +81,16 @@ func auth() gin.HandlerFunc {
 	}
 }
 
+func authAdmin() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		currentUser, _ := acl.GetSessionFromCtx(ctx)
+		if !acl.IsAdmin(currentUser) {
+			ctx.AbortWithStatus(http.StatusUnauthorized)
+			return
+		}
+	}
+}
+
 type bodyWriter struct {
 	gin.ResponseWriter
 	body *bytes.Buffer

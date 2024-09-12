@@ -1,7 +1,6 @@
 package schedule
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"strings"
@@ -19,28 +18,7 @@ import (
 	"github.com/veops/oneterm/util"
 )
 
-var (
-	ctx, cancel = context.WithCancel(context.Background())
-	d           = time.Hour * 2
-)
-
-func RunConnectable() (err error) {
-	tk := time.NewTicker(d)
-	for {
-		select {
-		case <-tk.C:
-			CheckUpdate()
-		case <-ctx.Done():
-			return
-		}
-	}
-}
-
-func StopConnectable() {
-	defer cancel()
-}
-
-func CheckUpdate(ids ...int) (err error) {
+func UpdateConnectables(ids ...int) (err error) {
 	defer func() {
 		if err != nil {
 			logger.L().Warn("check connectable failed", zap.Error(err))
@@ -52,7 +30,7 @@ func CheckUpdate(ids ...int) (err error) {
 	if len(ids) > 0 {
 		db = db.Where("id IN ?", ids)
 	} else {
-		db = db.Where("updated_at <= ?", time.Now().Add(-d).Unix())
+		db = db.Where("updated_at <= ?", time.Now().Add(time.Hour).Unix())
 	}
 	if err = db.
 		Find(&assets).Error; err != nil {
@@ -80,7 +58,7 @@ func CheckUpdate(ids ...int) (err error) {
 	all, oks := lo.Map(assets, func(a *model.Asset, _ int) int { return a.Id }), make([]int, 0)
 	sids := make([]string, 0)
 	for _, a := range assets {
-		sid, ok := checkOne(a, gatewayMap[a.GatewayId])
+		sid, ok := updateConnectable(a, gatewayMap[a.GatewayId])
 		if ok {
 			oks = append(oks, a.Id)
 		}
@@ -100,7 +78,7 @@ func CheckUpdate(ids ...int) (err error) {
 	return
 }
 
-func checkOne(asset *model.Asset, gateway *model.Gateway) (sid string, ok bool) {
+func updateConnectable(asset *model.Asset, gateway *model.Gateway) (sid string, ok bool) {
 	sid = uuid.New().String()
 	for _, p := range asset.Protocols {
 		ip, port := asset.Ip, cast.ToInt(strings.Split(p, ":")[1])

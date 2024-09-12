@@ -118,17 +118,8 @@ type Session struct {
 	Chans        *SessionChans   `json:"-" gorm:"-"`
 	ConnectionId string          `json:"-" gorm:"-"`
 	GuacdTunnel  *guacd.Tunnel   `json:"-" gorm:"-"`
-	IdleTimout   time.Duration   `json:"-" gorm:"-"`
 	IdleTk       *time.Ticker    `json:"-" gorm:"-"`
 	SshRecoder   *Asciinema      `json:"-" gorm:"-"`
-}
-
-func NewSession(ctx context.Context) *Session {
-	s := &Session{}
-	s.G, s.Gctx = errgroup.WithContext(ctx)
-	s.Chans = NewSessionChans()
-	s.Monitors = &sync.Map{}
-	return s
 }
 
 func (m *Session) HasMonitors() (has bool) {
@@ -137,6 +128,29 @@ func (m *Session) HasMonitors() (has bool) {
 		return false
 	})
 	return
+}
+
+func (m *Session) SetIdle() {
+	d := time.Hour
+	cfg := model.GlobalConfig.Load()
+	if cfg != nil && cfg.Timeout > 0 {
+		d = time.Second * time.Duration(cfg.Timeout)
+	}
+	if m.IdleTk == nil {
+		m.IdleTk = time.NewTicker(d)
+	} else {
+		m.IdleTk.Reset(d)
+	}
+
+}
+
+func NewSession(ctx context.Context) *Session {
+	s := &Session{}
+	s.G, s.Gctx = errgroup.WithContext(ctx)
+	s.Chans = NewSessionChans()
+	s.Monitors = &sync.Map{}
+	s.SetIdle()
+	return s
 }
 
 func UpsertSession(data *Session) (err error) {

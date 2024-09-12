@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"net"
 	"net/http"
 	"strings"
 
@@ -21,9 +20,6 @@ var (
 				ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrWrongPk, Data: nil})
 			} else {
 				data.Pk = strings.TrimSpace(strings.TrimSuffix(data.Pk, comment))
-			}
-			if _, err := net.ParseMAC(data.Mac); err != nil {
-				ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrWrongMac, Data: nil})
 			}
 		},
 		func(ctx *gin.Context, data *model.PublicKey) {

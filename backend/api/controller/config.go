@@ -3,12 +3,14 @@ package controller
 import (
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/cast"
 	"gorm.io/gorm"
 
 	"github.com/veops/oneterm/acl"
+	redis "github.com/veops/oneterm/cache"
 	mysql "github.com/veops/oneterm/db"
 	"github.com/veops/oneterm/model"
 )
@@ -44,6 +46,9 @@ func (c *Controller) PostConfig(ctx *gin.Context) {
 		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
+
+	model.GlobalConfig.Store(cfg)
+	redis.SetEx(ctx, "config", cfg, time.Hour)
 
 	ctx.JSON(http.StatusOK, defaultHttpResponse)
 }

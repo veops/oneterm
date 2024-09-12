@@ -106,7 +106,7 @@ func doCreate[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType 
 		}
 
 		if err = tx.Create(&model.History{
-			RemoteIp:   ctx.RemoteIP(),
+			RemoteIp:   ctx.ClientIP(),
 			Type:       md.TableName(),
 			TargetId:   md.GetId(),
 			ActionType: model.ACTION_CREATE,
@@ -401,7 +401,7 @@ func filterSearch(ctx *gin.Context, db *gorm.DB, fields ...string) *gorm.DB {
 
 	return db
 }
-func filterStartEnd(ctx *gin.Context, db *gorm.DB, fields ...string) (*gorm.DB, error) {
+func filterStartEnd(ctx *gin.Context, db *gorm.DB) (*gorm.DB, error) {
 	if q, ok := ctx.GetQuery("start"); ok {
 		t, err := time.Parse(time.RFC3339, q)
 		if err != nil {

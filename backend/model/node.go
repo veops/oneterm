@@ -11,14 +11,14 @@ const (
 )
 
 type Node struct {
-	Id            int                  `json:"id" gorm:"column:id;primarykey"`
+	Id            int                  `json:"id" gorm:"column:id;primarykey;autoIncrement"`
 	Name          string               `json:"name" gorm:"column:name"`
 	Comment       string               `json:"comment" gorm:"column:comment"`
 	ParentId      int                  `json:"parent_id" gorm:"column:parent_id"`
 	Authorization Map[int, Slice[int]] `json:"authorization" gorm:"column:authorization"`
-	*AccessAuth   `json:"access_auth" gorm:"column:access_auth"`
-	Protocols     Slice[string] `json:"protocols" gorm:"column:protocols"`
-	GatewayId     int           `json:"gateway_id" gorm:"column:gateway_id"`
+	AccessAuth    AccessAuth           `json:"access_auth" gorm:"embedded;column:access_auth"`
+	Protocols     Slice[string]        `json:"protocols" gorm:"column:protocols"`
+	GatewayId     int                  `json:"gateway_id" gorm:"column:gateway_id"`
 
 	// ResourceId int       `json:"resource_id"`
 	CreatorId int                   `json:"creator_id" gorm:"column:creator_id"`

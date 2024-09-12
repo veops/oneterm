@@ -7,8 +7,8 @@ import (
 )
 
 type Gateway struct {
-	Id          int    `json:"id" gorm:"column:id;primarykey"`
-	Name        string `json:"name" gorm:"column:name"`
+	Id          int    `json:"id" gorm:"column:id;primarykey;autoIncrement"`
+	Name        string `json:"name" gorm:"column:name;uniqueIndex:name_del;size:128"`
 	Host        string `json:"host" gorm:"column:host"`
 	Port        int    `json:"port" gorm:"column:port"`
 	AccountType int    `json:"account_type" gorm:"column:account_type"`
@@ -22,7 +22,7 @@ type Gateway struct {
 	UpdaterId  int                   `json:"updater_id" gorm:"column:updater_id"`
 	CreatedAt  time.Time             `json:"created_at" gorm:"column:created_at"`
 	UpdatedAt  time.Time             `json:"updated_at" gorm:"column:updated_at"`
-	DeletedAt  soft_delete.DeletedAt `json:"-" gorm:"column:deleted_at"`
+	DeletedAt  soft_delete.DeletedAt `json:"-" gorm:"column:deleted_at;uniqueIndex:name_del"`
 
 	AssetCount int64 `json:"asset_count" gorm:"-"`
 }

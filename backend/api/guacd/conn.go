@@ -50,6 +50,7 @@ func NewTunnel(connectionId, sessionId string, w, h, dpi int, protocol string, a
 	}
 	ss := strings.Split(protocol, ":")
 	protocol, port := ss[0], ss[1]
+	cfg := model.GlobalConfig.Load()
 	t = &Tunnel{
 		conn:         conn,
 		reader:       bufio.NewReader(conn),
@@ -73,8 +74,8 @@ func NewTunnel(connectionId, sessionId string, w, h, dpi int, protocol string, a
 						"port":                  port,
 						"username":              account.Account,
 						"password":              account.Password,
-						"disable-copy":          "false",
-						"disable-paste":         "false",
+						"disable-copy":          cast.ToString(lo.Ternary(strings.Contains(protocol, "rdp"), !cfg.RdpConfig.Copy, !cfg.VncConfig.Copy)),
+						"disable-paste":         cast.ToString(lo.Ternary(strings.Contains(protocol, "rdp"), !cfg.RdpConfig.Paste, !cfg.VncConfig.Paste)),
 					}
 				}, func() map[string]string {
 					return map[string]string{

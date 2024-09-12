@@ -5,19 +5,16 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"encoding/base64"
-)
 
-var (
-	key = []byte("thisis32bitlongpassphraseimusing")
-	iv  = []byte("0123456789abcdef")
+	"github.com/veops/oneterm/conf"
 )
 
 func EncryptAES(plainText string) string {
-	block, _ := aes.NewCipher(key)
+	block, _ := aes.NewCipher(conf.Cfg.Auth.Aes.Key)
 	bs := []byte(plainText)
 	bs = paddingPKCS7(bs, aes.BlockSize)
 
-	mode := cipher.NewCBCEncrypter(block, iv)
+	mode := cipher.NewCBCEncrypter(block, conf.Cfg.Auth.Aes.Iv)
 	mode.CryptBlocks(bs, bs)
 
 	return base64.StdEncoding.EncodeToString(bs)
@@ -25,12 +22,12 @@ func EncryptAES(plainText string) string {
 
 func DecryptAES(cipherText string) string {
 	bs, _ := base64.StdEncoding.DecodeString(cipherText)
-	block, err := aes.NewCipher(key)
+	block, err := aes.NewCipher(conf.Cfg.Auth.Aes.Key)
 	if err != nil {
 		panic(err)
 	}
 
-	mode := cipher.NewCBCDecrypter(block, iv)
+	mode := cipher.NewCBCDecrypter(block, conf.Cfg.Auth.Aes.Iv)
 	mode.CryptBlocks(bs, bs)
 
 	return string(unPaddingPKCS7(bs))

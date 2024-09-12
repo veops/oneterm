@@ -7,8 +7,8 @@ import (
 )
 
 type Account struct {
-	Id          int    `json:"id" gorm:"column:id;primarykey"`
-	Name        string `json:"name" gorm:"column:name"`
+	Id          int    `json:"id" gorm:"column:id;primarykey;autoIncrement"`
+	Name        string `json:"name" gorm:"column:name;uniqueIndex:name_del;size:128"`
 	AccountType int    `json:"account_type" gorm:"column:account_type"`
 	Account     string `json:"account" gorm:"column:account"`
 	Password    string `json:"password" gorm:"column:password"`
@@ -20,7 +20,7 @@ type Account struct {
 	UpdaterId  int                   `json:"updater_id" gorm:"column:updater_id"`
 	CreatedAt  time.Time             `json:"created_at" gorm:"column:created_at"`
 	UpdatedAt  time.Time             `json:"updated_at" gorm:"column:updated_at"`
-	DeletedAt  soft_delete.DeletedAt `json:"-" gorm:"column:deleted_at"`
+	DeletedAt  soft_delete.DeletedAt `json:"-" gorm:"column:deleted_at;uniqueIndex:name_del"`
 
 	AssetCount int64 `json:"asset_count" gorm:"-"`
 }

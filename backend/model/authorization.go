@@ -7,16 +7,16 @@ import (
 )
 
 type Authorization struct {
-	Id        int `json:"id" gorm:"column:id;primarykey"`
-	AssetId   int `json:"asset_id" gorm:"column:asset_id"`
-	AccountId int `json:"account_id" gorm:"column:account_id"`
+	Id        int `json:"id" gorm:"column:id;primarykey;autoIncrement"`
+	AssetId   int `json:"asset_id" gorm:"column:asset_id;uniqueIndex:asset_account_id_del"`
+	AccountId int `json:"account_id" gorm:"column:account_id;uniqueIndex:asset_account_id_del"`
 
 	ResourceId int                   `json:"resource_id" gorm:"column:resource_id"`
 	CreatorId  int                   `json:"creator_id" gorm:"column:creator_id"`
 	UpdaterId  int                   `json:"updater_id" gorm:"column:updater_id"`
 	CreatedAt  time.Time             `json:"created_at" gorm:"column:created_at"`
 	UpdatedAt  time.Time             `json:"updated_at" gorm:"column:updated_at"`
-	DeletedAt  soft_delete.DeletedAt `json:"-" gorm:"column:deleted_at"`
+	DeletedAt  soft_delete.DeletedAt `json:"-" gorm:"column:deleted_at;uniqueIndex:asset_account_id_del"`
 }
 
 func (m *Authorization) TableName() string {
@@ -28,7 +28,7 @@ type InfoModel interface {
 }
 
 type AssetInfo struct {
-	Id            int           `json:"id" gorm:"column:id;primarykey"`
+	Id            int           `json:"id" gorm:"column:id;primarykey;autoIncrement"`
 	Name          string        `json:"name" gorm:"column:name"`
 	Comment       string        `json:"comment" gorm:"column:comment"`
 	ParentId      int           `json:"parent_id" gorm:"column:parent_id"`
@@ -49,7 +49,7 @@ func (m *AssetInfo) GetId() int {
 }
 
 type AccountInfo struct {
-	Id          int    `json:"id" gorm:"column:id;primarykey"`
+	Id          int    `json:"id" gorm:"column:id;primarykey;autoIncrement"`
 	Name        string `json:"name" gorm:"column:name"`
 	Account     string `json:"account" gorm:"column:account"`
 	AccountType int    `json:"account_type,omitempty" gorm:"column:account_type"`
@@ -61,7 +61,7 @@ func (m *AccountInfo) GetId() int {
 }
 
 type GatewayInfo struct {
-	Id          int    `json:"id" gorm:"column:id;primarykey"`
+	Id          int    `json:"id" gorm:"column:id;primarykey;autoIncrement"`
 	Name        string `json:"name" gorm:"column:name"`
 	Host        string `json:"host" gorm:"column:host"`
 	Port        int    `json:"port" gorm:"column:port"`
@@ -75,7 +75,7 @@ func (m *GatewayInfo) GetId() int {
 }
 
 type CmdInfo struct {
-	Id     int           `json:"id" gorm:"column:id;primarykey"`
+	Id     int           `json:"id" gorm:"column:id;primarykey;autoIncrement"`
 	Name   string        `json:"name" gorm:"column:name"`
 	Cmds   Slice[string] `json:"cmds" gorm:"column:cmds"`
 	Enable int           `json:"enable" gorm:"column:enable"`

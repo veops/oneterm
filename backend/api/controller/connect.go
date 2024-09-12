@@ -61,12 +61,12 @@ func read(sess *gsession.Session) error {
 				switch t {
 				case websocket.TextMessage:
 					chs.InChan <- msg
-					if sess.IsSsh() || guacd.IsActive(msg) {
-						sess.IdleTk.Reset(sess.IdleTimout)
+					if (sess.IsSsh() && len(msg) > 0 && msg[0] != '9') || guacd.IsActive(msg) {
+						sess.SetIdle()
 					}
 				}
 			} else if sess.SessionType == model.SESSIONTYPE_CLIENT {
-				sess.IdleTk.Reset(sess.IdleTimout)
+				sess.SetIdle()
 				chs.InChan <- sess.CliRw.Read()
 			}
 		}
@@ -110,8 +110,6 @@ func HandleSsh(sess *gsession.Session) (err error) {
 		}
 	}()
 	chs := sess.Chans
-	sess.IdleTimout = idleTime()
-	sess.IdleTk = time.NewTicker(sess.IdleTimout)
 	tk, tk1s, tk1m := time.NewTicker(time.Millisecond*100), time.NewTicker(time.Second), time.NewTicker(time.Minute)
 	sess.G.Go(func() error {
 		return read(sess)
@@ -127,7 +125,7 @@ func HandleSsh(sess *gsession.Session) (err error) {
 				return nil
 			case <-sess.IdleTk.C:
 				writeErrMsg(sess, "idle timeout\n\n")
-				return &ApiError{Code: ErrIdleTimeout, Data: map[string]any{"second": int64(sess.IdleTimout.Seconds())}}
+				return &ApiError{Code: ErrIdleTimeout, Data: map[string]any{"second": model.GlobalConfig.Load().Timeout}}
 			case <-tk1m.C:
 				if mysql.DB.Model(asset).Where("id = ?", sess.AssetId).First(asset).Error != nil {
 					continue
@@ -142,6 +140,7 @@ func HandleSsh(sess *gsession.Session) (err error) {
 				logger.L().Info("closed by", zap.String("admin", closeBy))
 				return &ApiError{Code: ErrAdminClose, Data: map[string]any{"admin": closeBy}}
 			case err := <-chs.ErrChan:
+				writeErrMsg(sess, err.Error())
 				return err
 			case in := <-chs.InChan:
 				if sess.SessionType == model.SESSIONTYPE_WEB {
@@ -195,8 +194,6 @@ func handleGuacd(sess *gsession.Session) (err error) {
 		}
 	}()
 	chs := sess.Chans
-	sess.IdleTimout = idleTime()
-	sess.IdleTk = time.NewTicker(sess.IdleTimout)
 	tk := time.NewTicker(time.Minute)
 	asset := &model.Asset{}
 	sess.G.Go(func() error {
@@ -208,7 +205,7 @@ func handleGuacd(sess *gsession.Session) (err error) {
 			case <-sess.Gctx.Done():
 				return nil
 			case <-sess.IdleTk.C:
-				return &ApiError{Code: ErrIdleTimeout, Data: map[string]any{"second": int64(sess.IdleTimout.Seconds())}}
+				return &ApiError{Code: ErrIdleTimeout, Data: map[string]any{"second": model.GlobalConfig.Load().Timeout}}
 			case <-tk.C:
 				if mysql.DB.Model(asset).Where("id = ?", sess.AssetId).First(asset).Error != nil {
 					continue
@@ -269,6 +266,7 @@ func DoConnect(ctx *gin.Context, ws *websocket.Conn) (sess *gsession.Session, er
 		GatewayInfo: lo.Ternary(asset.GatewayId == 0, "", fmt.Sprintf("%s(%s)", gateway.Name, gateway.Host)),
 		Protocol:    ctx.Param("protocol"),
 		Status:      model.SESSIONSTATUS_ONLINE,
+		ShareId:     cast.ToInt(ctx.Value("shareId")),
 	}
 	if sess.IsSsh() {
 		w, h := cast.ToInt(ctx.Query("w")), cast.ToInt(ctx.Query("h"))
@@ -324,7 +322,7 @@ func connectSsh(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, ac
 		}
 	}()
 
-	ip, port, err := util.Proxy(uuid.New().String(), "ssh", asset, gateway)
+	ip, port, err := util.Proxy(sess.SessionId, "ssh", asset, gateway)
 	if err != nil {
 		return
 	}
@@ -484,8 +482,8 @@ func connectGuacd(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, 
 //	@Param		w	query		int	false	"width"
 //	@Param		h	query		int	false	"height"
 //	@Param		dpi	query		int	false	"dpi"
-//	@Success	200	{object}	HttpResponse{data=gsession.Session}
-//	@Router		/connect/:asset_id/:account_id/:protocol [post]
+//	@Success	200	{object}	HttpResponse{}
+//	@Router		/connect/:asset_id/:account_id/:protocol [get]
 func (c *Controller) Connect(ctx *gin.Context) {
 	ctx.Set("sessionType", model.SESSIONTYPE_WEB)
 
@@ -711,7 +709,7 @@ func offlineSession(ctx *gin.Context, sessionId string, closer string) {
 	})
 }
 
-func checkTime(data *model.AccessAuth) bool {
+func checkTime(data model.AccessAuth) bool {
 	now := time.Now()
 	in := true
 	if (data.Start != nil && now.Before(*data.Start)) || (data.End != nil && now.After(*data.End)) {
@@ -758,14 +756,4 @@ func handleError(ctx *gin.Context, sess *gsession.Session, err error, ws *websoc
 	} else {
 		ws.WriteMessage(websocket.TextMessage, guacd.NewInstruction("error", lo.Ternary(ok, (ae).MessageBase64(ctx), err.Error()), cast.ToString(ErrAdminClose)).Bytes())
 	}
-}
-
-func idleTime() (d time.Duration) {
-	d = time.Hour * 2
-	cfg := &model.Config{}
-	if err := mysql.DB.Where(cfg).First(cfg).Error; err != nil {
-		return
-	}
-	d = time.Second * time.Duration(cfg.Timeout)
-	return
 }

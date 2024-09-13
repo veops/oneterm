@@ -78,16 +78,10 @@ export default {
     }),
     filterAccountList() {
       const _filterAccountList = []
-      Object.entries(this.authorization).forEach(([acc_id, rids]) => {
-        if (
-          rids.includes(this.rid) ||
-          this.roles.permissions.includes('acl_admin') ||
-          this.roles.permissions.includes('oneterm_admin')
-        ) {
-          const _find = this.accountList.find((item) => item.id === Number(acc_id))
-          if (_find) {
-            _filterAccountList.push(_find)
-          }
+      Object.keys(this.authorization).forEach((acc_id) => {
+        const _find = this.accountList.find((item) => Number(item.id) === Number(acc_id))
+        if (_find) {
+          _filterAccountList.push(_find)
         }
       })
       return _filterAccountList

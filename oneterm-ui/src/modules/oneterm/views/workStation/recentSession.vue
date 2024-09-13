@@ -139,20 +139,11 @@ export default {
       })
       const asset = (res?.data?.list || [])?.[0]
 
-      if (
-        !asset ||
-        !asset.protocols.includes(row.protocol) ||
-        !Object.keys(asset.authorization).flat().includes(String(row.account_id))
-      ) {
-        this.$message.warning(this.$t('oneterm.sessionTable.loginMessage'))
-        return
-      }
-
       const protocolType = row.protocol.split?.(':')?.[0] || ''
 
       this.$emit('openTerminal', {
         assetId: row.asset_id,
-        assetName: asset?.name || '',
+        assetName: asset?.name || row?.asset_info || '',
         accountId: row.account_id,
         protocol: row.protocol,
         protocolType
@@ -165,33 +156,14 @@ export default {
         info: true
       }).then((res) => {
         const asset = (res?.data?.list || [])?.[0]
-        const isError = this.validLoginData(asset)
-        if (!isError) {
+        const accountLength = Object.values(asset?.authorization || {})?.flat?.()?.length
+
+        if (accountLength) {
           this.$refs.loginModal.open(row.asset_id, asset?.name || '', asset.authorization, asset.protocols)
         } else {
           this.$message.warning(this.$t('oneterm.sessionTable.loginMessage'))
         }
       })
-    },
-
-    validLoginData(asset) {
-      if (!asset) {
-        return true
-      }
-
-      const hasAccount = Object.entries(asset.authorization).some(([_, rids]) => {
-        if (
-          rids.includes(this.rid) ||
-          this.roles.permissions.includes('acl_admin') ||
-          this.roles.permissions.includes('oneterm_admin')
-        ) {
-          return true
-        }
-
-        return false
-      })
-
-      return !hasAccount
     },
 
     loginOpenTerminal(data) {

@@ -55,7 +55,7 @@ export default {
   },
   methods: {
     async initTerm({ disableStdin = false }) {
-      const fitAddon = new FitAddon()
+      this.fitAddon = new FitAddon()
       this.term = new Terminal({
         fontSize: 14,
         cursorBlink: !disableStdin,
@@ -63,7 +63,7 @@ export default {
         disableStdin: disableStdin,
       })
 
-      this.term.loadAddon(fitAddon)
+      this.term.loadAddon(this.fitAddon)
       this.term.open(this.$refs.onetermTerminalRef)
       this.term.writeln('\x1b[1;1;32mwelcome to oneterm!\x1b[0m')
       if (!disableStdin) {
@@ -75,7 +75,13 @@ export default {
         })
       }
 
-      fitAddon.fit()
+      this.term.onResize((size) => {
+        if (this.websocket) {
+          this.websocket.send(`w${size.cols},${size.rows}`)
+        }
+      })
+
+      this.fitAddon.fit()
       this.term.focus()
     },
     initWebsocket() {
@@ -128,7 +134,9 @@ export default {
       this.term.write(message.data)
     },
     resize() {
-      this.websocket.send(`w${this.term.cols},${this.term.rows}`)
+      if (this.fitAddon) {
+        this.fitAddon.fit()
+      }
     },
   },
 }

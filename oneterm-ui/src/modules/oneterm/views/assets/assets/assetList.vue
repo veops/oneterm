@@ -362,22 +362,16 @@ export default {
 
             const accountList = []
             row._protocols.forEach((protocol) => {
-              Object.entries(row.authorization).forEach(([acc_id, rids]) => {
-                if (
-                  rids.includes(this.rid) ||
-                  this.roles.permissions.includes('acl_admin') ||
-                  this.roles.permissions.includes('oneterm_admin')
-                ) {
-                  const _find = this.accountList?.find((item) => item.id === Number(acc_id))
-                  if (_find) {
-                    accountList.push({
-                      account_id: _find.id,
-                      account_name: _find.name,
-                      protocol: protocol.value,
-                      protocolType: protocol.key,
-                      protocolIcon: protocol.icon,
-                    })
-                  }
+              Object.keys(row.authorization).forEach((acc_id) => {
+                const _find = this.accountList?.find((item) => Number(item.id) === Number(acc_id))
+                if (_find) {
+                  accountList.push({
+                    account_id: _find.id,
+                    account_name: _find.name,
+                    protocol: protocol.value,
+                    protocolType: protocol.key,
+                    protocolIcon: protocol.icon,
+                  })
                 }
               })
             })
@@ -492,20 +486,14 @@ export default {
     clickProtocol(protocol, row) {
       const accountList = []
 
-      Object.entries(row.authorization).forEach(([acc_id, rids]) => {
-        if (
-          rids.includes(this.rid) ||
-          this.roles.permissions.includes('acl_admin') ||
-          this.roles.permissions.includes('oneterm_admin')
-        ) {
-          const _find = this.accountList?.find((item) => item.id === Number(acc_id))
+      Object.keys(row.authorization).forEach((acc_id) => {
+        const _find = this.accountList?.find((item) => Number(item.id) === Number(acc_id))
 
-          if (_find) {
-            accountList.push({
-              account_id: _find.id,
-              account_name: _find.name,
-            })
-          }
+        if (_find) {
+          accountList.push({
+            account_id: _find.id,
+            account_name: _find.name,
+          })
         }
       })
 

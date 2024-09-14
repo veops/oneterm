@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/samber/lo"
 	"github.com/veops/go-ansiterm"
 	mysql "github.com/veops/oneterm/db"
 	"github.com/veops/oneterm/logger"
@@ -40,9 +41,10 @@ func NewParser(sessionId string, w, h int) *Parser {
 	stream := ansiterm.InitByteStream(screen, false)
 	stream.Attach(screen)
 	p := &Parser{
+		SessionId:    sessionId,
 		OutputStream: stream,
 		isEdit:       false,
-		first:        true,
+		isPrompt:     true,
 	}
 	return p
 }
@@ -53,36 +55,43 @@ type Parser struct {
 	Output       []byte
 	SessionId    string
 	Cmds         []*model.Command
-	first        bool
+	isPrompt     bool
 	prompt       string
 	isEdit       bool
+	curCmd       string
 	lastCmd      string
 	lastRes      string
+	curRes       string
 }
 
 func (p *Parser) AddInput(bs []byte) (cmd string, forbidden bool) {
-	if p.first {
-		p.GetOutput()
-		p.first = false
+	if p.isPrompt && !p.isEdit {
+		p.prompt = p.GetOutput()
+		p.isPrompt = false
+		p.WriteDb()
+		p.lastCmd = ""
 	}
 	p.Input = append(p.Input, bs...)
 	if !bytes.HasSuffix(p.Input, []byte("\r")) {
 		return
 	}
-	cmd = p.GetCmd()
-	fmt.Println("----------------------cmd", cmd)
+	p.isPrompt = true
+	p.curCmd = p.GetCmd()
+	fmt.Println("----------------------cmd", p.curCmd)
 	p.Reset()
 	filter := ""
-	if filter, forbidden = p.IsForbidden(cmd); forbidden {
+	if filter, forbidden = p.IsForbidden(p.curCmd); forbidden {
 		cmd = filter
 		return
 	}
-	p.lastCmd = cmd
-	p.WriteDb()
+	p.lastCmd = p.curCmd
 	return
 }
 
 func (p *Parser) IsForbidden(cmd string) (string, bool) {
+	if p.isEdit {
+		return "", false
+	}
 	for _, c := range p.Cmds {
 		if c.IsRe {
 			if c.Re.MatchString(cmd) {
@@ -113,24 +122,7 @@ func (p *Parser) WriteDb() {
 }
 
 func (p *Parser) AddOutput(bs []byte) {
-	fmt.Println("-----------out", string(bs))
-	if !p.isEdit {
-		p.Output = append(p.Output, bs...)
-		end := bytes.LastIndex(p.Output, []byte("\r"))
-		if end < 0 {
-			return
-		}
-		begin := end - 1
-		for ; begin > 0; begin-- {
-			if p.Output[begin] == '\r' {
-				break
-			}
-		}
-		if begin+1 > end-1 {
-			return
-		}
-		p.prompt = string(p.Output[begin+1 : end-1])
-	}
+	p.Output = append(p.Output, bs...)
 }
 
 func (p *Parser) GetCmd() string {
@@ -154,21 +146,20 @@ func (p *Parser) Reset() {
 func (p *Parser) GetOutput() string {
 	p.OutputStream.Feed(p.Output)
 
-	res := parseOutput(p.OutputStream.Listener.Display())
-	if len(res) == 0 {
+	res := p.OutputStream.Listener.Display()
+	res = lo.DropRightWhile(res, func(item string) bool { return item == "" })
+	ln := len(res)
+	if ln == 0 {
 		return ""
 	}
-	p.lastRes = res[len(res)-1]
-	return p.lastRes
-}
+	fmt.Println("----------res", strings.Join(res, "\n"))
 
-func parseOutput(data []string) (output []string) {
-	for _, line := range data {
-		if strings.TrimSpace(line) != "" {
-			output = append(output, line)
-		}
+	p.lastRes = ""
+	if ln > 1 {
+		p.lastRes = strings.Join(res[:ln-1], "\n")
 	}
-	return output
+	p.curRes = res[ln-1]
+	return p.curRes
 }
 
 func (p *Parser) State(b []byte) bool {

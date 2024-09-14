@@ -52,7 +52,11 @@ func (i *Instruction) Parse(content string) *Instruction {
 
 	var args = make([]string, len(elements))
 	for i, e := range elements {
-		args[i] = strings.Split(e, ".")[1]
+		ss := strings.Split(e, ".")
+		if len(ss) < 2 {
+			continue
+		}
+		args[i] = ss[1]
 	}
 	return NewInstruction(args[0], args[1:]...)
 }

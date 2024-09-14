@@ -107,18 +107,19 @@ func (c *Controller) GetAssets(ctx *gin.Context) {
 			handleRemoteErr(ctx, err)
 			return
 		}
-		ids := make([]int, 0)
+		ids := make([]*model.AuthorizationIds, 0)
 		if err = mysql.DB.
 			Model(&model.Authorization{}).
 			Where("resource_id IN ?", authorizationResourceIds).
-			Distinct().
-			Pluck("asset_id", &ids).
+			Find(&ids).
 			Error; err != nil {
 			ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
 			return
 		}
+		assetIds := lo.Uniq(lo.Map(ids, func(item *model.AuthorizationIds, _ int) int { return item.AssetId }))
+		db = db.Where("id IN ?", assetIds)
 
-		db = db.Where("id IN ?", ids)
+		ctx.Set("authorizationIds", ids)
 	}
 
 	db = db.Order("name")
@@ -159,12 +160,15 @@ func assetPostHookAuth(ctx *gin.Context, data []*model.Asset) {
 	if acl.IsAdmin(currentUser) {
 		return
 	}
+	authorizationIds, _ := ctx.Value("authorizationIds").([]*model.AuthorizationIds)
 	for _, a := range data {
-		for k, v := range a.Authorization {
-			if lo.Contains(v, currentUser.GetRid()) {
-				continue
+		accountIds := lo.Uniq(
+			lo.Map(lo.Filter(authorizationIds, func(item *model.AuthorizationIds, _ int) bool { return item.AssetId == a.Id }),
+				func(item *model.AuthorizationIds, _ int) int { return item.AccountId }))
+		for k := range a.Authorization {
+			if !lo.Contains(accountIds, k) {
+				delete(a.Authorization, k)
 			}
-			delete(a.Authorization, k)
 		}
 	}
 }

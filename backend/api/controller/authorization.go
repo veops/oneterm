@@ -154,14 +154,20 @@ func GetAutorizationResourceIds(ctx *gin.Context) (resourceIds []int, err error)
 	return
 }
 
-func HasAuthorization(ctx *gin.Context) (ok bool) {
-	currentUser, _ := acl.GetSessionFromCtx(ctx)
-	rs, err := acl.GetRoleResources(ctx, currentUser.Acl.Rid, conf.RESOURCE_AUTHORIZATION)
+func HasAuthorization(ctx *gin.Context, assetId, accountId int) (ok bool) {
+	ids, err := GetAutorizationResourceIds(ctx)
 	if err != nil {
-		logger.L().Error("check authorization failed", zap.Error(err))
+		logger.L().Error("", zap.Error(err))
 		return
 	}
-	k := fmt.Sprintf("%s-%s", ctx.Param("asset_id"), ctx.Param("account_id"))
-	_, ok = lo.Find(rs, func(r *acl.Resource) bool { return k == r.Name })
-	return
+	cnt := int64(0)
+	err = mysql.DB.Model(&model.Authorization{}).
+		Where("asset_id =? AND account_id =? AND resource_id IN (?)", assetId, accountId, ids).
+		Count(&cnt).Error
+	if err != nil {
+		logger.L().Error("", zap.Error(err))
+		return
+	}
+
+	return cnt > 0
 }

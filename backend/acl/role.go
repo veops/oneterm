@@ -18,7 +18,7 @@ func GetRoleResources(ctx context.Context, rid int, resourceTypeId string) (res 
 	}
 
 	data := &ResourceResult{}
-	url := fmt.Sprintf("%v/acl/roles/%v/resources", conf.Cfg.Auth.Acl.Url, rid)
+	url := fmt.Sprintf("%s/acl/roles/%d/resources", conf.Cfg.Auth.Acl.Url, rid)
 	resp, err := remote.RC.R().
 		SetHeader("App-Access-Token", token).
 		SetQueryParams(map[string]string{

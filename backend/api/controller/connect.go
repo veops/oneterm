@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -41,6 +42,8 @@ var (
 			return true
 		},
 	}
+
+	clear = []byte("\x1b[2k\r")
 )
 
 func read(sess *gsession.Session) error {
@@ -61,7 +64,7 @@ func read(sess *gsession.Session) error {
 				switch t {
 				case websocket.TextMessage:
 					chs.InChan <- msg
-					if (sess.IsSsh() && len(msg) > 0 && msg[0] != '9') || guacd.IsActive(msg) {
+					if (sess.IsSsh() && len(msg) > 0 && msg[0] != '9') || (!sess.IsSsh() && guacd.IsActive(msg)) {
 						sess.SetIdle()
 					}
 				}
@@ -95,7 +98,7 @@ func write(sess *gsession.Session) {
 
 func writeErrMsg(sess *gsession.Session, msg string) {
 	chs := sess.Chans
-	out := append([]byte("\r\n \033[31m "), msg...)
+	out := []byte(fmt.Sprintf("\r\n \033[31m %s \x1b[0m", msg))
 	chs.OutBuf.Write(out)
 	write(sess)
 }
@@ -148,7 +151,7 @@ func HandleSsh(sess *gsession.Session) (err error) {
 					msg := in[1:]
 					switch rt {
 					case '1':
-						chs.Win.Write(msg)
+						in = msg
 					case '9':
 						continue
 					case 'w':
@@ -161,11 +164,17 @@ func HandleSsh(sess *gsession.Session) (err error) {
 							Height: cast.ToInt(wh[1]),
 						}
 					}
-				} else if sess.SessionType == model.SESSIONTYPE_CLIENT {
-					chs.Win.Write(in)
 				}
+				if cmd, forbidden := sess.SshParser.AddInput(in); forbidden {
+					writeErrMsg(sess, fmt.Sprintf("%s is forbidden\n", cmd))
+					sess.SshParser.AddInput(clear)
+					chs.Win.Write(clear)
+					continue
+				}
+				chs.Win.Write(in)
 			case out := <-chs.OutChan:
 				chs.OutBuf.Write(out)
+				sess.SshParser.AddOutput(out)
 			case <-tk.C:
 				write(sess)
 			case <-tk1s.C:
@@ -270,6 +279,16 @@ func DoConnect(ctx *gin.Context, ws *websocket.Conn) (sess *gsession.Session, er
 	}
 	if sess.IsSsh() {
 		w, h := cast.ToInt(ctx.Query("w")), cast.ToInt(ctx.Query("h"))
+		sess.SshParser = gsession.NewParser(sess.SessionId, w, h)
+		if err = mysql.DB.Model(sess.SshParser.Cmds).Where("id IN ? AND enable=?", []int(asset.AccessAuth.CmdIds), true).
+			Find(&sess.SshParser.Cmds).Error; err != nil {
+			return
+		}
+		for _, c := range sess.SshParser.Cmds {
+			if c.IsRe {
+				c.Re, _ = regexp.Compile(c.Cmd)
+			}
+		}
 		if sess.SshRecoder, err = gsession.NewAsciinema(sess.SessionId, w, h); err != nil {
 			return
 		}
@@ -285,9 +304,9 @@ func DoConnect(ctx *gin.Context, ws *websocket.Conn) (sess *gsession.Session, er
 		ctx.AbortWithError(http.StatusBadRequest, err)
 		return
 	}
-	if !checkAuthorization(currentUser, asset, accountId) {
-		err = &ApiError{Code: ErrLogin}
-		ctx.AbortWithError(http.StatusInternalServerError, err)
+	if !acl.IsAdmin(currentUser) && !HasAuthorization(ctx, assetId, accountId) {
+		err = &ApiError{Code: ErrUnauthorized}
+		ctx.AbortWithError(http.StatusForbidden, err)
 		return
 	}
 
@@ -410,6 +429,7 @@ func connectSsh(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, ac
 					continue
 				}
 				sess.SshRecoder.Resize(window.Width, window.Height)
+				sess.SshParser.Resize(window.Width, window.Height)
 			}
 		}
 	})
@@ -731,10 +751,6 @@ func checkTime(data model.AccessAuth) bool {
 		}
 	}
 	return !has || in == data.Allow
-}
-
-func checkAuthorization(user *acl.Session, asset *model.Asset, accountId int) bool {
-	return acl.IsAdmin(user) || lo.Contains(asset.Authorization[accountId], user.GetRid())
 }
 
 func handleError(ctx *gin.Context, sess *gsession.Session, err error, ws *websocket.Conn, chs *gsession.SessionChans) {

@@ -51,6 +51,7 @@ func init() {
 	if err = viper.Unmarshal(Cfg); err != nil {
 		panic(fmt.Sprintf("parse config from config.yaml failed:%s", err))
 	}
+
 }
 
 type HttpConfig struct {
@@ -84,8 +85,8 @@ type AclConfig struct {
 }
 
 type AesConfig struct {
-	Key []byte `yaml:"key"`
-	Iv  []byte `yaml:"iv"`
+	Key string `yaml:"key"`
+	Iv  string `yaml:"iv"`
 }
 
 type LogConfig struct {

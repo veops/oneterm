@@ -120,6 +120,7 @@ type Session struct {
 	GuacdTunnel  *guacd.Tunnel   `json:"-" gorm:"-"`
 	IdleTk       *time.Ticker    `json:"-" gorm:"-"`
 	SshRecoder   *Asciinema      `json:"-" gorm:"-"`
+	SshParser    *Parser         `json:"-" gorm:"-"`
 }
 
 func (m *Session) HasMonitors() (has bool) {

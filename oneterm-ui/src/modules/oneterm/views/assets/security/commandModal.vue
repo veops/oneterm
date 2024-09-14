@@ -5,10 +5,13 @@
         <a-input v-model="form.name" :placeholder="`${$t(`placeholder1`)}`" />
       </a-form-model-item>
       <a-form-model-item :label="$t(`oneterm.command`)" prop="cmds">
-        <a-select v-model="form.cmds" :placeholder="`${$t(`placeholder1`)}`" mode="tags"> </a-select>
+        <a-input v-model="form.cmd" :placeholder="`${$t(`placeholder1`)}`" />
       </a-form-model-item>
       <a-form-model-item :label="$t(`oneterm.assetList.enable`)" prop="enable">
         <a-switch v-model="form.enable" />
+      </a-form-model-item>
+      <a-form-model-item :label="$t(`oneterm.assetList.regexp`)" prop="enable">
+        <a-switch v-model="form.is_re" />
       </a-form-model-item>
     </a-form-model>
   </a-modal>
@@ -24,8 +27,9 @@ export default {
       visible: false,
       form: {
         name: '',
-        cmds: [],
+        cmd: [],
         enable: true,
+        is_re: true,
       },
       rules: {
         name: [{ required: true, message: `${this.$t(`placeholder1`)}` }],
@@ -45,15 +49,21 @@ export default {
     open(data) {
       this.visible = true
       if (data) {
-        this.form = { ...data, enable: Boolean(data.enable), cmds: data.cmds ?? [] }
+        this.form = {
+          ...data,
+          enable: Boolean(data.enable),
+          is_re: Boolean(data.is_re),
+          cmd: data.cmd ?? ''
+        }
       }
     },
     handleCancel() {
       this.$refs.commandForm.resetFields()
       this.form = {
         name: '',
-        cmds: [],
+        cmd: '',
         enable: true,
+        is_re: true,
       }
       this.visible = false
     },

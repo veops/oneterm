@@ -66,7 +66,7 @@
           <vxe-column :title="$t(`oneterm.account`)" field="account_info"> </vxe-column>
           <vxe-column :title="$t('oneterm.protocol')" field="protocol"> </vxe-column>
           <vxe-column :title="$t(`oneterm.sessionTable.clientIp`)" field="client_ip"> </vxe-column>
-          <!-- <vxe-column :title="$t(`oneterm.sessionTable.cmdCount`)" field="cmd_count"> </vxe-column> -->
+          <vxe-column :title="$t(`oneterm.sessionTable.cmdCount`)" field="cmd_count"> </vxe-column>
           <vxe-column :title="$t('created_at')" field="created_at" width="150px">
             <template #default="{row}">
               {{ moment(row.created_at).format('YYYY-MM-DD HH:mm:ss') }}
@@ -87,9 +87,9 @@
                   <a-tooltip :title="$t('download')">
                     <a :href="`/api/oneterm/v1/session/replay/${row.session_id}`"><a-icon type="download"/></a>
                   </a-tooltip>
-                  <!-- <a-tooltip :title="$t('oneterm.menu.commandRecord')">
+                  <a-tooltip :title="$t('oneterm.menu.commandRecord')">
                     <a @click="openDetail(row)"><ops-icon type="oneterm-commandrecord"/></a>
-                  </a-tooltip> -->
+                  </a-tooltip>
                 </template>
                 <template v-else>
                   <a-tooltip :title="$t('oneterm.sessionTable.monitor')">

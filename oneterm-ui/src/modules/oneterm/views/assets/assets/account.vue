@@ -18,6 +18,7 @@
               }"
               :placeholder="$t('placeholder2')"
               optionFilterProp="title"
+              allowClear
               @change="(value) => selectAccount(value, index)"
             >
               <a-select-option
@@ -39,6 +40,7 @@
               showSearch
               :placeholder="$t('placeholder2')"
               optionFilterProp="title"
+              allowClear
               @change="(value) => selectAccount(value, index)"
             >
               <a-select-option
@@ -68,6 +70,7 @@
                 '--custom-multiple-lineHeight': '18px',
               }"
               :limit="1"
+              :otherOptions="visualRoleList"
             />
           </td>
           <td>
@@ -85,7 +88,9 @@
 <script>
 import { v4 as uuidv4 } from 'uuid'
 import { getAccountList } from '../../../api/account'
+import { searchRole } from '@/modules/acl/api/role'
 import EmployeeTreeSelect from '@/views/setting/components/employeeTreeSelect.vue'
+
 export default {
   name: 'Account',
   components: { EmployeeTreeSelect },
@@ -105,11 +110,35 @@ export default {
     }
   },
   created() {
+    this.loadRoles()
     getAccountList({ page_index: 1 }).then((res) => {
       this.accountList = res?.data?.list || []
     })
   },
   methods: {
+    async loadRoles() {
+      const res = await searchRole({ page_size: 9999, page: 1, app_id: 'oneterm', user_role: 0, user_only: 0, is_all: true })
+
+      const visualRoleList = []
+      const roleList = (res?.roles || []).filter((item) => !/_virtual$/.test(item.name))
+
+      if (roleList.length) {
+        visualRoleList.push({
+          acl_rid: -100,
+          department_name: this.$t('acl.visualRole'),
+          sub_departments: [],
+          employees: roleList.map((item) => {
+            return {
+              nickname: item.name,
+              acl_rid: item.id
+            }
+          })
+        })
+      }
+
+      this.$set(this, 'visualRoleList', visualRoleList)
+    },
+
     addCount() {
       this.countList.push({ id: uuidv4(), name: undefined, account: undefined, rids: undefined })
     },

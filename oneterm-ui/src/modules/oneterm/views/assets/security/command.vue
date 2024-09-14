@@ -36,17 +36,10 @@
         :row-config="{ keyField: 'id' }"
         :height="tableHeight"
         resizable
-        :tooltip-config="{ contentMethod: contentMethod }"
       >
         <vxe-column type="checkbox" width="60px"></vxe-column>
         <vxe-column :title="$t(`oneterm.name`)" field="name"> </vxe-column>
-        <vxe-column :title="$t(`oneterm.command`)" field="cmds">
-          <template #default="{row}">
-            <template v-if="row.cmds">
-              <a-tag v-for="item in row.cmds" :key="item">{{ item }}</a-tag>
-            </template>
-          </template>
-        </vxe-column>
+        <vxe-column :title="$t(`oneterm.command`)" field="cmd"></vxe-column>
         <vxe-column :title="$t(`oneterm.assetList.enable`)" field="enable">
           <template #default="{row}">
             <a-switch :checked="Boolean(row.enable)" @change="changeEnable(row)" />
@@ -206,12 +199,6 @@ export default {
           })
         },
       })
-    },
-    contentMethod({ row, column }) {
-      if (column.property === 'cmds') {
-        return row.cmds.join('，')
-      }
-      return null
     },
     changeEnable(row) {
       putCommandById(row.id, { ...row, enable: Boolean(!row.enable) }).then(() => {

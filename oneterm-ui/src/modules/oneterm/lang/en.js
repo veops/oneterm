@@ -116,6 +116,7 @@ const oneterm_en = {
         createAsset: 'Create Asset',
         editAsset: 'Edit Asset',
         enable: 'Enable',
+        regexp: 'RegExp',
         addAccount: 'Create Account',
         editProtocol: 'Edit Protocol',
         createGateway: 'Create Gateway',

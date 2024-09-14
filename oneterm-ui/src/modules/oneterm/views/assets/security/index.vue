@@ -1,8 +1,8 @@
 <template>
   <a-tabs type="card" class="ops-tab">
-    <!-- <a-tab-pane key="1" :tab="$t('oneterm.assetList.commandFilter')">
+    <a-tab-pane key="1" :tab="$t('oneterm.assetList.commandFilter')">
       <Command />
-    </a-tab-pane> -->
+    </a-tab-pane>
     <a-tab-pane key="2" :tab="$t('oneterm.assetList.basicSettings')">
       <BasicSetting />
     </a-tab-pane>

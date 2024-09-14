@@ -20,7 +20,7 @@
     <a-form-model-item :label="$t(`oneterm.assetList.effectiveDate`)" prop="startAndEnd">
       <a-range-picker v-model="form.startAndEnd" />
     </a-form-model-item>
-    <!-- <a-form-model-item :label="$t(`oneterm.assetList.commandFilter`)" prop="cmd_ids">
+    <a-form-model-item :label="$t(`oneterm.assetList.commandFilter`)" prop="cmd_ids">
       <treeselect
         class="custom-treeselect custom-treeselect-bgcAndBorder"
         :style="{
@@ -48,7 +48,7 @@
         :z-index="1056"
       >
       </treeselect>
-    </a-form-model-item> -->
+    </a-form-model-item>
   </a-form-model>
 </template>
 
@@ -137,9 +137,9 @@ export default {
       }
     },
     async setValues(access_auth) {
-      const { start, end, ranges = [], allow = true } = access_auth
+      const { cmd_ids = undefined, start, end, ranges = [], allow = true } = access_auth
       this.form = {
-        cmd_ids: undefined,
+        cmd_ids,
         allow,
         startAndEnd: [start ? moment(start) : null, end ? moment(end) : null],
         ranges: ranges.map((r, index) => {

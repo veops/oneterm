@@ -116,6 +116,7 @@ const oneterm_zh = {
         createAsset: '创建资产',
         editAsset: '编辑资产',
         enable: '是否激活',
+        regexp: '是否正则',
         addAccount: '添加账号',
         editProtocol: '编辑协议',
         createGateway: '创建网关',

@@ -61,7 +61,7 @@ func (c *Controller) GetFileHistory(ctx *gin.Context) {
 //	@Router		/file/ls/:asset_id/:account_id [post]
 func (c *Controller) FileLS(ctx *gin.Context) {
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
-	if !acl.IsAdmin(currentUser) && !HasAuthorization(ctx) {
+	if !acl.IsAdmin(currentUser) && !HasAuthorization(ctx, cast.ToInt(ctx.Param("account_id")), cast.ToInt(ctx.Param("account_id"))) {
 		ctx.AbortWithError(http.StatusForbidden, &ApiError{Code: ErrNoPerm, Data: map[string]any{}})
 		return
 	}
@@ -101,7 +101,7 @@ func (c *Controller) FileLS(ctx *gin.Context) {
 //	@Router		/file/mkdir/:asset_id/:account_id [post]
 func (c *Controller) FileMkdir(ctx *gin.Context) {
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
-	if !acl.IsAdmin(currentUser) && !HasAuthorization(ctx) {
+	if !acl.IsAdmin(currentUser) && !HasAuthorization(ctx, cast.ToInt(ctx.Param("account_id")), cast.ToInt(ctx.Param("account_id"))) {
 		ctx.AbortWithError(http.StatusForbidden, &ApiError{Code: ErrNoPerm, Data: map[string]any{}})
 		return
 	}
@@ -141,7 +141,7 @@ func (c *Controller) FileMkdir(ctx *gin.Context) {
 //	@Router		/file/upload/:asset_id/:account_id [post]
 func (c *Controller) FileUpload(ctx *gin.Context) {
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
-	if !acl.IsAdmin(currentUser) && !HasAuthorization(ctx) {
+	if !acl.IsAdmin(currentUser) && !HasAuthorization(ctx, cast.ToInt(ctx.Param("account_id")), cast.ToInt(ctx.Param("account_id"))) {
 		ctx.AbortWithError(http.StatusForbidden, &ApiError{Code: ErrNoPerm, Data: map[string]any{}})
 		return
 	}
@@ -202,7 +202,7 @@ func (c *Controller) FileUpload(ctx *gin.Context) {
 //	@Router		/file/download/:asset_id/:account_id [get]
 func (c *Controller) FileDownload(ctx *gin.Context) {
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
-	if !acl.IsAdmin(currentUser) && !HasAuthorization(ctx) {
+	if !acl.IsAdmin(currentUser) && !HasAuthorization(ctx, cast.ToInt(ctx.Param("account_id")), cast.ToInt(ctx.Param("account_id"))) {
 		ctx.AbortWithError(http.StatusForbidden, &ApiError{Code: ErrNoPerm, Data: map[string]any{}})
 		return
 	}

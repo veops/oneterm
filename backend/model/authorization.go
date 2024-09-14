@@ -27,6 +27,15 @@ type InfoModel interface {
 	GetId() int
 }
 
+type AuthorizationIds struct {
+	AssetId   int `json:"asset_id" gorm:"column:asset_id"`
+	AccountId int `json:"account_id" gorm:"column:account_id"`
+}
+
+func (m *AuthorizationIds) TableName() string {
+	return "authorization"
+}
+
 type AssetInfo struct {
 	Id            int           `json:"id" gorm:"column:id;primarykey;autoIncrement"`
 	Name          string        `json:"name" gorm:"column:name"`

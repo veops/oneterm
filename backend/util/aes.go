@@ -9,12 +9,21 @@ import (
 	"github.com/veops/oneterm/conf"
 )
 
+var (
+	key, iv []byte
+)
+
+func init() {
+	key = []byte(conf.Cfg.Auth.Aes.Key)
+	iv = []byte(conf.Cfg.Auth.Aes.Iv)
+}
+
 func EncryptAES(plainText string) string {
-	block, _ := aes.NewCipher(conf.Cfg.Auth.Aes.Key)
+	block, _ := aes.NewCipher(key)
 	bs := []byte(plainText)
 	bs = paddingPKCS7(bs, aes.BlockSize)
 
-	mode := cipher.NewCBCEncrypter(block, conf.Cfg.Auth.Aes.Iv)
+	mode := cipher.NewCBCEncrypter(block, iv)
 	mode.CryptBlocks(bs, bs)
 
 	return base64.StdEncoding.EncodeToString(bs)
@@ -22,12 +31,12 @@ func EncryptAES(plainText string) string {
 
 func DecryptAES(cipherText string) string {
 	bs, _ := base64.StdEncoding.DecodeString(cipherText)
-	block, err := aes.NewCipher(conf.Cfg.Auth.Aes.Key)
+	block, err := aes.NewCipher(key)
 	if err != nil {
 		panic(err)
 	}
 
-	mode := cipher.NewCBCDecrypter(block, conf.Cfg.Auth.Aes.Iv)
+	mode := cipher.NewCBCDecrypter(block, iv)
 	mode.CryptBlocks(bs, bs)
 
 	return string(unPaddingPKCS7(bs))

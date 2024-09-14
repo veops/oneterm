@@ -1,7 +1,6 @@
 package schedule
 
 import (
-	"fmt"
 	"time"
 
 	redis "github.com/veops/oneterm/cache"
@@ -11,6 +10,10 @@ import (
 
 func UpdateConfig() {
 	cfg := &model.Config{}
+	defer func() {
+		redis.SetEx(ctx, "config", cfg, time.Hour)
+		model.GlobalConfig.Store(cfg)
+	}()
 	err := redis.Get(ctx, "config", cfg)
 	if err == nil {
 		return
@@ -19,9 +22,4 @@ func UpdateConfig() {
 	if err != nil {
 		return
 	}
-	redis.SetEx(ctx, "config", cfg, time.Hour)
-	model.GlobalConfig.Store(cfg)
-
-	fmt.Println("--------------------------", *model.GlobalConfig.Load())
-
 }

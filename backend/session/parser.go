@@ -77,7 +77,6 @@ func (p *Parser) AddInput(bs []byte) (cmd string, forbidden bool) {
 	}
 	p.isPrompt = true
 	p.curCmd = p.GetCmd()
-	fmt.Println("----------------------cmd", p.curCmd)
 	p.Reset()
 	filter := ""
 	if filter, forbidden = p.IsForbidden(p.curCmd); forbidden {
@@ -117,7 +116,7 @@ func (p *Parser) WriteDb() {
 	}
 	err := mysql.DB.Model(m).Create(m).Error
 	if err != nil {
-		logger.L().Error("write session cmd failed", zap.Error(err))
+		logger.L().Error("write session cmd failed", zap.Error(err), zap.Any("cmd", *m))
 	}
 }
 
@@ -128,8 +127,6 @@ func (p *Parser) AddOutput(bs []byte) {
 func (p *Parser) GetCmd() string {
 	s := p.GetOutput()
 	// TODO: some promot may change with its dir
-	fmt.Println("============", s)
-	fmt.Println("============", p.prompt)
 	return strings.TrimPrefix(s, p.prompt)
 }
 
@@ -152,7 +149,6 @@ func (p *Parser) GetOutput() string {
 	if ln == 0 {
 		return ""
 	}
-	fmt.Println("----------res", strings.Join(res, "\n"))
 
 	p.lastRes = ""
 	if ln > 1 {

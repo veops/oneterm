@@ -42,8 +42,7 @@ var (
 			return true
 		},
 	}
-
-	clear = []byte("\x1b[2k\r")
+	clear = []byte("\x15\r")
 )
 
 func read(sess *gsession.Session) error {
@@ -105,6 +104,7 @@ func writeErrMsg(sess *gsession.Session, msg string) {
 
 func HandleSsh(sess *gsession.Session) (err error) {
 	defer func() {
+		sess.SshParser.WriteDb()
 		sess.Status = model.SESSIONSTATUS_OFFLINE
 		sess.ClosedAt = lo.ToPtr(time.Now())
 		if err = gsession.UpsertSession(sess); err != nil {

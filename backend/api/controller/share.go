@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -90,7 +91,7 @@ func (c *Controller) ConnectShare(ctx *gin.Context) {
 		}
 		now := time.Now()
 		if now.Before(share.Start) || now.After(share.End) {
-			ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrBadRequest, Data: map[string]any{"err": "share expired or not started"}})
+			err = fmt.Errorf("share expired or not started")
 			return
 		}
 		if share.NoLimit {
@@ -101,7 +102,7 @@ func (c *Controller) ConnectShare(ctx *gin.Context) {
 			return
 		}
 		if db.RowsAffected != 1 {
-			ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrBadRequest, Data: map[string]any{"err": "no times left"}})
+			err = fmt.Errorf("no times left")
 			return
 		}
 		return

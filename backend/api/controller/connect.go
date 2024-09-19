@@ -36,8 +36,9 @@ import (
 
 var (
 	Upgrader = websocket.Upgrader{
-		ReadBufferSize:  4096,
-		WriteBufferSize: 4096,
+		HandshakeTimeout: time.Minute,
+		ReadBufferSize:   4096,
+		WriteBufferSize:  4096,
 		CheckOrigin: func(r *http.Request) bool {
 			return true
 		},
@@ -255,13 +256,10 @@ func DoConnect(ctx *gin.Context, ws *websocket.Conn) (sess *gsession.Session, er
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
 
 	assetId, accountId := cast.ToInt(ctx.Param("asset_id")), cast.ToInt(ctx.Param("account_id"))
-	fmt.Println("--------------------------------------", assetId, accountId)
 	asset, account, gateway, err := util.GetAAG(assetId, accountId)
 	if err != nil {
 		return
 	}
-	fmt.Println("--------------------------------------", *asset)
-	fmt.Println("--------------------------------------", *account)
 
 	sess = gsession.NewSession(ctx)
 	sess.Ws = ws
@@ -280,8 +278,6 @@ func DoConnect(ctx *gin.Context, ws *websocket.Conn) (sess *gsession.Session, er
 		Status:      model.SESSIONSTATUS_ONLINE,
 		ShareId:     cast.ToInt(ctx.Value("shareId")),
 	}
-	fmt.Printf("==============%+v\n", *sess)
-	fmt.Printf("==============%+v\n", *sess.Session)
 	if sess.IsSsh() {
 		w, h := cast.ToInt(ctx.Query("w")), cast.ToInt(ctx.Query("h"))
 		sess.SshParser = gsession.NewParser(sess.SessionId, w, h)
@@ -315,10 +311,8 @@ func DoConnect(ctx *gin.Context, ws *websocket.Conn) (sess *gsession.Session, er
 		return
 	}
 
-	
 	switch strings.Split(sess.Protocol, ":")[0] {
 	case "ssh":
-		fmt.Println("-----------------------------------------------fuckkkkkkkkkkkkkkkkkkkkkkkkkkk")
 		go connectSsh(ctx, sess, asset, account, gateway)
 	case "vnc", "rdp":
 		go connectGuacd(ctx, sess, asset, account, gateway)

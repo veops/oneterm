@@ -223,7 +223,7 @@ func (c *Controller) StatCountOfUser(ctx *gin.Context) {
 		isAdmin := acl.IsAdmin(currentUser)
 		db := mysql.DB.Model(&model.Asset{})
 		if !isAdmin {
-			authorizationResourceIds, err := GetAutorizationResourceIds(ctx)
+			authorizationResourceIds, err := getAutorizationResourceIds(ctx)
 			if err != nil {
 				return err
 			}

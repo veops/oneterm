@@ -1,26 +1,37 @@
 package model
 
 import (
+	"fmt"
 	"time"
 
 	"gorm.io/plugin/soft_delete"
 )
 
 type Authorization struct {
-	Id        int `json:"id" gorm:"column:id;primarykey;autoIncrement"`
-	AssetId   int `json:"asset_id" gorm:"column:asset_id;uniqueIndex:asset_account_id_del"`
-	AccountId int `json:"account_id" gorm:"column:account_id;uniqueIndex:asset_account_id_del"`
+	Id        int        `json:"id" gorm:"column:id;primarykey;autoIncrement"`
+	AssetId   *int       `json:"asset_id" gorm:"column:asset_id"`
+	AccountId *int       `json:"account_id" gorm:"column:account_id"`
+	NodeId    *int       `json:"node_id" gorm:"column:node_id"`
+	Rids      Slice[int] `json:"rids" gorm:"column:rids"`
 
 	ResourceId int                   `json:"resource_id" gorm:"column:resource_id"`
 	CreatorId  int                   `json:"creator_id" gorm:"column:creator_id"`
 	UpdaterId  int                   `json:"updater_id" gorm:"column:updater_id"`
 	CreatedAt  time.Time             `json:"created_at" gorm:"column:created_at"`
 	UpdatedAt  time.Time             `json:"updated_at" gorm:"column:updated_at"`
-	DeletedAt  soft_delete.DeletedAt `json:"-" gorm:"column:deleted_at;uniqueIndex:asset_account_id_del"`
+	DeletedAt  soft_delete.DeletedAt `json:"-" gorm:"column:deleted_at"`
 }
 
 func (m *Authorization) TableName() string {
 	return "authorization"
+}
+
+func (m *Authorization) GetName() string {
+	return fmt.Sprintf("%s-%s-%s", m.AssetId, m.AccountId, m.NodeId)
+}
+
+func (m *Authorization) GetId() int {
+	return m.Id
 }
 
 type InfoModel interface {
@@ -28,8 +39,9 @@ type InfoModel interface {
 }
 
 type AuthorizationIds struct {
-	AssetId   int `json:"asset_id" gorm:"column:asset_id"`
-	AccountId int `json:"account_id" gorm:"column:account_id"`
+	AssetId   *int `json:"asset_id" gorm:"column:asset_id"`
+	AccountId *int `json:"account_id" gorm:"column:account_id"`
+	NodeId    *int `json:"node_id" gorm:"column:node_id"`
 }
 
 func (m *AuthorizationIds) TableName() string {

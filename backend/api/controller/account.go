@@ -145,27 +145,41 @@ func (c *Controller) GetAccounts(ctx *gin.Context) {
 	}
 
 	if info && !acl.IsAdmin(currentUser) {
-		//rs := make([]*acl.Resource, 0)
-		rs, err := acl.GetRoleResources(ctx, currentUser.Acl.Rid, acl.GetResourceTypeName(conf.RESOURCE_AUTHORIZATION))
+		ids, err := getAccountIdsByAuthorization(ctx)
 		if err != nil {
-			handleRemoteErr(ctx, err)
 			return
 		}
-		ids := make([]int, 0)
-		if err = mysql.DB.
-			Model(&model.Authorization{}).
-			Where("resource_id IN ?", lo.Map(rs, func(r *acl.Resource, _ int) int { return r.ResourceId })).
-			Distinct().
-			Pluck("account_id", &ids).
-			Error; err != nil {
-			ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
-			return
-		}
-
 		db = db.Where("id IN ?", ids)
 	}
 
 	db = db.Order("name")
 
 	doGet[*model.Account](ctx, !info, db, acl.GetResourceTypeName(conf.RESOURCE_ACCOUNT), accountPostHooks...)
+}
+
+func getAccountIdsByAuthorization(ctx *gin.Context) (ids []int, err error) {
+	assetIds, err := getAssertIdsByAuthorization(ctx)
+	if err != nil {
+		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+		return
+	}
+	assets := make([]*model.Asset, 0)
+	if err = mysql.DB.Model(&model.Asset{}).Where("id IN ?", assetIds).Find(&assets).Error; err != nil {
+		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+		return
+	}
+	authorizationIds, _ := ctx.Value("authorizationIds").([]*model.AuthorizationIds)
+	parentNodeIds, _ := ctx.Value("parentNodeIds").([]int)
+	for _, a := range assets {
+		if lo.Contains(parentNodeIds, a.Id) {
+			ids = append(ids, lo.Keys(a.Authorization)...)
+		}
+		accountIds := lo.Uniq(
+			lo.Map(lo.Filter(authorizationIds, func(item *model.AuthorizationIds, _ int) bool {
+				return item.AssetId != nil && *item.AssetId == a.Id && item.AccountId != nil
+			}),
+				func(item *model.AuthorizationIds, _ int) int { return *item.AccountId }))
+		ids = append(ids, accountIds...)
+	}
+	return
 }

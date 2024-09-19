@@ -99,7 +99,7 @@ func doCreate[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType 
 
 		switch t := any(md).(type) {
 		case *model.Asset:
-			if err = HandleAuthorization(currentUser, tx, model.ACTION_CREATE, nil, t); err != nil {
+			if err = handleAuthorization(ctx, tx, model.ACTION_CREATE, t, nil); err != nil {
 				handleRemoteErr(ctx, err)
 				return
 			}
@@ -178,7 +178,7 @@ func doDelete[T model.Model](ctx *gin.Context, needAcl bool, md T, dcs ...delete
 	if err = mysql.DB.Transaction(func(tx *gorm.DB) (err error) {
 		switch t := any(md).(type) {
 		case *model.Asset:
-			if err = HandleAuthorization(currentUser, tx, model.ACTION_DELETE, t, nil); err != nil {
+			if err = handleAuthorization(ctx, tx, model.ACTION_DELETE, t, nil, nil); err != nil {
 				handleRemoteErr(ctx, err)
 				return
 			}
@@ -268,7 +268,7 @@ func doUpdate[T model.Model](ctx *gin.Context, needAcl bool, md T, preHooks ...p
 		selects := []string{"*"}
 		switch t := any(md).(type) {
 		case *model.Asset:
-			if err = HandleAuthorization(currentUser, tx, model.ACTION_UPDATE, any(old).(*model.Asset), t); err != nil {
+			if err = handleAuthorization(ctx, tx, model.ACTION_UPDATE, t, nil); err != nil {
 				handleRemoteErr(ctx, err)
 				return
 			}

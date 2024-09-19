@@ -124,7 +124,7 @@ func nodePostHookCountAsset(ctx *gin.Context, data []*model.Node) {
 	assets := make([]*model.AssetIdPid, 0)
 	db := mysql.DB.Model(&model.Asset{})
 	if !isAdmin {
-		authorizationResourceIds, err := GetAutorizationResourceIds(ctx)
+		authorizationResourceIds, err := getAutorizationResourceIds(ctx)
 		if err != nil {
 			ctx.AbortWithError(http.StatusInternalServerError, err)
 			return
@@ -240,6 +240,29 @@ func handleSelfParent(id int) (ids []int, err error) {
 	dfs(id)
 
 	ids = append(lo.Without(lo.Keys(g), ids...), id)
+
+	return
+}
+
+func handleSelfChild(ins []int) (ids []int, err error) {
+	nodes := make([]*model.NodeIdPid, 0)
+	if err = mysql.DB.Model(&model.Node{}).Find(&nodes).Error; err != nil {
+		return
+	}
+	g := make(map[int][]int)
+	for _, n := range nodes {
+		g[n.ParentId] = append(g[n.ParentId], n.Id)
+	}
+	var dfs func(int, bool)
+	dfs = func(x int, b bool) {
+		if b {
+			ids = append(ids, x)
+		}
+		for _, y := range g[x] {
+			dfs(y, b || lo.Contains(ins, x))
+		}
+	}
+	dfs(0, false)
 
 	return
 }

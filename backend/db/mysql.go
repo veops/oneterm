@@ -2,6 +2,7 @@ package mysql
 
 import (
 	"fmt"
+	"strings"
 
 	"go.uber.org/zap"
 	"gorm.io/driver/mysql"
@@ -34,5 +35,9 @@ func init() {
 	)
 	if err != nil {
 		logger.L().Fatal("auto migrate mysql failed", zap.Error(err))
+	}
+
+	if err = DB.Migrator().DropIndex(&model.Authorization{}, "asset_account_id_del"); err != nil && !strings.Contains(err.Error(), "1091") {
+		logger.L().Fatal("drop index failed", zap.Error(err))
 	}
 }

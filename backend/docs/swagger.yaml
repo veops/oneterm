@@ -98,12 +98,35 @@ definitions:
       updater_id:
         type: integer
     type: object
+  model.Authorization:
+    properties:
+      account_id:
+        type: integer
+      asset_id:
+        type: integer
+      created_at:
+        type: string
+      creator_id:
+        type: integer
+      id:
+        type: integer
+      node_id:
+        type: integer
+      resource_id:
+        type: integer
+      rids:
+        items:
+          type: integer
+        type: array
+      updated_at:
+        type: string
+      updater_id:
+        type: integer
+    type: object
   model.Command:
     properties:
-      cmds:
-        items:
-          type: string
-        type: array
+      cmd:
+        type: string
       created_at:
         type: string
       creator_id:
@@ -112,6 +135,8 @@ definitions:
         type: boolean
       id:
         type: integer
+      is_re:
+        type: boolean
       name:
         type: string
       resource_id:
@@ -662,6 +687,57 @@ paths:
             $ref: '#/definitions/controller.HttpResponse'
       tags:
       - asset
+  /authorization:
+    post:
+      parameters:
+      - description: authorization
+        in: body
+        name: authorization
+        required: true
+        schema:
+          $ref: '#/definitions/model.Authorization'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - authorization
+  /authorization/:id:
+    delete:
+      parameters:
+      - description: authorization id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - authorization
+    put:
+      parameters:
+      - description: authorization id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: authorization
+        in: body
+        name: authorization
+        required: true
+        schema:
+          $ref: '#/definitions/model.Authorization'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - authorization
   /command:
     get:
       parameters:
@@ -1652,7 +1728,9 @@ paths:
         name: share
         required: true
         schema:
-          $ref: '#/definitions/model.Share'
+          items:
+            $ref: '#/definitions/model.Share'
+          type: array
       responses:
         "200":
           description: OK
@@ -1708,7 +1786,7 @@ paths:
           schema:
             $ref: '#/definitions/controller.HttpResponse'
       tags:
-      - connect
+      - share
   /stat/account:
     get:
       parameters:

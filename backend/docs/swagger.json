@@ -356,6 +356,87 @@
                 }
             }
         },
+        "/authorization": {
+            "post": {
+                "tags": [
+                    "authorization"
+                ],
+                "parameters": [
+                    {
+                        "description": "authorization",
+                        "name": "authorization",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.Authorization"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controller.HttpResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/authorization/:id": {
+            "put": {
+                "tags": [
+                    "authorization"
+                ],
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "authorization id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "authorization",
+                        "name": "authorization",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.Authorization"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controller.HttpResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "authorization"
+                ],
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "authorization id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controller.HttpResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/command": {
             "get": {
                 "tags": [
@@ -1984,7 +2065,10 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/model.Share"
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/model.Share"
+                            }
                         }
                     }
                 ],
@@ -2052,7 +2136,7 @@
         "/share/connect/:uuid": {
             "get": {
                 "tags": [
-                    "connect"
+                    "share"
                 ],
                 "parameters": [
                     {
@@ -2486,14 +2570,49 @@
                 }
             }
         },
+        "model.Authorization": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "integer"
+                },
+                "asset_id": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "creator_id": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "node_id": {
+                    "type": "integer"
+                },
+                "resource_id": {
+                    "type": "integer"
+                },
+                "rids": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "updater_id": {
+                    "type": "integer"
+                }
+            }
+        },
         "model.Command": {
             "type": "object",
             "properties": {
-                "cmds": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
+                "cmd": {
+                    "type": "string"
                 },
                 "created_at": {
                     "type": "string"
@@ -2506,6 +2625,9 @@
                 },
                 "id": {
                     "type": "integer"
+                },
+                "is_re": {
+                    "type": "boolean"
                 },
                 "name": {
                     "type": "string"

@@ -1,15 +1,13 @@
 package controller
 
 import (
-	"context"
-	"errors"
-	"fmt"
+	"net/http"
 	"reflect"
 	"sort"
-	"sync"
 
 	"github.com/gin-gonic/gin"
 	"github.com/samber/lo"
+	"github.com/spf13/cast"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"gorm.io/gorm"
@@ -21,99 +19,83 @@ import (
 	"github.com/veops/oneterm/model"
 )
 
-func HandleAuthorization(currentUser *acl.Session, tx *gorm.DB, action int, old, new *model.Asset) (err error) {
-	ctx := context.Background()
-	assetId := lo.TernaryF(new == nil, func() int { return old.Id }, func() int { return new.Id })
-	mtx := &sync.Mutex{}
+func getAuthsByAsset(t *model.Asset) (data []*model.Authorization, err error) {
+	db := mysql.DB.Model(data)
+	for accountId := range t.Authorization {
+		db = db.Or("asset_id=? AND account_id=? AND node_id=NULL", t.Id, accountId)
+	}
+	err = db.Find(&data).Error
+
+	return
+}
+
+func handleAuthorization(ctx *gin.Context, tx *gorm.DB, action int, asset *model.Asset, auths ...*model.Authorization) (err error) {
+	currentUser, _ := acl.GetSessionFromCtx(ctx)
+
 	eg := &errgroup.Group{}
-	if action == model.ACTION_UPDATE {
-		if sameAuthorization(old.Authorization, new.Authorization) {
-			return
-		}
-		for id := range old.Authorization {
-			if _, ok := new.Authorization[id]; ok {
-				continue
-			}
-			accountId := id
-			eg.Go(func() (err error) {
-				a := &model.Authorization{}
-				if err = mysql.DB.
-					Model(a).
-					Select("id", "resource_id").
-					Where("asset_id = ? AND account_id = ?", assetId, accountId).
-					First(a).
-					Error; err != nil {
-					return
-				}
-				if err = acl.DeleteResource(ctx, currentUser.GetUid(), a.ResourceId); err != nil {
-					return
-				}
-				mtx.Lock()
-				defer mtx.Unlock()
-				err = tx.Delete(a, a.Id).Error
+
+	if asset != nil {
+		if action == model.ACTION_UPDATE {
+			var pres []*model.Authorization
+			pres, err = getAuthsByAsset(asset)
+			if err != nil {
 				return
+			}
+			for _, p := range pres {
+				if _, ok := asset.Authorization[*p.AccountId]; ok {
+					auths = append(auths, p)
+				} else {
+					eg.Go(func() error {
+						return acl.DeleteResource(ctx, currentUser.GetUid(), p.ResourceId)
+					})
+				}
+			}
+		} else {
+			auths = lo.Map(lo.Keys(asset.Authorization), func(id int, _ int) *model.Authorization {
+				return &model.Authorization{AssetId: &asset.Id, AccountId: &id, Rids: asset.Authorization[id]}
 			})
 		}
 	}
-	as := lo.TernaryF(action == model.ACTION_DELETE,
-		func() model.Map[int, model.Slice[int]] { return old.Authorization },
-		func() model.Map[int, model.Slice[int]] { return new.Authorization })
-	for k, v := range as {
-		accountId := k
-		curRids := lo.Uniq(v)
-		eg.Go(func() (err error) {
-			resourceId := 0
-			if err = mysql.DB.
-				Model(&model.Authorization{}).
-				Select("resource_id").
-				Where("asset_id = ? AND account_id = ?", assetId, accountId).
-				First(&resourceId).
-				Error; err != nil {
-				notFount := errors.Is(err, gorm.ErrRecordNotFound)
-				if !notFount || (notFount && action == model.ACTION_DELETE) {
+
+	for _, auth := range lo.Filter(auths, func(item *model.Authorization, _ int) bool { return item != nil }) {
+		switch action {
+		case model.ACTION_CREATE:
+			eg.Go(func() (err error) {
+				resourceId := 0
+				if resourceId, err = acl.CreateGrantAcl(ctx, currentUser, conf.GetResourceTypeName(conf.RESOURCE_AUTHORIZATION), auth.GetName()); err != nil {
 					return
 				}
-				if resourceId, err = acl.CreateGrantAcl(ctx, currentUser, conf.GetResourceTypeName(conf.RESOURCE_AUTHORIZATION),
-					fmt.Sprintf("%d-%d", assetId, accountId)); err != nil {
+				if err = acl.BatchGrantRoleResource(ctx, currentUser.GetUid(), auth.Rids, resourceId, []string{acl.READ}); err != nil {
 					return
 				}
-				mtx.Lock()
-				if err = tx.Create(&model.Authorization{AssetId: assetId, AccountId: accountId, ResourceId: resourceId,
-					CreatorId: currentUser.GetUid(), UpdaterId: currentUser.GetUid()}).Error; err != nil {
+				auth.CreatorId = currentUser.GetUid()
+				auth.UpdaterId = currentUser.GetUid()
+				auth.ResourceId = resourceId
+				return tx.Create(auth).Error
+			})
+		case model.ACTION_DELETE:
+			eg.Go(func() (err error) {
+				return acl.DeleteResource(ctx, currentUser.GetUid(), auth.ResourceId)
+			})
+		case model.ACTION_UPDATE:
+			eg.Go(func() (err error) {
+				pre := &model.Authorization{}
+				if err = mysql.DB.First(pre, auth.GetId()).Error; err != nil {
 					return
 				}
-				mtx.Unlock()
-			}
-			switch action {
-			case model.ACTION_CREATE:
-				err = acl.BatchGrantRoleResource(ctx, currentUser.GetUid(), curRids, resourceId, []string{acl.READ})
-			case model.ACTION_DELETE:
-				err = acl.DeleteResource(ctx, currentUser.GetUid(), resourceId)
-			case model.ACTION_UPDATE:
-				var res map[string]*acl.ResourcePermissionsRespItem
-				res, err = acl.GetResourcePermissions(ctx, resourceId)
-				if err != nil {
-					return
-				}
-				perms := make([]*acl.Perm, 0)
-				for _, v := range res {
-					perms = append(perms, v.Perms...)
-				}
-				preRids := lo.Map(lo.Filter(perms, func(p *acl.Perm, _ int) bool { return p.Name == acl.READ }), func(p *acl.Perm, _ int) int { return p.Rid })
-				revokeRids := lo.Without(preRids, curRids...)
+				revokeRids := lo.Without(pre.Rids, auth.Rids...)
 				if len(revokeRids) > 0 {
-					if err = acl.BatchRevokeRoleResource(ctx, currentUser.GetUid(), revokeRids, resourceId, []string{acl.READ}); err != nil {
+					if err = acl.BatchRevokeRoleResource(ctx, currentUser.GetUid(), revokeRids, auth.ResourceId, []string{acl.READ}); err != nil {
 						return
 					}
 				}
-				grantRids := lo.Without(curRids, preRids...)
+				grantRids := lo.Without(auth.Rids, pre.Rids...)
 				if len(grantRids) > 0 {
-					err = acl.BatchGrantRoleResource(ctx, currentUser.GetUid(), grantRids, resourceId, []string{acl.READ})
+					err = acl.BatchGrantRoleResource(ctx, currentUser.GetUid(), grantRids, auth.ResourceId, []string{acl.READ})
 				}
 				return
-			}
-			return
-		})
+			})
+		}
 	}
 
 	err = eg.Wait()
@@ -142,7 +124,7 @@ func sameAuthorization(old, new model.Map[int, model.Slice[int]]) bool {
 	return true
 }
 
-func GetAutorizationResourceIds(ctx *gin.Context) (resourceIds []int, err error) {
+func getAutorizationResourceIds(ctx *gin.Context) (resourceIds []int, err error) {
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
 	var rs []*acl.Resource
 	rs, err = acl.GetRoleResources(ctx, currentUser.Acl.Rid, conf.RESOURCE_AUTHORIZATION)
@@ -154,8 +136,11 @@ func GetAutorizationResourceIds(ctx *gin.Context) (resourceIds []int, err error)
 	return
 }
 
-func HasAuthorization(ctx *gin.Context, assetId, accountId int) (ok bool) {
-	ids, err := GetAutorizationResourceIds(ctx)
+func hasAuthorization(ctx *gin.Context, assetId, accountId int) (ok bool) {
+	if cast.ToString(ctx.Value("shareId")) != "" {
+		return true
+	}
+	ids, err := getAutorizationResourceIds(ctx)
 	if err != nil {
 		logger.L().Error("", zap.Error(err))
 		return
@@ -170,4 +155,75 @@ func HasAuthorization(ctx *gin.Context, assetId, accountId int) (ok bool) {
 	}
 
 	return cnt > 0
+}
+
+// CreateAccount godoc
+//
+//	@Tags		authorization
+//	@Param		authorization	body		model.Authorization	true	"authorization"
+//	@Success	200		{object}	HttpResponse
+//	@Router		/authorization [post]
+func (c *Controller) CreateAuthorization(ctx *gin.Context) {
+	auth := &model.Authorization{}
+	err := ctx.ShouldBindBodyWithJSON(auth)
+	if err != nil {
+		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
+		return
+	}
+	if err := handleAuthorization(ctx, mysql.DB, model.ACTION_CREATE, nil, auth); err != nil {
+		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+		return
+	}
+	ctx.JSON(http.StatusOK, HttpResponse{
+		Data: map[string]any{
+			"id": auth.GetId(),
+		},
+	})
+}
+
+// DeleteAccount godoc
+//
+//	@Tags		authorization
+//	@Param		id	path		int	true	"authorization id"
+//	@Success	200	{object}	HttpResponse
+//	@Router		/authorization/:id [delete]
+func (c *Controller) DeleteAuthorization(ctx *gin.Context) {
+	auth := &model.Authorization{
+		Id: cast.ToInt(ctx.Param("id")),
+	}
+	if err := handleAuthorization(ctx, mysql.DB, model.ACTION_DELETE, nil, auth); err != nil {
+		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+		return
+	}
+	ctx.JSON(http.StatusOK, HttpResponse{
+		Data: map[string]any{
+			"id": auth.GetId(),
+		},
+	})
+}
+
+// UpdateAccount godoc
+//
+//	@Tags		authorization
+//	@Param		id		path		int				true	"authorization id"
+//	@Param		authorization	body		model.Authorization	true	"authorization"
+//	@Success	200		{object}	HttpResponse
+//	@Router		/authorization/:id [put]
+func (c *Controller) UpdateAuthorization(ctx *gin.Context) {
+	auth := &model.Authorization{}
+	err := ctx.ShouldBindBodyWithJSON(auth)
+	if err != nil {
+		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
+		return
+	}
+	auth.Id = cast.ToInt(ctx.Param("id"))
+	if err := handleAuthorization(ctx, mysql.DB, model.ACTION_UPDATE, nil, auth); err != nil {
+		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+		return
+	}
+	ctx.JSON(http.StatusOK, HttpResponse{
+		Data: map[string]any{
+			"id": auth.GetId(),
+		},
+	})
 }

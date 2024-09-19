@@ -18,11 +18,12 @@ import (
 // CreateShare godoc
 //
 //	@Tags		share
-//	@Param		share	body		model.Share	true	"share"
+//	@Param		share	body		[]model.Share	true	"share"
 //	@Success	200		{object}	HttpResponse{data=ListData{list=[]string}}
 //	@Router		/share [post]
 func (c *Controller) CreateShare(ctx *gin.Context) {
 	shares := make([]*model.Share, 0)
+
 	if err := ctx.ShouldBindBodyWithJSON(&shares); err != nil {
 		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
 		return
@@ -31,14 +32,14 @@ func (c *Controller) CreateShare(ctx *gin.Context) {
 		s.Uuid = uuid.New().String()
 		return s.Uuid
 	})
-	if err := mysql.DB.Create(shares); err != nil {
+	if err := mysql.DB.Create(&shares).Error; err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
 	ctx.JSON(http.StatusOK, toListData(uuids))
 }
 
-// DeleteAsset godoc
+// DeleteShare godoc
 //
 //	@Tags		share
 //	@Param		id	path		int	true	"share id"
@@ -48,7 +49,7 @@ func (c *Controller) DeleteShare(ctx *gin.Context) {
 	doDelete(ctx, false, &model.Share{})
 }
 
-// GetAssets godoc
+// GetShare godoc
 //
 //	@Tags		share
 //	@Param		page_index	query		int		true	"page_index"
@@ -72,9 +73,9 @@ func (c *Controller) GetShare(ctx *gin.Context) {
 	doGet[*model.Share](ctx, false, db, "")
 }
 
-// Connect godoc
+// ConnectShare godoc
 //
-//	@Tags		connect
+//	@Tags		share
 //	@Success	200	{object}	HttpResponse
 //	@Param		w	query		int	false	"width"
 //	@Param		h	query		int	false	"height"

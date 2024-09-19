@@ -101,25 +101,11 @@ func (c *Controller) GetAssets(ctx *gin.Context) {
 	}
 
 	if info && !acl.IsAdmin(currentUser) {
-		//rs := make([]*acl.Resource, 0)
-		authorizationResourceIds, err := GetAutorizationResourceIds(ctx)
+		ids, err := getAssertIdsByAuthorization(ctx)
 		if err != nil {
-			handleRemoteErr(ctx, err)
 			return
 		}
-		ids := make([]*model.AuthorizationIds, 0)
-		if err = mysql.DB.
-			Model(&model.Authorization{}).
-			Where("resource_id IN ?", authorizationResourceIds).
-			Find(&ids).
-			Error; err != nil {
-			ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
-			return
-		}
-		assetIds := lo.Uniq(lo.Map(ids, func(item *model.AuthorizationIds, _ int) int { return item.AssetId }))
-		db = db.Where("id IN ?", assetIds)
-
-		ctx.Set("authorizationIds", ids)
+		db = db.Where("id IN ?", ids)
 	}
 
 	db = db.Order("name")
@@ -161,10 +147,16 @@ func assetPostHookAuth(ctx *gin.Context, data []*model.Asset) {
 		return
 	}
 	authorizationIds, _ := ctx.Value("authorizationIds").([]*model.AuthorizationIds)
+	parentNodeIds, _ := ctx.Value("parentNodeIds").([]int)
 	for _, a := range data {
+		if lo.Contains(parentNodeIds, a.Id) {
+			continue
+		}
 		accountIds := lo.Uniq(
-			lo.Map(lo.Filter(authorizationIds, func(item *model.AuthorizationIds, _ int) bool { return item.AssetId == a.Id }),
-				func(item *model.AuthorizationIds, _ int) int { return item.AccountId }))
+			lo.Map(lo.Filter(authorizationIds, func(item *model.AuthorizationIds, _ int) bool {
+				return item.AssetId != nil && *item.AssetId == a.Id && item.AccountId != nil
+			}),
+				func(item *model.AuthorizationIds, _ int) int { return *item.AccountId }))
 		for k := range a.Authorization {
 			if !lo.Contains(accountIds, k) {
 				delete(a.Authorization, k)
@@ -191,5 +183,36 @@ func handleParentId(parentId int) (pids []int, err error) {
 	}
 	dfs(parentId)
 
+	return
+}
+
+func getAssertIdsByAuthorization(ctx *gin.Context) (ids []int, err error) {
+	authorizationResourceIds, err := getAutorizationResourceIds(ctx)
+	if err != nil {
+		handleRemoteErr(ctx, err)
+		return
+	}
+	authIds := make([]*model.AuthorizationIds, 0)
+	if err = mysql.DB.Model(authIds).Where("resource_id IN ?", authorizationResourceIds).Find(&ids).Error; err != nil {
+		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+		return
+	}
+	ctx.Set("authorizationIds", authIds)
+
+	parentNodeIds := make([]int, 0)
+	for _, a := range authIds {
+		if a.NodeId != nil {
+			parentNodeIds = append(parentNodeIds, *a.NodeId)
+		} else if a.AssetId != nil {
+			ids = append(ids, *a.AssetId)
+		}
+	}
+	ctx.Set("parentNodeIds", parentNodeIds)
+	tmp := make([]int, 0)
+	if err = mysql.DB.Model(&model.Asset{}).Where("parent_id IN?", parentNodeIds).Pluck("id", &tmp).Error; err != nil {
+		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+		return
+	}
+	ids = append(ids, tmp...)
 	return
 }

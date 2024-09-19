@@ -242,8 +242,8 @@ func (m *view) refresh() {
 		logger.L().Error("auths", zap.Error(err))
 		return
 	}
-	dbAccount = dbAccount.Where("id IN ?", lo.Map(auths, func(a *model.Authorization, _ int) int { return a.AccountId }))
-	dbAsset = dbAsset.Where("id IN ?", lo.Map(auths, func(a *model.Authorization, _ int) int { return a.AssetId }))
+	dbAccount = dbAccount.Where("id IN ?", lo.Map(auths, func(a *model.Authorization, _ int) int { return *a.AccountId }))
+	dbAsset = dbAsset.Where("id IN ?", lo.Map(auths, func(a *model.Authorization, _ int) int { return *a.AssetId }))
 
 	eg := &errgroup.Group{}
 	eg.Go(func() error {
@@ -262,11 +262,11 @@ func (m *view) refresh() {
 
 	m.combines = make(map[string][3]int)
 	for _, auth := range auths {
-		asset, ok := assetMap[auth.AssetId]
+		asset, ok := assetMap[*auth.AssetId]
 		if !ok {
 			continue
 		}
-		account, ok := accountMap[auth.AccountId]
+		account, ok := accountMap[*auth.AccountId]
 		if !ok {
 			continue
 		}

@@ -135,7 +135,14 @@ func RunApi() error {
 			share.DELETE("/:id", c.DeleteShare, authAdmin())
 			share.GET("", c.GetShare, authAdmin())
 		}
-		r.GET("/api/oneterm/v1/share/connect/:uuid", Error2Resp(),c.ConnectShare)
+		r.GET("/api/oneterm/v1/share/connect/:uuid", Error2Resp(), c.ConnectShare)
+
+		authorization := v1.Group("/authorization")
+		{
+			authorization.POST("", c.CreateAuthorization)
+			authorization.DELETE("/:id", c.DeleteAccount)
+			authorization.PUT("/:id", c.UpdateAuthorization)
+		}
 	}
 
 	srv.Addr = fmt.Sprintf("%s:%d", conf.Cfg.Http.Host, conf.Cfg.Http.Port)

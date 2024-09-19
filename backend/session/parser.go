@@ -66,10 +66,14 @@ type Parser struct {
 
 func (p *Parser) AddInput(bs []byte) (cmd string, forbidden bool) {
 	if p.isPrompt && !p.isEdit {
-		p.prompt = p.GetOutput()
+		//TODO: may someone has empty ps1?
+		if ps1 := p.GetOutput(); ps1 != "" {
+			p.prompt = ps1
+		}
 		p.isPrompt = false
 		p.WriteDb()
 		p.lastCmd = ""
+		p.lastRes = ""
 	}
 	p.Input = append(p.Input, bs...)
 	if !bytes.HasSuffix(p.Input, []byte("\r")) {
@@ -88,7 +92,7 @@ func (p *Parser) AddInput(bs []byte) (cmd string, forbidden bool) {
 }
 
 func (p *Parser) IsForbidden(cmd string) (string, bool) {
-	if p.isEdit {
+	if p.isEdit || cmd == "" {
 		return "", false
 	}
 	for _, c := range p.Cmds {

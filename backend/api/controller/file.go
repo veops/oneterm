@@ -18,6 +18,7 @@ import (
 	mysql "github.com/veops/oneterm/db"
 	"github.com/veops/oneterm/logger"
 	"github.com/veops/oneterm/model"
+	gsession "github.com/veops/oneterm/session"
 )
 
 // GetFileHistory godoc
@@ -60,8 +61,14 @@ func (c *Controller) GetFileHistory(ctx *gin.Context) {
 //	@Success	200			{object}	HttpResponse
 //	@Router		/file/ls/:asset_id/:account_id [post]
 func (c *Controller) FileLS(ctx *gin.Context) {
-	currentUser, _ := acl.GetSessionFromCtx(ctx)
-	if !acl.IsAdmin(currentUser) && !hasAuthorization(ctx, cast.ToInt(ctx.Param("account_id")), cast.ToInt(ctx.Param("account_id"))) {
+	sess := &gsession.Session{
+		Session: &model.Session{
+			AssetId:   cast.ToInt(ctx.Param("asset_id")),
+			AccountId: cast.ToInt(ctx.Param("account_id")),
+		},
+	}
+
+	if !hasAuthorization(ctx, sess) {
 		ctx.AbortWithError(http.StatusForbidden, &ApiError{Code: ErrNoPerm, Data: map[string]any{}})
 		return
 	}
@@ -101,7 +108,15 @@ func (c *Controller) FileLS(ctx *gin.Context) {
 //	@Router		/file/mkdir/:asset_id/:account_id [post]
 func (c *Controller) FileMkdir(ctx *gin.Context) {
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
-	if !acl.IsAdmin(currentUser) && !hasAuthorization(ctx, cast.ToInt(ctx.Param("account_id")), cast.ToInt(ctx.Param("account_id"))) {
+
+	sess := &gsession.Session{
+		Session: &model.Session{
+			AssetId:   cast.ToInt(ctx.Param("asset_id")),
+			AccountId: cast.ToInt(ctx.Param("account_id")),
+		},
+	}
+
+	if !hasAuthorization(ctx, sess) {
 		ctx.AbortWithError(http.StatusForbidden, &ApiError{Code: ErrNoPerm, Data: map[string]any{}})
 		return
 	}
@@ -141,7 +156,15 @@ func (c *Controller) FileMkdir(ctx *gin.Context) {
 //	@Router		/file/upload/:asset_id/:account_id [post]
 func (c *Controller) FileUpload(ctx *gin.Context) {
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
-	if !acl.IsAdmin(currentUser) && !hasAuthorization(ctx, cast.ToInt(ctx.Param("account_id")), cast.ToInt(ctx.Param("account_id"))) {
+
+	sess := &gsession.Session{
+		Session: &model.Session{
+			AssetId:   cast.ToInt(ctx.Param("asset_id")),
+			AccountId: cast.ToInt(ctx.Param("account_id")),
+		},
+	}
+
+	if !hasAuthorization(ctx, sess) {
 		ctx.AbortWithError(http.StatusForbidden, &ApiError{Code: ErrNoPerm, Data: map[string]any{}})
 		return
 	}
@@ -202,7 +225,15 @@ func (c *Controller) FileUpload(ctx *gin.Context) {
 //	@Router		/file/download/:asset_id/:account_id [get]
 func (c *Controller) FileDownload(ctx *gin.Context) {
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
-	if !acl.IsAdmin(currentUser) && !hasAuthorization(ctx, cast.ToInt(ctx.Param("account_id")), cast.ToInt(ctx.Param("account_id"))) {
+
+	sess := &gsession.Session{
+		Session: &model.Session{
+			AssetId:   cast.ToInt(ctx.Param("asset_id")),
+			AccountId: cast.ToInt(ctx.Param("account_id")),
+		},
+	}
+
+	if !hasAuthorization(ctx, sess) {
 		ctx.AbortWithError(http.StatusForbidden, &ApiError{Code: ErrNoPerm, Data: map[string]any{}})
 		return
 	}

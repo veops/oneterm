@@ -688,6 +688,49 @@ paths:
       tags:
       - asset
   /authorization:
+    get:
+      parameters:
+      - description: page_index
+        in: query
+        name: page_index
+        required: true
+        type: integer
+      - description: page_size
+        in: query
+        name: page_size
+        required: true
+        type: integer
+      - description: node id
+        in: query
+        name: node_id
+        type: integer
+      - description: asset id
+        in: query
+        name: asset_id
+        type: integer
+      - description: account id
+        in: query
+        name: account_id
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/controller.HttpResponse'
+            - properties:
+                data:
+                  allOf:
+                  - $ref: '#/definitions/controller.ListData'
+                  - properties:
+                      list:
+                        items:
+                          $ref: '#/definitions/model.Account'
+                        type: array
+                    type: object
+              type: object
+      tags:
+      - authorization
     post:
       parameters:
       - description: authorization
@@ -711,26 +754,6 @@ paths:
         name: id
         required: true
         type: integer
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/controller.HttpResponse'
-      tags:
-      - authorization
-    put:
-      parameters:
-      - description: authorization id
-        in: path
-        name: id
-        required: true
-        type: integer
-      - description: authorization
-        in: body
-        name: authorization
-        required: true
-        schema:
-          $ref: '#/definitions/model.Authorization'
       responses:
         "200":
           description: OK

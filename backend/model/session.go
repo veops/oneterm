@@ -28,6 +28,7 @@ type Session struct {
 	Uid         int        `json:"uid" gorm:"column:uid"`
 	UserName    string     `json:"user_name" gorm:"column:user_name"`
 	AssetId     int        `json:"asset_id" gorm:"column:asset_id"`
+	Asset       *Asset     `json:"-" gorm:"-"`
 	AssetInfo   string     `json:"asset_info" gorm:"column:asset_info"`
 	AccountId   int        `json:"account_id" gorm:"column:account_id"`
 	AccountInfo string     `json:"account_info" gorm:"column:account_info"`

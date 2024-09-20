@@ -269,6 +269,7 @@ func DoConnect(ctx *gin.Context, ws *websocket.Conn) (sess *gsession.Session, er
 		Uid:         currentUser.GetUid(),
 		UserName:    currentUser.GetUserName(),
 		AssetId:     assetId,
+		Asset:       asset,
 		AssetInfo:   fmt.Sprintf("%s(%s)", asset.Name, asset.Ip),
 		AccountId:   accountId,
 		AccountInfo: fmt.Sprintf("%s(%s)", account.Name, account.Account),
@@ -305,7 +306,7 @@ func DoConnect(ctx *gin.Context, ws *websocket.Conn) (sess *gsession.Session, er
 		ctx.AbortWithError(http.StatusBadRequest, err)
 		return
 	}
-	if !acl.IsAdmin(currentUser) && !hasAuthorization(ctx, assetId, accountId) {
+	if  !hasAuthorization(ctx, sess) {
 		err = &ApiError{Code: ErrUnauthorized}
 		ctx.AbortWithError(http.StatusForbidden, err)
 		return

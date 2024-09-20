@@ -16,9 +16,9 @@ type Asset struct {
 	Comment       string               `json:"comment" gorm:"column:comment"`
 	ParentId      int                  `json:"parent_id" gorm:"column:parent_id"`
 	Ip            string               `json:"ip" gorm:"column:ip"`
-	Protocols     Slice[string]        `json:"protocols" gorm:"column:protocols"`
+	Protocols     Slice[string]        `json:"protocols" gorm:"column:protocols;type:text"`
 	GatewayId     int                  `json:"gateway_id" gorm:"column:gateway_id"`
-	Authorization Map[int, Slice[int]] `json:"authorization" gorm:"column:authorization"`
+	Authorization Map[int, Slice[int]] `json:"authorization" gorm:"column:authorization;type:text"`
 	AccessAuth    AccessAuth           `json:"access_auth" gorm:"embedded;column:access_auth"`
 	Connectable   bool                 `json:"connectable" gorm:"column:connectable"`
 	NodeChain     string               `json:"node_chain" gorm:"-"`
@@ -34,8 +34,8 @@ type Asset struct {
 type AccessAuth struct {
 	Start  *time.Time   `json:"start,omitempty" gorm:"column:start"`
 	End    *time.Time   `json:"end,omitempty" gorm:"column:end"`
-	CmdIds Slice[int]   `json:"cmd_ids" gorm:"column:cmd_ids"`
-	Ranges Slice[Range] `json:"ranges" gorm:"column:ranges"`
+	CmdIds Slice[int]   `json:"cmd_ids" gorm:"column:cmd_ids;type:text"`
+	Ranges Slice[Range] `json:"ranges" gorm:"column:ranges;type:text"`
 	Allow  bool         `json:"allow" gorm:"column:allow"`
 }
 

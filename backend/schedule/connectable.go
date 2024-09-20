@@ -30,7 +30,7 @@ func UpdateConnectables(ids ...int) (err error) {
 	if len(ids) > 0 {
 		db = db.Where("id IN ?", ids)
 	} else {
-		db = db.Where("updated_at <= ?", time.Now().Add(time.Hour).Unix())
+		db = db.Where("updated_at <= ?", time.Now().Add(-time.Hour))
 	}
 	if err = db.
 		Find(&assets).Error; err != nil {

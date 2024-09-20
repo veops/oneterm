@@ -23,7 +23,6 @@ import (
 	"github.com/veops/oneterm/acl"
 	"github.com/veops/oneterm/api/controller"
 	redis "github.com/veops/oneterm/cache"
-	"github.com/veops/oneterm/conf"
 	mysql "github.com/veops/oneterm/db"
 	"github.com/veops/oneterm/logger"
 	"github.com/veops/oneterm/model"
@@ -226,24 +225,22 @@ func (m *view) refresh() {
 	auths := make([]*model.Authorization, 0)
 	assets := make([]*model.Asset, 0)
 	accounts := make([]*model.Account, 0)
-	dbAuth := mysql.DB.Model(auths)
 	dbAsset := mysql.DB.Model(assets)
 	dbAccount := mysql.DB.Model(accounts)
 
 	if !acl.IsAdmin(m.currentUser) {
-		rs, err := acl.GetRoleResources(ctx, m.currentUser.Acl.Rid, conf.GetResourceTypeName(conf.RESOURCE_AUTHORIZATION))
+		assetIds, err := controller.GetAssetIdsByAuthorization(m.Ctx)
 		if err != nil {
-			logger.L().Error("auths", zap.Error(err))
 			return
 		}
-		dbAuth = dbAuth.Where("resource_id IN ?", lo.Map(rs, func(r *acl.Resource, _ int) int { return r.ResourceId }))
+		dbAccount = dbAccount.Where("id IN ?", assetIds)
+
+		accountIds, err := controller.GetAccountIdsByAuthorization(m.Ctx)
+		if err != nil {
+			return
+		}
+		dbAsset = dbAsset.Where("id IN ?", accountIds)
 	}
-	if err := dbAuth.Find(&auths).Error; err != nil {
-		logger.L().Error("auths", zap.Error(err))
-		return
-	}
-	dbAccount = dbAccount.Where("id IN ?", lo.Map(auths, func(a *model.Authorization, _ int) int { return *a.AccountId }))
-	dbAsset = dbAsset.Where("id IN ?", lo.Map(auths, func(a *model.Authorization, _ int) int { return *a.AssetId }))
 
 	eg := &errgroup.Group{}
 	eg.Go(func() error {

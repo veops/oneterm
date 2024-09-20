@@ -1,9 +1,11 @@
 package controller
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/samber/lo"
@@ -12,9 +14,14 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/veops/oneterm/acl"
+	redis "github.com/veops/oneterm/cache"
 	mysql "github.com/veops/oneterm/db"
 	"github.com/veops/oneterm/logger"
 	"github.com/veops/oneterm/model"
+)
+
+const (
+	kFmtAllNodes = "allNodes"
 )
 
 var (
@@ -30,6 +37,7 @@ var (
 //	@Success	200		{object}	HttpResponse
 //	@Router		/node [post]
 func (c *Controller) CreateNode(ctx *gin.Context) {
+	redis.RC.Del(ctx, kFmtAllNodes)
 	doCreate(ctx, false, &model.Node{}, "")
 }
 
@@ -40,6 +48,7 @@ func (c *Controller) CreateNode(ctx *gin.Context) {
 //	@Success	200	{object}	HttpResponse
 //	@Router		/node/:id [delete]
 func (c *Controller) DeleteNode(ctx *gin.Context) {
+	redis.RC.Del(ctx, kFmtAllNodes)
 	doDelete(ctx, false, &model.Node{}, nodeDcs...)
 }
 
@@ -51,6 +60,7 @@ func (c *Controller) DeleteNode(ctx *gin.Context) {
 //	@Success	200		{object}	HttpResponse
 //	@Router		/node/:id [put]
 func (c *Controller) UpdateNode(ctx *gin.Context) {
+	redis.RC.Del(ctx, kFmtAllNodes)
 	doUpdate(ctx, false, &model.Node{}, nodePreHooks...)
 }
 
@@ -77,7 +87,7 @@ func (c *Controller) GetNodes(ctx *gin.Context) {
 		db = db.Where("id IN ?", lo.Map(strings.Split(q, ","), func(s string, _ int) int { return cast.ToInt(s) }))
 	}
 	if id, ok := ctx.GetQuery("no_self_child"); ok {
-		ids, err := handleNoSelfChild(cast.ToInt(id))
+		ids, err := handleNoSelfChild(ctx, cast.ToInt(id))
 		if err != nil {
 			return
 		}
@@ -85,7 +95,7 @@ func (c *Controller) GetNodes(ctx *gin.Context) {
 	}
 
 	if id, ok := ctx.GetQuery("self_parent"); ok {
-		ids, err := handleSelfParent(cast.ToInt(id))
+		ids, err := handleSelfParent(ctx, cast.ToInt(id))
 		if err != nil {
 			return
 		}
@@ -200,10 +210,13 @@ func nodeDelHook(ctx *gin.Context, id int) {
 	ctx.AbortWithError(http.StatusBadRequest, err)
 }
 
-func handleNoSelfChild(id int) (ids []int, err error) {
+func handleNoSelfChild(ctx context.Context, id int) (ids []int, err error) {
 	nodes := make([]*model.NodeIdPid, 0)
-	if err = mysql.DB.Model(&model.Node{}).Find(&nodes).Error; err != nil {
-		return
+	if err = redis.Get(ctx, kFmtAllNodes, &nodes); err != nil {
+		if err = mysql.DB.Model(&model.Node{}).Find(&nodes).Error; err != nil {
+			return
+		}
+		redis.SetEx(ctx, kFmtAllNodes, nodes, time.Hour)
 	}
 	g := make(map[int][]int)
 	for _, n := range nodes {
@@ -221,10 +234,13 @@ func handleNoSelfChild(id int) (ids []int, err error) {
 	return
 }
 
-func handleSelfParent(id int) (ids []int, err error) {
+func handleSelfParent(ctx context.Context, id int) (ids []int, err error) {
 	nodes := make([]*model.NodeIdPid, 0)
-	if err = mysql.DB.Model(&model.Node{}).Find(&nodes).Error; err != nil {
-		return
+	if err = redis.Get(ctx, kFmtAllNodes, &nodes); err != nil {
+		if err = mysql.DB.Model(&model.Node{}).Find(&nodes).Error; err != nil {
+			return
+		}
+		redis.SetEx(ctx, kFmtAllNodes, nodes, time.Hour)
 	}
 	g := make(map[int][]int)
 	for _, n := range nodes {
@@ -244,10 +260,14 @@ func handleSelfParent(id int) (ids []int, err error) {
 	return
 }
 
-func handleSelfChild(ins []int) (ids []int, err error) {
+func handleSelfChild(ctx context.Context, parentIds []int) (ids []int, err error) {
+	// TODO: cache
 	nodes := make([]*model.NodeIdPid, 0)
-	if err = mysql.DB.Model(&model.Node{}).Find(&nodes).Error; err != nil {
-		return
+	if err = redis.Get(ctx, kFmtAllNodes, &nodes); err != nil {
+		if err = mysql.DB.Model(&model.Node{}).Find(&nodes).Error; err != nil {
+			return
+		}
+		redis.SetEx(ctx, kFmtAllNodes, nodes, time.Hour)
 	}
 	g := make(map[int][]int)
 	for _, n := range nodes {
@@ -259,7 +279,7 @@ func handleSelfChild(ins []int) (ids []int, err error) {
 			ids = append(ids, x)
 		}
 		for _, y := range g[x] {
-			dfs(y, b || lo.Contains(ins, x))
+			dfs(y, b || lo.Contains(parentIds, x))
 		}
 	}
 	dfs(0, false)

@@ -2,8 +2,10 @@ package controller
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/samber/lo"
@@ -12,10 +14,15 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/veops/oneterm/acl"
+	redis "github.com/veops/oneterm/cache"
 	"github.com/veops/oneterm/conf"
 	mysql "github.com/veops/oneterm/db"
 	"github.com/veops/oneterm/model"
 	"github.com/veops/oneterm/util"
+)
+
+const (
+	kFmtAccountIds = "accountIds-%d"
 )
 
 var (
@@ -145,7 +152,7 @@ func (c *Controller) GetAccounts(ctx *gin.Context) {
 	}
 
 	if info && !acl.IsAdmin(currentUser) {
-		ids, err := getAccountIdsByAuthorization(ctx)
+		ids, err := GetAccountIdsByAuthorization(ctx)
 		if err != nil {
 			return
 		}
@@ -157,29 +164,29 @@ func (c *Controller) GetAccounts(ctx *gin.Context) {
 	doGet[*model.Account](ctx, !info, db, acl.GetResourceTypeName(conf.RESOURCE_ACCOUNT), accountPostHooks...)
 }
 
-func getAccountIdsByAuthorization(ctx *gin.Context) (ids []int, err error) {
-	assetIds, err := getAssertIdsByAuthorization(ctx)
+func GetAccountIdsByAuthorization(ctx *gin.Context) (ids []int, err error) {
+	currentUser, _ := acl.GetSessionFromCtx(ctx)
+
+	k := fmt.Sprintf(kFmtAccountIds, currentUser.GetUid())
+	if err = redis.Get(ctx, k, &ids); err == nil {
+		return
+	}
+
+	assetIds, err := GetAssetIdsByAuthorization(ctx)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
-	assets := make([]*model.Asset, 0)
-	if err = mysql.DB.Model(&model.Asset{}).Where("id IN ?", assetIds).Find(&assets).Error; err != nil {
+	ss := make([][]int, 0)
+	if err = mysql.DB.Model(&model.Asset{}).Where("id IN ?", assetIds).Pluck("JSON_KEYS(authorization)", &ss).Error; err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
-	authorizationIds, _ := ctx.Value("authorizationIds").([]*model.AuthorizationIds)
-	parentNodeIds, _ := ctx.Value("parentNodeIds").([]int)
-	for _, a := range assets {
-		if lo.Contains(parentNodeIds, a.Id) {
-			ids = append(ids, lo.Keys(a.Authorization)...)
-		}
-		accountIds := lo.Uniq(
-			lo.Map(lo.Filter(authorizationIds, func(item *model.AuthorizationIds, _ int) bool {
-				return item.AssetId != nil && *item.AssetId == a.Id && item.AccountId != nil
-			}),
-				func(item *model.AuthorizationIds, _ int) int { return *item.AccountId }))
-		ids = append(ids, accountIds...)
-	}
+	ids = lo.Uniq(lo.Flatten(ss))
+	_, _, accountIds := getIdsByAuthorizationIds(ctx)
+	ids = lo.Uniq(append(ids, accountIds...))
+
+	redis.SetEx(ctx, k, ids, time.Minute)
+
 	return
 }

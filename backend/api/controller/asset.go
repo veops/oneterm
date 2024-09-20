@@ -1,9 +1,10 @@
 package controller
 
 import (
+	"context"
 	"fmt"
-	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/samber/lo"
@@ -11,11 +12,19 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/veops/oneterm/acl"
+	redis "github.com/veops/oneterm/cache"
 	"github.com/veops/oneterm/conf"
 	mysql "github.com/veops/oneterm/db"
 	"github.com/veops/oneterm/logger"
 	"github.com/veops/oneterm/model"
 	"github.com/veops/oneterm/schedule"
+)
+
+const (
+	kFmtAssetIds      = "assetIds-%d"
+	kAuthorizationIds = "authorizationIds"
+	kParentNodeIds    = "parentNodeIds"
+	kAccountIds       = "accountIds"
 )
 
 var (
@@ -92,7 +101,7 @@ func (c *Controller) GetAssets(ctx *gin.Context) {
 		db = db.Where("id IN ?", lo.Map(strings.Split(q, ","), func(s string, _ int) int { return cast.ToInt(s) }))
 	}
 	if q, ok := ctx.GetQuery("parent_id"); ok {
-		parentIds, err := handleParentId(cast.ToInt(q))
+		parentIds, err := handleParentId(ctx, cast.ToInt(q))
 		if err != nil {
 			logger.L().Error("parent id found failed", zap.Error(err))
 			return
@@ -101,7 +110,7 @@ func (c *Controller) GetAssets(ctx *gin.Context) {
 	}
 
 	if info && !acl.IsAdmin(currentUser) {
-		ids, err := getAssertIdsByAuthorization(ctx)
+		ids, err := GetAssetIdsByAuthorization(ctx)
 		if err != nil {
 			return
 		}
@@ -147,28 +156,32 @@ func assetPostHookAuth(ctx *gin.Context, data []*model.Asset) {
 		return
 	}
 	authorizationIds, _ := ctx.Value("authorizationIds").([]*model.AuthorizationIds)
-	parentNodeIds, _ := ctx.Value("parentNodeIds").([]int)
+	parentNodeIds, _, accountIds := getIdsByAuthorizationIds(ctx)
 	for _, a := range data {
 		if lo.Contains(parentNodeIds, a.Id) {
 			continue
 		}
-		accountIds := lo.Uniq(
+		ids := lo.Uniq(
 			lo.Map(lo.Filter(authorizationIds, func(item *model.AuthorizationIds, _ int) bool {
 				return item.AssetId != nil && *item.AssetId == a.Id && item.AccountId != nil
 			}),
 				func(item *model.AuthorizationIds, _ int) int { return *item.AccountId }))
+
 		for k := range a.Authorization {
-			if !lo.Contains(accountIds, k) {
+			if !lo.Contains(ids, k) && !lo.Contains(accountIds, k) {
 				delete(a.Authorization, k)
 			}
 		}
 	}
 }
 
-func handleParentId(parentId int) (pids []int, err error) {
+func handleParentId(ctx context.Context, parentId int) (pids []int, err error) {
 	nodes := make([]*model.NodeIdPid, 0)
-	if err = mysql.DB.Model(&model.Node{}).Find(&nodes).Error; err != nil {
-		return
+	if err = redis.Get(ctx, kFmtAllNodes, &nodes); err != nil {
+		if err = mysql.DB.Model(&model.Node{}).Find(&nodes).Error; err != nil {
+			return
+		}
+		redis.SetEx(ctx, kFmtAllNodes, nodes, time.Hour)
 	}
 	g := make(map[int][]int)
 	for _, n := range nodes {
@@ -186,33 +199,69 @@ func handleParentId(parentId int) (pids []int, err error) {
 	return
 }
 
-func getAssertIdsByAuthorization(ctx *gin.Context) (ids []int, err error) {
-	authorizationResourceIds, err := getAutorizationResourceIds(ctx)
+func GetAssetIdsByAuthorization(ctx *gin.Context) (ids []int, err error) {
+	currentUser, _ := acl.GetSessionFromCtx(ctx)
+
+	authIds, err := getAuthorizationIds(ctx)
+	if err != nil {
+		return
+	}
+	ctx.Set(kAuthorizationIds, authIds)
+
+	k := fmt.Sprintf(kFmtAssetIds, currentUser.GetUid())
+	if err = redis.Get(ctx, k, &ids); err == nil {
+		return
+	}
+
+	parentNodeIds, ids, accountIds := getIdsByAuthorizationIds(ctx)
+
+	tmp, err := handleSelfChild(ctx, parentNodeIds)
+	if err != nil {
+		return
+	}
+	parentNodeIds = append(parentNodeIds, tmp...)
+	ctx.Set(kParentNodeIds, parentNodeIds)
+	ctx.Set(kAccountIds, accountIds)
+	tmp, err = getAssetIdsByNodeAccount(ctx, parentNodeIds, accountIds)
+	if err != nil {
+		return
+	}
+	ids = lo.Uniq(append(ids, tmp...))
+
+	redis.SetEx(ctx, k, ids, time.Minute)
+
+	return
+}
+
+func getIdsByAuthorizationIds(ctx context.Context) (parentNodeIds, assetIds, accountIds []int) {
+	authIds, _ := ctx.Value(kAuthorizationIds).([]*model.AuthorizationIds)
+
+	for _, a := range authIds {
+		if a.NodeId != nil && a.AssetId == nil && a.AccountId == nil {
+			parentNodeIds = append(parentNodeIds, *a.NodeId)
+		}
+		if a.AssetId != nil && a.NodeId == nil && a.AccountId == nil {
+			assetIds = append(assetIds, *a.AssetId)
+		}
+		if a.AccountId != nil && a.AssetId == nil && a.NodeId == nil {
+			accountIds = append(accountIds, *a.AccountId)
+		}
+	}
+	return
+}
+
+func getAuthorizationIds(ctx *gin.Context) (authIds []*model.AuthorizationIds, err error) {
+	resourceIds, err := getAutorizationResourceIds(ctx)
 	if err != nil {
 		handleRemoteErr(ctx, err)
 		return
 	}
-	authIds := make([]*model.AuthorizationIds, 0)
-	if err = mysql.DB.Model(authIds).Where("resource_id IN ?", authorizationResourceIds).Find(&ids).Error; err != nil {
-		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
-		return
-	}
-	ctx.Set("authorizationIds", authIds)
 
-	parentNodeIds := make([]int, 0)
-	for _, a := range authIds {
-		if a.NodeId != nil {
-			parentNodeIds = append(parentNodeIds, *a.NodeId)
-		} else if a.AssetId != nil {
-			ids = append(ids, *a.AssetId)
-		}
-	}
-	ctx.Set("parentNodeIds", parentNodeIds)
-	tmp := make([]int, 0)
-	if err = mysql.DB.Model(&model.Asset{}).Where("parent_id IN?", parentNodeIds).Pluck("id", &tmp).Error; err != nil {
-		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
-		return
-	}
-	ids = append(ids, tmp...)
+	err = mysql.DB.Model(authIds).Where("resource_id IN ?", resourceIds).Find(&authIds).Error
+	return
+}
+
+func getAssetIdsByNodeAccount(ctx context.Context, parentNodeIds, accountIds []int) (assetIds []int, err error) {
+	err = mysql.DB.Model(&model.Asset{}).Where("parent_id IN?", parentNodeIds).Or("JSON_KEYS(authorization) IN ?", accountIds).Pluck("id", &assetIds).Error
 	return
 }

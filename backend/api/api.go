@@ -131,13 +131,13 @@ func RunApi() error {
 
 		share := v1.Group("/share")
 		{
-			share.POST("", authAdmin(), c.CreateShare)
-			share.DELETE("/:id", authAdmin(), c.DeleteShare)
-			share.GET("", authAdmin(), c.GetShare)
+			share.POST("", c.CreateShare)
+			share.DELETE("/:id", c.DeleteShare)
+			share.GET("", c.GetShare)
 		}
 		r.GET("/api/oneterm/v1/share/connect/:uuid", Error2Resp(), c.ConnectShare)
 
-		authorization := v1.Group("/authorization", authAdmin())
+		authorization := v1.Group("/authorization")
 		{
 			authorization.POST("", c.UpsertAuthorization)
 			authorization.DELETE("/:id", c.DeleteAccount)

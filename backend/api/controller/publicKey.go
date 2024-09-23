@@ -57,7 +57,7 @@ func (c *Controller) CreatePublicKey(ctx *gin.Context) {
 //	@Success	200	{object}	HttpResponse
 //	@Router		/public_key/:id [delete]
 func (c *Controller) DeletePublicKey(ctx *gin.Context) {
-	doDelete(ctx, false, &model.PublicKey{})
+	doDelete(ctx, false, &model.PublicKey{}, "")
 }
 
 // UpdatePublicKey godoc
@@ -68,7 +68,7 @@ func (c *Controller) DeletePublicKey(ctx *gin.Context) {
 //	@Success	200			{object}	HttpResponse
 //	@Router		/public_key/:id [put]
 func (c *Controller) UpdatePublicKey(ctx *gin.Context) {
-	doUpdate(ctx, false, &model.PublicKey{}, publicKeyPreHooks...)
+	doUpdate(ctx, false, &model.PublicKey{}, "", publicKeyPreHooks...)
 }
 
 // GetPublicKeys godoc

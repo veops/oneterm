@@ -41,6 +41,7 @@ type Model interface {
 	GetResourceId() int
 	GetId() int
 	GetName() string
+	SetPerms([]string)
 }
 
 type Pair[T1, T2 any] struct {

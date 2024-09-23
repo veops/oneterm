@@ -104,7 +104,7 @@ func (c *Controller) CreateGateway(ctx *gin.Context) {
 //	@Success	200	{object}	HttpResponse
 //	@Router		/gateway/:id [delete]
 func (c *Controller) DeleteGateway(ctx *gin.Context) {
-	doDelete(ctx, true, &model.Gateway{}, gatewayDcs...)
+	doDelete(ctx, true, &model.Gateway{},  conf.RESOURCE_GATEWAY,gatewayDcs...)
 }
 
 // UpdateGateway godoc
@@ -115,7 +115,7 @@ func (c *Controller) DeleteGateway(ctx *gin.Context) {
 //	@Success	200		{object}	HttpResponse
 //	@Router		/gateway/:id [put]
 func (c *Controller) UpdateGateway(ctx *gin.Context) {
-	doUpdate(ctx, true, &model.Gateway{}, gatewayPreHooks...)
+	doUpdate(ctx, true, &model.Gateway{},  conf.RESOURCE_GATEWAY,gatewayPreHooks...)
 }
 
 // GetGateways godoc

@@ -112,7 +112,7 @@ func (c *Controller) CreateAccount(ctx *gin.Context) {
 //	@Success	200	{object}	HttpResponse
 //	@Router		/account/:id [delete]
 func (c *Controller) DeleteAccount(ctx *gin.Context) {
-	doDelete(ctx, true, &model.Account{}, accountDcs...)
+	doDelete(ctx, true, &model.Account{}, conf.RESOURCE_ACCOUNT,accountDcs...)
 }
 
 // UpdateAccount godoc
@@ -123,7 +123,7 @@ func (c *Controller) DeleteAccount(ctx *gin.Context) {
 //	@Success	200		{object}	HttpResponse
 //	@Router		/account/:id [put]
 func (c *Controller) UpdateAccount(ctx *gin.Context) {
-	doUpdate(ctx, true, &model.Account{}, accountPreHooks...)
+	doUpdate(ctx, true, &model.Account{},conf.RESOURCE_ACCOUNT, accountPreHooks...)
 }
 
 // GetAccounts godoc
@@ -161,7 +161,7 @@ func (c *Controller) GetAccounts(ctx *gin.Context) {
 
 	db = db.Order("name")
 
-	doGet[*model.Account](ctx, !info, db, acl.GetResourceTypeName(conf.RESOURCE_ACCOUNT), accountPostHooks...)
+	doGet(ctx, !info, db, acl.GetResourceTypeName(conf.RESOURCE_ACCOUNT), accountPostHooks...)
 }
 
 func GetAccountIdsByAuthorization(ctx *gin.Context) (ids []int, err error) {

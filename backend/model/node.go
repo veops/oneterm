@@ -20,12 +20,12 @@ type Node struct {
 	Protocols     Slice[string]        `json:"protocols" gorm:"column:protocols;type:text"`
 	GatewayId     int                  `json:"gateway_id" gorm:"column:gateway_id"`
 
-	// ResourceId int       `json:"resource_id"`
-	CreatorId int                   `json:"creator_id" gorm:"column:creator_id"`
-	UpdaterId int                   `json:"updater_id" gorm:"column:updater_id"`
-	CreatedAt time.Time             `json:"created_at" gorm:"column:created_at"`
-	UpdatedAt time.Time             `json:"updated_at" gorm:"column:updated_at"`
-	DeletedAt soft_delete.DeletedAt `json:"-" gorm:"column:deleted_at"`
+	ResourceId int                   `json:"resource_id" gorm:"column:resource_id"`
+	CreatorId  int                   `json:"creator_id" gorm:"column:creator_id"`
+	UpdaterId  int                   `json:"updater_id" gorm:"column:updater_id"`
+	CreatedAt  time.Time             `json:"created_at" gorm:"column:created_at"`
+	UpdatedAt  time.Time             `json:"updated_at" gorm:"column:updated_at"`
+	DeletedAt  soft_delete.DeletedAt `json:"-" gorm:"column:deleted_at"`
 
 	AssetCount int64 `json:"asset_count" gorm:"-"`
 	HasChild   bool  `json:"has_child" gorm:"-"`
@@ -54,23 +54,4 @@ func (m *Node) GetName() string {
 }
 func (m *Node) GetId() int {
 	return m.Id
-}
-
-type NodeIdPid struct {
-	Id       int `gorm:"column:id"`
-	ParentId int `gorm:"column:parent_id"`
-}
-
-func (m *NodeIdPid) TableName() string {
-	return TABLE_NAME_NODE
-}
-
-type NodeIdPidName struct {
-	Id       int    `gorm:"column:id"`
-	ParentId int    `gorm:"column:parent_id"`
-	Name     string `gorm:"column:name"`
-}
-
-func (m *NodeIdPidName) TableName() string {
-	return TABLE_NAME_NODE
 }

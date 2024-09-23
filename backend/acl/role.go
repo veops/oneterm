@@ -3,15 +3,26 @@ package acl
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/spf13/cast"
 	"golang.org/x/sync/errgroup"
 
+	redis "github.com/veops/oneterm/cache"
 	"github.com/veops/oneterm/conf"
 	"github.com/veops/oneterm/remote"
 )
 
+const (
+	kFmtResources = "resource-%s-%d"
+)
+
 func GetRoleResources(ctx context.Context, rid int, resourceTypeId string) (res []*Resource, err error) {
+	k := fmt.Sprintf(kFmtResources, resourceTypeId, rid)
+	if err = redis.Get(ctx, k, &res); err == nil {
+		return
+	}
+
 	token, err := remote.GetAclToken(ctx)
 	if err != nil {
 		return
@@ -34,10 +45,12 @@ func GetRoleResources(ctx context.Context, rid int, resourceTypeId string) (res 
 
 	res = data.Resources
 
+	redis.SetEx(ctx, k, res, time.Minute)
+
 	return
 }
 
-func HasPermission(ctx context.Context, rid int, resourceName, resourceTypeName, permission string) (res bool, err error) {
+func HasPermission(ctx context.Context, rid int, resourceTypeName string, resourceId int, permission string) (res bool, err error) {
 	token, err := remote.GetAclToken(ctx)
 	if err != nil {
 		return false, err
@@ -49,7 +62,7 @@ func HasPermission(ctx context.Context, rid int, resourceName, resourceTypeName,
 		SetHeader("App-Access-Token", token).
 		SetQueryParams(map[string]string{
 			"rid":                cast.ToString(rid),
-			"resource_name":      resourceName,
+			"resource_id":        cast.ToString(resourceId),
 			"resource_type_name": resourceTypeName,
 			"perm":               permission,
 		}).

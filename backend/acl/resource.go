@@ -5,11 +5,104 @@ import (
 	"fmt"
 
 	"github.com/gin-gonic/gin"
+	"github.com/samber/lo"
 	"github.com/spf13/cast"
+	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/veops/oneterm/conf"
+	mysql "github.com/veops/oneterm/db"
+	"github.com/veops/oneterm/logger"
+	"github.com/veops/oneterm/model"
 	"github.com/veops/oneterm/remote"
 )
+
+func init() {
+	migrateNode()
+}
+
+type ResourceType struct {
+	AppId string `json:"app_id"`
+	Name  string `json:"name"`
+}
+
+func migrateNode() {
+	ctx := context.Background()
+
+	rts, err := GetResourceTypes(ctx)
+	if err != nil {
+		logger.L().Fatal("get resource type failed", zap.Error(err))
+	}
+
+	if _, ok := lo.Find(rts, func(rt *ResourceType) bool { return rt.AppId == "oneterm" && rt.Name == "node" }); !ok {
+		if err = AddResourceTypes(ctx, &ResourceType{AppId: "oneterm", Name: "node"}); err != nil {
+			logger.L().Fatal("add resource type failed", zap.Error(err))
+		}
+	}
+
+	nodes := make([]*model.Node, 0)
+	if err = mysql.DB.Model(&nodes).Where("resource_id=?", 0).Find(&nodes).Error; err != nil {
+		logger.L().Fatal("get nodes failed", zap.Error(err))
+	}
+	eg := errgroup.Group{}
+	for _, n := range nodes {
+		nd := n
+		eg.Go(func() error {
+			r, err := AddResource(ctx, 0, "node", cast.ToString(nd.Id))
+			if err != nil {
+				return err
+			}
+			if err := mysql.DB.Model(&nd).Where("id=?", nd.Id).Update("resource_id", r.ResourceId).Error; err != nil {
+				return err
+			}
+			return nil
+		})
+	}
+	if err = eg.Wait(); err != nil {
+		logger.L().Fatal("add resource failed", zap.Error(err))
+	}
+}
+
+func GetResourceTypes(ctx context.Context) (rt []*ResourceType, err error) {
+	token, err := remote.GetAclToken(ctx)
+	if err != nil {
+		return
+	}
+
+	rt = make([]*ResourceType, 0)
+	url := fmt.Sprintf("%s/acl/resource_types", conf.Cfg.Auth.Acl.Url)
+	resp, err := remote.RC.R().
+		SetHeaders(map[string]string{
+			"App-Access-Token": token,
+		}).
+		SetQueryParams(map[string]string{
+			"app_id":    "oneterm",
+			"page_size": "100",
+		}).
+		SetResult(&rt).
+		Post(url)
+	err = remote.HandleErr(err, resp, func(dt map[string]any) bool { return true })
+
+	return
+}
+
+func AddResourceTypes(ctx context.Context, rt *ResourceType) (err error) {
+	token, err := remote.GetAclToken(ctx)
+	if err != nil {
+		return
+	}
+
+	url := fmt.Sprintf("%s/acl/resource_types", conf.Cfg.Auth.Acl.Url)
+	resp, err := remote.RC.R().
+		SetHeaders(map[string]string{
+			"App-Access-Token": token,
+		}).
+		SetBody(rt).
+		Post(url)
+	err = remote.HandleErr(err, resp, func(dt map[string]any) bool { return true })
+
+	return
+}
 
 func AddResource(ctx context.Context, uid int, resourceTypeId string, name string) (res *Resource, err error) {
 	token, err := remote.GetAclToken(ctx)

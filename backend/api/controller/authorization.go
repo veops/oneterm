@@ -1,10 +1,10 @@
 package controller
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	kFmtAuthorizationIds = "AuthorizationIds-%d"
+	kFmtAuthorizations   = "Authorizations-%d"
 	kFmtHasAuthorization = "HasAuthorization-%d-%d-%d"
 )
 
@@ -41,6 +41,7 @@ func (c *Controller) UpsertAuthorization(ctx *gin.Context) {
 		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
 		return
 	}
+
 	if err := mysql.DB.Transaction(func(tx *gorm.DB) error {
 		auth := &model.Authorization{}
 		if err = tx.Model(auth).
@@ -49,14 +50,23 @@ func (c *Controller) UpsertAuthorization(ctx *gin.Context) {
 				lo.Ternary(auth.AssetId == nil, "IS NULL", fmt.Sprintf("=%d", auth.AssetId)),
 				lo.Ternary(auth.AccountId == nil, "IS NULL", fmt.Sprintf("=%d", auth.AccountId)),
 			)).
-			FirstOrCreate(auth).Error; err != nil {
+			First(auth).Error; err != nil {
 			if !errors.Is(err, gorm.ErrRecordNotFound) {
 				return err
 			}
+			err = nil
+		}
+		if auth.Id > 0 && !hasPermAuthorization(ctx, auth, acl.GRANT) {
+			err = &ApiError{Code: ErrNoPerm, Data: map[string]any{"perm": acl.GRANT}}
+			ctx.AbortWithError(http.StatusForbidden, err)
+			return err
 		}
 		action := lo.Ternary(auth.Id > 0, model.ACTION_UPDATE, model.ACTION_CREATE)
 		return handleAuthorization(ctx, tx, action, nil, auth)
 	}); err != nil {
+		if ctx.IsAborted() {
+			return
+		}
 		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
@@ -78,6 +88,17 @@ func (c *Controller) DeleteAuthorization(ctx *gin.Context) {
 	auth := &model.Authorization{
 		Id: cast.ToInt(ctx.Param("id")),
 	}
+
+	if err := mysql.DB.Model(auth).Where("id=?", auth.Id).First(auth); err != nil {
+		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
+		return
+	}
+
+	if !hasPermAuthorization(ctx, auth, acl.GRANT) {
+		ctx.AbortWithError(http.StatusForbidden, &ApiError{Code: ErrNoPerm, Data: map[string]any{"perm": acl.GRANT}})
+		return
+	}
+
 	if err := handleAuthorization(ctx, mysql.DB, model.ACTION_DELETE, nil, auth); err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
 		return
@@ -100,17 +121,116 @@ func (c *Controller) DeleteAuthorization(ctx *gin.Context) {
 //	@Success	200			{object}	HttpResponse{data=ListData{list=[]model.Account}}
 //	@Router		/authorization [get]
 func (c *Controller) GetAuthorizations(ctx *gin.Context) {
-	db := mysql.DB.Model(&model.Authorization{})
+	auth := &model.Authorization{}
+	db := mysql.DB.Model(auth)
 	for _, k := range []string{"node_id", "asset_id", "account_id"} {
 		q, ok := ctx.GetQuery(k)
 		if ok {
-			db = db.Where(fmt.Sprintf("%s IN ?", k), lo.Map(strings.Split(q, ","), func(s string, _ int) int { return cast.ToInt(s) }))
+			db = db.Where(fmt.Sprintf("%s = ?", k), cast.ToInt(q))
+			switch k {
+			case "node_id":
+				auth.NodeId = lo.ToPtr(cast.ToInt(q))
+			case "asset_id":
+				auth.AssetId = lo.ToPtr(cast.ToInt(q))
+			case "account_id":
+				auth.AccountId = lo.ToPtr(cast.ToInt(q))
+			}
 		} else {
 			db = db.Where(fmt.Sprintf("%s IS NULL", k))
 		}
 	}
 
+	if !hasPermAuthorization(ctx, auth, acl.GRANT) {
+		ctx.AbortWithError(http.StatusForbidden, &ApiError{Code: ErrNoPerm, Data: map[string]any{"perm": acl.GRANT}})
+		return
+	}
+
 	doGet[*model.Authorization](ctx, false, db, acl.GetResourceTypeName(conf.RESOURCE_AUTHORIZATION))
+}
+
+func getGrantNodeAssetAccoutIds(ctx context.Context, action string) (nodeIds, assetIds, accountIds []int, err error) {
+	currentUser, _ := acl.GetSessionFromCtx(ctx)
+
+	eg := &errgroup.Group{}
+	ch := make(chan bool)
+
+	eg.Go(func() (err error) {
+		defer close(ch)
+		res, err := acl.GetRoleResources(ctx, currentUser.GetRid(), conf.RESOURCE_NODE)
+		if err != nil {
+			return
+		}
+		res = lo.Filter(res, func(r *acl.Resource, _ int) bool { return lo.Contains(r.Permissions, action) })
+		resIds, err := handleSelfChild(ctx, lo.Map(res, func(r *acl.Resource, _ int) int { return r.ResourceId }))
+		if err != nil {
+			return
+		}
+		if err = mysql.DB.Model(&model.Node{}).Where("resource_id IN ?", resIds).Pluck("id", &nodeIds).Error; err != nil {
+			return
+		}
+		nodeIds, err = handleSelfChild(ctx, nodeIds)
+		return
+	})
+
+	eg.Go(func() (err error) {
+		res, err := acl.GetRoleResources(ctx, currentUser.GetRid(), conf.RESOURCE_ASSET)
+		if err != nil {
+			return
+		}
+		res = lo.Filter(res, func(r *acl.Resource, _ int) bool { return lo.Contains(r.Permissions, action) })
+		resIds, err := handleSelfChild(ctx, lo.Map(res, func(r *acl.Resource, _ int) int { return r.ResourceId }))
+		if err != nil {
+			return
+		}
+		<-ch
+		if err = mysql.DB.Model(&model.Asset{}).Where("resource_id IN ?", resIds).Or("parent_id IN ?", nodeIds).Pluck("id", &assetIds).Error; err != nil {
+			return
+		}
+		return
+	})
+
+	eg.Go(func() (err error) {
+		res, err := acl.GetRoleResources(ctx, currentUser.GetRid(), conf.RESOURCE_ACCOUNT)
+		if err != nil {
+			return
+		}
+		res = lo.Filter(res, func(r *acl.Resource, _ int) bool { return lo.Contains(r.Permissions, action) })
+		resIds, err := handleSelfChild(ctx, lo.Map(res, func(r *acl.Resource, _ int) int { return r.ResourceId }))
+		if err != nil {
+			return
+		}
+		if err = mysql.DB.Model(&model.Node{}).Where("resource_id IN ?", resIds).Pluck("id", &accountIds).Error; err != nil {
+			return
+		}
+		return
+	})
+
+	err = eg.Wait()
+
+	return
+}
+
+func hasPermAuthorization(ctx context.Context, auth *model.Authorization, action string) (ok bool) {
+	currentUser, _ := acl.GetSessionFromCtx(ctx)
+
+	if ok = acl.IsAdmin(currentUser); ok {
+		return true
+	}
+
+	nodeIds, assetIds, accountIds, err := getGrantNodeAssetAccoutIds(ctx, action)
+	if err != nil {
+		return
+	}
+
+	if auth.NodeId != nil && auth.AssetId == nil && auth.AccountId == nil {
+		ok = lo.Contains(nodeIds, *auth.NodeId)
+	} else if auth.AssetId != nil && auth.NodeId == nil && auth.AccountId == nil {
+		ok = lo.Contains(assetIds, *auth.AssetId)
+	} else if auth.AccountId != nil && auth.AssetId == nil && auth.NodeId == nil {
+		ok = lo.Contains(accountIds, *auth.AccountId)
+	}
+
+	return
 }
 
 func getAuthsByAsset(t *model.Asset) (data []*model.Authorization, err error) {
@@ -135,7 +255,8 @@ func handleAuthorization(ctx *gin.Context, tx *gorm.DB, action int, asset *model
 			if err != nil {
 				return
 			}
-			for _, p := range pres {
+			for _, pre := range pres {
+				p := pre
 				if _, ok := asset.Authorization[*p.AccountId]; ok {
 					auths = append(auths, p)
 				} else {
@@ -198,23 +319,54 @@ func handleAuthorization(ctx *gin.Context, tx *gorm.DB, action int, asset *model
 	return
 }
 
-func getAutorizationResourceIds(ctx *gin.Context) (resourceIds []int, err error) {
+func getAuthorizations(ctx *gin.Context) (res []*acl.Resource, err error) {
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
 
-	k := fmt.Sprintf(kFmtAuthorizationIds, currentUser.GetUid())
-	if err = redis.Get(ctx, k, &resourceIds); err == nil {
+	k := fmt.Sprintf(kFmtAuthorizations, currentUser.GetUid())
+	if err = redis.Get(ctx, k, &res); err == nil {
 		return
 	}
 
-	var rs []*acl.Resource
-	rs, err = acl.GetRoleResources(ctx, currentUser.Acl.Rid, conf.RESOURCE_AUTHORIZATION)
+	res, err = acl.GetRoleResources(ctx, currentUser.Acl.Rid, conf.RESOURCE_AUTHORIZATION)
 	if err != nil {
 		return
 	}
-	resourceIds = lo.Map(rs, func(r *acl.Resource, _ int) int { return r.ResourceId })
 
-	redis.SetEx(ctx, k, resourceIds, time.Minute)
+	redis.SetEx(ctx, k, res, time.Minute)
 
+	return
+}
+
+func getAutorizationResourceIdPerms(ctx *gin.Context) (resourceIdPerms map[int][]string, err error) {
+	res, err := getAuthorizations(ctx)
+	if err != nil {
+		return
+	}
+
+	resourceIdPerms = lo.SliceToMap(res, func(r *acl.Resource) (int, []string) { return r.ResourceId, r.Permissions })
+
+	return
+}
+
+func getAutorizationResourceIds(ctx *gin.Context) (resourceIds []int, err error) {
+	res, err := getAuthorizations(ctx)
+	if err != nil {
+		return
+	}
+
+	resourceIds = lo.Map(res, func(r *acl.Resource, _ int) int { return r.ResourceId })
+
+	return
+}
+
+func getAuthorizationIds(ctx *gin.Context) (authIds []*model.AuthorizationIds, err error) {
+	resourceIds, err := getAutorizationResourceIds(ctx)
+	if err != nil {
+		handleRemoteErr(ctx, err)
+		return
+	}
+
+	err = mysql.DB.Model(authIds).Where("resource_id IN ?", resourceIds).Find(&authIds).Error
 	return
 }
 

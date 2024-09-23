@@ -54,6 +54,8 @@ auth:
         value: gateway
       - key: authorization
         value: authorization
+      - key: node
+        value: node
   aes:
     key: thisis32bitlongpassphraseimusing
     iv: 0123456789abcdef

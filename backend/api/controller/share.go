@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"time"
@@ -29,6 +30,14 @@ func (c *Controller) CreateShare(ctx *gin.Context) {
 		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
 		return
 	}
+
+	for _, s := range shares {
+		if !hasPermShare(ctx, s, acl.GRANT) {
+			ctx.AbortWithError(http.StatusForbidden, &ApiError{Code: ErrNoPerm, Data: map[string]any{"perm": acl.GRANT}})
+			return
+		}
+	}
+
 	uuids := lo.Map(shares, func(s *model.Share, _ int) string {
 		s.Uuid = uuid.New().String()
 		return s.Uuid
@@ -47,7 +56,20 @@ func (c *Controller) CreateShare(ctx *gin.Context) {
 //	@Success	200	{object}	HttpResponse
 //	@Router		/share/:id [delete]
 func (c *Controller) DeleteShare(ctx *gin.Context) {
-	doDelete(ctx, false, &model.Share{})
+	share := &model.Share{
+		Id: cast.ToInt(ctx.Param("id")),
+	}
+
+	if err := mysql.DB.Model(share).Where("id=?", share.Id).First(share); err != nil {
+		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
+		return
+	}
+
+	if !hasPermShare(ctx, share, acl.GRANT) {
+		ctx.AbortWithError(http.StatusForbidden, &ApiError{Code: ErrNoPerm, Data: map[string]any{"perm": acl.GRANT}})
+		return
+	}
+	doDelete(ctx, false, &model.Share{}, "")
 }
 
 // GetShare godoc
@@ -63,6 +85,8 @@ func (c *Controller) DeleteShare(ctx *gin.Context) {
 //	@Success	200			{object}	HttpResponse{data=ListData{list=[]model.Share}}
 //	@Router		/share [get]
 func (c *Controller) GetShare(ctx *gin.Context) {
+	currentUser, _ := acl.GetSessionFromCtx(ctx)
+
 	db := mysql.DB.Model(&model.Share{})
 	db = filterSearch(ctx, db)
 	db, err := filterStartEnd(ctx, db)
@@ -70,6 +94,14 @@ func (c *Controller) GetShare(ctx *gin.Context) {
 		return
 	}
 	db = filterEqual(ctx, db, "asset_id", "account_id")
+
+	if !acl.IsAdmin(currentUser) {
+		_, assetIds, accountIds, err := getGrantNodeAssetAccoutIds(ctx, acl.GRANT)
+		if err != nil {
+			return
+		}
+		db = db.Where("asset_id IN (?) OR account_id IN (?)", assetIds, accountIds)
+	}
 
 	doGet[*model.Share](ctx, false, db, "")
 }
@@ -120,4 +152,19 @@ func (c *Controller) ConnectShare(ctx *gin.Context) {
 	ctx.Set("shareId", share.Id)
 	ctx.Set("session", &acl.Session{})
 	c.Connect(ctx)
+}
+
+func hasPermShare(ctx context.Context, share *model.Share, action string) (ok bool) {
+	currentUser, _ := acl.GetSessionFromCtx(ctx)
+
+	if ok = acl.IsAdmin(currentUser); ok {
+		return true
+	}
+
+	_, assetIds, accountIds, err := getGrantNodeAssetAccoutIds(ctx, action)
+	if err != nil {
+		return
+	}
+
+	return lo.Contains(assetIds, share.AssetId) || lo.Contains(accountIds, share.AccountId)
 }

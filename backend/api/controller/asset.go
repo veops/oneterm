@@ -60,7 +60,7 @@ func (c *Controller) CreateAsset(ctx *gin.Context) {
 //	@Success	200	{object}	HttpResponse
 //	@Router		/asset/:id [delete]
 func (c *Controller) DeleteAsset(ctx *gin.Context) {
-	doDelete(ctx, true, &model.Asset{})
+	doDelete(ctx, true, &model.Asset{}, conf.RESOURCE_ASSET)
 }
 
 // UpdateAsset godoc
@@ -71,7 +71,7 @@ func (c *Controller) DeleteAsset(ctx *gin.Context) {
 //	@Success	200		{object}	HttpResponse
 //	@Router		/asset/:id [put]
 func (c *Controller) UpdateAsset(ctx *gin.Context) {
-	doUpdate(ctx, true, &model.Asset{})
+	doUpdate(ctx, true, &model.Asset{}, conf.RESOURCE_ASSET)
 	schedule.UpdateConnectables(cast.ToInt(ctx.Param("id")))
 }
 
@@ -123,14 +123,11 @@ func (c *Controller) GetAssets(ctx *gin.Context) {
 }
 
 func assetPostHookCount(ctx *gin.Context, data []*model.Asset) {
-	nodes := make([]*model.NodeIdPidName, 0)
-	if err := mysql.DB.
-		Model(nodes).
-		Find(&nodes).
-		Error; err != nil {
-		logger.L().Error("asset posthookfailed", zap.Error(err))
+	nodes, err := getAllNodes(ctx)
+	if err != nil {
 		return
 	}
+
 	g := make(map[int][]model.Pair[int, string])
 	for _, n := range nodes {
 		g[n.ParentId] = append(g[n.ParentId], model.Pair[int, string]{First: n.Id, Second: n.Name})
@@ -176,13 +173,11 @@ func assetPostHookAuth(ctx *gin.Context, data []*model.Asset) {
 }
 
 func handleParentId(ctx context.Context, parentId int) (pids []int, err error) {
-	nodes := make([]*model.NodeIdPid, 0)
-	if err = redis.Get(ctx, kFmtAllNodes, &nodes); err != nil {
-		if err = mysql.DB.Model(&model.Node{}).Find(&nodes).Error; err != nil {
-			return
-		}
-		redis.SetEx(ctx, kFmtAllNodes, nodes, time.Hour)
+	nodes, err := getAllNodes(ctx)
+	if err != nil {
+		return
 	}
+
 	g := make(map[int][]int)
 	for _, n := range nodes {
 		g[n.ParentId] = append(g[n.ParentId], n.Id)
@@ -250,18 +245,7 @@ func getIdsByAuthorizationIds(ctx context.Context) (parentNodeIds, assetIds, acc
 	return
 }
 
-func getAuthorizationIds(ctx *gin.Context) (authIds []*model.AuthorizationIds, err error) {
-	resourceIds, err := getAutorizationResourceIds(ctx)
-	if err != nil {
-		handleRemoteErr(ctx, err)
-		return
-	}
-
-	err = mysql.DB.Model(authIds).Where("resource_id IN ?", resourceIds).Find(&authIds).Error
-	return
-}
-
 func getAssetIdsByNodeAccount(ctx context.Context, parentNodeIds, accountIds []int) (assetIds []int, err error) {
-	err = mysql.DB.Model(&model.Asset{}).Where("parent_id IN?", parentNodeIds).Or("JSON_KEYS(authorization) IN ?", accountIds).Pluck("id", &assetIds).Error
+	err = mysql.DB.WithContext(ctx).Model(&model.Asset{}).Where("parent_id IN?", parentNodeIds).Or("JSON_KEYS(authorization) IN ?", accountIds).Pluck("id", &assetIds).Error
 	return
 }

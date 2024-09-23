@@ -66,7 +66,7 @@ func (c *Controller) CreateCommand(ctx *gin.Context) {
 //	@Success	200	{object}	HttpResponse
 //	@Router		/command/:id [delete]
 func (c *Controller) DeleteCommand(ctx *gin.Context) {
-	doDelete(ctx, true, &model.Command{}, commandDcs...)
+	doDelete(ctx, true, &model.Command{},  conf.RESOURCE_COMMAND,commandDcs...)
 }
 
 // UpdateCommand godoc
@@ -77,7 +77,7 @@ func (c *Controller) DeleteCommand(ctx *gin.Context) {
 //	@Success	200		{object}	HttpResponse
 //	@Router		/command/:id [put]
 func (c *Controller) UpdateCommand(ctx *gin.Context) {
-	doUpdate(ctx, true, &model.Command{}, commandPreHooks...)
+	doUpdate(ctx, true, &model.Command{},  conf.RESOURCE_COMMAND,commandPreHooks...)
 }
 
 // GetCommands godoc

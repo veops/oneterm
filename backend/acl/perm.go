@@ -5,31 +5,15 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/gin-gonic/gin"
-	"github.com/samber/lo"
-
 	"github.com/veops/oneterm/conf"
 )
 
-func GetSessionFromCtx(ctx *gin.Context) (res *Session, err error) {
+func GetSessionFromCtx(ctx context.Context) (res *Session, err error) {
 	res, ok := ctx.Value("session").(*Session)
 	if !ok || res == nil {
 		err = fmt.Errorf("empty session")
 	}
 	return
-}
-
-func HasPerm(resourceId int, rid int, action string) bool {
-	mapping, err := GetResourcePermissions(context.Background(), resourceId)
-	if err != nil {
-		return false
-	}
-	for _, v := range mapping {
-		if lo.ContainsBy(v.Perms, func(p *Perm) bool { return p.Rid == rid && p.Name == action }) {
-			return true
-		}
-	}
-	return false
 }
 
 func IsAdmin(session *Session) bool {

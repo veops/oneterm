@@ -8,6 +8,7 @@ import (
 )
 
 const (
+	RESOURCE_NODE          = "node"
 	RESOURCE_ACCOUNT       = "account"
 	RESOURCE_ASSET         = "asset"
 	RESOURCE_COMMAND       = "command"
@@ -16,6 +17,8 @@ const (
 )
 
 var (
+	PermResource = []string{RESOURCE_NODE, RESOURCE_ACCOUNT, RESOURCE_ASSET, RESOURCE_COMMAND, RESOURCE_GATEWAY}
+
 	Cfg = &ConfigYaml{
 		Mode: "debug",
 		Http: HttpConfig{

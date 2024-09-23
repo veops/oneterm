@@ -15,6 +15,7 @@ type Account struct {
 	Pk          string `json:"pk" gorm:"column:pk"`
 	Phrase      string `json:"phrase" gorm:"column:phrase"`
 
+	
 	ResourceId int                   `json:"resource_id" gorm:"column:resource_id"`
 	CreatorId  int                   `json:"creator_id" gorm:"column:creator_id"`
 	UpdaterId  int                   `json:"updater_id" gorm:"column:updater_id"`

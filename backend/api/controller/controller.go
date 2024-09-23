@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,6 +16,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/veops/oneterm/acl"
+	"github.com/veops/oneterm/conf"
 	mysql "github.com/veops/oneterm/db"
 	"github.com/veops/oneterm/model"
 	"github.com/veops/oneterm/remote"
@@ -77,11 +79,8 @@ func doCreate[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType 
 
 	resourceId := 0
 	if needAcl {
-		if !acl.IsAdmin(currentUser) {
-			ctx.AbortWithError(http.StatusForbidden, &ApiError{Code: ErrNoPerm, Data: map[string]any{"perm": acl.WRITE}})
-			return
-		}
-		resourceId, err = acl.CreateGrantAcl(ctx, currentUser, resourceType, md.GetName())
+		_, ok := any(md).(*model.Node)
+		resourceId, err = acl.CreateGrantAcl(ctx, currentUser, resourceType, lo.Ternary(ok, cast.ToString(md.GetId()), md.GetName()))
 		if err != nil {
 			handleRemoteErr(ctx, err)
 			return
@@ -133,7 +132,7 @@ func doCreate[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType 
 	return
 }
 
-func doDelete[T model.Model](ctx *gin.Context, needAcl bool, md T, dcs ...deleteCheck) (err error) {
+func doDelete[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType string, dcs ...deleteCheck) (err error) {
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
 	id, err := cast.ToIntE(ctx.Param("id"))
 	if err != nil {
@@ -153,11 +152,9 @@ func doDelete[T model.Model](ctx *gin.Context, needAcl bool, md T, dcs ...delete
 		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
-	if needAcl {
-		if !acl.IsAdmin(currentUser) && acl.HasPerm(md.GetResourceId(), currentUser.Acl.Rid, acl.DELETE) {
-			ctx.AbortWithError(http.StatusForbidden, &ApiError{Code: ErrNoPerm, Data: map[string]any{"perm": acl.DELETE}})
-			return
-		}
+	if needAcl && !hasPerm(ctx, md, resourceType, acl.DELETE) {
+		ctx.AbortWithError(http.StatusForbidden, &ApiError{Code: ErrNoPerm, Data: map[string]any{"perm": acl.DELETE}})
+		return
 	}
 	for _, dc := range dcs {
 		if dc == nil {
@@ -216,7 +213,7 @@ func doDelete[T model.Model](ctx *gin.Context, needAcl bool, md T, dcs ...delete
 	return
 }
 
-func doUpdate[T model.Model](ctx *gin.Context, needAcl bool, md T, preHooks ...preHook[T]) (err error) {
+func doUpdate[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType string, preHooks ...preHook[T]) (err error) {
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
 
 	id, err := cast.ToIntE(ctx.Param("id"))
@@ -251,12 +248,14 @@ func doUpdate[T model.Model](ctx *gin.Context, needAcl bool, md T, preHooks ...p
 		return
 	}
 	if needAcl {
-		if !acl.IsAdmin(currentUser) && acl.HasPerm(md.GetResourceId(), currentUser.Acl.Rid, acl.WRITE) {
+		if hasPerm(ctx, md, resourceType, acl.WRITE) {
 			ctx.AbortWithError(http.StatusForbidden, &ApiError{Code: ErrNoPerm, Data: map[string]any{"perm": acl.WRITE}})
 			return
 		}
 
-		if err = acl.UpdateResource(ctx, currentUser.GetUid(), old.GetResourceId(), map[string]string{"name": md.GetName()}); err != nil {
+		_, ok := any(md).(*model.Node)
+		if err = acl.UpdateResource(ctx, currentUser.GetUid(), old.GetResourceId(),
+			map[string]string{"name": lo.Ternary(ok, cast.ToString(md.GetId()), md.GetName())}); err != nil {
 			handleRemoteErr(ctx, err)
 			return
 		}
@@ -277,7 +276,7 @@ func doUpdate[T model.Model](ctx *gin.Context, needAcl bool, md T, preHooks ...p
 			}
 		case *model.Account:
 			if cast.ToBool(ctx.Value("isAuthWithKey")) {
-				selects = []string{"password", "phrase", "pk", "account_type"}
+				selects = []string{"account", "password", "phrase", "pk", "account_type"}
 			}
 		}
 
@@ -458,4 +457,52 @@ func getEmpty[T model.Model](data T) T {
 	t := reflect.TypeOf(data).Elem()
 	v := reflect.New(t)
 	return v.Interface().(T)
+}
+
+func hasPerm[T model.Model](ctx context.Context, md T, resourceTypeName, action string) bool {
+	currentUser, _ := acl.GetSessionFromCtx(ctx)
+
+	if acl.IsAdmin(currentUser) {
+		return true
+	}
+
+	if ok, _ := acl.HasPermission(ctx, currentUser.GetRid(), resourceTypeName, md.GetResourceId(), action); ok {
+		return true
+	}
+
+	pid := 0
+	switch t := any(md).(type) {
+	case *model.Asset:
+		pid = t.ParentId
+	case *model.Node:
+		pid = t.ParentId
+	}
+
+	if pid > 0 {
+		res, _ := acl.GetRoleResources(ctx, currentUser.GetRid(), conf.RESOURCE_NODE)
+		if _, ok := lo.Find(res, func(r *acl.Resource) bool { return r.ResourceId == pid }); ok {
+			return true
+		}
+	}
+
+	return false
+}
+
+func handlePermissions[T model.Model](ctx *gin.Context, data []T, resourceTypeName string) {
+	currentUser, _ := acl.GetSessionFromCtx(ctx)
+
+	if !lo.Contains(conf.PermResource, resourceTypeName) {
+		return
+	}
+
+	res, err := acl.GetRoleResources(ctx, currentUser.GetRid(), resourceTypeName)
+	if err != nil {
+		handleRemoteErr(ctx, err)
+		return
+	}
+	id2perm := lo.SliceToMap(res, func(r *acl.Resource) (int, []string) { return r.ResourceId, r.Permissions })
+
+	for _, d := range data {
+		d.SetPerms(id2perm[d.GetResourceId()])
+	}
 }

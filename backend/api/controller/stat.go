@@ -282,7 +282,7 @@ func nodeCountAsset() (m map[int]int64, err error) {
 	if err = mysql.DB.Model(&model.Asset{}).Find(&assets).Error; err != nil {
 		return
 	}
-	nodes := make([]*model.NodeIdPid, 0)
+	nodes := make([]*model.Node, 0)
 	if err = mysql.DB.Model(&model.Node{}).Find(&nodes).Error; err != nil {
 		return
 	}

@@ -17,12 +17,13 @@ type Gateway struct {
 	Pk          string `json:"pk" gorm:"column:pk"`
 	Phrase      string `json:"phrase" gorm:"column:phrase"`
 
-	ResourceId int                   `json:"resource_id" gorm:"column:resource_id"`
-	CreatorId  int                   `json:"creator_id" gorm:"column:creator_id"`
-	UpdaterId  int                   `json:"updater_id" gorm:"column:updater_id"`
-	CreatedAt  time.Time             `json:"created_at" gorm:"column:created_at"`
-	UpdatedAt  time.Time             `json:"updated_at" gorm:"column:updated_at"`
-	DeletedAt  soft_delete.DeletedAt `json:"-" gorm:"column:deleted_at;uniqueIndex:name_del"`
+	Permissions []string              `json:"permissions" gorm:"-"`
+	ResourceId  int                   `json:"resource_id" gorm:"column:resource_id"`
+	CreatorId   int                   `json:"creator_id" gorm:"column:creator_id"`
+	UpdaterId   int                   `json:"updater_id" gorm:"column:updater_id"`
+	CreatedAt   time.Time             `json:"created_at" gorm:"column:created_at"`
+	UpdatedAt   time.Time             `json:"updated_at" gorm:"column:updated_at"`
+	DeletedAt   soft_delete.DeletedAt `json:"-" gorm:"column:deleted_at;uniqueIndex:name_del"`
 
 	AssetCount int64 `json:"asset_count" gorm:"-"`
 }
@@ -50,6 +51,10 @@ func (m *Gateway) GetName() string {
 }
 func (m *Gateway) GetId() int {
 	return m.Id
+}
+
+func (m *Gateway) SetPerms(perms []string) {
+	m.Permissions = perms
 }
 
 type GatewayCount struct {

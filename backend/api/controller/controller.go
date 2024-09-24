@@ -362,6 +362,10 @@ func doGet[T any](ctx *gin.Context, needAcl bool, dbFind *gorm.DB, resourceType 
 		}
 	}
 
+	if err = handlePermissions(ctx, list, resourceType); err != nil {
+		return
+	}
+
 	res := &ListData{
 		Count: count,
 		List:  lo.Map(list, func(t T, _ int) any { return t }),
@@ -488,7 +492,7 @@ func hasPerm[T model.Model](ctx context.Context, md T, resourceTypeName, action 
 	return false
 }
 
-func handlePermissions[T model.Model](ctx *gin.Context, data []T, resourceTypeName string) {
+func handlePermissions[T any](ctx *gin.Context, data []T, resourceTypeName string) (err error) {
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
 
 	if !lo.Contains(conf.PermResource, resourceTypeName) {
@@ -500,9 +504,47 @@ func handlePermissions[T model.Model](ctx *gin.Context, data []T, resourceTypeNa
 		handleRemoteErr(ctx, err)
 		return
 	}
-	id2perm := lo.SliceToMap(res, func(r *acl.Resource) (int, []string) { return r.ResourceId, r.Permissions })
+	resId2perms := lo.SliceToMap(res, func(r *acl.Resource) (int, []string) { return r.ResourceId, r.Permissions })
 
-	for _, d := range data {
-		d.SetPerms(id2perm[d.GetResourceId()])
+	switch ds := any(data).(type) {
+	case []*model.Node:
+		resId2perms, err = handleSelfChildPerms(ctx, resId2perms)
+		if err != nil {
+			ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+			return
+		}
+	case []*model.Asset:
+		res, err = acl.GetRoleResources(ctx, currentUser.GetRid(), conf.RESOURCE_NODE)
+		if err != nil {
+			handleRemoteErr(ctx, err)
+			return
+		}
+		nodeResId2perms := lo.SliceToMap(res, func(r *acl.Resource) (int, []string) { return r.ResourceId, r.Permissions })
+		if nodeResId2perms, err = handleSelfChildPerms(ctx, nodeResId2perms); err != nil {
+			ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+			return
+		}
+		nodeId2ResId := make(map[int]int)
+		if nodeId2ResId, err = getNodeId2ResId(ctx); err != nil {
+			return
+		}
+		for _, d := range ds {
+			resId2perms[d.GetResourceId()] = append(resId2perms[d.GetResourceId()], nodeResId2perms[nodeId2ResId[d.ParentId]]...)
+		}
 	}
+
+	ds := lo.Map(data, func(d T, _ int) model.Model {
+		x, _ := any(d).(model.Model)
+		return x
+	})
+	b := acl.IsAdmin(currentUser)
+	for _, d := range ds {
+		if b {
+			d.SetPerms(acl.AllPermissions)
+			continue
+		}
+		d.SetPerms(resId2perms[d.GetResourceId()])
+	}
+
+	return
 }

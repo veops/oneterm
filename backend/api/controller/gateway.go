@@ -104,7 +104,7 @@ func (c *Controller) CreateGateway(ctx *gin.Context) {
 //	@Success	200	{object}	HttpResponse
 //	@Router		/gateway/:id [delete]
 func (c *Controller) DeleteGateway(ctx *gin.Context) {
-	doDelete(ctx, true, &model.Gateway{},  conf.RESOURCE_GATEWAY,gatewayDcs...)
+	doDelete(ctx, true, &model.Gateway{}, conf.RESOURCE_GATEWAY, gatewayDcs...)
 }
 
 // UpdateGateway godoc
@@ -115,7 +115,7 @@ func (c *Controller) DeleteGateway(ctx *gin.Context) {
 //	@Success	200		{object}	HttpResponse
 //	@Router		/gateway/:id [put]
 func (c *Controller) UpdateGateway(ctx *gin.Context) {
-	doUpdate(ctx, true, &model.Gateway{},  conf.RESOURCE_GATEWAY,gatewayPreHooks...)
+	doUpdate(ctx, true, &model.Gateway{}, conf.RESOURCE_GATEWAY, gatewayPreHooks...)
 }
 
 // GetGateways godoc
@@ -144,27 +144,17 @@ func (c *Controller) GetGateways(ctx *gin.Context) {
 	}
 
 	if info && !acl.IsAdmin(currentUser) {
-		rs := make([]*acl.Resource, 0)
-		rs, err := acl.GetRoleResources(ctx, currentUser.Acl.Rid, acl.GetResourceTypeName(conf.RESOURCE_AUTHORIZATION))
+		assetIds, err := GetAssetIdsByAuthorization(ctx)
 		if err != nil {
-			handleRemoteErr(ctx, err)
+			ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
 			return
 		}
 		sub := mysql.DB.
-			Model(&model.Authorization{}).
-			Select("DISTINCT asset_id").
-			Where("resource_id IN ?", lo.Map(rs, func(r *acl.Resource, _ int) int { return r.ResourceId }))
-		ids := make([]int, 0)
-		if err = mysql.DB.
 			Model(&model.Asset{}).
-			Where("id IN (?)", sub).
-			Distinct().
-			Pluck("gateway_id", &ids).
-			Error; err != nil {
-			ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
-		}
+			Select("DISTINCT gateway_id").
+			Where("asset_id IN ?", assetIds)
 
-		db = db.Where("id IN ?", ids)
+		db = db.Where("id IN ?", sub)
 	}
 
 	db = db.Order("name")

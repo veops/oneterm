@@ -37,7 +37,15 @@ func init() {
 		logger.L().Fatal("auto migrate mysql failed", zap.Error(err))
 	}
 
-	if err = DB.Migrator().DropIndex(&model.Authorization{}, "asset_account_id_del"); err != nil && !strings.Contains(err.Error(), "1091") {
-		logger.L().Fatal("drop index failed", zap.Error(err))
+	dropIndexs := map[string]any{
+		"asset_account_id_del": &model.Authorization{},
+	}
+	for k, v := range dropIndexs {
+		if !DB.Migrator().HasIndex(v, k) {
+			continue
+		}
+		if err = DB.Migrator().DropIndex(v, k); err != nil && !strings.Contains(err.Error(), "1091") {
+			logger.L().Fatal("drop index failed", zap.Error(err))
+		}
 	}
 }

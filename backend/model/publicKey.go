@@ -51,6 +51,8 @@ func (m *PublicKey) GetId() int {
 	return m.Id
 }
 
+func (m *PublicKey) SetPerms(perms []string) {}
+
 type ReqAuth struct {
 	Method   int    `json:"method"`
 	UserName string `json:"username"`

@@ -83,6 +83,8 @@ func (c *Controller) UpdateNode(ctx *gin.Context) {
 func (c *Controller) GetNodes(ctx *gin.Context) {
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
 
+	info := cast.ToBool(ctx.Query("info"))
+
 	db := mysql.DB.Model(&model.Node{})
 
 	db = filterEqual(ctx, db, "id", "parent_id")
@@ -107,7 +109,7 @@ func (c *Controller) GetNodes(ctx *gin.Context) {
 		db = db.Where("id IN ?", ids)
 	}
 
-	if !acl.IsAdmin(currentUser) {
+	if info && !acl.IsAdmin(currentUser) {
 		ids, err := GetNodeIdsByAuthorization(ctx)
 		if err != nil {
 			return
@@ -117,7 +119,7 @@ func (c *Controller) GetNodes(ctx *gin.Context) {
 
 	db = db.Order("name DESC")
 
-	doGet(ctx, false, db, "", nodePostHooks...)
+	doGet(ctx, !info, db, acl.GetResourceTypeName(conf.RESOURCE_NODE), nodePostHooks...)
 }
 
 func nodePreHookCheckCycle(ctx *gin.Context, data *model.Node) {
@@ -228,7 +230,7 @@ func handleNoSelfChild(ctx context.Context, id int) (ids []int, err error) {
 	if err != nil {
 		return
 	}
-	
+
 	g := make(map[int][]int)
 	for _, n := range nodes {
 		g[n.ParentId] = append(g[n.ParentId], n.Id)
@@ -327,4 +329,39 @@ func getAllNodes(ctx context.Context) (nodes []*model.Node, err error) {
 	}
 
 	return
+}
+
+func handleSelfChildPerms(ctx context.Context, id2perms map[int][]string) (res map[int][]string, err error) {
+	nodes, err := getAllNodes(ctx)
+	if err != nil {
+		return
+	}
+
+	res = make(map[int][]string)
+	id2rid := make(map[int]int)
+	g := make(map[int][]int)
+	for _, n := range nodes {
+		g[n.ParentId] = append(g[n.ParentId], n.Id)
+		id2rid[n.Id] = n.ResourceId
+		res[id2rid[n.Id]] = id2perms[id2rid[n.Id]]
+	}
+	var dfs func(int)
+	dfs = func(x int) {
+		for _, y := range g[x] {
+			res[id2rid[y]] = lo.Uniq(append(res[id2rid[y]], res[id2rid[x]]...))
+			dfs(y)
+		}
+	}
+	dfs(0)
+
+	return
+}
+
+func getNodeId2ResId(ctx context.Context) (resid2ids map[int]int, err error) {
+	nodes, err := getAllNodes(ctx)
+	if err != nil {
+		return
+	}
+
+	return lo.SliceToMap(nodes, func(n *model.Node) (int, int) { return n.Id, n.ResourceId }), nil
 }

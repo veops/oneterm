@@ -43,18 +43,20 @@ func (c *Controller) UpsertAuthorization(ctx *gin.Context) {
 	}
 
 	if err := mysql.DB.Transaction(func(tx *gorm.DB) error {
-		auth := &model.Authorization{}
-		if err = tx.Model(auth).
+		t := &model.Authorization{}
+		if err = tx.Model(t).
 			Where(fmt.Sprintf("node_id %s AND asset_id %s AND account_id %s",
 				lo.Ternary(auth.NodeId == nil, "IS NULL", fmt.Sprintf("=%d", auth.NodeId)),
 				lo.Ternary(auth.AssetId == nil, "IS NULL", fmt.Sprintf("=%d", auth.AssetId)),
 				lo.Ternary(auth.AccountId == nil, "IS NULL", fmt.Sprintf("=%d", auth.AccountId)),
 			)).
-			First(auth).Error; err != nil {
+			First(t).Error; err != nil {
 			if !errors.Is(err, gorm.ErrRecordNotFound) {
 				return err
 			}
 			err = nil
+		} else {
+			auth = t
 		}
 		if auth.Id > 0 && !hasPermAuthorization(ctx, auth, acl.GRANT) {
 			err = &ApiError{Code: ErrNoPerm, Data: map[string]any{"perm": acl.GRANT}}

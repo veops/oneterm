@@ -52,3 +52,5 @@ func (m *Share) GetName() string {
 func (m *Share) GetId() int {
 	return m.Id
 }
+
+func (m *Share) SetPerms(perms []string){}

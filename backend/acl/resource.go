@@ -22,8 +22,11 @@ func init() {
 }
 
 type ResourceType struct {
-	AppId string `json:"app_id"`
-	Name  string `json:"name"`
+	Name string `json:"name"`
+}
+
+type ResourceTypeResp struct {
+	Groups []*ResourceType `json:"groups"`
 }
 
 func migrateNode() {
@@ -34,14 +37,14 @@ func migrateNode() {
 		logger.L().Fatal("get resource type failed", zap.Error(err))
 	}
 
-	if _, ok := lo.Find(rts, func(rt *ResourceType) bool { return rt.AppId == "oneterm" && rt.Name == "node" }); !ok {
-		if err = AddResourceTypes(ctx, &ResourceType{AppId: "oneterm", Name: "node"}); err != nil {
+	if _, ok := lo.Find(rts, func(rt *ResourceType) bool { return rt.Name == "node" }); !ok {
+		if err = AddResourceTypes(ctx, &ResourceType{Name: "node"}); err != nil {
 			logger.L().Fatal("add resource type failed", zap.Error(err))
 		}
 	}
 
 	nodes := make([]*model.Node, 0)
-	if err = mysql.DB.Model(&nodes).Where("resource_id=?", 0).Find(&nodes).Error; err != nil {
+	if err = mysql.DB.Model(&nodes).Where("resource_id IS NULL").Find(&nodes).Error; err != nil {
 		logger.L().Fatal("get nodes failed", zap.Error(err))
 	}
 	eg := errgroup.Group{}
@@ -69,7 +72,7 @@ func GetResourceTypes(ctx context.Context) (rt []*ResourceType, err error) {
 		return
 	}
 
-	rt = make([]*ResourceType, 0)
+	data := &ResourceTypeResp{}
 	url := fmt.Sprintf("%s/acl/resource_types", conf.Cfg.Auth.Acl.Url)
 	resp, err := remote.RC.R().
 		SetHeaders(map[string]string{
@@ -79,9 +82,11 @@ func GetResourceTypes(ctx context.Context) (rt []*ResourceType, err error) {
 			"app_id":    "oneterm",
 			"page_size": "100",
 		}).
-		SetResult(&rt).
-		Post(url)
+		SetResult(data).
+		Get(url)
 	err = remote.HandleErr(err, resp, func(dt map[string]any) bool { return true })
+
+	rt = data.Groups
 
 	return
 }

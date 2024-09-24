@@ -154,6 +154,7 @@ func (c *Controller) GetAccounts(ctx *gin.Context) {
 	if info && !acl.IsAdmin(currentUser) {
 		ids, err := GetAccountIdsByAuthorization(ctx)
 		if err != nil {
+			ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
 			return
 		}
 		db = db.Where("id IN ?", ids)

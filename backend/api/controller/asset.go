@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -112,6 +113,7 @@ func (c *Controller) GetAssets(ctx *gin.Context) {
 	if info && !acl.IsAdmin(currentUser) {
 		ids, err := GetAssetIdsByAuthorization(ctx)
 		if err != nil {
+			ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
 			return
 		}
 		db = db.Where("id IN ?", ids)
@@ -119,7 +121,7 @@ func (c *Controller) GetAssets(ctx *gin.Context) {
 
 	db = db.Order("name")
 
-	doGet(ctx, !info, db, acl.GetResourceTypeName(conf.RESOURCE_AUTHORIZATION), assetPostHooks...)
+	doGet(ctx, !info, db, acl.GetResourceTypeName(conf.RESOURCE_ASSET), assetPostHooks...)
 }
 
 func assetPostHookCount(ctx *gin.Context, data []*model.Asset) {

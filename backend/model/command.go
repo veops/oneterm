@@ -15,12 +15,13 @@ type Command struct {
 	Enable bool           `json:"enable" gorm:"column:enable"`
 	Re     *regexp.Regexp `json:"-" gorm:"-"`
 
-	ResourceId int                   `json:"resource_id" gorm:"column:resource_id"`
-	CreatorId  int                   `json:"creator_id" gorm:"column:creator_id"`
-	UpdaterId  int                   `json:"updater_id" gorm:"column:updater_id"`
-	CreatedAt  time.Time             `json:"created_at" gorm:"column:created_at"`
-	UpdatedAt  time.Time             `json:"updated_at" gorm:"column:updated_at"`
-	DeletedAt  soft_delete.DeletedAt `json:"-" gorm:"column:deleted_at;uniqueIndex:name_del"`
+	Permissions []string              `json:"permissions" gorm:"-"`
+	ResourceId  int                   `json:"resource_id" gorm:"column:resource_id"`
+	CreatorId   int                   `json:"creator_id" gorm:"column:creator_id"`
+	UpdaterId   int                   `json:"updater_id" gorm:"column:updater_id"`
+	CreatedAt   time.Time             `json:"created_at" gorm:"column:created_at"`
+	UpdatedAt   time.Time             `json:"updated_at" gorm:"column:updated_at"`
+	DeletedAt   soft_delete.DeletedAt `json:"-" gorm:"column:deleted_at;uniqueIndex:name_del"`
 }
 
 func (m *Command) TableName() string {
@@ -46,4 +47,8 @@ func (m *Command) GetName() string {
 }
 func (m *Command) GetId() int {
 	return m.Id
+}
+
+func (m *Command) SetPerms(perms []string) {
+	m.Permissions = perms
 }

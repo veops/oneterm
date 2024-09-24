@@ -70,6 +70,10 @@ func (m *Asset) GetId() int {
 	return m.Id
 }
 
+func (m *Asset) SetPerms(perms []string) {
+	m.Permissions = perms
+}
+
 type AssetIdPid struct {
 	Id       int `gorm:"column:id"`
 	ParentId int `gorm:"column:parent_id"`

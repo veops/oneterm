@@ -46,9 +46,9 @@ func (c *Controller) UpsertAuthorization(ctx *gin.Context) {
 		t := &model.Authorization{}
 		if err = tx.Model(t).
 			Where(fmt.Sprintf("node_id %s AND asset_id %s AND account_id %s",
-				lo.Ternary(auth.NodeId == nil, "IS NULL", fmt.Sprintf("=%d", auth.NodeId)),
-				lo.Ternary(auth.AssetId == nil, "IS NULL", fmt.Sprintf("=%d", auth.AssetId)),
-				lo.Ternary(auth.AccountId == nil, "IS NULL", fmt.Sprintf("=%d", auth.AccountId)),
+				lo.Ternary(auth.NodeId == nil, "IS NULL", fmt.Sprintf("=%d", cast.ToInt(auth.NodeId))),
+				lo.Ternary(auth.AssetId == nil, "IS NULL", fmt.Sprintf("=%d", cast.ToInt(auth.AssetId))),
+				lo.Ternary(auth.AccountId == nil, "IS NULL", fmt.Sprintf("=%d", cast.ToInt(auth.AccountId))),
 			)).
 			First(t).Error; err != nil {
 			if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -56,7 +56,8 @@ func (c *Controller) UpsertAuthorization(ctx *gin.Context) {
 			}
 			err = nil
 		} else {
-			auth = t
+			auth.Id = t.Id
+			auth.ResourceId = t.ResourceId
 		}
 		if auth.Id > 0 && !hasPermAuthorization(ctx, auth, acl.GRANT) {
 			err = &ApiError{Code: ErrNoPerm, Data: map[string]any{"perm": acl.GRANT}}
@@ -309,9 +310,11 @@ func handleAuthorization(ctx *gin.Context, tx *gorm.DB, action int, asset *model
 				}
 				grantRids := lo.Without(auth.Rids, pre.Rids...)
 				if len(grantRids) > 0 {
-					err = acl.BatchGrantRoleResource(ctx, currentUser.GetUid(), grantRids, auth.ResourceId, []string{acl.READ})
+					if err = acl.BatchGrantRoleResource(ctx, currentUser.GetUid(), grantRids, auth.ResourceId, []string{acl.READ}); err != nil {
+						return
+					}
 				}
-				return
+				return tx.Model(auth).Update("rids", auth.Rids).Error
 			})
 		}
 	}

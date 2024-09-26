@@ -112,7 +112,7 @@ func (c *Controller) CreateAccount(ctx *gin.Context) {
 //	@Success	200	{object}	HttpResponse
 //	@Router		/account/:id [delete]
 func (c *Controller) DeleteAccount(ctx *gin.Context) {
-	doDelete(ctx, true, &model.Account{}, conf.RESOURCE_ACCOUNT,accountDcs...)
+	doDelete(ctx, true, &model.Account{}, conf.RESOURCE_ACCOUNT, accountDcs...)
 }
 
 // UpdateAccount godoc
@@ -123,7 +123,7 @@ func (c *Controller) DeleteAccount(ctx *gin.Context) {
 //	@Success	200		{object}	HttpResponse
 //	@Router		/account/:id [put]
 func (c *Controller) UpdateAccount(ctx *gin.Context) {
-	doUpdate(ctx, true, &model.Account{},conf.RESOURCE_ACCOUNT, accountPreHooks...)
+	doUpdate(ctx, true, &model.Account{}, conf.RESOURCE_ACCOUNT, accountPreHooks...)
 }
 
 // GetAccounts godoc
@@ -162,7 +162,7 @@ func (c *Controller) GetAccounts(ctx *gin.Context) {
 
 	db = db.Order("name")
 
-	doGet(ctx, !info, db, acl.GetResourceTypeName(conf.RESOURCE_ACCOUNT), accountPostHooks...)
+	doGet(ctx, !info, db, conf.RESOURCE_ACCOUNT, accountPostHooks...)
 }
 
 func GetAccountIdsByAuthorization(ctx *gin.Context) (ids []int, err error) {
@@ -178,12 +178,12 @@ func GetAccountIdsByAuthorization(ctx *gin.Context) (ids []int, err error) {
 		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
-	ss := make([][]int, 0)
+	ss := make([]model.Slice[string], 0)
 	if err = mysql.DB.Model(&model.Asset{}).Where("id IN ?", assetIds).Pluck("JSON_KEYS(authorization)", &ss).Error; err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
-	ids = lo.Uniq(lo.Flatten(ss))
+	ids = lo.Uniq(lo.Map(lo.Flatten(ss), func(s string, _ int) int { return cast.ToInt(s) }))
 	_, _, accountIds := getIdsByAuthorizationIds(ctx)
 	ids = lo.Uniq(append(ids, accountIds...))
 

@@ -48,7 +48,7 @@ func (m *Node) SetResourceId(resourceId int) {
 
 }
 func (m *Node) GetResourceId() int {
-	return 0
+	return m.ResourceId
 }
 func (m *Node) GetName() string {
 	return m.Name

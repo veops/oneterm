@@ -878,7 +878,7 @@ func (m *Model) updateSuggestions() {
 	for _, s := range m.suggestions {
 		suggestion := string(s)
 
-		if strings.HasPrefix(strings.ToLower(suggestion), strings.ToLower(string(m.value))) {
+		if strings.HasPrefix(suggestion, string(m.value)) {
 			matches = append(matches, []rune(suggestion))
 		}
 	}

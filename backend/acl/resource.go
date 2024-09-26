@@ -22,7 +22,8 @@ func init() {
 }
 
 type ResourceType struct {
-	Name string `json:"name"`
+	Name  string   `json:"name"`
+	Perms []string `json:"perms"`
 }
 
 type ResourceTypeResp struct {
@@ -37,8 +38,8 @@ func migrateNode() {
 		logger.L().Fatal("get resource type failed", zap.Error(err))
 	}
 
-	if _, ok := lo.Find(rts, func(rt *ResourceType) bool { return rt.Name == "node" }); !ok {
-		if err = AddResourceTypes(ctx, &ResourceType{Name: "node"}); err != nil {
+	if !lo.ContainsBy(rts, func(rt *ResourceType) bool { return rt.Name == "node" }) {
+		if err = AddResourceTypes(ctx, &ResourceType{Name: "node", Perms: AllPermissions}); err != nil {
 			logger.L().Fatal("add resource type failed", zap.Error(err))
 		}
 	}
@@ -51,7 +52,7 @@ func migrateNode() {
 	for _, n := range nodes {
 		nd := n
 		eg.Go(func() error {
-			r, err := AddResource(ctx, 0, "node", cast.ToString(nd.Id))
+			r, err := AddResource(ctx, nd.CreatorId, "node", cast.ToString(nd.Id))
 			if err != nil {
 				return err
 			}

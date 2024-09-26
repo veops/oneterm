@@ -4,8 +4,6 @@ package acl
 import (
 	"context"
 	"fmt"
-
-	"github.com/veops/oneterm/conf"
 )
 
 func GetSessionFromCtx(ctx context.Context) (res *Session, err error) {
@@ -25,21 +23,8 @@ func IsAdmin(session *Session) bool {
 	return false
 }
 
-func GetResourceTypeName(resourceType string) string {
-	names := conf.Cfg.Auth.Acl.ResourceNames
-	for _, v := range names {
-		if v.Key == resourceType {
-			return v.Value
-		}
-	}
-	return "NONE"
-}
-
 func CreateGrantAcl(ctx context.Context, session *Session, resourceType string, resourceName string) (resourceId int, err error) {
-	resource, err := AddResource(ctx,
-		session.GetUid(),
-		GetResourceTypeName(resourceType),
-		resourceName)
+	resource, err := AddResource(ctx, session.GetUid(), resourceType, resourceName)
 	if err != nil {
 		return
 	}
@@ -54,10 +39,7 @@ func CreateGrantAcl(ctx context.Context, session *Session, resourceType string, 
 }
 
 func CreateAcl(ctx context.Context, session *Session, resourceType string, resourceName string) (resourceId int, err error) {
-	resource, err := AddResource(ctx,
-		session.GetUid(),
-		GetResourceTypeName(resourceType),
-		resourceName)
+	resource, err := AddResource(ctx, session.GetUid(), resourceType, resourceName)
 	if err != nil {
 		return
 	}

@@ -4,15 +4,14 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/spf13/cast"
 	"gorm.io/plugin/soft_delete"
 )
 
 type Authorization struct {
 	Id        int        `json:"id" gorm:"column:id;primarykey;autoIncrement"`
-	AssetId   *int       `json:"asset_id" gorm:"column:asset_id;uniqueIndex:uidx_aand"`
-	AccountId *int       `json:"account_id" gorm:"column:account_id;uniqueIndex:uidx_aand"`
-	NodeId    *int       `json:"node_id" gorm:"column:node_id;uniqueIndex:uidx_aand"`
+	AssetId   int        `json:"asset_id" gorm:"column:asset_id;uniqueIndex:uidx_aand"`
+	AccountId int        `json:"account_id" gorm:"column:account_id;uniqueIndex:uidx_aand"`
+	NodeId    int        `json:"node_id" gorm:"column:node_id;uniqueIndex:uidx_aand"`
 	Rids      Slice[int] `json:"rids" gorm:"column:rids"`
 
 	ResourceId int                   `json:"resource_id" gorm:"column:resource_id"`
@@ -28,7 +27,7 @@ func (m *Authorization) TableName() string {
 }
 
 func (m *Authorization) GetName() string {
-	return fmt.Sprintf("%d-%d-%d", cast.ToInt(m.AssetId), cast.ToInt(m.AccountId), cast.ToInt(m.NodeId))
+	return fmt.Sprintf("%d-%d-%d", m.AssetId, m.AccountId, m.NodeId)
 }
 
 func (m *Authorization) GetId() int {
@@ -40,9 +39,9 @@ type InfoModel interface {
 }
 
 type AuthorizationIds struct {
-	AssetId   *int `json:"asset_id" gorm:"column:asset_id"`
-	AccountId *int `json:"account_id" gorm:"column:account_id"`
-	NodeId    *int `json:"node_id" gorm:"column:node_id"`
+	AssetId   int `json:"asset_id" gorm:"column:asset_id"`
+	AccountId int `json:"account_id" gorm:"column:account_id"`
+	NodeId    int `json:"node_id" gorm:"column:node_id"`
 }
 
 func (m *AuthorizationIds) TableName() string {

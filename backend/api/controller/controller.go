@@ -80,7 +80,7 @@ func doCreate[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType 
 	resourceId := 0
 	if needAcl {
 		_, ok := any(md).(*model.Node)
-		resourceId, err = acl.CreateGrantAcl(ctx, currentUser, resourceType, lo.Ternary(ok, cast.ToString(md.GetId()), md.GetName()))
+		resourceId, err = acl.CreateGrantAcl(ctx, currentUser, resourceType, md.GetName()+lo.Ternary(ok, time.Now().Format(time.RFC3339), ""))
 		if err != nil {
 			handleRemoteErr(ctx, err)
 			return
@@ -99,6 +99,11 @@ func doCreate[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType 
 		switch t := any(md).(type) {
 		case *model.Asset:
 			if err = handleAuthorization(ctx, tx, model.ACTION_CREATE, t, nil); err != nil {
+				handleRemoteErr(ctx, err)
+				return
+			}
+		case *model.Node:
+			if err = acl.UpdateResource(ctx, currentUser.GetUid(), resourceId, map[string]string{"name": cast.ToString(md.GetId())}); err != nil {
 				handleRemoteErr(ctx, err)
 				return
 			}
@@ -248,7 +253,7 @@ func doUpdate[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType 
 		return
 	}
 	if needAcl {
-		if hasPerm(ctx, md, resourceType, acl.WRITE) {
+		if !hasPerm(ctx, md, resourceType, acl.WRITE) {
 			ctx.AbortWithError(http.StatusForbidden, &ApiError{Code: ErrNoPerm, Data: map[string]any{"perm": acl.WRITE}})
 			return
 		}
@@ -316,13 +321,10 @@ func doGet[T any](ctx *gin.Context, needAcl bool, dbFind *gorm.DB, resourceType 
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
 
 	if needAcl && !acl.IsAdmin(currentUser) {
-		var rs []*acl.Resource
-		rs, err = acl.GetRoleResources(ctx, currentUser.Acl.Rid, resourceType)
-		if err != nil {
-			handleRemoteErr(ctx, err)
+		if dbFind, err = handleAcl[T](ctx, dbFind, resourceType); err != nil {
+			ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
 			return
 		}
-		dbFind = dbFind.Where("resource_id IN ?", lo.Map(rs, func(r *acl.Resource, _ int) int { return r.ResourceId }))
 	}
 
 	dbCount := dbFind.Session(&gorm.Session{})
@@ -352,6 +354,13 @@ func doGet[T any](ctx *gin.Context, needAcl bool, dbFind *gorm.DB, resourceType 
 		return
 	}
 
+	// switch t := any(list).(type) {
+	// case []*model.Node:
+	// 	if t, err = nodePostHookParent(ctx, t); err != nil {
+	// 		return
+	// 	}
+	// 	list = lo.Map(t, func(n *model.Node, _ int) T { return any(n).(T) })
+	// }
 	for _, hook := range postHooks {
 		if hook == nil {
 			continue
@@ -474,17 +483,21 @@ func hasPerm[T model.Model](ctx context.Context, md T, resourceTypeName, action 
 		return true
 	}
 
-	pid := 0
+	pids := make([]int, 0)
 	switch t := any(md).(type) {
 	case *model.Asset:
-		pid = t.ParentId
+		pids, _ = handleSelfParent(ctx, t.ParentId)
 	case *model.Node:
-		pid = t.ParentId
+		pids, _ = handleSelfParent(ctx, t.ParentId)
 	}
 
-	if pid > 0 {
+	if len(pids) > 0 {
 		res, _ := acl.GetRoleResources(ctx, currentUser.GetRid(), conf.RESOURCE_NODE)
-		if _, ok := lo.Find(res, func(r *acl.Resource) bool { return r.ResourceId == pid }); ok {
+		resId2perms := lo.SliceToMap(res, func(r *acl.Resource) (int, []string) { return r.ResourceId, r.Permissions })
+		resId2perms, _ = handleSelfChildPerms(ctx, resId2perms)
+		nodes, _ := getAllNodes(ctx)
+		id2resId := lo.SliceToMap(nodes, func(n *model.Node) (int, int) { return n.Id, n.ResourceId })
+		if lo.ContainsBy(pids, func(pid int) bool { return lo.Contains(resId2perms[id2resId[pid]], action) }) {
 			return true
 		}
 	}
@@ -545,6 +558,82 @@ func handlePermissions[T any](ctx *gin.Context, data []T, resourceTypeName strin
 		}
 		d.SetPerms(resId2perms[d.GetResourceId()])
 	}
+
+	return
+}
+
+func handleAcl[T any](ctx *gin.Context, dbFind *gorm.DB, resourceType string) (db *gorm.DB, err error) {
+	currentUser, _ := acl.GetSessionFromCtx(ctx)
+
+	resIds, err := acl.GetRoleResourceIds(ctx, currentUser.Acl.Rid, resourceType)
+	if err != nil {
+		return
+	}
+	switch any(*new(T)).(type) {
+	case *model.Node:
+		db, err = handleNodeIds(ctx, dbFind, resIds)
+	case *model.Asset:
+		db, err = handleAssetIds(ctx, dbFind, resIds)
+	default:
+		db = dbFind.Where("resource_id IN ?", resIds)
+	}
+
+	return
+}
+
+func handleNodeIds(ctx *gin.Context, dbFind *gorm.DB, resIds []int) (db *gorm.DB, err error) {
+	currentUser, _ := acl.GetSessionFromCtx(ctx)
+
+	nodes, err := getAllNodes(ctx)
+	if err != nil {
+		return
+	}
+	nodes = lo.Filter(nodes, func(n *model.Node, _ int) bool { return lo.Contains(resIds, n.ResourceId) })
+	ids := lo.Map(nodes, func(n *model.Node, _ int) int { return n.Id })
+	if ids, err = handleSelfChild(ctx, ids...); err != nil {
+		return
+	}
+
+	assetResIds, err := acl.GetRoleResources(ctx, currentUser.GetRid(), conf.RESOURCE_ASSET)
+	if err != nil {
+		return
+	}
+	assets := make([]*model.AssetIdPid, 0)
+	if err = mysql.DB.Model(assets).Where("resource_id IN ?", assetResIds).Find(&assets).Error; err != nil {
+		return
+	}
+	ids = append(ids, lo.Map(assets, func(a *model.AssetIdPid, _ int) int { return a.ParentId })...)
+
+	ids, err = handleSelfParent(ctx, ids...)
+	if err != nil {
+		return
+	}
+
+	db = dbFind.Where("id IN ?", ids)
+
+	return
+}
+
+func handleAssetIds(ctx *gin.Context, dbFind *gorm.DB, resIds []int) (db *gorm.DB, err error) {
+	currentUser, _ := acl.GetSessionFromCtx(ctx)
+
+	nodes, err := getAllNodes(ctx)
+	if err != nil {
+		return
+	}
+	nodeResIds, err := acl.GetRoleResourceIds(ctx, currentUser.GetRid(), conf.RESOURCE_NODE)
+	if err != nil {
+		return
+	}
+	nodes = lo.Filter(nodes, func(n *model.Node, _ int) bool { return lo.Contains(nodeResIds, n.ResourceId) })
+	nodeIds := lo.Map(nodes, func(n *model.Node, _ int) int { return n.Id })
+	if nodeIds, err = handleSelfChild(ctx, nodeIds...); err != nil {
+		return
+	}
+
+	d := mysql.DB.Where("resource_id IN ?", resIds).Or("parent_id IN?", nodeIds)
+
+	db = dbFind.Where(d)
 
 	return
 }

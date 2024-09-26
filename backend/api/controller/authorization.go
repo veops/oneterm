@@ -45,11 +45,7 @@ func (c *Controller) UpsertAuthorization(ctx *gin.Context) {
 	if err := mysql.DB.Transaction(func(tx *gorm.DB) error {
 		t := &model.Authorization{}
 		if err = tx.Model(t).
-			Where(fmt.Sprintf("node_id %s AND asset_id %s AND account_id %s",
-				lo.Ternary(auth.NodeId == nil, "IS NULL", fmt.Sprintf("=%d", cast.ToInt(auth.NodeId))),
-				lo.Ternary(auth.AssetId == nil, "IS NULL", fmt.Sprintf("=%d", cast.ToInt(auth.AssetId))),
-				lo.Ternary(auth.AccountId == nil, "IS NULL", fmt.Sprintf("=%d", cast.ToInt(auth.AccountId))),
-			)).
+			Where("node_id=? AND asset_id=? AND account_id=?", auth.NodeId, auth.AssetId, auth.AccountId).
 			First(t).Error; err != nil {
 			if !errors.Is(err, gorm.ErrRecordNotFound) {
 				return err
@@ -129,17 +125,17 @@ func (c *Controller) GetAuthorizations(ctx *gin.Context) {
 	for _, k := range []string{"node_id", "asset_id", "account_id"} {
 		q, ok := ctx.GetQuery(k)
 		if ok {
-			db = db.Where(fmt.Sprintf("%s = ?", k), cast.ToInt(q))
+			db = db.Where(fmt.Sprintf("%s=?", k), cast.ToInt(q))
 			switch k {
 			case "node_id":
-				auth.NodeId = lo.ToPtr(cast.ToInt(q))
+				auth.NodeId = cast.ToInt(q)
 			case "asset_id":
-				auth.AssetId = lo.ToPtr(cast.ToInt(q))
+				auth.AssetId = cast.ToInt(q)
 			case "account_id":
-				auth.AccountId = lo.ToPtr(cast.ToInt(q))
+				auth.AccountId = cast.ToInt(q)
 			}
 		} else {
-			db = db.Where(fmt.Sprintf("%s IS NULL", k))
+			db = db.Where("?=0", k)
 		}
 	}
 
@@ -148,7 +144,7 @@ func (c *Controller) GetAuthorizations(ctx *gin.Context) {
 		return
 	}
 
-	doGet[*model.Authorization](ctx, false, db, acl.GetResourceTypeName(conf.RESOURCE_AUTHORIZATION))
+	doGet[*model.Authorization](ctx, false, db, conf.RESOURCE_AUTHORIZATION)
 }
 
 func getGrantNodeAssetAccoutIds(ctx context.Context, action string) (nodeIds, assetIds, accountIds []int, err error) {
@@ -164,14 +160,14 @@ func getGrantNodeAssetAccoutIds(ctx context.Context, action string) (nodeIds, as
 			return
 		}
 		res = lo.Filter(res, func(r *acl.Resource, _ int) bool { return lo.Contains(r.Permissions, action) })
-		resIds, err := handleSelfChild(ctx, lo.Map(res, func(r *acl.Resource, _ int) int { return r.ResourceId }))
+		resIds, err := handleSelfChild(ctx, lo.Map(res, func(r *acl.Resource, _ int) int { return r.ResourceId })...)
 		if err != nil {
 			return
 		}
 		if err = mysql.DB.Model(&model.Node{}).Where("resource_id IN ?", resIds).Pluck("id", &nodeIds).Error; err != nil {
 			return
 		}
-		nodeIds, err = handleSelfChild(ctx, nodeIds)
+		nodeIds, err = handleSelfChild(ctx, nodeIds...)
 		return
 	})
 
@@ -181,7 +177,7 @@ func getGrantNodeAssetAccoutIds(ctx context.Context, action string) (nodeIds, as
 			return
 		}
 		res = lo.Filter(res, func(r *acl.Resource, _ int) bool { return lo.Contains(r.Permissions, action) })
-		resIds, err := handleSelfChild(ctx, lo.Map(res, func(r *acl.Resource, _ int) int { return r.ResourceId }))
+		resIds, err := handleSelfChild(ctx, lo.Map(res, func(r *acl.Resource, _ int) int { return r.ResourceId })...)
 		if err != nil {
 			return
 		}
@@ -198,7 +194,7 @@ func getGrantNodeAssetAccoutIds(ctx context.Context, action string) (nodeIds, as
 			return
 		}
 		res = lo.Filter(res, func(r *acl.Resource, _ int) bool { return lo.Contains(r.Permissions, action) })
-		resIds, err := handleSelfChild(ctx, lo.Map(res, func(r *acl.Resource, _ int) int { return r.ResourceId }))
+		resIds, err := handleSelfChild(ctx, lo.Map(res, func(r *acl.Resource, _ int) int { return r.ResourceId })...)
 		if err != nil {
 			return
 		}
@@ -225,12 +221,12 @@ func hasPermAuthorization(ctx context.Context, auth *model.Authorization, action
 		return
 	}
 
-	if auth.NodeId != nil && auth.AssetId == nil && auth.AccountId == nil {
-		ok = lo.Contains(nodeIds, *auth.NodeId)
-	} else if auth.AssetId != nil && auth.NodeId == nil && auth.AccountId == nil {
-		ok = lo.Contains(assetIds, *auth.AssetId)
-	} else if auth.AccountId != nil && auth.AssetId == nil && auth.NodeId == nil {
-		ok = lo.Contains(accountIds, *auth.AccountId)
+	if auth.NodeId != 0 && auth.AssetId == 0 && auth.AccountId == 0 {
+		ok = lo.Contains(nodeIds, auth.NodeId)
+	} else if auth.AssetId != 0 && auth.NodeId == 0 && auth.AccountId == 0 {
+		ok = lo.Contains(assetIds, auth.AssetId)
+	} else if auth.AccountId != 0 && auth.AssetId == 0 && auth.NodeId == 0 {
+		ok = lo.Contains(accountIds, auth.AccountId)
 	}
 
 	return
@@ -260,7 +256,7 @@ func handleAuthorization(ctx *gin.Context, tx *gorm.DB, action int, asset *model
 			}
 			for _, pre := range pres {
 				p := pre
-				if _, ok := asset.Authorization[*p.AccountId]; ok {
+				if _, ok := asset.Authorization[p.AccountId]; ok {
 					auths = append(auths, p)
 				} else {
 					eg.Go(func() error {
@@ -270,7 +266,7 @@ func handleAuthorization(ctx *gin.Context, tx *gorm.DB, action int, asset *model
 			}
 		} else {
 			auths = lo.Map(lo.Keys(asset.Authorization), func(id int, _ int) *model.Authorization {
-				return &model.Authorization{AssetId: &asset.Id, AccountId: &id, Rids: asset.Authorization[id]}
+				return &model.Authorization{AssetId: asset.Id, AccountId: id, Rids: asset.Authorization[id]}
 			})
 		}
 	}
@@ -281,7 +277,7 @@ func handleAuthorization(ctx *gin.Context, tx *gorm.DB, action int, asset *model
 		case model.ACTION_CREATE:
 			eg.Go(func() (err error) {
 				resourceId := 0
-				if resourceId, err = acl.CreateGrantAcl(ctx, currentUser, conf.GetResourceTypeName(conf.RESOURCE_AUTHORIZATION), auth.GetName()); err != nil {
+				if resourceId, err = acl.CreateGrantAcl(ctx, currentUser, conf.RESOURCE_AUTHORIZATION, auth.GetName()); err != nil {
 					return
 				}
 				if err = acl.BatchGrantRoleResource(ctx, currentUser.GetUid(), auth.Rids, resourceId, []string{acl.READ}); err != nil {
@@ -342,17 +338,6 @@ func getAuthorizations(ctx *gin.Context) (res []*acl.Resource, err error) {
 	return
 }
 
-func getAutorizationResourceIdPerms(ctx *gin.Context) (resourceIdPerms map[int][]string, err error) {
-	res, err := getAuthorizations(ctx)
-	if err != nil {
-		return
-	}
-
-	resourceIdPerms = lo.SliceToMap(res, func(r *acl.Resource) (int, []string) { return r.ResourceId, r.Permissions })
-
-	return
-}
-
 func getAutorizationResourceIds(ctx *gin.Context) (resourceIds []int, err error) {
 	res, err := getAuthorizations(ctx)
 	if err != nil {
@@ -404,15 +389,15 @@ func hasAuthorization(ctx *gin.Context, sess *gsession.Session) (ok bool) {
 	if err != nil {
 		return
 	}
-	if _, ok = lo.Find(authIds, func(item *model.AuthorizationIds) bool {
-		return item.NodeId == nil && item.AssetId != nil && *item.AssetId == sess.AssetId && item.AccountId != nil && *item.AccountId == sess.AccountId
-	}); ok {
+	if lo.ContainsBy(authIds, func(item *model.AuthorizationIds) bool {
+		return item.NodeId == 0 && item.AssetId == sess.AssetId && item.AccountId == sess.AccountId
+	}) {
 		return
 	}
 	ctx.Set(kAuthorizationIds, authIds)
 
 	parentNodeIds, assetIds, accountIds := getIdsByAuthorizationIds(ctx)
-	tmp, err := handleSelfChild(ctx, parentNodeIds)
+	tmp, err := handleSelfChild(ctx, parentNodeIds...)
 	if err != nil {
 		logger.L().Error("", zap.Error(err))
 		return

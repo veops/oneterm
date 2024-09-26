@@ -88,7 +88,7 @@ func write(sess *gsession.Session) {
 		sess.CliRw.Write(out)
 	}
 
-	if len(out) > 0 && strings.Contains(sess.Protocol, "ssh") {
+	if sess.SshRecoder != nil && len(out) > 0 && strings.Contains(sess.Protocol, "ssh") {
 		sess.SshRecoder.Write(out)
 	}
 
@@ -137,7 +137,9 @@ func HandleSsh(sess *gsession.Session) (err error) {
 				if checkTime(asset.AccessAuth) {
 					continue
 				}
-				writeErrMsg(sess, "invalid access time\n\n")
+				if sess.ShareId != 0 && time.Now().Before(sess.ShareEnd) {
+					continue
+				}
 				return &ApiError{Code: ErrAccessTime}
 			case closeBy := <-chs.CloseChan:
 				writeErrMsg(sess, "closed by admin\n\n")
@@ -223,6 +225,9 @@ func handleGuacd(sess *gsession.Session) (err error) {
 				if checkTime(asset.AccessAuth) {
 					continue
 				}
+				if sess.ShareId != 0 && time.Now().Before(sess.ShareEnd) {
+					continue
+				}
 				return &ApiError{Code: ErrAccessTime}
 			case closeBy := <-chs.CloseChan:
 				return &ApiError{Code: ErrAdminClose, Data: map[string]any{"admin": closeBy}}
@@ -279,6 +284,12 @@ func DoConnect(ctx *gin.Context, ws *websocket.Conn) (sess *gsession.Session, er
 		Status:      model.SESSIONSTATUS_ONLINE,
 		ShareId:     cast.ToInt(ctx.Value("shareId")),
 	}
+	if sess.ShareId != 0 {
+		sess.ShareEnd, _ = ctx.Value("shareEnd").(time.Time)
+		if err, _ = ctx.Value("shareErr").(error); err != nil {
+			return
+		}
+	}
 	if sess.IsSsh() {
 		w, h := cast.ToInt(ctx.Query("w")), cast.ToInt(ctx.Query("h"))
 		sess.SshParser = gsession.NewParser(sess.SessionId, w, h)
@@ -306,7 +317,7 @@ func DoConnect(ctx *gin.Context, ws *websocket.Conn) (sess *gsession.Session, er
 		ctx.AbortWithError(http.StatusBadRequest, err)
 		return
 	}
-	if  !hasAuthorization(ctx, sess) {
+	if !hasAuthorization(ctx, sess) {
 		err = &ApiError{Code: ErrUnauthorized}
 		ctx.AbortWithError(http.StatusForbidden, err)
 		return

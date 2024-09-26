@@ -24,7 +24,7 @@ import (
 
 const (
 	kFmtAllNodes = "allNodes"
-	kFmtNodeIds  = "assetIds-%d"
+	kFmtNodeIds  = "nodeIds-%d"
 )
 
 var (
@@ -41,7 +41,7 @@ var (
 //	@Router		/node [post]
 func (c *Controller) CreateNode(ctx *gin.Context) {
 	redis.RC.Del(ctx, kFmtAllNodes)
-	doCreate(ctx, false, &model.Node{}, "")
+	doCreate(ctx, true, &model.Node{}, conf.RESOURCE_NODE)
 }
 
 // DeleteNode godoc
@@ -52,7 +52,7 @@ func (c *Controller) CreateNode(ctx *gin.Context) {
 //	@Router		/node/:id [delete]
 func (c *Controller) DeleteNode(ctx *gin.Context) {
 	redis.RC.Del(ctx, kFmtAllNodes)
-	doDelete(ctx, false, &model.Node{}, conf.RESOURCE_NODE, nodeDcs...)
+	doDelete(ctx, true, &model.Node{}, conf.RESOURCE_NODE, nodeDcs...)
 }
 
 // UpdateNode godoc
@@ -64,7 +64,7 @@ func (c *Controller) DeleteNode(ctx *gin.Context) {
 //	@Router		/node/:id [put]
 func (c *Controller) UpdateNode(ctx *gin.Context) {
 	redis.RC.Del(ctx, kFmtAllNodes)
-	doUpdate(ctx, false, &model.Node{}, conf.RESOURCE_NODE, nodePreHooks...)
+	doUpdate(ctx, true, &model.Node{}, conf.RESOURCE_NODE, nodePreHooks...)
 }
 
 // GetNodes godoc
@@ -114,12 +114,16 @@ func (c *Controller) GetNodes(ctx *gin.Context) {
 		if err != nil {
 			return
 		}
+		if ids, err = handleSelfChild(ctx, ids...); err != nil {
+			return
+		}
+		if ids, err = handleSelfParent(ctx, ids...); err != nil {
+			return
+		}
 		db = db.Where("id IN ?", ids)
 	}
 
-	db = db.Order("name DESC")
-
-	doGet(ctx, !info, db, acl.GetResourceTypeName(conf.RESOURCE_NODE), nodePostHooks...)
+	doGet(ctx, !info, db, conf.RESOURCE_NODE, nodePostHooks...)
 }
 
 func nodePreHookCheckCycle(ctx *gin.Context, data *model.Node) {
@@ -149,22 +153,11 @@ func nodePostHookCountAsset(ctx *gin.Context, data []*model.Node) {
 	assets := make([]*model.AssetIdPid, 0)
 	db := mysql.DB.Model(&model.Asset{})
 	if !isAdmin {
-		authorizationResourceIds, err := getAutorizationResourceIds(ctx)
+		assetIds, err := GetAssetIdsByAuthorization(ctx)
 		if err != nil {
-			ctx.AbortWithError(http.StatusInternalServerError, err)
 			return
 		}
-		ids := make([]int, 0)
-		if err = mysql.DB.
-			Model(&model.Authorization{}).
-			Where("resource_id IN ?", authorizationResourceIds).
-			Distinct().
-			Pluck("asset_id", &ids).
-			Error; err != nil {
-			ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
-			return
-		}
-		db = db.Where("id IN ?", ids)
+		db = db.Where("id IN ?", assetIds)
 	}
 	if err := db.Find(&assets).Error; err != nil {
 		logger.L().Error("node posthookfailed asset count", zap.Error(err))
@@ -213,6 +206,31 @@ func nodePostHookHasChild(ctx *gin.Context, data []*model.Node) {
 	}
 }
 
+// func nodePostHookParent(ctx *gin.Context, data []*model.Node) (res []*model.Node, err error) {
+// 	defer func() {
+// 		if err != nil {
+// 			ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+// 		}
+// 	}()
+// 	nodes, err := getAllNodes(ctx)
+// 	if err != nil {
+// 		return
+// 	}
+// 	ids, err := handleSelfParent(ctx, lo.Map(data, func(n *model.Node, _ int) int { return n.Id })...)
+// 	if err != nil {
+// 		return
+// 	}
+// 	nm := lo.SliceToMap(nodes, func(n *model.Node) (int, *model.Node) { return n.Id, n })
+// 	for _, id := range ids {
+// 		if x, ok := nm[id]; ok {
+// 			data = append(data, x)
+// 		}
+// 	}
+// 	res = lo.UniqBy(data, func(n *model.Node) int { return n.Id })
+// 	sort.Slice(res, func(i, j int) bool { return res[i].Name < res[j].Name })
+// 	return
+// }
+
 func nodeDelHook(ctx *gin.Context, id int) {
 	noChild := true
 	noChild = noChild && errors.Is(mysql.DB.Model(&model.Node{}).Select("id").Where("parent_id = ?", id).First(map[string]any{}).Error, gorm.ErrRecordNotFound)
@@ -247,7 +265,7 @@ func handleNoSelfChild(ctx context.Context, id int) (ids []int, err error) {
 	return
 }
 
-func handleSelfParent(ctx context.Context, id int) (ids []int, err error) {
+func handleSelfParent(ctx context.Context, ids ...int) (res []int, err error) {
 	nodes, err := getAllNodes(ctx)
 	if err != nil {
 		return
@@ -257,21 +275,26 @@ func handleSelfParent(ctx context.Context, id int) (ids []int, err error) {
 	for _, n := range nodes {
 		g[n.ParentId] = append(g[n.ParentId], n.Id)
 	}
+	t := make([]int, 0)
 	var dfs func(int)
 	dfs = func(x int) {
-		ids = append(ids, x)
+		t = append(t, x)
+		if lo.Contains(ids, x) {
+			res = append(res, t...)
+		}
 		for _, y := range g[x] {
 			dfs(y)
 		}
+		t = t[:len(t)-1]
 	}
-	dfs(id)
+	dfs(0)
 
-	ids = append(lo.Without(lo.Keys(g), ids...), id)
+	res = lo.Uniq(res)
 
 	return
 }
 
-func handleSelfChild(ctx context.Context, parentIds []int) (ids []int, err error) {
+func handleSelfChild(ctx context.Context, ids ...int) (res []int, err error) {
 	nodes, err := getAllNodes(ctx)
 	if err != nil {
 		return
@@ -284,13 +307,15 @@ func handleSelfChild(ctx context.Context, parentIds []int) (ids []int, err error
 	var dfs func(int, bool)
 	dfs = func(x int, b bool) {
 		if b {
-			ids = append(ids, x)
+			res = append(res, x)
 		}
 		for _, y := range g[x] {
-			dfs(y, b || lo.Contains(parentIds, x))
+			dfs(y, b || lo.Contains(ids, x))
 		}
 	}
 	dfs(0, false)
+
+	res = append(res, ids...)
 
 	return
 }
@@ -298,20 +323,16 @@ func handleSelfChild(ctx context.Context, parentIds []int) (ids []int, err error
 func GetNodeIdsByAuthorization(ctx *gin.Context) (ids []int, err error) {
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
 
-	authIds, err := getAuthorizationIds(ctx)
-	if err != nil {
-		return
-	}
-	ctx.Set(kAuthorizationIds, authIds)
-
 	k := fmt.Sprintf(kFmtNodeIds, currentUser.GetUid())
 	if err = redis.Get(ctx, k, &ids); err == nil {
 		return
 	}
 
-	parentNodeIds, _, _ := getIdsByAuthorizationIds(ctx)
-	ids, err = handleSelfChild(ctx, parentNodeIds)
+	assetIds, err := GetAssetIdsByAuthorization(ctx)
 	if err != nil {
+		return
+	}
+	if err = mysql.DB.Model(&model.Asset{}).Where("id IN ?", assetIds).Pluck("parent_id", &ids).Error; err != nil {
 		return
 	}
 

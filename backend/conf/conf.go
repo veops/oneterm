@@ -81,10 +81,9 @@ type KV struct {
 }
 
 type AclConfig struct {
-	Url           string `yaml:"url"`
-	AppId         string `yaml:"appId"`
-	SecretKey     string `yaml:"secretKey"`
-	ResourceNames []*KV  `yaml:"resourceNames"`
+	Url       string `yaml:"url"`
+	AppId     string `yaml:"appId"`
+	SecretKey string `yaml:"secretKey"`
 }
 
 type AesConfig struct {
@@ -136,14 +135,4 @@ type ConfigYaml struct {
 	Ssh       SshConfig   `yaml:"ssh"`
 	Auth      Auth        `yaml:"auth"`
 	SecretKey string      `yaml:"secretKey"`
-}
-
-func GetResourceTypeName(key string) (val string) {
-	for _, kv := range Cfg.Auth.Acl.ResourceNames {
-		if kv.Key == key {
-			val = kv.Value
-			return
-		}
-	}
-	return
 }

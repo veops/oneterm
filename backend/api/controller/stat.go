@@ -223,11 +223,11 @@ func (c *Controller) StatCountOfUser(ctx *gin.Context) {
 		isAdmin := acl.IsAdmin(currentUser)
 		db := mysql.DB.Model(&model.Asset{})
 		if !isAdmin {
-			authorizationResourceIds, err := getAutorizationResourceIds(ctx)
+			assetIds, err := GetAssetIdsByAuthorization(ctx)
 			if err != nil {
 				return err
 			}
-			db = db.Where("id IN (?)", mysql.DB.Model(&model.Authorization{}).Select("asset_id").Where("resource_id IN ?", authorizationResourceIds))
+			db = db.Where("id IN ?", assetIds)
 		}
 		return db.Count(&stat.TotalAsset).Error
 	})

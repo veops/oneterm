@@ -24,7 +24,7 @@ import (
 const (
 	kFmtAssetIds      = "assetIds-%d"
 	kAuthorizationIds = "authorizationIds"
-	kParentNodeIds    = "parentNodeIds"
+	kNodeIds          = "nodeIds"
 	kAccountIds       = "accountIds"
 )
 
@@ -121,7 +121,7 @@ func (c *Controller) GetAssets(ctx *gin.Context) {
 
 	db = db.Order("name")
 
-	doGet(ctx, !info, db, acl.GetResourceTypeName(conf.RESOURCE_ASSET), assetPostHooks...)
+	doGet(ctx, !info, db, conf.RESOURCE_ASSET, assetPostHooks...)
 }
 
 func assetPostHookCount(ctx *gin.Context, data []*model.Asset) {
@@ -154,17 +154,23 @@ func assetPostHookAuth(ctx *gin.Context, data []*model.Asset) {
 	if acl.IsAdmin(currentUser) {
 		return
 	}
-	authorizationIds, _ := ctx.Value("authorizationIds").([]*model.AuthorizationIds)
-	parentNodeIds, _, accountIds := getIdsByAuthorizationIds(ctx)
+	authorizationIds, _ := ctx.Value(kAuthorizationIds).([]*model.AuthorizationIds)
+	nodeIds, _, accountIds := getIdsByAuthorizationIds(ctx)
+	nodeIds, _ = handleSelfChild(ctx, nodeIds...)
+
 	for _, a := range data {
-		if lo.Contains(parentNodeIds, a.Id) {
+		if lo.Contains(nodeIds, a.ParentId) {
 			continue
 		}
-		ids := lo.Uniq(
-			lo.Map(lo.Filter(authorizationIds, func(item *model.AuthorizationIds, _ int) bool {
-				return item.AssetId != nil && *item.AssetId == a.Id && item.AccountId != nil
-			}),
-				func(item *model.AuthorizationIds, _ int) int { return *item.AccountId }))
+		if lo.ContainsBy(authorizationIds, func(item *model.AuthorizationIds) bool {
+			return item.AssetId == a.Id && item.NodeId == 0 && item.AccountId == 0
+		}) {
+			continue
+		}
+		ids := lo.Map(lo.Filter(authorizationIds, func(item *model.AuthorizationIds, _ int) bool {
+			return item.AssetId == a.Id && item.AccountId != 0 && item.NodeId == 0
+		}),
+			func(item *model.AuthorizationIds, _ int) int { return item.AccountId })
 
 		for k := range a.Authorization {
 			if !lo.Contains(ids, k) && !lo.Contains(accountIds, k) {
@@ -210,16 +216,16 @@ func GetAssetIdsByAuthorization(ctx *gin.Context) (ids []int, err error) {
 		return
 	}
 
-	parentNodeIds, ids, accountIds := getIdsByAuthorizationIds(ctx)
+	nodeIds, ids, accountIds := getIdsByAuthorizationIds(ctx)
 
-	tmp, err := handleSelfChild(ctx, parentNodeIds)
+	tmp, err := handleSelfChild(ctx, nodeIds...)
 	if err != nil {
 		return
 	}
-	parentNodeIds = append(parentNodeIds, tmp...)
-	ctx.Set(kParentNodeIds, parentNodeIds)
+	nodeIds = append(nodeIds, tmp...)
+	ctx.Set(kNodeIds, nodeIds)
 	ctx.Set(kAccountIds, accountIds)
-	tmp, err = getAssetIdsByNodeAccount(ctx, parentNodeIds, accountIds)
+	tmp, err = getAssetIdsByNodeAccount(ctx, nodeIds, accountIds)
 	if err != nil {
 		return
 	}
@@ -230,24 +236,23 @@ func GetAssetIdsByAuthorization(ctx *gin.Context) (ids []int, err error) {
 	return
 }
 
-func getIdsByAuthorizationIds(ctx context.Context) (parentNodeIds, assetIds, accountIds []int) {
+func getIdsByAuthorizationIds(ctx context.Context) (nodeIds, assetIds, accountIds []int) {
 	authIds, _ := ctx.Value(kAuthorizationIds).([]*model.AuthorizationIds)
-
 	for _, a := range authIds {
-		if a.NodeId != nil && a.AssetId == nil && a.AccountId == nil {
-			parentNodeIds = append(parentNodeIds, *a.NodeId)
+		if a.NodeId != 0 && a.AssetId == 0 && a.AccountId == 0 {
+			nodeIds = append(nodeIds, a.NodeId)
 		}
-		if a.AssetId != nil && a.NodeId == nil && a.AccountId == nil {
-			assetIds = append(assetIds, *a.AssetId)
+		if a.AssetId != 0 && a.NodeId == 0 && a.AccountId == 0 {
+			assetIds = append(assetIds, a.AssetId)
 		}
-		if a.AccountId != nil && a.AssetId == nil && a.NodeId == nil {
-			accountIds = append(accountIds, *a.AccountId)
+		if a.AccountId != 0 && a.AssetId == 0 && a.NodeId == 0 {
+			accountIds = append(accountIds, a.AccountId)
 		}
 	}
 	return
 }
 
-func getAssetIdsByNodeAccount(ctx context.Context, parentNodeIds, accountIds []int) (assetIds []int, err error) {
-	err = mysql.DB.WithContext(ctx).Model(&model.Asset{}).Where("parent_id IN?", parentNodeIds).Or("JSON_KEYS(authorization) IN ?", accountIds).Pluck("id", &assetIds).Error
+func getAssetIdsByNodeAccount(ctx context.Context, nodeIds, accountIds []int) (assetIds []int, err error) {
+	err = mysql.DB.WithContext(ctx).Model(&model.Asset{}).Where("parent_id IN?", nodeIds).Or("JSON_KEYS(authorization) IN ?", accountIds).Pluck("id", &assetIds).Error
 	return
 }

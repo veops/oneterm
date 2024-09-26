@@ -108,7 +108,7 @@ func (c *Controller) GetCommands(ctx *gin.Context) {
 
 	if info && !acl.IsAdmin(currentUser) {
 		//rs := make([]*acl.Resource, 0)
-		rs, err := acl.GetRoleResources(ctx, currentUser.Acl.Rid, acl.GetResourceTypeName(conf.RESOURCE_AUTHORIZATION))
+		rs, err := acl.GetRoleResources(ctx, currentUser.Acl.Rid, conf.RESOURCE_AUTHORIZATION)
 		if err != nil {
 			handleRemoteErr(ctx, err)
 			return
@@ -137,5 +137,5 @@ func (c *Controller) GetCommands(ctx *gin.Context) {
 
 	db = db.Order("name")
 
-	doGet[*model.Command](ctx, !info, db, acl.GetResourceTypeName(conf.RESOURCE_COMMAND))
+	doGet[*model.Command](ctx, !info, db, conf.RESOURCE_COMMAND)
 }

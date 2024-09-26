@@ -43,19 +43,6 @@ auth:
     appId: 5867e079dfd1437e9ae07576ab24b391
     secretKey: 2qlTA4z@#KyigJLYHGrev?0WD6hjX*8E
     url: http://acl-api:5000/api/v1
-    resourceNames:
-      - key: account
-        value: account
-      - key: asset
-        value: asset
-      - key: command
-        value: command
-      - key: gateway
-        value: gateway
-      - key: authorization
-        value: authorization
-      - key: node
-        value: node
   aes:
     key: thisis32bitlongpassphraseimusing
     iv: 0123456789abcdef

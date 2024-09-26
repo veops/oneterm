@@ -139,8 +139,7 @@ func (c *Controller) ConnectShare(ctx *gin.Context) {
 		}
 		return
 	}); err != nil {
-		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrBadRequest, Data: map[string]any{"err": err}})
-		return
+		ctx.Set("shareErr", &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
 	}
 
 	ctx.Params = lo.Filter(ctx.Params, func(p gin.Param, _ int) bool {
@@ -151,6 +150,7 @@ func (c *Controller) ConnectShare(ctx *gin.Context) {
 	ctx.Params = append(ctx.Params, gin.Param{Key: "protocol", Value: cast.ToString(share.Protocol)})
 	ctx.Set("shareId", share.Id)
 	ctx.Set("session", &acl.Session{})
+	ctx.Set("shareEnd", share.End)
 	c.Connect(ctx)
 }
 

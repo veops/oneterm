@@ -121,6 +121,7 @@ type Session struct {
 	IdleTk       *time.Ticker    `json:"-" gorm:"-"`
 	SshRecoder   *Asciinema      `json:"-" gorm:"-"`
 	SshParser    *Parser         `json:"-" gorm:"-"`
+	ShareEnd     time.Time       `json:"-" gorm:"-"`
 }
 
 func (m *Session) HasMonitors() (has bool) {

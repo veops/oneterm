@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/samber/lo"
 	"github.com/spf13/cast"
 	"golang.org/x/sync/errgroup"
 
@@ -50,6 +51,16 @@ func GetRoleResources(ctx context.Context, rid int, resourceTypeId string) (res 
 	return
 }
 
+func GetRoleResourceIds(ctx context.Context, rid int, resourceTypeId string) (ids []int, err error) {
+	res, err := GetRoleResources(ctx, rid, resourceTypeId)
+	if err != nil {
+		return
+	}
+
+	ids = lo.Map(res, func(r *Resource, _ int) int { return r.ResourceId })
+	return
+}
+
 func HasPermission(ctx context.Context, rid int, resourceTypeName string, resourceId int, permission string) (res bool, err error) {
 	token, err := remote.GetAclToken(ctx)
 	if err != nil {
@@ -75,6 +86,7 @@ func HasPermission(ctx context.Context, rid int, resourceTypeName string, resour
 	if v, ok := data["result"]; ok {
 		res = v.(bool)
 	}
+
 	return
 }
 

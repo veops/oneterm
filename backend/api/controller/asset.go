@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/samber/lo"
@@ -13,7 +12,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/veops/oneterm/acl"
-	redis "github.com/veops/oneterm/cache"
 	"github.com/veops/oneterm/conf"
 	mysql "github.com/veops/oneterm/db"
 	"github.com/veops/oneterm/logger"
@@ -154,12 +152,21 @@ func assetPostHookAuth(ctx *gin.Context, data []*model.Asset) {
 	if acl.IsAdmin(currentUser) {
 		return
 	}
+	info := cast.ToBool(ctx.Query("info"))
+	noInfoIds := make([]int, 0)
+	if !info {
+		t := mysql.DB.Model(&model.Asset{})
+		assetResIds, _ := acl.GetRoleResourceIds(ctx, currentUser.GetRid(), conf.RESOURCE_ASSET)
+		t, _ = handleAssetIds(ctx, t, assetResIds)
+		t.Pluck("id", &noInfoIds)
+	}
+
 	authorizationIds, _ := ctx.Value(kAuthorizationIds).([]*model.AuthorizationIds)
 	nodeIds, _, accountIds := getIdsByAuthorizationIds(ctx)
 	nodeIds, _ = handleSelfChild(ctx, nodeIds...)
 
 	for _, a := range data {
-		if lo.Contains(nodeIds, a.ParentId) {
+		if lo.Contains(nodeIds, a.ParentId) || lo.Contains(noInfoIds, a.Id) {
 			continue
 		}
 		if lo.ContainsBy(authorizationIds, func(item *model.AuthorizationIds) bool {
@@ -203,7 +210,7 @@ func handleParentId(ctx context.Context, parentId int) (pids []int, err error) {
 }
 
 func GetAssetIdsByAuthorization(ctx *gin.Context) (ids []int, err error) {
-	currentUser, _ := acl.GetSessionFromCtx(ctx)
+	// currentUser, _ := acl.GetSessionFromCtx(ctx)
 
 	authIds, err := getAuthorizationIds(ctx)
 	if err != nil {
@@ -211,10 +218,10 @@ func GetAssetIdsByAuthorization(ctx *gin.Context) (ids []int, err error) {
 	}
 	ctx.Set(kAuthorizationIds, authIds)
 
-	k := fmt.Sprintf(kFmtAssetIds, currentUser.GetUid())
-	if err = redis.Get(ctx, k, &ids); err == nil {
-		return
-	}
+	// k := fmt.Sprintf(kFmtAssetIds, currentUser.GetUid())
+	// if err = redis.Get(ctx, k, &ids); err == nil {
+	// 	return
+	// }
 
 	nodeIds, ids, accountIds := getIdsByAuthorizationIds(ctx)
 
@@ -231,21 +238,22 @@ func GetAssetIdsByAuthorization(ctx *gin.Context) (ids []int, err error) {
 	}
 	ids = lo.Uniq(append(ids, tmp...))
 
-	redis.SetEx(ctx, k, ids, time.Minute)
+	// redis.SetEx(ctx, k, ids, time.Minute)
 
 	return
 }
 
-func getIdsByAuthorizationIds(ctx context.Context) (nodeIds, assetIds, accountIds []int) {
+func getIdsByAuthorizationIds(ctx *gin.Context) (nodeIds, assetIds, accountIds []int) {
 	authIds, _ := ctx.Value(kAuthorizationIds).([]*model.AuthorizationIds)
+	info := cast.ToBool(ctx.Query("info"))
 	for _, a := range authIds {
 		if a.NodeId != 0 && a.AssetId == 0 && a.AccountId == 0 {
 			nodeIds = append(nodeIds, a.NodeId)
 		}
-		if a.AssetId != 0 && a.NodeId == 0 && a.AccountId == 0 {
+		if a.AssetId != 0 && a.NodeId == 0 && (info || a.AccountId == 0) {
 			assetIds = append(assetIds, a.AssetId)
 		}
-		if a.AccountId != 0 && a.AssetId == 0 && a.NodeId == 0 {
+		if a.AccountId != 0 && a.AssetId == 0 && (info || a.NodeId == 0) {
 			accountIds = append(accountIds, a.AccountId)
 		}
 	}
@@ -253,6 +261,11 @@ func getIdsByAuthorizationIds(ctx context.Context) (nodeIds, assetIds, accountId
 }
 
 func getAssetIdsByNodeAccount(ctx context.Context, nodeIds, accountIds []int) (assetIds []int, err error) {
-	err = mysql.DB.WithContext(ctx).Model(&model.Asset{}).Where("parent_id IN?", nodeIds).Or("JSON_KEYS(authorization) IN ?", accountIds).Pluck("id", &assetIds).Error
+	db := mysql.DB.WithContext(ctx).Model(&model.Asset{}).Where("parent_id IN ?", nodeIds)
+	if len(accountIds) > 0 {
+		db = db.Or(fmt.Sprintf("JSON_CONTAINS_PATH(authorization,'one',%s)",
+			strings.Join(lo.Map(accountIds, func(id int, _ int) string { return fmt.Sprintf("'$.\"%d\"'", id) }), ",")))
+	}
+	err = db.Pluck("id", &assetIds).Error
 	return
 }

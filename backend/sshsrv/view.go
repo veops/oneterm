@@ -133,7 +133,7 @@ func (m *view) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if ln > 100 {
 				m.cmds = m.cmds[ln-100 : ln]
 			}
-			m.cmdsIdx = len(m.cmds) - 1
+			m.cmdsIdx = len(m.cmds)
 			if cmd == "exit" {
 				return m, tea.Sequence(hisCmd, tea.Quit)
 			} else if strings.HasPrefix(cmd, "ssh") {
@@ -286,7 +286,7 @@ func (m *view) refresh() {
 			return err
 		}
 		m.cmds, err = redis.RC.LRange(m.Ctx, fmt.Sprintf(hisCmdsFmt, m.currentUser.GetUid()), -100, -1).Result()
-		m.cmdsIdx = len(m.cmds) - 1
+		m.cmdsIdx = len(m.cmds)
 		return err
 	})
 

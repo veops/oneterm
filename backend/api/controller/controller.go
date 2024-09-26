@@ -253,6 +253,9 @@ func doUpdate[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType 
 		return
 	}
 	if needAcl {
+		md.SetResourceId(old.GetResourceId())
+		fmt.Printf("%+v\n", old)
+		fmt.Printf("%+v\n", md)
 		if !hasPerm(ctx, md, resourceType, acl.WRITE) {
 			ctx.AbortWithError(http.StatusForbidden, &ApiError{Code: ErrNoPerm, Data: map[string]any{"perm": acl.WRITE}})
 			return
@@ -488,7 +491,7 @@ func hasPerm[T model.Model](ctx context.Context, md T, resourceTypeName, action 
 	case *model.Asset:
 		pids, _ = handleSelfParent(ctx, t.ParentId)
 	case *model.Node:
-		pids, _ = handleSelfParent(ctx, t.ParentId)
+		pids, _ = handleSelfParent(ctx, t.Id)
 	}
 
 	if len(pids) > 0 {
@@ -574,6 +577,12 @@ func handleAcl[T any](ctx *gin.Context, dbFind *gorm.DB, resourceType string) (d
 		db, err = handleNodeIds(ctx, dbFind, resIds)
 	case *model.Asset:
 		db, err = handleAssetIds(ctx, dbFind, resIds)
+	case *model.Account:
+		db, err = handleAccountIds(ctx, dbFind, resIds)
+	case *model.Gateway:
+		db = dbFind
+	case *model.Command:
+		db = dbFind
 	default:
 		db = dbFind.Where("resource_id IN ?", resIds)
 	}
@@ -594,7 +603,7 @@ func handleNodeIds(ctx *gin.Context, dbFind *gorm.DB, resIds []int) (db *gorm.DB
 		return
 	}
 
-	assetResIds, err := acl.GetRoleResources(ctx, currentUser.GetRid(), conf.RESOURCE_ASSET)
+	assetResIds, err := acl.GetRoleResourceIds(ctx, currentUser.GetRid(), conf.RESOURCE_ASSET)
 	if err != nil {
 		return
 	}
@@ -632,6 +641,27 @@ func handleAssetIds(ctx *gin.Context, dbFind *gorm.DB, resIds []int) (db *gorm.D
 	}
 
 	d := mysql.DB.Where("resource_id IN ?", resIds).Or("parent_id IN?", nodeIds)
+
+	db = dbFind.Where(d)
+
+	return
+}
+
+func handleAccountIds(ctx *gin.Context, dbFind *gorm.DB, resIds []int) (db *gorm.DB, err error) {
+	currentUser, _ := acl.GetSessionFromCtx(ctx)
+
+	assetResIds, err := acl.GetRoleResourceIds(ctx, currentUser.GetRid(), conf.RESOURCE_ASSET)
+	if err != nil {
+		return
+	}
+	t, _ := handleAssetIds(ctx, mysql.DB.Model(&model.Asset{}), assetResIds)
+	ss := make([]model.Slice[string], 0)
+	if err = t.Pluck("JSON_KEYS(authorization)", &ss).Error; err != nil {
+		return
+	}
+	ids := lo.Uniq(lo.Map(lo.Flatten(ss), func(s string, _ int) int { return cast.ToInt(s) }))
+
+	d := mysql.DB.Where("resource_id IN ?", resIds).Or("id IN ?", ids)
 
 	db = dbFind.Where(d)
 

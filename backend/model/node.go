@@ -45,7 +45,7 @@ func (m *Node) SetUpdaterId(updaterId int) {
 	m.UpdaterId = updaterId
 }
 func (m *Node) SetResourceId(resourceId int) {
-
+	m.ResourceId = resourceId
 }
 func (m *Node) GetResourceId() int {
 	return m.ResourceId

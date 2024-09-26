@@ -2,10 +2,8 @@ package controller
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/samber/lo"
@@ -14,7 +12,6 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/veops/oneterm/acl"
-	redis "github.com/veops/oneterm/cache"
 	"github.com/veops/oneterm/conf"
 	mysql "github.com/veops/oneterm/db"
 	"github.com/veops/oneterm/model"
@@ -166,12 +163,12 @@ func (c *Controller) GetAccounts(ctx *gin.Context) {
 }
 
 func GetAccountIdsByAuthorization(ctx *gin.Context) (ids []int, err error) {
-	currentUser, _ := acl.GetSessionFromCtx(ctx)
+	// currentUser, _ := acl.GetSessionFromCtx(ctx)
 
-	k := fmt.Sprintf(kFmtAccountIds, currentUser.GetUid())
-	if err = redis.Get(ctx, k, &ids); err == nil {
-		return
-	}
+	// k := fmt.Sprintf(kFmtAccountIds, currentUser.GetUid())
+	// if err = redis.Get(ctx, k, &ids); err == nil {
+	// 	return
+	// }
 
 	assetIds, err := GetAssetIdsByAuthorization(ctx)
 	if err != nil {
@@ -187,7 +184,7 @@ func GetAccountIdsByAuthorization(ctx *gin.Context) (ids []int, err error) {
 	_, _, accountIds := getIdsByAuthorizationIds(ctx)
 	ids = lo.Uniq(append(ids, accountIds...))
 
-	redis.SetEx(ctx, k, ids, time.Minute)
+	// redis.SetEx(ctx, k, ids, time.Minute)
 
 	return
 }

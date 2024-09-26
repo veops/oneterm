@@ -3,13 +3,11 @@ package acl
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/samber/lo"
 	"github.com/spf13/cast"
 	"golang.org/x/sync/errgroup"
 
-	redis "github.com/veops/oneterm/cache"
 	"github.com/veops/oneterm/conf"
 	"github.com/veops/oneterm/remote"
 )
@@ -19,10 +17,10 @@ const (
 )
 
 func GetRoleResources(ctx context.Context, rid int, resourceTypeId string) (res []*Resource, err error) {
-	k := fmt.Sprintf(kFmtResources, resourceTypeId, rid)
-	if err = redis.Get(ctx, k, &res); err == nil {
-		return
-	}
+	// k := fmt.Sprintf(kFmtResources, resourceTypeId, rid)
+	// if err = redis.Get(ctx, k, &res); err == nil {
+	// 	return
+	// }
 
 	token, err := remote.GetAclToken(ctx)
 	if err != nil {
@@ -46,7 +44,7 @@ func GetRoleResources(ctx context.Context, rid int, resourceTypeId string) (res 
 
 	res = data.Resources
 
-	redis.SetEx(ctx, k, res, time.Minute)
+	// redis.SetEx(ctx, k, res, time.Minute)
 
 	return
 }

@@ -27,6 +27,10 @@ func GetGatewayManager() *GateWayManager {
 	return manager
 }
 
+func GetGatewayBySessionId(sessionId string) *GatewayTunnel {
+	return manager.gateways[sessionId]
+}
+
 type GatewayTunnel struct {
 	listener   net.Listener
 	GatewayId  int
@@ -37,7 +41,7 @@ type GatewayTunnel struct {
 	RemotePort int
 	LocalConn  net.Conn
 	RemoteConn net.Conn
-	Opened     chan struct{}
+	Opened     chan error
 }
 
 func (gt *GatewayTunnel) Open() (err error) {
@@ -46,20 +50,21 @@ func (gt *GatewayTunnel) Open() (err error) {
 		logger.L().Debug("timeout 5 second close listener", zap.String("sessionId", gt.SessionId))
 		gt.listener.Close()
 	}()
-	close(gt.Opened)
+	defer func() {
+		gt.Opened <- err
+	}()
+	gt.Opened <- nil
 	gt.LocalConn, err = gt.listener.Accept()
 	if err != nil {
 		logger.L().Error("accept failed", zap.String("sessionId", gt.SessionId), zap.Error(err))
-		return err
+		return
 	}
-
 	remoteAddr := fmt.Sprintf("%s:%d", gt.RemoteIp, gt.RemotePort)
 	gt.RemoteConn, err = manager.sshClients[gt.GatewayId].Dial("tcp", remoteAddr)
 	if err != nil {
 		logger.L().Error("dial remote failed", zap.String("sessionId", gt.SessionId), zap.Error(err))
 		return err
 	}
-
 	go io.Copy(gt.LocalConn, gt.RemoteConn)
 	go io.Copy(gt.RemoteConn, gt.LocalConn)
 
@@ -95,6 +100,7 @@ func (gm *GateWayManager) Open(sessionId, remoteIp string, remotePort int, gatew
 			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 		})
 		if err != nil {
+			logger.L().Error("open gateway sshcli failed", zap.Int("gatewayId", gateway.Id), zap.Error(err))
 			return
 		}
 		go func() {
@@ -120,7 +126,7 @@ func (gm *GateWayManager) Open(sessionId, remoteIp string, remotePort int, gatew
 		LocalPort:  localPort,
 		RemoteIp:   remoteIp,
 		RemotePort: remotePort,
-		Opened:     make(chan struct{}),
+		Opened:     make(chan error),
 	}
 	gm.gateways[sessionId] = g
 	go g.Open()

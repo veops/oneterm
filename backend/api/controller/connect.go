@@ -314,12 +314,10 @@ func DoConnect(ctx *gin.Context, ws *websocket.Conn) (sess *gsession.Session, er
 
 	if !checkTime(asset.AccessAuth) {
 		err = &ApiError{Code: ErrAccessTime}
-		ctx.AbortWithError(http.StatusBadRequest, err)
 		return
 	}
 	if !hasAuthorization(ctx, sess) {
 		err = &ApiError{Code: ErrUnauthorized}
-		ctx.AbortWithError(http.StatusForbidden, err)
 		return
 	}
 
@@ -334,7 +332,7 @@ func DoConnect(ctx *gin.Context, ws *websocket.Conn) (sess *gsession.Session, er
 
 	if err = <-sess.Chans.ErrChan; err != nil {
 		logger.L().Error("failed to connect", zap.Error(err))
-		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrConnectServer, Data: map[string]any{"err": err}})
+		err = &ApiError{Code: ErrConnectServer, Data: map[string]any{"err": err}}
 		return
 	}
 
@@ -372,6 +370,12 @@ func connectSsh(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, ac
 	})
 	if err != nil {
 		return
+	}
+
+	if asset.GatewayId != 0 {
+		if err = <-ggateway.GetGatewayBySessionId(sess.SessionId).Opened; err != nil {
+			return
+		}
 	}
 
 	sshSess, err := sshCli.NewSession()

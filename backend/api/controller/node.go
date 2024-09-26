@@ -3,7 +3,6 @@ package controller
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -114,9 +113,6 @@ func (c *Controller) GetNodes(ctx *gin.Context) {
 		if err != nil {
 			return
 		}
-		if ids, err = handleSelfChild(ctx, ids...); err != nil {
-			return
-		}
 		if ids, err = handleSelfParent(ctx, ids...); err != nil {
 			return
 		}
@@ -149,15 +145,26 @@ func nodePreHookCheckCycle(ctx *gin.Context, data *model.Node) {
 
 func nodePostHookCountAsset(ctx *gin.Context, data []*model.Node) {
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
-	isAdmin := acl.IsAdmin(currentUser)
 	assets := make([]*model.AssetIdPid, 0)
 	db := mysql.DB.Model(&model.Asset{})
-	if !isAdmin {
-		assetIds, err := GetAssetIdsByAuthorization(ctx)
-		if err != nil {
-			return
+	if !acl.IsAdmin(currentUser) {
+		info := cast.ToBool(ctx.Query("info"))
+		if info {
+			assetIds, err := GetAssetIdsByAuthorization(ctx)
+			if err != nil {
+				return
+			}
+			db = db.Where("id IN ?", assetIds)
+		} else {
+			assetResId, err := acl.GetRoleResourceIds(ctx, currentUser.GetRid(), conf.RESOURCE_ASSET)
+			if err != nil {
+				return
+			}
+			db, err = handleAssetIds(ctx, db, assetResId)
+			if err != nil {
+				return
+			}
 		}
-		db = db.Where("id IN ?", assetIds)
 	}
 	if err := db.Find(&assets).Error; err != nil {
 		logger.L().Error("node posthookfailed asset count", zap.Error(err))
@@ -321,12 +328,12 @@ func handleSelfChild(ctx context.Context, ids ...int) (res []int, err error) {
 }
 
 func GetNodeIdsByAuthorization(ctx *gin.Context) (ids []int, err error) {
-	currentUser, _ := acl.GetSessionFromCtx(ctx)
+	// currentUser, _ := acl.GetSessionFromCtx(ctx)
 
-	k := fmt.Sprintf(kFmtNodeIds, currentUser.GetUid())
-	if err = redis.Get(ctx, k, &ids); err == nil {
-		return
-	}
+	// k := fmt.Sprintf(kFmtNodeIds, currentUser.GetUid())
+	// if err = redis.Get(ctx, k, &ids); err == nil {
+	// 	return
+	// }
 
 	assetIds, err := GetAssetIdsByAuthorization(ctx)
 	if err != nil {
@@ -336,7 +343,7 @@ func GetNodeIdsByAuthorization(ctx *gin.Context) (ids []int, err error) {
 		return
 	}
 
-	redis.SetEx(ctx, k, ids, time.Minute)
+	// redis.SetEx(ctx, k, ids, time.Minute)
 
 	return
 }

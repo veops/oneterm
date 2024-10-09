@@ -220,19 +220,20 @@ func nodePostHookHasChild(ctx *gin.Context, data []*model.Node) {
 			eg.Go(func() (err error) {
 				assetResIds, err = acl.GetRoleResourceIds(ctx, currentUser.GetRid(), conf.RESOURCE_ASSET)
 				assets = lo.Filter(assets, func(a *model.Asset, _ int) bool { return lo.Contains(assetResIds, a.ResourceId) })
-				pids = lo.Map(data, func(n *model.Node, _ int) int { return n.ParentId })
+				pids = lo.Map(assets, func(n *model.Asset, _ int) int { return n.ParentId })
+				pids, _ = handleSelfParent(ctx, pids...)
 				return
 			})
 			eg.Go(func() (err error) {
 				nodeResIds, err = acl.GetRoleResourceIds(ctx, currentUser.GetRid(), conf.RESOURCE_NODE)
 				ns := lo.Filter(nodes, func(n *model.Node, _ int) bool { return lo.Contains(nodeResIds, n.ResourceId) })
 				nids, _ = handleSelfChild(ctx, lo.Map(ns, func(n *model.Node, _ int) int { return n.Id })...)
+				nids, _ = handleSelfParent(ctx, nids...)
 				return
 			})
 			eg.Wait()
-			pids, _ = handleNoSelfParent(ctx, append(pids, nids...)...)
-			nodes = lo.Filter(nodes, func(n *model.Node, _ int) bool { return lo.Contains(pids, n.Id) })
-			ps = lo.SliceToMap(nodes, func(a *model.Node) (int, bool) { return a.ParentId, true })
+			nodes = lo.Filter(nodes, func(n *model.Node, _ int) bool { return lo.Contains(pids, n.Id) || lo.Contains(nids, n.Id) })
+			ps = lo.SliceToMap(nodes, func(n *model.Node) (int, bool) { return n.ParentId, true })
 		}
 	}
 	for _, n := range data {

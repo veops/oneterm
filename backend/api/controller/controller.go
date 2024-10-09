@@ -20,6 +20,7 @@ import (
 	mysql "github.com/veops/oneterm/db"
 	"github.com/veops/oneterm/model"
 	"github.com/veops/oneterm/remote"
+	"github.com/veops/oneterm/util"
 )
 
 var (
@@ -60,6 +61,8 @@ func NewHttpResponseWithData(data any) *HttpResponse {
 }
 
 func doCreate[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType string, preHooks ...preHook[T]) (err error) {
+	defer util.DeleteAllFromCacheDb(ctx, md)
+
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
 
 	if err = ctx.ShouldBindBodyWithJSON(md); err != nil {
@@ -124,6 +127,10 @@ func doCreate[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType 
 
 		return
 	}); err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrDuplicateName, Data: map[string]any{"err": err}})
+			return
+		}
 		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
@@ -138,7 +145,10 @@ func doCreate[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType 
 }
 
 func doDelete[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType string, dcs ...deleteCheck) (err error) {
+	defer util.DeleteAllFromCacheDb(ctx, md)
+
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
+
 	id, err := cast.ToIntE(ctx.Param("id"))
 	if err != nil {
 		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
@@ -219,6 +229,8 @@ func doDelete[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType 
 }
 
 func doUpdate[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType string, preHooks ...preHook[T]) (err error) {
+	defer util.DeleteAllFromCacheDb(ctx, md)
+
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
 
 	id, err := cast.ToIntE(ctx.Param("id"))
@@ -498,7 +510,7 @@ func hasPerm[T model.Model](ctx context.Context, md T, resourceTypeName, action 
 		res, _ := acl.GetRoleResources(ctx, currentUser.GetRid(), conf.RESOURCE_NODE)
 		resId2perms := lo.SliceToMap(res, func(r *acl.Resource) (int, []string) { return r.ResourceId, r.Permissions })
 		resId2perms, _ = handleSelfChildPerms(ctx, resId2perms)
-		nodes, _ := getAllNodes(ctx)
+		nodes, _ := util.GetAllFromCacheDb(ctx, model.DefaultNode)
 		id2resId := lo.SliceToMap(nodes, func(n *model.Node) (int, int) { return n.Id, n.ResourceId })
 		if lo.ContainsBy(pids, func(pid int) bool { return lo.Contains(resId2perms[id2resId[pid]], action) }) {
 			return true
@@ -593,7 +605,7 @@ func handleAcl[T any](ctx *gin.Context, dbFind *gorm.DB, resourceType string) (d
 func handleNodeIds(ctx *gin.Context, dbFind *gorm.DB, resIds []int) (db *gorm.DB, err error) {
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
 
-	nodes, err := getAllNodes(ctx)
+	nodes, err := util.GetAllFromCacheDb(ctx, model.DefaultNode)
 	if err != nil {
 		return
 	}
@@ -626,7 +638,7 @@ func handleNodeIds(ctx *gin.Context, dbFind *gorm.DB, resIds []int) (db *gorm.DB
 func handleAssetIds(ctx *gin.Context, dbFind *gorm.DB, resIds []int) (db *gorm.DB, err error) {
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
 
-	nodes, err := getAllNodes(ctx)
+	nodes, err := util.GetAllFromCacheDb(ctx, model.DefaultNode)
 	if err != nil {
 		return
 	}
@@ -654,7 +666,7 @@ func handleAccountIds(ctx *gin.Context, dbFind *gorm.DB, resIds []int) (db *gorm
 	if err != nil {
 		return
 	}
-	t, _ := handleAssetIds(ctx, mysql.DB.Model(&model.Asset{}), assetResIds)
+	t, _ := handleAssetIds(ctx, mysql.DB.Model(model.DefaultAsset), assetResIds)
 	ss := make([]model.Slice[string], 0)
 	if err = t.Pluck("JSON_KEYS(authorization)", &ss).Error; err != nil {
 		return

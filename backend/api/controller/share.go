@@ -24,6 +24,8 @@ import (
 //	@Success	200		{object}	HttpResponse{data=ListData{list=[]string}}
 //	@Router		/share [post]
 func (c *Controller) CreateShare(ctx *gin.Context) {
+	currentUser, _ := acl.GetSessionFromCtx(ctx)
+
 	shares := make([]*model.Share, 0)
 
 	if err := ctx.ShouldBindBodyWithJSON(&shares); err != nil {
@@ -36,6 +38,8 @@ func (c *Controller) CreateShare(ctx *gin.Context) {
 			ctx.AbortWithError(http.StatusForbidden, &ApiError{Code: ErrNoPerm, Data: map[string]any{"perm": acl.GRANT}})
 			return
 		}
+		s.CreatorId = currentUser.GetUid()
+		s.UpdaterId = currentUser.GetUid()
 	}
 
 	uuids := lo.Map(shares, func(s *model.Share, _ int) string {
@@ -96,7 +100,7 @@ func (c *Controller) GetShare(ctx *gin.Context) {
 	db = filterEqual(ctx, db, "asset_id", "account_id")
 
 	if !acl.IsAdmin(currentUser) {
-		_, assetIds, accountIds, err := getGrantNodeAssetAccoutIds(ctx, acl.GRANT)
+		_, assetIds, accountIds, err := getNodeAssetAccoutIdsByAction(ctx, acl.GRANT)
 		if err != nil {
 			return
 		}
@@ -161,7 +165,7 @@ func hasPermShare(ctx context.Context, share *model.Share, action string) (ok bo
 		return true
 	}
 
-	_, assetIds, accountIds, err := getGrantNodeAssetAccoutIds(ctx, action)
+	_, assetIds, accountIds, err := getNodeAssetAccoutIdsByAction(ctx, action)
 	if err != nil {
 		return
 	}

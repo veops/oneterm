@@ -91,7 +91,7 @@ func (c *Controller) CreateSessionCmd(ctx *gin.Context) {
 //	@Success	200			{object}	HttpResponse{data=ListData{list=[]model.Session}}
 //	@Router		/session [get]
 func (c *Controller) GetSessions(ctx *gin.Context) {
-	db := mysql.DB.Model(&model.Session{})
+	db := mysql.DB.Model(model.DefaultSession)
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
 	if !acl.IsAdmin(currentUser) {
 		db = db.Where("uid = ?", currentUser.Uid)
@@ -131,7 +131,7 @@ func (c *Controller) GetSessionCmds(ctx *gin.Context) {
 func (c *Controller) GetSessionOptionAsset(ctx *gin.Context) {
 	opts := make([]*model.SessionOptionAsset, 0)
 	if err := mysql.DB.
-		Model(&model.Asset{}).
+		Model(model.DefaultAsset).
 		Select("id, name").
 		Find(&opts).
 		Error; err != nil {
@@ -150,7 +150,7 @@ func (c *Controller) GetSessionOptionAsset(ctx *gin.Context) {
 func (c *Controller) GetSessionOptionClientIp(ctx *gin.Context) {
 	opts := make([]string, 0)
 	if err := mysql.DB.
-		Model(&model.Session{}).
+		Model(model.DefaultSession).
 		Distinct("client_ip").
 		Find(&opts).
 		Error; err != nil {

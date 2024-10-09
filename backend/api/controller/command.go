@@ -34,7 +34,7 @@ var (
 		func(ctx *gin.Context, id int) {
 			assetName := ""
 			err := mysql.DB.
-				Model(&model.Asset{}).
+				Model(model.DefaultAsset).
 				Select("name").
 				Where(fmt.Sprintf("JSON_CONTAINS(cmd_ids, '%d')", id)).
 				First(&assetName).
@@ -66,7 +66,7 @@ func (c *Controller) CreateCommand(ctx *gin.Context) {
 //	@Success	200	{object}	HttpResponse
 //	@Router		/command/:id [delete]
 func (c *Controller) DeleteCommand(ctx *gin.Context) {
-	doDelete(ctx, true, &model.Command{},  conf.RESOURCE_COMMAND,commandDcs...)
+	doDelete(ctx, true, &model.Command{}, conf.RESOURCE_COMMAND, commandDcs...)
 }
 
 // UpdateCommand godoc
@@ -77,7 +77,7 @@ func (c *Controller) DeleteCommand(ctx *gin.Context) {
 //	@Success	200		{object}	HttpResponse
 //	@Router		/command/:id [put]
 func (c *Controller) UpdateCommand(ctx *gin.Context) {
-	doUpdate(ctx, true, &model.Command{},  conf.RESOURCE_COMMAND,commandPreHooks...)
+	doUpdate(ctx, true, &model.Command{}, conf.RESOURCE_COMMAND, commandPreHooks...)
 }
 
 // GetCommands godoc
@@ -119,7 +119,7 @@ func (c *Controller) GetCommands(ctx *gin.Context) {
 			Where("resource_id IN ?", lo.Map(rs, func(r *acl.Resource, _ int) int { return r.ResourceId }))
 		cmdIds := make([]model.Slice[int], 0)
 		if err = mysql.DB.
-			Model(&model.Asset{}).
+			Model(model.DefaultAsset).
 			Select("cmd_ids").
 			Where("id IN (?)", sub).
 			Find(&cmdIds).

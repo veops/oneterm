@@ -34,6 +34,24 @@ func (m *Authorization) GetId() int {
 	return m.Id
 }
 
+func (m *Authorization) SetId(id int) {
+	m.Id = id
+}
+func (m *Authorization) SetCreatorId(creatorId int) {
+	m.CreatorId = creatorId
+}
+func (m *Authorization) SetUpdaterId(updaterId int) {
+	m.UpdaterId = updaterId
+}
+func (m *Authorization) SetResourceId(resourceId int) {
+	m.ResourceId = resourceId
+}
+func (m *Authorization) GetResourceId() int {
+	return m.ResourceId
+}
+
+func (m *Authorization) SetPerms(perms []string) {}
+
 type InfoModel interface {
 	GetId() int
 }

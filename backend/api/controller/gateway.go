@@ -47,7 +47,7 @@ var (
 		func(ctx *gin.Context, data []*model.Gateway) {
 			post := make([]*model.GatewayCount, 0)
 			if err := mysql.DB.
-				Model(&model.Asset{}).
+				Model(model.DefaultAsset).
 				Select("gateway_id AS id, COUNT(*) AS count").
 				Where("gateway_id IN ?", lo.Map(data, func(d *model.Gateway, _ int) int { return d.Id })).
 				Group("gateway_id").
@@ -72,7 +72,7 @@ var (
 		func(ctx *gin.Context, id int) {
 			assetName := ""
 			err := mysql.DB.
-				Model(&model.Asset{}).
+				Model(model.DefaultAsset).
 				Select("name").
 				Where("gateway_id = ?", id).
 				First(&assetName).
@@ -135,7 +135,7 @@ func (c *Controller) GetGateways(ctx *gin.Context) {
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
 	info := cast.ToBool(ctx.Query("info"))
 
-	db := mysql.DB.Model(&model.Gateway{})
+	db := mysql.DB.Model(model.DefaultGateway)
 	db = filterEqual(ctx, db, "id", "type")
 	db = filterLike(ctx, db, "name")
 	db = filterSearch(ctx, db, "name", "host", "account", "port")
@@ -150,7 +150,7 @@ func (c *Controller) GetGateways(ctx *gin.Context) {
 			return
 		}
 		sub := mysql.DB.
-			Model(&model.Asset{}).
+			Model(model.DefaultAsset).
 			Select("DISTINCT gateway_id").
 			Where("asset_id IN ?", assetIds)
 

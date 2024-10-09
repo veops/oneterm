@@ -14,6 +14,7 @@ import (
 	redis "github.com/veops/oneterm/cache"
 	mysql "github.com/veops/oneterm/db"
 	"github.com/veops/oneterm/model"
+	"github.com/veops/oneterm/util"
 )
 
 // StatAssetType godoc
@@ -67,20 +68,20 @@ func (c *Controller) StatCount(ctx *gin.Context) {
 	eg := &errgroup.Group{}
 	eg.Go(func() error {
 		return mysql.DB.
-			Model(&model.Session{}).
+			Model(model.DefaultSession).
 			Select("COUNT(DISTINCT asset_id, account_id) as connect, COUNT(DISTINCT uid) as user, COUNT(DISTINCT gateway_id) as gateway, COUNT(*) as session").
 			Where("status = 1").
 			First(&stat).
 			Error
 	})
 	eg.Go(func() error {
-		return mysql.DB.Model(&model.Asset{}).Count(&stat.TotalAsset).Error
+		return mysql.DB.Model(model.DefaultAsset).Count(&stat.TotalAsset).Error
 	})
 	eg.Go(func() error {
-		return mysql.DB.Model(&model.Asset{}).Where("connectable = 1").Count(&stat.Asset).Error
+		return mysql.DB.Model(model.DefaultAsset).Where("connectable = 1").Count(&stat.Asset).Error
 	})
 	eg.Go(func() error {
-		return mysql.DB.Model(&model.Gateway{}).Count(&stat.TotalGateway).Error
+		return mysql.DB.Model(model.DefaultGateway).Count(&stat.TotalGateway).Error
 	})
 
 	if err := eg.Wait(); err != nil {
@@ -174,7 +175,7 @@ func (c *Controller) StatAsset(ctx *gin.Context) {
 		return
 	}
 	err := mysql.DB.
-		Model(&model.Session{}).
+		Model(model.DefaultSession).
 		Select("COUNT(DISTINCT asset_id, uid) AS connect, COUNT(*) AS session, COUNT(DISTINCT asset_id) AS asset, COUNT(DISTINCT uid) AS user, DATE_FORMAT(created_at, ?) AS time", dateFmt).
 		Where("session.created_at >= ? AND session.created_at <= ?", start, end).
 		Group("time").
@@ -212,24 +213,25 @@ func (c *Controller) StatCountOfUser(ctx *gin.Context) {
 	eg := &errgroup.Group{}
 	eg.Go(func() error {
 		return mysql.DB.
-			Model(&model.Session{}).
+			Model(model.DefaultSession).
 			Select("COUNT(DISTINCT asset_id, account_id) as connect, COUNT(DISTINCT asset_id) as asset, COUNT(*) as session").
 			Where("status = 1").
-			Where("uid = ?", currentUser.Uid).
+			Where("uid = ?", currentUser.GetUid()).
 			First(&stat).
 			Error
 	})
 	eg.Go(func() error {
 		isAdmin := acl.IsAdmin(currentUser)
-		db := mysql.DB.Model(&model.Asset{})
+		assets, err := util.GetAllFromCacheDb(ctx, model.DefaultAsset)
 		if !isAdmin {
 			assetIds, err := GetAssetIdsByAuthorization(ctx)
 			if err != nil {
 				return err
 			}
-			db = db.Where("id IN ?", assetIds)
+			assets = lo.Filter(assets, func(a *model.Asset, _ int) bool { return lo.Contains(assetIds, a.Id) })
 		}
-		return db.Count(&stat.TotalAsset).Error
+		stat.TotalAsset = int64(len(assets))
+		return err
 	})
 
 	if err := eg.Wait(); err != nil {
@@ -254,7 +256,7 @@ func (c *Controller) StatRankOfUser(ctx *gin.Context) {
 	}
 
 	if err := mysql.DB.
-		Model(&model.Session{}).
+		Model(model.DefaultSession).
 		Select("uid, COUNT(*) AS count, MAX(created_at) AS last_time").
 		Group("uid").
 		Order("count DESC").
@@ -279,11 +281,11 @@ func toListData[T any](data []T) *ListData {
 
 func nodeCountAsset() (m map[int]int64, err error) {
 	assets := make([]*model.AssetIdPid, 0)
-	if err = mysql.DB.Model(&model.Asset{}).Find(&assets).Error; err != nil {
+	if err = mysql.DB.Model(model.DefaultAsset).Find(&assets).Error; err != nil {
 		return
 	}
 	nodes := make([]*model.Node, 0)
-	if err = mysql.DB.Model(&model.Node{}).Find(&nodes).Error; err != nil {
+	if err = mysql.DB.Model(model.DefaultNode).Find(&nodes).Error; err != nil {
 		return
 	}
 	m = make(map[int]int64)

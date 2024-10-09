@@ -134,10 +134,7 @@ func HandleSsh(sess *gsession.Session) (err error) {
 				if mysql.DB.Model(asset).Where("id = ?", sess.AssetId).First(asset).Error != nil {
 					continue
 				}
-				if checkTime(asset.AccessAuth) {
-					continue
-				}
-				if sess.ShareId != 0 && time.Now().Before(sess.ShareEnd) {
+				if checkTime(asset.AccessAuth) && (sess.ShareId == 0 || time.Now().Before(sess.ShareEnd)) {
 					continue
 				}
 				return &ApiError{Code: ErrAccessTime}
@@ -222,10 +219,7 @@ func handleGuacd(sess *gsession.Session) (err error) {
 				if mysql.DB.Model(asset).Where("id = ?", sess.AssetId).First(asset).Error != nil {
 					continue
 				}
-				if checkTime(asset.AccessAuth) {
-					continue
-				}
-				if sess.ShareId != 0 && time.Now().Before(sess.ShareEnd) {
+				if checkTime(asset.AccessAuth) && (sess.ShareId == 0 || time.Now().Before(sess.ShareEnd)) {
 					continue
 				}
 				return &ApiError{Code: ErrAccessTime}

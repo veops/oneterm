@@ -1,4 +1,4 @@
-FROM golang:1.21.3-alpine3.17
+FROM golang:alpine
 WORKDIR /oneterm
 COPY . .
 RUN go env -w GOPROXY=https://goproxy.cn,direct \

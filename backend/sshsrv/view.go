@@ -23,11 +23,11 @@ import (
 	"github.com/veops/oneterm/acl"
 	"github.com/veops/oneterm/api/controller"
 	redis "github.com/veops/oneterm/cache"
-	mysql "github.com/veops/oneterm/db"
 	"github.com/veops/oneterm/logger"
 	"github.com/veops/oneterm/model"
 	"github.com/veops/oneterm/session"
 	"github.com/veops/oneterm/sshsrv/textinput"
+	"github.com/veops/oneterm/util"
 )
 
 const (
@@ -222,63 +222,55 @@ func (m *view) possible() string {
 }
 
 func (m *view) refresh() {
-	auths := make([]*model.Authorization, 0)
-	assets := make([]*model.Asset, 0)
-	accounts := make([]*model.Account, 0)
-	dbAsset := mysql.DB.Model(assets)
-	dbAccount := mysql.DB.Model(accounts)
-
-	if !acl.IsAdmin(m.currentUser) {
-		assetIds, err := controller.GetAssetIdsByAuthorization(m.Ctx)
-		if err != nil {
-			return
-		}
-		dbAccount = dbAccount.Where("id IN ?", assetIds)
-
-		accountIds, err := controller.GetAccountIdsByAuthorization(m.Ctx)
-		if err != nil {
-			return
-		}
-		dbAsset = dbAsset.Where("id IN ?", accountIds)
-	}
-
 	eg := &errgroup.Group{}
-	eg.Go(func() error {
-		return dbAsset.Find(&assets).Error
-	})
-	eg.Go(func() error {
-		return dbAccount.Find(&accounts).Error
-	})
-	if err := eg.Wait(); err != nil {
-		logger.L().Error("refresh failed", zap.Error(err))
-		return
-	}
-
-	assetMap := lo.SliceToMap(assets, func(a *model.Asset) (int, *model.Asset) { return a.Id, a })
-	accountMap := lo.SliceToMap(accounts, func(a *model.Account) (int, *model.Account) { return a.Id, a })
-
-	m.combines = make(map[string][3]int)
-	for _, auth := range auths {
-		asset, ok := assetMap[auth.AssetId]
-		if !ok {
-			continue
+	eg.Go(func() (err error) {
+		assets, err := util.GetAllFromCacheDb(m.gctx, model.DefaultAsset)
+		if err != nil {
+			return
 		}
-		account, ok := accountMap[auth.AccountId]
-		if !ok {
-			continue
+		accounts, err := util.GetAllFromCacheDb(m.gctx, model.DefaultAccount)
+		if err != nil {
+			return
 		}
-		k := fmt.Sprintf("ssh %s@%s", account.Name, asset.Name)
-		for _, p := range asset.Protocols {
-			if strings.HasPrefix(p, "ssh") {
-				ss := strings.Split(p, ":")
-				port := cast.ToInt(ss[1])
-				if len(ss) != 2 || port == 0 {
+		if !acl.IsAdmin(m.currentUser) {
+			var assetIds, accountIds []int
+			if assetIds, err = controller.GetAssetIdsByAuthorization(m.Ctx); err != nil {
+				return
+			}
+			assets = lo.Filter(assets, func(a *model.Asset, _ int) bool { return lo.Contains(assetIds, a.Id) })
+
+			if accountIds, err = controller.GetAccountIdsByAuthorization(m.Ctx); err != nil {
+				return
+			}
+			accounts = lo.Filter(accounts, func(a *model.Account, _ int) bool { return lo.Contains(accountIds, a.Id) })
+		}
+
+		accountMap := lo.SliceToMap(accounts, func(a *model.Account) (int, *model.Account) { return a.Id, a })
+
+		m.combines = make(map[string][3]int)
+		for _, asset := range assets {
+			for accountId, _ := range asset.Authorization {
+				account, ok := accountMap[accountId]
+				if !ok {
 					continue
 				}
-				m.combines[lo.Ternary(port == 22, k, fmt.Sprintf("%s:%s", k, ss[1]))] = [3]int{account.Id, asset.Id, port}
+				k := fmt.Sprintf("ssh %s@%s", account.Name, asset.Name)
+				for _, p := range asset.Protocols {
+					if strings.HasPrefix(p, "ssh") {
+						ss := strings.Split(p, ":")
+						port := cast.ToInt(ss[1])
+						if len(ss) != 2 || port == 0 {
+							continue
+						}
+						m.combines[lo.Ternary(port == 22, k, fmt.Sprintf("%s:%s", k, ss[1]))] = [3]int{account.Id, asset.Id, port}
+					}
+				}
 			}
 		}
-	}
+		m.textinput.SetSuggestions(lo.Keys(m.combines))
+
+		return
+	})
 
 	eg.Go(func() error {
 		var err error
@@ -290,7 +282,11 @@ func (m *view) refresh() {
 		return err
 	})
 
-	m.textinput.SetSuggestions(lo.Keys(m.combines))
+	if err := eg.Wait(); err != nil {
+		logger.L().Error("refresh failed", zap.Error(err))
+		return
+	}
+
 }
 
 func (m *view) magicn() tea.Msg {

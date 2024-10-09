@@ -17,6 +17,7 @@ import (
 	"github.com/veops/oneterm/logger"
 	"github.com/veops/oneterm/model"
 	"github.com/veops/oneterm/schedule"
+	"github.com/veops/oneterm/util"
 )
 
 const (
@@ -92,7 +93,7 @@ func (c *Controller) GetAssets(ctx *gin.Context) {
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
 	info := cast.ToBool(ctx.Query("info"))
 
-	db := mysql.DB.Model(&model.Asset{})
+	db := mysql.DB.Model(model.DefaultAsset)
 	db = filterEqual(ctx, db, "id")
 	db = filterLike(ctx, db, "name", "ip")
 	db = filterSearch(ctx, db, "name", "ip")
@@ -123,7 +124,7 @@ func (c *Controller) GetAssets(ctx *gin.Context) {
 }
 
 func assetPostHookCount(ctx *gin.Context, data []*model.Asset) {
-	nodes, err := getAllNodes(ctx)
+	nodes, err := util.GetAllFromCacheDb(ctx, model.DefaultNode)
 	if err != nil {
 		return
 	}
@@ -155,7 +156,7 @@ func assetPostHookAuth(ctx *gin.Context, data []*model.Asset) {
 	info := cast.ToBool(ctx.Query("info"))
 	noInfoIds := make([]int, 0)
 	if !info {
-		t := mysql.DB.Model(&model.Asset{})
+		t := mysql.DB.Model(model.DefaultAsset)
 		assetResIds, _ := acl.GetRoleResourceIds(ctx, currentUser.GetRid(), conf.RESOURCE_ASSET)
 		t, _ = handleAssetIds(ctx, t, assetResIds)
 		t.Pluck("id", &noInfoIds)
@@ -188,7 +189,7 @@ func assetPostHookAuth(ctx *gin.Context, data []*model.Asset) {
 }
 
 func handleParentId(ctx context.Context, parentId int) (pids []int, err error) {
-	nodes, err := getAllNodes(ctx)
+	nodes, err := util.GetAllFromCacheDb(ctx, model.DefaultNode)
 	if err != nil {
 		return
 	}
@@ -210,18 +211,11 @@ func handleParentId(ctx context.Context, parentId int) (pids []int, err error) {
 }
 
 func GetAssetIdsByAuthorization(ctx *gin.Context) (ids []int, err error) {
-	// currentUser, _ := acl.GetSessionFromCtx(ctx)
-
 	authIds, err := getAuthorizationIds(ctx)
 	if err != nil {
 		return
 	}
 	ctx.Set(kAuthorizationIds, authIds)
-
-	// k := fmt.Sprintf(kFmtAssetIds, currentUser.GetUid())
-	// if err = redis.Get(ctx, k, &ids); err == nil {
-	// 	return
-	// }
 
 	nodeIds, ids, accountIds := getIdsByAuthorizationIds(ctx)
 
@@ -237,8 +231,6 @@ func GetAssetIdsByAuthorization(ctx *gin.Context) (ids []int, err error) {
 		return
 	}
 	ids = lo.Uniq(append(ids, tmp...))
-
-	// redis.SetEx(ctx, k, ids, time.Minute)
 
 	return
 }
@@ -261,11 +253,14 @@ func getIdsByAuthorizationIds(ctx *gin.Context) (nodeIds, assetIds, accountIds [
 }
 
 func getAssetIdsByNodeAccount(ctx context.Context, nodeIds, accountIds []int) (assetIds []int, err error) {
-	db := mysql.DB.WithContext(ctx).Model(&model.Asset{}).Where("parent_id IN ?", nodeIds)
-	if len(accountIds) > 0 {
-		db = db.Or(fmt.Sprintf("JSON_CONTAINS_PATH(authorization,'one',%s)",
-			strings.Join(lo.Map(accountIds, func(id int, _ int) string { return fmt.Sprintf("'$.\"%d\"'", id) }), ",")))
+	assets, err := util.GetAllFromCacheDb(ctx, model.DefaultAsset)
+	if err != nil {
+		return
 	}
-	err = db.Pluck("id", &assetIds).Error
+	assets = lo.Filter(assets, func(a *model.Asset, _ int) bool {
+		return lo.Contains(nodeIds, a.ParentId) || len(lo.Intersect(lo.Keys(a.Authorization), accountIds)) > 0
+	})
+	assetIds = lo.Map(assets, func(a *model.Asset, _ int) int { return a.Id })
+
 	return
 }

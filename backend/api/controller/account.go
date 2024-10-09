@@ -18,10 +18,6 @@ import (
 	"github.com/veops/oneterm/util"
 )
 
-const (
-	kFmtAccountIds = "accountIds-%d"
-)
-
 var (
 	accountPreHooks = []preHook[*model.Account]{
 		func(ctx *gin.Context, data *model.Account) {
@@ -77,7 +73,7 @@ var (
 		func(ctx *gin.Context, id int) {
 			assetName := ""
 			err := mysql.DB.
-				Model(&model.Asset{}).
+				Model(model.DefaultAsset).
 				Select("name").
 				Where("id = (?)", mysql.DB.Model(&model.Authorization{}).Select("asset_id").Where("account_id = ?", id).Limit(1)).
 				First(&assetName).
@@ -163,28 +159,19 @@ func (c *Controller) GetAccounts(ctx *gin.Context) {
 }
 
 func GetAccountIdsByAuthorization(ctx *gin.Context) (ids []int, err error) {
-	// currentUser, _ := acl.GetSessionFromCtx(ctx)
-
-	// k := fmt.Sprintf(kFmtAccountIds, currentUser.GetUid())
-	// if err = redis.Get(ctx, k, &ids); err == nil {
-	// 	return
-	// }
-
 	assetIds, err := GetAssetIdsByAuthorization(ctx)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
 	ss := make([]model.Slice[string], 0)
-	if err = mysql.DB.Model(&model.Asset{}).Where("id IN ?", assetIds).Pluck("JSON_KEYS(authorization)", &ss).Error; err != nil {
+	if err = mysql.DB.Model(model.DefaultAsset).Where("id IN ?", assetIds).Pluck("JSON_KEYS(authorization)", &ss).Error; err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
 	ids = lo.Uniq(lo.Map(lo.Flatten(ss), func(s string, _ int) int { return cast.ToInt(s) }))
 	_, _, accountIds := getIdsByAuthorizationIds(ctx)
 	ids = lo.Uniq(append(ids, accountIds...))
-
-	// redis.SetEx(ctx, k, ids, time.Minute)
 
 	return
 }

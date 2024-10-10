@@ -89,7 +89,7 @@ func (fm *FileManager) GetFileClient(assetId, accountId int) (cli *sftp.Client, 
 		User:            account.Account,
 		Auth:            []ssh.AuthMethod{auth},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-		Timeout:         time.Second * 3,
+		Timeout:         time.Second,
 	})
 	if err != nil {
 		return

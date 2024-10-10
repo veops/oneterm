@@ -77,7 +77,8 @@ export default {
     handleClick(route) {
       this.visible = false
       if (route.name !== this.current) {
-        this.$router.push(route.redirect)
+        const redirect = typeof route.redirect === 'function' ? route.redirect() : route.redirect
+        this.$router.push(redirect)
         // this.current = route.name
       }
     },

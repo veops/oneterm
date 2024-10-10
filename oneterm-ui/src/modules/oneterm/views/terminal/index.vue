@@ -27,6 +27,10 @@ export default {
     isFullScreen: {
       type: Boolean,
       default: true,
+    },
+    shareId: {
+      type: String,
+      default: ''
     }
   },
   data() {
@@ -95,10 +99,21 @@ export default {
       }
 
       const protocol = document.location.protocol.startsWith('https') ? 'wss' : 'ws'
+      let socketLink = ''
+      if (is_monitor) {
+        socketLink = `${protocol}://${document.location.host}/api/oneterm/v1/connect/monitor/${session_id}?w=${this.term.cols}&h=${this.term.rows}`
+      } else if (this.shareId) {
+        socketLink = `${protocol}://${document.location.host}/api/oneterm/v1/share/connect/${this.shareId}?w=${this.term.cols}&h=${this.term.rows}`
+      } else {
+        socketLink = `${protocol}://${document.location.host}/api/oneterm/v1/connect/${asset_id}/${account_id}/${queryProtocol}?w=${this.term.cols}&h=${this.term.rows}`
+      }
+
+      if (!socketLink) {
+        return
+      }
+
       this.websocket = new WebSocket(
-        is_monitor
-          ? `${protocol}://${document.location.host}/api/oneterm/v1/connect/monitor/${session_id}?w=${this.term.cols}&h=${this.term.rows}`
-          : `${protocol}://${document.location.host}/api/oneterm/v1/connect/${asset_id}/${account_id}/${queryProtocol}?w=${this.term.cols}&h=${this.term.rows}`,
+        socketLink,
         ['Sec-WebSocket-Protocol']
       )
       this.websocket.onopen = this.websocketOpen()

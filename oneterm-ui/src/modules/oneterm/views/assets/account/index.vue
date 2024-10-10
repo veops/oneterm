@@ -15,6 +15,7 @@
             />
             <div class="ops-list-batch-action" v-show="!!selectedRowKeys.length">
               <span @click="batchDelete">{{ $t(`delete`) }}</span>
+              <span @click="grantAccount">{{ $t(`grant`) }}</span>
               <span>{{ $t('selectRows', { rows: selectedRowKeys.length }) }}</span>
             </div>
           </a-space>
@@ -63,8 +64,8 @@
           <vxe-column :title="$t(`operation`)" width="100">
             <template #default="{row}">
               <a-space>
-                <a @click="openModal(row)"><ops-icon type="icon-xianxing-edit"/></a>
-                <a-popconfirm :title="$t('confirmDelete')" @confirm="deleteGateway(row)">
+                <a @click="openModal(row)" v-if="showAccountOperation(row, 'write')" ><ops-icon type="icon-xianxing-edit"/></a>
+                <a-popconfirm :title="$t('confirmDelete')" v-if="showAccountOperation(row, 'delete')" @confirm="deleteGateway(row)">
                   <a style="color:red"><ops-icon type="icon-xianxing-delete"/></a>
                 </a-popconfirm>
               </a-space>
@@ -94,6 +95,7 @@
       </div>
     </a-spin>
     <AccountModal ref="accountModal" @submit="updateTableData()" />
+    <GrantModal ref="grantModalRef" />
   </div>
 </template>
 
@@ -102,10 +104,14 @@ import moment from 'moment'
 import { mapState } from 'vuex'
 import AccountModal from './accountModal.vue'
 import { getAccountList, deleteAccountById } from '../../../api/account'
+import GrantModal from '@/modules/oneterm/components/grant/grantModal.vue'
 
 export default {
   name: 'Account',
-  components: { AccountModal },
+  components: {
+    AccountModal,
+    GrantModal
+  },
   data() {
     return {
       filterName: '',
@@ -123,6 +129,7 @@ export default {
   computed: {
     ...mapState({
       windowHeight: (state) => state.windowHeight,
+      roles: (state) => state.user.roles,
     }),
     tableHeight() {
       return this.windowHeight - 258
@@ -170,7 +177,7 @@ export default {
     deleteGateway(row) {
       this.loading = true
       deleteAccountById(row.id)
-        .then((res) => {
+        .then(() => {
           this.$message.success(this.$t('deleteSuccess'))
           this.updateTableData()
         })
@@ -211,6 +218,22 @@ export default {
         },
       })
     },
+
+    grantAccount() {
+      const firstSlect = this.tableData?.find((item) => item.id === this.selectedRowKeys?.[0]) || {}
+
+      this.$refs.grantModalRef.open({
+        resourceId: firstSlect?.resource_id || '',
+        type: 'account',
+        ids: [...this.selectedRowKeys]
+      })
+    },
+
+    showAccountOperation(account, operation) {
+      const permissions = this?.roles?.permissions || []
+      const isAdmin = permissions?.includes?.('oneterm_admin') || permissions?.includes?.('acl_admin')
+      return account?.permissions?.some((perm) => perm === operation) || isAdmin
+    }
   },
 }
 </script>

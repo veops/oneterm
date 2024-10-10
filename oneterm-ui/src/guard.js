@@ -13,6 +13,7 @@ NProgress.configure({ showSpinner: false })
 
 // 不用认证的页面
 const whitePath = ['/user/login', '/user/logout', '/user/register', '/api/sso/login', '/api/sso/logout', '/user/forgetPassword']
+const startsMathWhitePath = ['/oneterm/share']
 
 // 此处不处理登录, 只处理 是否有用户信息的认证  前端permission的处理  axios处理401 ->  登录
 //  登录页面处理处理 是否使用单点登录
@@ -22,7 +23,10 @@ router.beforeEach(async (to, from, next) => {
 
   const authed = store.state.authed
   const auth_type = localStorage.getItem('ops_auth_type')
-  if (whitePath.includes(to.path)) {
+  if (
+    whitePath.includes(to.path) ||
+    startsMathWhitePath.some((path) => to?.path?.startsWith?.(path) || false)
+  ) {
     next()
   } else if ((auth_type || (!auth_type && Vue.ls.get(ACCESS_TOKEN))) && store.getters.roles.length === 0) {
     store.dispatch('GetAuthDataEnable')

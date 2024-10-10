@@ -6,6 +6,104 @@
   "description": "",
   "glyphs": [
     {
+      "icon_id": "42050642",
+      "name": "itsm-requirement",
+      "font_class": "itsm-request",
+      "unicode": "e9d6",
+      "unicode_decimal": 59862
+    },
+    {
+      "icon_id": "42050622",
+      "name": "itsm-release",
+      "font_class": "itsm-release",
+      "unicode": "e9d5",
+      "unicode_decimal": 59861
+    },
+    {
+      "icon_id": "41903314",
+      "name": "veops-link",
+      "font_class": "veops-link",
+      "unicode": "e9d4",
+      "unicode_decimal": 59860
+    },
+    {
+      "icon_id": "41876664",
+      "name": "oneterm-command_record",
+      "font_class": "oneterm-command_record",
+      "unicode": "e9d3",
+      "unicode_decimal": 59859
+    },
+    {
+      "icon_id": "41859436",
+      "name": "ai-question",
+      "font_class": "ai-question",
+      "unicode": "e9d2",
+      "unicode_decimal": 59858
+    },
+    {
+      "icon_id": "41859414",
+      "name": "ai-sending",
+      "font_class": "ai-sending",
+      "unicode": "e9d1",
+      "unicode_decimal": 59857
+    },
+    {
+      "icon_id": "41859374",
+      "name": "ai-dialogue",
+      "font_class": "ai-dialogue",
+      "unicode": "e9d0",
+      "unicode_decimal": 59856
+    },
+    {
+      "icon_id": "41859191",
+      "name": "ai-report2",
+      "font_class": "ai-report2",
+      "unicode": "e9cf",
+      "unicode_decimal": 59855
+    },
+    {
+      "icon_id": "41858720",
+      "name": "ai-delete",
+      "font_class": "ai-delete",
+      "unicode": "e9cd",
+      "unicode_decimal": 59853
+    },
+    {
+      "icon_id": "41858484",
+      "name": "caise-knowledge",
+      "font_class": "caise-knowledge",
+      "unicode": "e9ce",
+      "unicode_decimal": 59854
+    },
+    {
+      "icon_id": "41833445",
+      "name": "ai-article",
+      "font_class": "ai-article",
+      "unicode": "e9cc",
+      "unicode_decimal": 59852
+    },
+    {
+      "icon_id": "41811974",
+      "name": "ai-model_setup (1)",
+      "font_class": "ai-model_setup1",
+      "unicode": "e9cb",
+      "unicode_decimal": 59851
+    },
+    {
+      "icon_id": "41811980",
+      "name": "ai-report",
+      "font_class": "ai-report",
+      "unicode": "e9ca",
+      "unicode_decimal": 59850
+    },
+    {
+      "icon_id": "41811915",
+      "name": "ai-customer_service",
+      "font_class": "ai-customer_service",
+      "unicode": "e9c9",
+      "unicode_decimal": 59849
+    },
+    {
       "icon_id": "41735717",
       "name": "oneterm-connect",
       "font_class": "oneterm-connect1",

@@ -17,6 +17,24 @@
     :zIndex="1050"
     :flat="flat"
   >
+    <div
+      slot="option-label"
+      slot-scope="{ node }"
+      :style="{ width: '100%', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }"
+    >
+      <a-tooltip :title="node.label">
+        {{ node.label }}
+      </a-tooltip>
+    </div>
+    <div
+      :style="{ width: '100%', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }"
+      slot="value-label"
+      slot-scope="{ node }"
+    >
+      <a-tooltip :title="node.label">
+        {{ node.label }}
+      </a-tooltip>
+    </div>
   </treeselect>
 </template>
 

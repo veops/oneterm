@@ -7,9 +7,9 @@
       <a-form-model-item prop="pk" :label="$t(`oneterm.publicKey`)">
         <a-textarea v-model="form.pk" :placeholder="`${$t(`placeholder1`)}`" />
       </a-form-model-item>
-      <a-form-model-item prop="mac" :label="$t(`oneterm.macAddress`)">
+      <!-- <a-form-model-item prop="mac" :label="$t(`oneterm.macAddress`)">
         <a-input v-model="form.mac" :placeholder="`${$t(`placeholder1`)}`" />
-      </a-form-model-item>
+      </a-form-model-item> -->
     </a-form-model>
   </a-modal>
 </template>
@@ -26,9 +26,9 @@ export default {
       rules: {
         name: [{ required: true, message: `${this.$t(`placeholder1`)}`, trigger: 'blur' }],
         pk: [{ required: true, message: `${this.$t(`placeholder1`)}`, trigger: 'blur' }],
-        mac: [
-          { required: true, message: `${this.$t(`placeholder1`)}`, trigger: 'blur' },
-        ],
+        // mac: [
+        //   { required: true, message: `${this.$t(`placeholder1`)}`, trigger: 'blur' },
+        // ],
       },
     }
   },
@@ -50,7 +50,7 @@ export default {
       if (type === 'add') {
         this.form = {
           name: '',
-          mac: '',
+          // mac: '',
           pk: '',
         }
       }
@@ -62,7 +62,7 @@ export default {
       this.$refs.editForm.resetFields()
       this.form = {
         name: '',
-        mac: '',
+        // mac: '',
         pk: '',
       }
       this.visible = false

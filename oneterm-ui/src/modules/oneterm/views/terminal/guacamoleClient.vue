@@ -34,6 +34,10 @@ export default {
     isFullScreen: {
       type: Boolean,
       default: true,
+    },
+    shareId: {
+      type: String,
+      default: ''
     }
   },
   data() {
@@ -68,11 +72,16 @@ export default {
 
       const protocol = document.location.protocol.startsWith('https') ? 'wss' : 'ws'
 
-      const tunnel = new Guacamole.WebSocketTunnel(
-        is_monitor
-          ? `${protocol}://${document.location.host}/api/oneterm/v1/connect/monitor/${session_id}`
-          : `${protocol}://${document.location.host}/api/oneterm/v1/connect/${asset_id}/${account_id}/${queryProtocol}`
-      )
+      let socketLink = ''
+      if (is_monitor) {
+        socketLink = `${protocol}://${document.location.host}/api/oneterm/v1/connect/monitor/${session_id}`
+      } else if (this.shareId) {
+        socketLink = `${protocol}://${document.location.host}/api/oneterm/v1/share/connect/${this.shareId}`
+      } else {
+        socketLink = `${protocol}://${document.location.host}/api/oneterm/v1/connect/${asset_id}/${account_id}/${queryProtocol}`
+      }
+
+      const tunnel = new Guacamole.WebSocketTunnel(socketLink)
       const client = new Guacamole.Client(tunnel)
 
       // 处理从虚拟机收到的剪贴板内容

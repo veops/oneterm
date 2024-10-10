@@ -1,5 +1,11 @@
 <template>
-  <CustomDrawer :closable="false" :visible="visible" width="1000px" :title="title">
+  <CustomDrawer
+    :closable="true"
+    :visible="visible"
+    width="1000px"
+    :title="title"
+    @close="visible = false"
+  >
     <p>
       <strong>{{ $t(`oneterm.baseInfo`) }}</strong>
     </p>
@@ -36,6 +42,7 @@
               return {
                 id: node.id,
                 label: node.name,
+                children: node.children && node.children.length ? node.children : undefined
               }
             }
           "
@@ -123,7 +130,8 @@ export default {
       this.visible = true
       this.type = type
       getNodeList().then((res) => {
-        this.nodeList = res?.data?.list || []
+        const tree = this.formatTree(res?.data?.list || [])
+        this.nodeList = tree
       })
       this.$nextTick(() => {
         const {
@@ -149,6 +157,26 @@ export default {
         this.$refs.accessAuth.setValues(access_auth)
       })
     },
+
+    formatTree(data) {
+      const tree = []
+      const lookup = {}
+
+      data.forEach(item => {
+        lookup[item.id] = { ...item, children: [] }
+      })
+
+      data.forEach(item => {
+        if (item.parent_id === 0) {
+          tree.push(lookup[item.id])
+        } else if (lookup[item.parent_id]) {
+          lookup[item.parent_id].children.push(lookup[item.id])
+        }
+      })
+
+      return tree
+    },
+
     handleSubmit() {
       this.$refs.baseForm.validate((valid) => {
         if (valid) {

@@ -50,7 +50,7 @@
           <vxe-column type="checkbox" width="60px"></vxe-column>
           <vxe-column field="name" :title="$t(`oneterm.name`)"></vxe-column>
           <vxe-column field="pk" :title="$t(`oneterm.publicKey`)"></vxe-column>
-          <vxe-column field="mac" :title="$t(`oneterm.macAddress`)"></vxe-column>
+          <!-- <vxe-column field="mac" :title="$t(`oneterm.macAddress`)"></vxe-column> -->
           <vxe-column field="created_at" :title="$t(`created_at`)" width="120">
             <template #default="{ row }">
               {{ moment(row.created_at).format('YYYY-MM-DD') }}

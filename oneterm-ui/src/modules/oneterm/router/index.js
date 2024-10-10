@@ -28,47 +28,47 @@ const genOnetermRoutes = () => {
               path: '/oneterm/dashboard',
               name: 'onterm_dashboard',
               component: () => import('../views/dashboard'),
-              meta: { title: 'dashboard', appName: 'oneterm', icon: 'ops-oneterm-dashboard', selectedIcon: 'ops-oneterm-dashboard-selected', keepAlive: false, permission: ['oneterm_admin', 'Dashboard'] }
+              meta: { title: 'dashboard', icon: 'ops-oneterm-dashboard', selectedIcon: 'ops-oneterm-dashboard-selected', keepAlive: false }
           },
           {
               path: '/oneterm/workstation',
               name: 'onterm_work_station',
               component: () => import('../views/workStation'),
               meta: {
-                title: 'oneterm.menu.workStation', appName: 'oneterm', icon: 'ops-oneterm-workstation', selectedIcon: 'ops-oneterm-workstation-selected', keepAlive: false, permission: ['WorkStation', 'oneterm_admin']
+                title: 'oneterm.menu.workStation', icon: 'ops-oneterm-workstation', selectedIcon: 'ops-oneterm-workstation-selected', keepAlive: false
               }
           },
           {
               path: '/oneterm/publickey',
               name: 'onterm_public_key',
               component: () => import('../views/publicKey'),
-              meta: { title: 'oneterm.menu.publicKey', appName: 'oneterm', keepAlive: false, icon: 'ops-oneterm-publickey', selectedIcon: 'ops-oneterm-publickey-selected', permission: ['oneterm_admin', 'Public_Key'] }
+              meta: { title: 'oneterm.menu.publicKey', keepAlive: false, icon: 'ops-oneterm-publickey', selectedIcon: 'ops-oneterm-publickey-selected' }
           },
           {
               path: '/oneterm/assets',
               name: 'oneterm_assets',
               component: RouteView,
-              meta: { title: 'oneterm.menu.assetManagement', appName: 'oneterm', icon: 'ops-oneterm-assets', selectedIcon: 'ops-oneterm-assets-selected', permission: ['oneterm_admin', 'Assets', 'Accounts', 'Gateways', 'Security'] },
+              meta: { title: 'oneterm.menu.assetManagement', icon: 'ops-oneterm-assets', selectedIcon: 'ops-oneterm-assets-selected' },
               redirect: '/oneterm/assets/assets',
               children: [{
                   path: '/oneterm/assetlist',
                   name: 'oneterm_asset_list',
-                  meta: { title: 'oneterm.menu.assets', appName: 'oneterm', icon: 'ops-oneterm-assetlist', selectedIcon: 'ops-oneterm-assetlist-selected', permission: ['oneterm_admin', 'Assets'] },
+                  meta: { title: 'oneterm.menu.assets', icon: 'ops-oneterm-assetlist', selectedIcon: 'ops-oneterm-assetlist-selected' },
                   component: () => import('../views/assets/assets')
               }, {
                 path: '/oneterm/account',
                 name: 'oneterm_account',
-                meta: { title: 'oneterm.menu.accounts', appName: 'oneterm', icon: 'ops-oneterm-account', selectedIcon: 'ops-oneterm-account-selected', permission: ['oneterm_admin', 'Accounts'] },
+                meta: { title: 'oneterm.menu.accounts', icon: 'ops-oneterm-account', selectedIcon: 'ops-oneterm-account-selected' },
                 component: () => import('../views/assets/account')
               }, {
                   path: '/oneterm/gateway',
                   name: 'oneterm_gateway',
-                  meta: { title: 'oneterm.menu.gateways', appName: 'oneterm', icon: 'ops-oneterm-gateway', selectedIcon: 'ops-oneterm-gateway-selected', permission: ['oneterm_admin', 'Gateways'] },
+                  meta: { title: 'oneterm.menu.gateways', icon: 'ops-oneterm-gateway', selectedIcon: 'ops-oneterm-gateway-selected' },
                   component: () => import('../views/assets/gateway')
               }, {
                   path: '/oneterm/security',
                   name: 'oneterm_security',
-                  meta: { title: 'oneterm.menu.security', appName: 'oneterm', icon: 'ops-oneterm-command', selectedIcon: 'ops-oneterm-command-selected', permission: ['oneterm_admin', 'Security'] },
+                  meta: { title: 'oneterm.menu.security', icon: 'ops-oneterm-command', selectedIcon: 'ops-oneterm-command-selected' },
                   component: () => import('../views/assets/security')
               }]
           },
@@ -76,40 +76,40 @@ const genOnetermRoutes = () => {
             path: '/oneterm/audit',
             name: 'oneterm_session',
             component: RouteView,
-            meta: { title: 'oneterm.menu.auditCentre', appName: 'oneterm', icon: 'ops-oneterm-log', selectedIcon: 'ops-oneterm-log-selected', permission: ['oneterm_admin', 'Online_Session', 'Offline_Session', 'Login_Audit', 'Operation_Audit'] },
+            meta: { title: 'oneterm.menu.auditCentre', icon: 'ops-oneterm-log', selectedIcon: 'ops-oneterm-log-selected' },
             redirect: '/oneterm/session/online',
             hideChildrenInMenu: false,
             children: [
               {
                   path: `/oneterm/session`,
                   name: `oneterm_session`,
-                  meta: { title: 'oneterm.menu.sessionAuditing', appName: 'oneterm', disabled: true, style: 'margin-left: 12px', permission: ['oneterm_admin', 'Online_Session', 'Offline_Session'] },
+                  meta: { title: 'oneterm.menu.sessionAuditing', disabled: true, style: 'margin-left: 12px' },
               },
               {
                   path: '/oneterm/session/online',
                   name: 'oneterm_session_online',
-                  meta: { title: 'oneterm.menu.onlineSession', appName: 'oneterm', icon: 'ops-oneterm-sessiononline', selectedIcon: 'ops-oneterm-sessiononline-selected', permission: ['oneterm_admin', 'Online_Session'] },
+                  meta: { title: 'oneterm.menu.onlineSession', icon: 'ops-oneterm-sessiononline', selectedIcon: 'ops-oneterm-sessiononline-selected' },
                   component: () => import('../views/session/online.vue')
               }, {
                   path: '/oneterm/session/history',
                   name: 'oneterm_session_history',
-                  meta: { title: 'oneterm.menu.offlineSession', appName: 'oneterm', icon: 'ops-oneterm-sessionhistory', selectedIcon: 'ops-oneterm-sessionhistory-selected', permission: ['oneterm_admin', 'Offline_Session'] },
+                  meta: { title: 'oneterm.menu.offlineSession', icon: 'ops-oneterm-sessionhistory', selectedIcon: 'ops-oneterm-sessionhistory-selected' },
                   component: () => import('../views/session/history.vue')
               },
               {
                   path: `/oneterm/log`,
                   name: `oneterm_log`,
-                  meta: { title: 'oneterm.menu.logAuditing', appName: 'oneterm', disabled: true, style: 'margin-left: 12px', permission: ['oneterm_admin', 'Login_Audit', 'Operation_Audit'] },
+                  meta: { title: 'oneterm.menu.logAuditing', disabled: true, style: 'margin-left: 12px' },
               },
               {
                   path: '/oneterm/log/login',
                   name: 'oneterm_log_login',
-                  meta: { title: 'oneterm.menu.loginLog', appName: 'oneterm', icon: 'ops-oneterm-login', selectedIcon: 'ops-oneterm-login-selected', permission: ['登录日志', 'oneterm_admin', 'Login_Audit'] },
+                  meta: { title: 'oneterm.menu.loginLog', icon: 'ops-oneterm-login', selectedIcon: 'ops-oneterm-login-selected' },
                   component: () => import('../views/log/login')
               }, {
                   path: '/oneterm/log/operation',
                   name: 'oneterm_log_operation',
-                  meta: { title: 'oneterm.menu.operationLog', appName: 'oneterm', icon: 'ops-oneterm-operation', selectedIcon: 'ops-oneterm-operation-selected', permission: ['操作日志', 'oneterm_admin', 'Operation_Audit'] },
+                  meta: { title: 'oneterm.menu.operationLog', icon: 'ops-oneterm-operation', selectedIcon: 'ops-oneterm-operation-selected' },
                   component: () => import('../views/log/operation')
               }
             ]

@@ -88,7 +88,7 @@
                     <a :href="`/api/oneterm/v1/session/replay/${row.session_id}`"><a-icon type="download"/></a>
                   </a-tooltip>
                   <a-tooltip :title="$t('oneterm.menu.commandRecord')">
-                    <a @click="openDetail(row)"><ops-icon type="oneterm-commandrecord"/></a>
+                    <a @click="openDetail(row)"><ops-icon type="oneterm-command_record"/></a>
                   </a-tooltip>
                 </template>
                 <template v-else>

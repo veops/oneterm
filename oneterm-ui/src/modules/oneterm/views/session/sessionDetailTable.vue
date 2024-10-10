@@ -23,7 +23,7 @@
       resizable
     >
       <vxe-column :title="$t('oneterm.sessionTable.cmd')" field="cmd"> </vxe-column>
-      <vxe-column :title="$t('oneterm.sessionTable.level')" field="level"> </vxe-column>
+      <!-- <vxe-column :title="$t('oneterm.sessionTable.level')" field="level"> </vxe-column> -->
       <vxe-column :title="$t('oneterm.sessionTable.execute_at')" field="created_at" width="150px">
         <template #default="{row}">
           {{ moment(row.created_at).format('YYYY-MM-DD HH:mm:ss') }}

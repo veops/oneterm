@@ -1,5 +1,11 @@
 <template>
-  <CustomDrawer :closable="false" :visible="visible" width="1000px" :title="title">
+  <CustomDrawer
+    :closable="true"
+    :visible="visible"
+    width="1000px"
+    :title="title"
+    @close="visible = false"
+  >
     <p>
       <strong>{{ $t(`oneterm.baseInfo`) }}</strong>
     </p>
@@ -10,7 +16,7 @@
       :label-col="{ span: 5 }"
       :wrapper-col="{ span: 16 }"
     >
-      <a-form-model-item :label="$t('oneterm.assetList.floderName')" prop="name">
+      <a-form-model-item :label="$t('oneterm.assetList.nodeName')" prop="name">
         <a-input v-model="baseForm.name" :placeholder="`${$t(`placeholder1`)}`" />
       </a-form-model-item>
       <a-form-model-item :label="$t(`oneterm.node`)" prop="parent_id">
@@ -205,9 +211,9 @@ export default {
   computed: {
     title() {
       if (this.type === 'create') {
-        return this.$t(`oneterm.assetList.createFloder`)
+        return this.$t(`oneterm.assetList.createNode`)
       }
-      return this.$t(`oneterm.assetList.editFloder`)
+      return this.$t(`oneterm.assetList.editNode`)
     },
   },
   mounted() {},

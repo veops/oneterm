@@ -95,6 +95,18 @@ export const generatorDynamicRouter = async () => {
   return routes
 }
 
+// 基础模块路由，根据当前 app config 配置添加
+const constantModuleRouteMap = []
+if (appConfig.buildModules.includes('oneterm')) {
+  constantModuleRouteMap.push({
+    path: '/oneterm/share/:protocol/:id',
+    name: 'oneterm_share',
+    hidden: true,
+    component: () => import('@/modules/oneterm/views/share'),
+    meta: { title: '分享', keepAlive: false }
+  })
+}
+
 /**
  * 基础路由
  */
@@ -134,15 +146,18 @@ export const constantRouterMap = [
   },
   {
     path: '/404',
+    name: '404',
     component: () => import(/* webpackChunkName: "fail" */ '@/views/exception/404'),
   },
   {
     path: '/403',
+    name: '403',
     component: () => import(/* webpackChunkName: "fail" */ '@/views/exception/403'),
   },
   {
     path: '/500',
+    name: '500',
     component: () => import(/* webpackChunkName: "fail" */ '@/views/exception/500'),
   },
-
+  ...constantModuleRouteMap,
 ]

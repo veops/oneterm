@@ -156,7 +156,9 @@ export default {
       last_login: (state) => state.user.last_login,
     }),
     isOnetermAdmin() {
-      return this.personRoles.permissions.includes('oneterm_admin')
+      const permissions = this?.personRoles?.permissions || []
+      const isAdmin = permissions?.includes?.('oneterm_admin') || permissions?.includes?.('acl_admin')
+      return isAdmin
     },
   },
   mounted() {
@@ -166,11 +168,15 @@ export default {
     async getOfUserStat(delayTime) {
       if (delayTime) {
         setTimeout(async () => {
-          const res = await getOfUserStat()
+          const res = await getOfUserStat({
+            info: true
+          })
           this.personInfo = res?.data ?? {}
         }, delayTime)
       } else {
-        const res = await getOfUserStat()
+        const res = await getOfUserStat({
+            info: true
+          })
         this.personInfo = res?.data ?? {}
       }
     },

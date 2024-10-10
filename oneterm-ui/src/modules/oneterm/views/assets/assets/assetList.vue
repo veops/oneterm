@@ -10,6 +10,7 @@
       <div class="asset-list-sidebar-header" v-if="!forMyAsset">
         <strong>{{ $t(`oneterm.assetList.assetTree`) }}</strong>
         <div
+          v-if="showCreateNodeBtn"
           @click="
             () => {
               $emit('openNode', null)
@@ -17,7 +18,7 @@
           "
         >
           <span><a-icon type="plus" style="color:#2F54EB"/></span>
-          {{ $t(`oneterm.assetList.createFloder`) }}
+          {{ $t(`oneterm.assetList.createNode`) }}
         </div>
       </div>
       <a-tree
@@ -37,20 +38,30 @@
             <ops-icon :type="selectedKeys[0] === node.dataRef.id ? 'oneterm-file-selected' : 'oneterm-file'" />
             <span :title="node.dataRef.name">{{ node.dataRef.name }}</span>
             <span>({{ node.dataRef.asset_count }})</span>
-            <a-dropdown v-if="!forMyAsset" :disabled="forMyAsset">
+            <a-dropdown v-if="!forMyAsset && showNodeOperation(node.dataRef, ['write', 'delete', 'grant'])" :disabled="forMyAsset">
               <ops-icon class="asset-list-sidebar-tree-title-more" type="veops-more" />
 
               <template #overlay>
                 <a-menu>
-                  <a-menu-item key="1" @click="$emit('openNode', { parent_id: node.dataRef.id })">{{
-                    $t(`oneterm.assetList.createFloder`)
-                  }}</a-menu-item>
-                  <a-menu-item key="2" @click="$emit('openNode', node.dataRef)">{{
-                    $t(`oneterm.assetList.editFloder`)
-                  }}</a-menu-item>
-                  <a-menu-item key="3" @click="deleteNode(node.dataRef)">{{
-                    $t(`oneterm.assetList.deleteFloder`)
-                  }}</a-menu-item>
+                  <a-menu-item key="1" v-if="showNodeOperation(node.dataRef, ['write'])" @click="$emit('openNode', { parent_id: node.dataRef.id })">
+                    <a-icon type="plus-circle" />
+                    {{ $t(`oneterm.assetList.createSubNode`) }}
+                  </a-menu-item>
+                  <a-menu-item key="2" v-if="showNodeOperation(node.dataRef, ['write'])" @click="$emit('openNode', node.dataRef)">
+                    <ops-icon type="icon-xianxing-edit" />
+                    {{ $t(`oneterm.assetList.editNode`) }}
+                  </a-menu-item>
+                  <a-menu-item key="3" v-if="showNodeOperation(node.dataRef, ['delete'])" @click="deleteNode(node.dataRef)">
+                    <ops-icon type="veops-delete" />
+                    {{ $t(`oneterm.assetList.deleteNode`) }}
+                  </a-menu-item>
+                  <template v-if="showNodeOperation(node.dataRef, ['grant'])">
+                    <a-divider style="margin: 4px 0" />
+                    <a-menu-item key="4" @click="openGrantModal(node.dataRef)">
+                      <a-icon type="user-add" />
+                      {{ $t(`oneterm.assetList.grantNode`) }}
+                    </a-menu-item>
+                  </template>
                 </a-menu>
               </template>
             </a-dropdown>
@@ -73,13 +84,13 @@
           <a-space>
             <div class="ops-list-batch-action" v-show="!!selectedRowKeys.length">
               <span @click="batchUpdate('access_auth')">{{ $t('oneterm.accessRestrictions') }}</span>
-              <span @click="batchUpdate('account_ids')">{{ $t('grant') }}</span>
+              <span @click="authAsset">{{ $t('grant') }}</span>
               <span @click="batchUpdate('protocols')">{{ $t('oneterm.assetList.editProtocol') }}</span>
               <span>{{ $t('selectRows', { rows: selectedRowKeys.length }) }}</span>
             </div>
-            <a-button v-if="!forMyAsset && selectedKeys && selectedKeys.length" type="primary" @click="createAsset">{{
-              $t(`create`)
-            }}</a-button>
+            <a-button v-if="!forMyAsset && selectedKeys && selectedKeys.length && showCreateNodeBtn" type="primary" @click="createAsset">
+              {{ $t(`create`) }}
+            </a-button>
             <a-button
               type="primary"
               class="ops-button-ghost"
@@ -143,8 +154,24 @@
             <vxe-column :title="$t(`operation`)" :width="100" align="center">
               <template #default="{row}">
                 <a-space v-if="!forMyAsset">
-                  <a @click="openAsset(row)"><ops-icon type="icon-xianxing-edit"/></a>
-                  <a-popconfirm :title="$t('confirmDelete')" @confirm="deleteAsset(row)">
+                  <a
+                    v-if="row.accountList.length && showAssetOperation(row, 'grant')"
+                    class="oneterm-table-operation-login"
+                    @click="createTempLink(row)"
+                  >
+                    <ops-icon type="veops-link" />
+                  </a>
+                  <a
+                    v-if="showAssetOperation(row, 'write')"
+                    @click="openAsset(row)"
+                  >
+                    <ops-icon type="icon-xianxing-edit"/>
+                  </a>
+                  <a-popconfirm
+                    v-if="showAssetOperation(row, 'delete')"
+                    :title="$t('confirmDelete')"
+                    @confirm="deleteAsset(row)"
+                  >
                     <a style="color:red"><ops-icon type="icon-xianxing-delete"/></a>
                   </a-popconfirm>
                 </a-space>
@@ -203,9 +230,17 @@
         ref="loginModal"
         :showProtocol="false"
         :choiceAccountByCheckbox="true"
+        :forMyAsset="forMyAsset"
         @openTerminal="loginOpenTerminal"
         @openTerminalList="loginOpenTerminalList"
       />
+
+      <TempLinkModal
+        ref="tempLinkModalRef"
+        :accountList="accountList"
+      />
+
+      <GrantModal ref="grantModalRef" />
     </template>
   </TwoColumnLayout>
 </template>
@@ -219,10 +254,12 @@ import { getAssetList, deleteAssetById } from '../../../api/asset'
 import { getAccountList } from '../../../api/account'
 import BatchUpdateModal from './batchUpdateModal.vue'
 import LoginModal from './loginModal.vue'
+import TempLinkModal from './tempLink/tempLinkModal.vue'
+import GrantModal from '@/modules/oneterm/components/grant/grantModal.vue'
 
 export default {
   name: 'AssetList',
-  components: { TwoColumnLayout, BatchUpdateModal, LoginModal },
+  components: { TwoColumnLayout, BatchUpdateModal, LoginModal, TempLinkModal, GrantModal },
   props: {
     forMyAsset: {
       type: Boolean,
@@ -253,6 +290,21 @@ export default {
       rid: (state) => state.user.rid,
       roles: (state) => state.user.roles,
     }),
+    isCreateRootNode() {
+      return true
+    },
+    showCreateNodeBtn() {
+      if (this.selectedKeys.length === 0) {
+        return this.isCreateRootNode
+      }
+      let currentNode = null
+      this.treeForeach(this.treeData, (node) => {
+        if (node.id === this.selectedKeys[0]) {
+          currentNode = node
+        }
+      })
+      return currentNode?.permissions?.some?.((perm) => perm === 'write') || false
+    }
   },
   watch: {
     selectedKeys: {
@@ -264,9 +316,7 @@ export default {
     },
   },
   async mounted() {
-    if (this.forMyAsset) {
-      await this.getAccountList()
-    }
+    await this.getAccountList()
     this.getFirstLayout()
   },
   methods: {
@@ -275,7 +325,10 @@ export default {
       this.chainIds = ''
       this.treeData = []
       this.refreshTreeFlag = false
-      getNodeList({ parent_id: 0 }).then((res) => {
+      getNodeList({
+        info: this.forMyAsset,
+        parent_id: 0
+      }).then((res) => {
         this.treeData = (res?.data?.list ?? []).map((item) => ({
           ...item,
           chainId: `${item.id}`,
@@ -286,7 +339,7 @@ export default {
     },
 
     async getAccountList() {
-      const res = await getAccountList({ page_index: 1, info: true })
+      const res = await getAccountList({ page_index: 1, info: this.forMyAsset })
       this.accountList = res?.data?.list || []
     },
 
@@ -296,7 +349,7 @@ export default {
           resolve()
           return
         }
-        getNodeList({ parent_id: treeNode.dataRef.id }).then((res) => {
+        getNodeList({ parent_id: treeNode.dataRef.id, info: this.forMyAsset }).then((res) => {
           treeNode.dataRef.children = (res?.data?.list ?? []).map((item) => ({
             ...item,
             chainId: `${treeNode.dataRef.chainId}@${item.id}`,
@@ -387,7 +440,10 @@ export default {
           }
 
           if (this.treeData && this.selectedKeys?.[0]) {
-            const updateDataRes = await getNodeList({ self_parent: this.selectedKeys?.[0] })
+            const updateDataRes = await getNodeList({
+              self_parent: this.selectedKeys?.[0],
+              info: this.forMyAsset
+            })
             const updateDataList = updateDataRes?.data?.list || []
 
             if (updateDataList.length) {
@@ -442,11 +498,17 @@ export default {
     async updateNodeCount(parent_id = null) {
       let res1 = []
       let res2 = []
-      await getNodeList({ ids: this.chainIds.split('@').join(',') }).then((result1) => {
+      await getNodeList({
+        ids: this.chainIds.split('@').join(','),
+        info: this.forMyAsset
+      }).then((result1) => {
         res1 = result1?.data?.list ?? []
       })
       if (parent_id) {
-        await getNodeList({ self_parent: parent_id }).then((result2) => {
+        await getNodeList({
+          self_parent: parent_id,
+          info: this.forMyAsset
+        }).then((result2) => {
           res2 = result2?.data?.list ?? []
         })
       }
@@ -524,6 +586,39 @@ export default {
       this.$refs.opsTable.getVxetableRef().clearCheckboxReserve()
       await this.getAccountList()
       this.getFirstLayout()
+    },
+
+    createTempLink(row) {
+      this.$refs.tempLinkModalRef.open(row)
+    },
+
+    openGrantModal(node) {
+      this.$refs.grantModalRef.open({
+        ids: [node.id],
+        resourceId: node.resource_id,
+        type: 'node'
+      })
+    },
+
+    authAsset() {
+      const assetIds = this.selectedRowKeys.map((item) => item.id)
+      this.$refs.grantModalRef.open({
+        resourceId: this.selectedRowKeys?.[0]?.resource_id || '',
+        type: 'asset',
+        ids: assetIds
+      })
+    },
+
+    showNodeOperation(node, operationList) {
+      const permissions = this?.roles?.permissions || []
+      const isAdmin = permissions?.includes?.('oneterm_admin') || permissions?.includes?.('acl_admin')
+      return node?.permissions?.some((item) => operationList.includes(item)) || isAdmin
+    },
+
+    showAssetOperation(asset, operaiton) {
+      const permissions = this?.roles?.permissions || []
+      const isAdmin = permissions?.includes?.('oneterm_admin') || permissions?.includes?.('acl_admin')
+      return asset?.permissions?.some((item) => item === operaiton) || isAdmin
     }
   },
 }

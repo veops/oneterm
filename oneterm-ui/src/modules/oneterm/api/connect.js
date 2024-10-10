@@ -17,3 +17,19 @@ export function postConnectIsRight(asset_id, account_id, protocol, query = null)
         method: 'post',
     })
 }
+
+export function postShareLink(data) {
+  return axios({
+    url: `/oneterm/v1/share`,
+    method: 'post',
+    data
+  })
+}
+
+export function getShareLink(params) {
+  return axios({
+    url: `/oneterm/v1/share`,
+    method: 'get',
+    params
+  })
+}

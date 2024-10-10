@@ -360,16 +360,11 @@ func connectSsh(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, ac
 		User:            account.Account,
 		Auth:            []gossh.AuthMethod{auth},
 		HostKeyCallback: gossh.InsecureIgnoreHostKey(),
-		Timeout:         time.Second * 3,
+		Timeout:         time.Second,
 	})
 	if err != nil {
+		logger.L().Error("ssh dial failed", zap.Error(err))
 		return
-	}
-
-	if asset.GatewayId != 0 {
-		if err = <-ggateway.GetGatewayBySessionId(sess.SessionId).Opened; err != nil {
-			return
-		}
 	}
 
 	sshSess, err := sshCli.NewSession()
@@ -465,6 +460,8 @@ func connectGuacd(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, 
 		logger.L().Error("guacd tunnel failed", zap.Error(err))
 		return
 	}
+	defer t.Close()
+
 	sess.ConnectionId = t.ConnectionId
 	sess.GuacdTunnel = t
 

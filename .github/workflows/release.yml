@@ -16,6 +16,8 @@ jobs:
         cd backend
         docker build . --file Dockerfile --tag registry.cn-hangzhou.aliyuncs.com/veops/oneterm-api:latest
         docker push registry.cn-hangzhou.aliyuncs.com/veops/oneterm-api:latest
+        docker build . --file Dockerfile --tag registry.cn-hangzhou.aliyuncs.com/veops/oneterm-api:${{github.ref_name}}
+        docker push registry.cn-hangzhou.aliyuncs.com/veops/oneterm-api:${{github.ref_name}}
   build-ui:
     runs-on: ubuntu-latest
     steps:
@@ -26,3 +28,5 @@ jobs:
         cd oneterm-ui
         docker build . --file Dockerfile --tag registry.cn-hangzhou.aliyuncs.com/veops/oneterm-ui:latest
         docker push registry.cn-hangzhou.aliyuncs.com/veops/oneterm-ui:latest
+        docker build . --file Dockerfile --tag registry.cn-hangzhou.aliyuncs.com/veops/oneterm-ui:${{github.ref_name}}
+        docker push registry.cn-hangzhou.aliyuncs.com/veops/oneterm-ui:${{github.ref_name}}

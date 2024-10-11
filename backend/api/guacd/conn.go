@@ -92,7 +92,7 @@ func NewTunnel(connectionId, sessionId string, w, h, dpi int, protocol string, a
 		t.Config.Parameters["recording-name"] = t.SessionId
 	}
 	if gateway != nil && gateway.Id != 0 && t.ConnectionId == "" {
-		t.gw, err = ggateway.GetGatewayManager().Open(t.SessionId, asset.Ip, cast.ToInt(port), gateway)
+		t.gw, err = ggateway.GetGatewayManager().Open(false, t.SessionId, asset.Ip, cast.ToInt(port), gateway)
 		if err != nil {
 			return t, err
 		}

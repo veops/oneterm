@@ -346,7 +346,7 @@ func connectSsh(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, ac
 		}
 	}()
 
-	ip, port, err := util.Proxy(sess.SessionId, "ssh", asset, gateway)
+	ip, port, err := util.Proxy(false, sess.SessionId, "ssh", asset, gateway)
 	if err != nil {
 		return
 	}

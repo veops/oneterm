@@ -75,7 +75,7 @@ func (fm *FileManager) GetFileClient(assetId, accountId int) (cli *sftp.Client, 
 		return
 	}
 
-	ip, port, err := util.Proxy(uuid.New().String(), "sftp,ssh", asset, gateway)
+	ip, port, err := util.Proxy(false, uuid.New().String(), "sftp,ssh", asset, gateway)
 	if err != nil {
 		return
 	}

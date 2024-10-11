@@ -17,7 +17,7 @@ import (
 
 var (
 	manager = &GateWayManager{
-		gateways:        map[string]*GatewayTunnel{},
+		gatewayTunnels:  map[string]*GatewayTunnel{},
 		sshClients:      map[int]*ssh.Client{},
 		sshClientsCount: map[int]int{},
 		mtx:             sync.Mutex{},
@@ -28,8 +28,8 @@ func GetGatewayManager() *GateWayManager {
 	return manager
 }
 
-func GetGatewayBySessionId(sessionId string) *GatewayTunnel {
-	return manager.gateways[sessionId]
+func GetGatewayTunnelBySessionId(sessionId string) *GatewayTunnel {
+	return manager.gatewayTunnels[sessionId]
 }
 
 type GatewayTunnel struct {
@@ -45,13 +45,14 @@ type GatewayTunnel struct {
 	Opened     chan error
 }
 
-func (gt *GatewayTunnel) Open() (err error) {
+func (gt *GatewayTunnel) Open(isConnectable bool) (err error) {
 	go func() {
 		<-time.After(time.Second * 3)
 		logger.L().Debug("timeout 3 second close listener", zap.String("sessionId", gt.SessionId))
 		gt.listener.Close()
 	}()
 	defer func() {
+		logger.L().Debug("close listener", zap.String("sessionId", gt.SessionId), zap.Error(err))
 		gt.Opened <- err
 	}()
 	gt.Opened <- nil
@@ -65,9 +66,18 @@ func (gt *GatewayTunnel) Open() (err error) {
 	defer cancel()
 	gt.RemoteConn, err = manager.sshClients[gt.GatewayId].DialContext(ctx, "tcp", remoteAddr)
 	if err != nil {
-		defer gt.LocalConn.Close()
-		defer gt.RemoteConn.Close()
+		defer func() {
+			if gt.LocalConn != nil {
+				defer gt.LocalConn.Close()
+			}
+			if gt.RemoteConn != nil {
+				defer gt.RemoteConn.Close()
+			}
+		}()
 		logger.L().Error("dial remote failed", zap.String("sessionId", gt.SessionId), zap.Error(err))
+		return
+	}
+	if isConnectable {
 		return
 	}
 	go io.Copy(gt.LocalConn, gt.RemoteConn)
@@ -77,13 +87,13 @@ func (gt *GatewayTunnel) Open() (err error) {
 }
 
 type GateWayManager struct {
-	gateways        map[string]*GatewayTunnel
+	gatewayTunnels  map[string]*GatewayTunnel
 	sshClients      map[int]*ssh.Client
 	sshClientsCount map[int]int
 	mtx             sync.Mutex
 }
 
-func (gm *GateWayManager) Open(sessionId, remoteIp string, remotePort int, gateway *model.Gateway) (g *GatewayTunnel, err error) {
+func (gm *GateWayManager) Open(isConnectable bool, sessionId, remoteIp string, remotePort int, gateway *model.Gateway) (g *GatewayTunnel, err error) {
 	if gateway == nil {
 		err = fmt.Errorf("gateway is nil")
 		return
@@ -109,7 +119,7 @@ func (gm *GateWayManager) Open(sessionId, remoteIp string, remotePort int, gatew
 			return
 		}
 		go func() {
-			logger.L().Debug("ssh client closed", zap.Int("gatewayId", gateway.Id), zap.Error(sshCli.Wait()))
+			logger.L().Debug("ssh proxy wait closed", zap.Int("gatewayId", gateway.Id), zap.Error(sshCli.Wait()))
 			delete(gm.sshClients, gateway.Id)
 		}()
 	}
@@ -133,8 +143,8 @@ func (gm *GateWayManager) Open(sessionId, remoteIp string, remotePort int, gatew
 		RemotePort: remotePort,
 		Opened:     make(chan error),
 	}
-	gm.gateways[sessionId] = g
-	go g.Open()
+	gm.gatewayTunnels[sessionId] = g
+	go g.Open(isConnectable)
 
 	logger.L().Debug("opening gateway", zap.Any("sessionId", sessionId))
 	<-g.Opened
@@ -147,13 +157,15 @@ func (gm *GateWayManager) Close(sessionIds ...string) {
 	gm.mtx.Lock()
 	defer gm.mtx.Unlock()
 	for _, sid := range sessionIds {
-		gt, ok := gm.gateways[sid]
+		gt, ok := gm.gatewayTunnels[sid]
 		if !ok {
 			return
 		}
 		gm.sshClientsCount[gt.GatewayId] -= 1
 		if gm.sshClientsCount[gt.GatewayId] <= 0 {
-			gm.sshClients[gt.GatewayId].Close()
+			if g := gm.sshClients[gt.GatewayId]; g != nil {
+				g.Close()
+			}
 			delete(gm.sshClients, gt.GatewayId)
 			delete(gm.sshClientsCount, gt.GatewayId)
 		}

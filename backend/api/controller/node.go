@@ -98,7 +98,7 @@ func (c *Controller) GetNodes(ctx *gin.Context) {
 		if err != nil {
 			return
 		}
-		db = db.Where("id NOT IN ?", ids)
+		db = db.Where("id IN ?", ids)
 	}
 
 	if id, ok := ctx.GetQuery("self_parent"); ok {
@@ -109,15 +109,18 @@ func (c *Controller) GetNodes(ctx *gin.Context) {
 		db = db.Where("id IN ?", ids)
 	}
 
-	if info && !acl.IsAdmin(currentUser) {
-		ids, err := GetNodeIdsByAuthorization(ctx)
-		if err != nil {
-			return
+	if info {
+		db = db.Select("id", "parent_id", "name")
+		if !acl.IsAdmin(currentUser) {
+			ids, err := GetNodeIdsByAuthorization(ctx)
+			if err != nil {
+				return
+			}
+			if ids, err = handleSelfParent(ctx, ids...); err != nil {
+				return
+			}
+			db = db.Where("id IN ?", ids)
 		}
-		if ids, err = handleSelfParent(ctx, ids...); err != nil {
-			return
-		}
-		db = db.Where("id IN ?", ids)
 	}
 
 	doGet(ctx, !info, db, conf.RESOURCE_NODE, nodePostHooks...)
@@ -253,7 +256,7 @@ func nodeDelHook(ctx *gin.Context, id int) {
 	ctx.AbortWithError(http.StatusBadRequest, err)
 }
 
-func handleNoSelfChild(ctx context.Context, ids ...int) (res []int, err error) {
+func handleSelfChild(ctx context.Context, ids ...int) (res []int, err error) {
 	nodes, err := util.GetAllFromCacheDb(ctx, model.DefaultNode)
 	if err != nil {
 		return
@@ -274,10 +277,12 @@ func handleNoSelfChild(ctx context.Context, ids ...int) (res []int, err error) {
 	}
 	dfs(0, false)
 
+	res = lo.Uniq(append(res, ids...))
+
 	return
 }
 
-func handleNoSelfParent(ctx context.Context, ids ...int) (res []int, err error) {
+func handleSelfParent(ctx context.Context, ids ...int) (res []int, err error) {
 	nodes, err := util.GetAllFromCacheDb(ctx, model.DefaultNode)
 	if err != nil {
 		return
@@ -290,10 +295,10 @@ func handleNoSelfParent(ctx context.Context, ids ...int) (res []int, err error) 
 	t := make([]int, 0)
 	var dfs func(int)
 	dfs = func(x int) {
+		t = append(t, x)
 		if lo.Contains(ids, x) {
 			res = append(res, t...)
 		}
-		t = append(t, x)
 		for _, y := range g[x] {
 			dfs(y)
 		}
@@ -301,27 +306,39 @@ func handleNoSelfParent(ctx context.Context, ids ...int) (res []int, err error) 
 	}
 	dfs(0)
 
-	res = lo.Uniq(res)
-
-	return
-}
-
-func handleSelfParent(ctx context.Context, ids ...int) (res []int, err error) {
-	res, err = handleNoSelfParent(ctx, ids...)
-	if err != nil {
-		return
-	}
 	res = lo.Uniq(append(res, ids...))
 
 	return
 }
 
-func handleSelfChild(ctx context.Context, ids ...int) (res []int, err error) {
-	res, err = handleNoSelfChild(ctx, ids...)
+func handleNoSelfChild(ctx context.Context, ids ...int) (res []int, err error) {
+	nodes, err := util.GetAllFromCacheDb(ctx, model.DefaultNode)
 	if err != nil {
 		return
 	}
-	res = lo.Uniq(append(res, ids...))
+	allids := lo.Map(nodes, func(n *model.Node, _ int) int { return n.Id })
+
+	res, err = handleSelfChild(ctx, ids...)
+	if err != nil {
+		return
+	}
+	res = lo.Uniq(lo.Without(allids, res...))
+
+	return
+}
+
+func handleNoSelfParent(ctx context.Context, ids ...int) (res []int, err error) {
+	nodes, err := util.GetAllFromCacheDb(ctx, model.DefaultNode)
+	if err != nil {
+		return
+	}
+	allids := lo.Map(nodes, func(n *model.Node, _ int) int { return n.Id })
+
+	res, err = handleSelfParent(ctx, ids...)
+	if err != nil {
+		return
+	}
+	res = lo.Uniq(lo.Without(allids, res...))
 
 	return
 }

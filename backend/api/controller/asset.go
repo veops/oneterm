@@ -109,13 +109,17 @@ func (c *Controller) GetAssets(ctx *gin.Context) {
 		db = db.Where("parent_id IN ?", parentIds)
 	}
 
-	if info && !acl.IsAdmin(currentUser) {
-		ids, err := GetAssetIdsByAuthorization(ctx)
-		if err != nil {
-			ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
-			return
+	if info {
+		db = db.Select("id", "parent_id", "name", "ip", "protocols", "connectable", "authorization")
+
+		if !acl.IsAdmin(currentUser) {
+			ids, err := GetAssetIdsByAuthorization(ctx)
+			if err != nil {
+				ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+				return
+			}
+			db = db.Where("id IN ?", ids)
 		}
-		db = db.Where("id IN ?", ids)
 	}
 
 	db = db.Order("name")

@@ -144,13 +144,16 @@ func (c *Controller) GetAccounts(ctx *gin.Context) {
 		db = db.Where("id IN ?", lo.Map(strings.Split(q, ","), func(s string, _ int) int { return cast.ToInt(s) }))
 	}
 
-	if info && !acl.IsAdmin(currentUser) {
-		ids, err := GetAccountIdsByAuthorization(ctx)
-		if err != nil {
-			ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
-			return
+	if info {
+		db = db.Select("id", "name", "account")
+		if !acl.IsAdmin(currentUser) {
+			ids, err := GetAccountIdsByAuthorization(ctx)
+			if err != nil {
+				ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+				return
+			}
+			db = db.Where("id IN ?", ids)
 		}
-		db = db.Where("id IN ?", ids)
 	}
 
 	db = db.Order("name")

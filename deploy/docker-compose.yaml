@@ -2,7 +2,7 @@ version: "3.0"
 
 services:
   oneterm-api:
-    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-api:latest
+    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-api:latest # use latest or version like v24.10.1
     container_name: oneterm-api
     volumes:
       - ./volume/replay:/replay

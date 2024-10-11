@@ -249,7 +249,7 @@ func (m *view) refresh() {
 
 		m.combines = make(map[string][3]int)
 		for _, asset := range assets {
-			for accountId, _ := range asset.Authorization {
+			for accountId := range asset.Authorization {
 				account, ok := accountMap[accountId]
 				if !ok {
 					continue

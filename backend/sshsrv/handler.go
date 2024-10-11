@@ -33,7 +33,7 @@ func handler(sess ssh.Session) {
 		Request: &http.Request{
 			RemoteAddr: sess.RemoteAddr().String(),
 			URL: &url.URL{
-				RawQuery: fmt.Sprintf("w=%d&h=%d", pty.Window.Width, pty.Window.Height),
+				RawQuery: fmt.Sprintf("info=true&w=%d&h=%d", pty.Window.Width, pty.Window.Height),
 			},
 		},
 	}

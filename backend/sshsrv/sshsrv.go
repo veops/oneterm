@@ -23,7 +23,6 @@ func init() {
 		Handler: handler,
 		PasswordHandler: func(ctx ssh.Context, password string) bool {
 			sess, err := acl.LoginByPassword(ctx, ctx.User(), password, util.IpFromNetAddr(ctx.RemoteAddr()))
-
 			ctx.SetValue("session", sess)
 			return err == nil
 		},

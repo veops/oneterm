@@ -8,7 +8,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/samber/lo"
-	"github.com/spf13/cast"
 	"go.uber.org/zap"
 
 	mysql "github.com/veops/oneterm/db"
@@ -80,31 +79,28 @@ func UpdateConnectables(ids ...int) (err error) {
 
 func updateConnectable(asset *model.Asset, gateway *model.Gateway) (sid string, ok bool) {
 	sid = uuid.New().String()
-	for _, p := range asset.Protocols {
-		ip, port := asset.Ip, cast.ToInt(strings.Split(p, ":")[1])
-		var (
-			gt  *ggateway.GatewayTunnel
-			err error
-		)
-		if asset.GatewayId != 0 {
-			gt, err = ggateway.GetGatewayManager().Open(sid, ip, port, gateway)
-			if err != nil {
-				logger.L().Debug("open gateway failed", zap.Error(err))
-				continue
-			}
-			ip, port = gt.LocalIp, gt.LocalPort
-			<-gt.Opened
-		}
-		addr := fmt.Sprintf("%s:%d", ip, port)
-		net, err := net.DialTimeout("tcp", addr, time.Second*3)
-		if err != nil {
-			logger.L().Debug("dail failed", zap.String("addr", addr), zap.Error(err))
-			continue
-		}
-		defer net.Close()
-
-		ok = true
+	ps := strings.Join(lo.Map(asset.Protocols, func(p string, _ int) string { return strings.Split(p, ":")[0] }), ",")
+	ip, port, err := util.Proxy(true, sid, ps, asset, gateway)
+	if err != nil {
+		logger.L().Debug("connectable proxy failed", zap.String("protocol", ps), zap.Error(err))
 		return
 	}
+	addr := fmt.Sprintf("%s:%d", ip, port)
+	conn, err := net.DialTimeout("tcp", addr, time.Second)
+	if err != nil {
+		logger.L().Debug("dail failed", zap.String("addr", addr), zap.Error(err))
+		return
+	}
+	defer conn.Close()
+	if asset.GatewayId != 0 {
+		t := ggateway.GetGatewayTunnelBySessionId(sid)
+		if t == nil {
+			return
+		}
+		if err = <-t.Opened; err != nil {
+			return
+		}
+	}
+	ok = true
 	return
 }

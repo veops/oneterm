@@ -58,7 +58,7 @@ func GetAuth(account *model.Account) (ssh.AuthMethod, error) {
 	}
 }
 
-func Proxy(sessionId string, protocol string, asset *model.Asset, gateway *model.Gateway) (ip string, port int, err error) {
+func Proxy(isConnectable bool, sessionId string, protocol string, asset *model.Asset, gateway *model.Gateway) (ip string, port int, err error) {
 	ip, port = asset.Ip, 0
 	for _, tp := range strings.Split(protocol, ",") {
 		for _, p := range asset.Protocols {
@@ -74,8 +74,7 @@ func Proxy(sessionId string, protocol string, asset *model.Asset, gateway *model
 		return
 	}
 
-
-	g, err := ggateway.GetGatewayManager().Open(sessionId, ip, port, gateway)
+	g, err := ggateway.GetGatewayManager().Open(isConnectable, sessionId, ip, port, gateway)
 	if err != nil {
 		return
 	}

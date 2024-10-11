@@ -266,8 +266,8 @@ func doUpdate[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType 
 	}
 	if needAcl {
 		md.SetResourceId(old.GetResourceId())
-		fmt.Printf("%+v\n", old)
-		fmt.Printf("%+v\n", md)
+		// fmt.Printf("%+v\n", old)
+		// fmt.Printf("%+v\n", md)
 		if !hasPerm(ctx, md, resourceType, acl.WRITE) {
 			ctx.AbortWithError(http.StatusForbidden, &ApiError{Code: ErrNoPerm, Data: map[string]any{"perm": acl.WRITE}})
 			return

@@ -76,16 +76,16 @@ func read(sess *gsession.Session) error {
 	}
 }
 
-func write(sess *gsession.Session) {
+func write(sess *gsession.Session) (err error) {
 	chs := sess.Chans
 	out := chs.OutBuf.Bytes()
 
 	if sess.SessionType == model.SESSIONTYPE_WEB && sess.Ws != nil {
 		if len(out) > 0 || !strings.Contains(sess.Protocol, "ssh") {
-			sess.Ws.WriteMessage(websocket.TextMessage, out)
+			err = sess.Ws.WriteMessage(websocket.TextMessage, out)
 		}
 	} else if sess.SessionType == model.SESSIONTYPE_CLIENT && len(out) > 0 {
-		sess.CliRw.Write(out)
+		_, err = sess.CliRw.Write(out)
 	}
 
 	if sess.SshRecoder != nil && len(out) > 0 && strings.Contains(sess.Protocol, "ssh") {
@@ -94,6 +94,8 @@ func write(sess *gsession.Session) {
 
 	writeToMonitors(sess.Monitors, out)
 	chs.OutBuf.Reset()
+
+	return
 }
 
 func writeErrMsg(sess *gsession.Session, msg string) {
@@ -105,11 +107,12 @@ func writeErrMsg(sess *gsession.Session, msg string) {
 
 func HandleSsh(sess *gsession.Session) (err error) {
 	defer func() {
+		logger.L().Debug("defer HandleSsh", zap.String("sessionId", sess.SessionId))
 		sess.SshParser.WriteDb()
 		sess.Status = model.SESSIONSTATUS_OFFLINE
 		sess.ClosedAt = lo.ToPtr(time.Now())
 		if err = gsession.UpsertSession(sess); err != nil {
-			logger.L().Error("offline ssh session failed", zap.Error(err))
+			logger.L().Error("offline ssh session failed", zap.String("sessionId", sess.SessionId), zap.Error(err))
 			return
 		}
 	}()
@@ -118,7 +121,7 @@ func HandleSsh(sess *gsession.Session) (err error) {
 	sess.G.Go(func() error {
 		return read(sess)
 	})
-	sess.G.Go(func() error {
+	sess.G.Go(func() (err error) {
 		asset := &model.Asset{}
 		defer sess.Chans.Rin.Close()
 		defer sess.Chans.Wout.Close()
@@ -142,9 +145,9 @@ func HandleSsh(sess *gsession.Session) (err error) {
 				writeErrMsg(sess, "closed by admin\n\n")
 				logger.L().Info("closed by", zap.String("admin", closeBy))
 				return &ApiError{Code: ErrAdminClose, Data: map[string]any{"admin": closeBy}}
-			case err := <-chs.ErrChan:
+			case err = <-chs.ErrChan:
 				writeErrMsg(sess, err.Error())
-				return err
+				return
 			case in := <-chs.InChan:
 				if sess.SessionType == model.SESSIONTYPE_WEB {
 					rt := in[0]
@@ -171,15 +174,24 @@ func HandleSsh(sess *gsession.Session) (err error) {
 					chs.Win.Write(clear)
 					continue
 				}
-				chs.Win.Write(in)
+				if _, err = chs.Win.Write(in); err != nil {
+					return
+				}
 			case out := <-chs.OutChan:
-				chs.OutBuf.Write(out)
+				if _, err = chs.OutBuf.Write(out); err != nil {
+					return
+				}
 				sess.SshParser.AddOutput(out)
 			case <-tk.C:
-				write(sess)
+				if err = write(sess); err != nil {
+					return
+				}
 			case <-tk1s.C:
-				if sess.Ws != nil {
-					sess.Ws.WriteMessage(websocket.TextMessage, nil)
+				if sess.Ws == nil {
+					continue
+				}
+				if err = sess.Ws.WriteMessage(websocket.TextMessage, nil); err != nil {
+					return
 				}
 			}
 		}

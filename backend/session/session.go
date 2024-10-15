@@ -72,8 +72,8 @@ func (rw *CliRW) Read() []byte {
 	return p
 }
 
-func (rw *CliRW) Write(p []byte) {
-	rw.Writer.Write(p)
+func (rw *CliRW) Write(p []byte) (n int, err error) {
+	return rw.Writer.Write(p)
 }
 
 type SessionChans struct {

@@ -45,7 +45,7 @@ func migrateNode() {
 	}
 
 	nodes := make([]*model.Node, 0)
-	if err = mysql.DB.Model(&nodes).Where("resource_id=0").Find(&nodes).Error; err != nil {
+	if err = mysql.DB.Model(&nodes).Where("resource_id = 0").Or("resource_id IS NULL").Find(&nodes).Error; err != nil {
 		logger.L().Fatal("get nodes failed", zap.Error(err))
 	}
 	eg := errgroup.Group{}

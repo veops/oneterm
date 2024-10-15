@@ -360,7 +360,9 @@ func (conn *connector) Run() error {
 	})
 	controller.HandleSsh(gsess)
 
-	gsess.G.Wait()
+	if err = gsess.G.Wait(); err != nil {
+		logger.L().Error("sshsrv run stopped", zap.String("sessionId", gsess.SessionId), zap.Error(err))
+	}
 
 	conn.stdout.Write([]byte("\n\n"))
 

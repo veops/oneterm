@@ -41,6 +41,12 @@ var (
 	errStyle     = lipgloss.NewStyle().Foreground(hotPink)
 	hintStyle    = lipgloss.NewStyle().Foreground(darkGray)
 	hiddenBorder = lipgloss.HiddenBorder()
+
+	p2p = map[string]int{
+		"ssh":   22,
+		"redis": 6379,
+		"mysql": 3306,
+	}
 )
 
 func init() {
@@ -254,16 +260,19 @@ func (m *view) refresh() {
 				if !ok {
 					continue
 				}
-				k := fmt.Sprintf("ssh %s@%s", account.Name, asset.Name)
 				for _, p := range asset.Protocols {
-					if strings.HasPrefix(p, "ssh") {
-						ss := strings.Split(p, ":")
-						port := cast.ToInt(ss[1])
-						if len(ss) != 2 || port == 0 {
-							continue
-						}
-						m.combines[lo.Ternary(port == 22, k, fmt.Sprintf("%s:%s", k, ss[1]))] = [3]int{account.Id, asset.Id, port}
+					ss := strings.Split(p, ":")
+					if len(ss) != 2 {
+						continue
 					}
+					protocol := ss[0]
+					defaultPort, ok := p2p[protocol]
+					if !ok {
+						continue
+					}
+					k := fmt.Sprintf("%s %s@%s", protocol, account.Name, asset.Name)
+					port := cast.ToInt(ss[1])
+					m.combines[lo.Ternary(port == defaultPort, k, fmt.Sprintf("%s:%s", k, ss[1]))] = [3]int{account.Id, asset.Id, port}
 				}
 			}
 		}
@@ -349,7 +358,7 @@ func (conn *connector) Run() error {
 		for {
 			select {
 			case <-conn.gctx.Done():
-				close(gsess.Chans.AwayChan)
+				gsess.Once.Do(func() { close(gsess.Chans.AwayChan) })
 				return nil
 			case <-gsess.Gctx.Done():
 				return nil
@@ -358,7 +367,7 @@ func (conn *connector) Run() error {
 			}
 		}
 	})
-	controller.HandleSsh(gsess)
+	controller.HandleTerm(gsess)
 
 	if err = gsess.G.Wait(); err != nil {
 		logger.L().Error("sshsrv run stopped", zap.String("sessionId", gsess.SessionId), zap.Error(err))

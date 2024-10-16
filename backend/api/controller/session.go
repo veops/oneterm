@@ -204,7 +204,7 @@ func (c *Controller) GetSessionReplay(ctx *gin.Context) {
 		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
 	}
 	filename := sessionId
-	if session.IsSsh() {
+	if !session.IsGuacd() {
 		filename += ".cast"
 	}
 	ctx.FileAttachment(filepath.Join("/replay", filename), filename)

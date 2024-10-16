@@ -65,8 +65,26 @@ func (m *SessionCmd) TableName() string {
 	return "session_cmd"
 }
 
+func (m *Session) IsGuacd() bool {
+	return m.IsRdp() || m.IsVnc()
+}
 func (m *Session) IsSsh() bool {
 	return strings.HasPrefix(m.Protocol, "ssh")
+}
+func (m *Session) IsRdp() bool {
+	return strings.HasPrefix(m.Protocol, "rdp")
+}
+func (m *Session) IsVnc() bool {
+	return strings.HasPrefix(m.Protocol, "vnc")
+}
+func (m *Session) IsRedis() bool {
+	return strings.HasPrefix(m.Protocol, "redis")
+}
+func (m *Session) IsMysql() bool {
+	return strings.HasPrefix(m.Protocol, "mysql")
+}
+func (m *Session) IsMongo() bool {
+	return strings.HasPrefix(m.Protocol, "mongo")
 }
 
 type CmdCount struct {

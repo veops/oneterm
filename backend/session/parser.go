@@ -159,6 +159,7 @@ func (p *Parser) GetOutput() string {
 		p.lastRes = strings.Join(res[:ln-1], "\n")
 	}
 	p.curRes = res[ln-1]
+	fmt.Println("----------------------------------------------", p.lastRes, ln, res, p.curRes)
 	return p.curRes
 }
 

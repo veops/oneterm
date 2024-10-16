@@ -122,6 +122,7 @@ type Session struct {
 	SshRecoder   *Asciinema      `json:"-" gorm:"-"`
 	SshParser    *Parser         `json:"-" gorm:"-"`
 	ShareEnd     time.Time       `json:"-" gorm:"-"`
+	Once         sync.Once       `json:"-" gorm:"-"`
 }
 
 func (m *Session) HasMonitors() (has bool) {

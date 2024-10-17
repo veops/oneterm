@@ -3,6 +3,7 @@ package controller
 import (
 	"bufio"
 	"bytes"
+	"database/sql"
 	"errors"
 	"fmt"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/table"
 	"github.com/gin-gonic/gin"
 	"github.com/gliderlabs/ssh"
@@ -52,16 +54,28 @@ var (
 	byteDel      = []byte{'\x7f'}
 	byteR        = []byte{'\r'}
 	byteN        = []byte{'\n'}
-	byteRN       = []byte{'\r', '\n'}
+	byteT        = []byte{'\t'}
+	byteS        = []byte{' '}
+	byteRN       = append(byteR, byteN...)
 
 	reRedis = regexp.MustCompile(`("[^"]*"|'[^']*'|\S+)`)
+	border  = lipgloss.RoundedBorder()
 )
+
+func init() {
+	// border.Left = "\r" + border.Left
+	// border.BottomLeft = "\r" + border.BottomLeft
+	// border.MiddleLeft = "\r" + border.MiddleLeft
+	// border.TopLeft = "\r" + border.TopLeft
+}
 
 func read(sess *gsession.Session) error {
 	chs := sess.Chans
 	for {
 		select {
 		case <-sess.Gctx.Done():
+			return nil
+		case <-sess.Chans.AwayChan:
 			return nil
 		default:
 			if sess.SessionType == model.SESSIONTYPE_WEB {
@@ -80,8 +94,12 @@ func read(sess *gsession.Session) error {
 					}
 				}
 			} else if sess.SessionType == model.SESSIONTYPE_CLIENT {
+				p, err := sess.CliRw.Read()
+				if err != nil {
+					return err
+				}
+				chs.InChan <- p
 				sess.SetIdle()
-				chs.InChan <- sess.CliRw.Read()
 			}
 		}
 	}
@@ -92,7 +110,7 @@ func write(sess *gsession.Session) (err error) {
 	out := chs.OutBuf.Bytes()
 
 	if sess.SessionType == model.SESSIONTYPE_WEB && sess.Ws != nil {
-		if len(out) > 0 || !sess.IsGuacd() {
+		if len(out) > 0 || sess.IsGuacd() {
 			err = sess.Ws.WriteMessage(websocket.TextMessage, out)
 		}
 	} else if sess.SessionType == model.SESSIONTYPE_CLIENT && len(out) > 0 {
@@ -119,7 +137,7 @@ func writeErrMsg(sess *gsession.Session, msg string) {
 func HandleTerm(sess *gsession.Session) (err error) {
 	defer func() {
 		logger.L().Debug("defer HandleSsh", zap.String("sessionId", sess.SessionId))
-		sess.SshParser.WriteDb()
+		sess.SshParser.Close(sess.Prompt)
 		sess.Status = model.SESSIONSTATUS_OFFLINE
 		sess.ClosedAt = lo.ToPtr(time.Now())
 		if err = gsession.UpsertSession(sess); err != nil {
@@ -140,7 +158,9 @@ func HandleTerm(sess *gsession.Session) (err error) {
 			select {
 			case <-sess.Gctx.Done():
 				write(sess)
-				return nil
+				return
+			case <-chs.AwayChan:
+				return
 			case <-sess.IdleTk.C:
 				writeErrMsg(sess, "idle timeout\n\n")
 				return &ApiError{Code: ErrIdleTimeout, Data: map[string]any{"second": model.GlobalConfig.Load().Timeout}}
@@ -209,7 +229,7 @@ func HandleTerm(sess *gsession.Session) (err error) {
 	})
 
 	if err = sess.G.Wait(); err != nil {
-		logger.L().Debug("sess wait end ssh", zap.String("id", sess.SessionId), zap.Error(err))
+		logger.L().Debug("handle term wait end", zap.String("id", sess.SessionId), zap.Error(err))
 	}
 
 	return
@@ -342,9 +362,9 @@ func DoConnect(ctx *gin.Context, ws *websocket.Conn) (sess *gsession.Session, er
 	case "ssh":
 		go connectSsh(ctx, sess, asset, account, gateway)
 	case "redis":
-		go connectRedis(ctx, sess, asset, account, gateway)
+		go connectOther(ctx, sess, asset, account, gateway)
 	case "mysql":
-		go connectMysql(ctx, sess, asset, account, gateway)
+		go connectOther(ctx, sess, asset, account, gateway)
 	case "vnc", "rdp":
 		go connectGuacd(ctx, sess, asset, account, gateway)
 	default:
@@ -529,7 +549,7 @@ func connectGuacd(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, 
 	return
 }
 
-func connectRedis(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, account *model.Account, gateway *model.Gateway) (err error) {
+func connectOther(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, account *model.Account, gateway *model.Gateway) (err error) {
 	chs := sess.Chans
 	defer func() {
 		ggateway.GetGatewayManager().Close(sess.SessionId)
@@ -538,19 +558,31 @@ func connectRedis(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, 
 		}
 	}()
 
-	ip, port, err := util.Proxy(false, sess.SessionId, "redis", asset, gateway)
+	ip, port, err := util.Proxy(false, sess.SessionId, strings.Split(sess.Protocol, ":")[0], asset, gateway)
 	if err != nil {
 		return
 	}
 
-	rdb := redis.NewClient(&redis.Options{
-		Addr:        fmt.Sprintf("%s:%d", ip, port),
-		Password:    account.Password,
-		DialTimeout: time.Second,
-	})
-	_, err = rdb.Ping(ctx).Result()
-	if err != nil {
-		return
+	var (
+		rdb *redis.Client
+		db  *gorm.DB
+	)
+	if sess.IsRedis() {
+		rdb = redis.NewClient(&redis.Options{
+			Addr:        fmt.Sprintf("%s:%d", ip, port),
+			Password:    account.Password,
+			DialTimeout: time.Second,
+		})
+		_, err = rdb.Ping(ctx).Result()
+		if err != nil {
+			return
+		}
+	} else if sess.IsMysql() {
+		dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/?charset=utf8mb4&parseTime=True&loc=Local", account.Account, account.Password, ip, port)
+		db, err = gorm.Open(mysqlDriver.Open(dsn))
+		if err != nil {
+			return
+		}
 	}
 
 	chs.ErrChan <- err
@@ -563,8 +595,8 @@ func connectRedis(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, 
 		if len(ss) == 2 {
 			pt = ss[1]
 		}
-		prompt := fmt.Sprintf("%s@%s:%s> ", account.Account, asset.Name, pt)
-		chs.OutChan <- append(byteRN, []byte(prompt)...)
+		sess.Prompt = fmt.Sprintf("%s@%s:%s> ", account.Account, asset.Name, pt)
+		chs.OutChan <- append(byteRN, []byte(sess.Prompt)...)
 		for {
 			select {
 			case <-sess.Gctx.Done():
@@ -579,11 +611,17 @@ func connectRedis(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, 
 				}
 				p := make([]byte, utf8.RuneLen(rn))
 				utf8.EncodeRune(p, rn)
+				p = bytes.ReplaceAll(p, byteT, byteS)
 				for bytes.HasSuffix(p, byteDel) {
 					p = p[:len(p)-1]
-					chs.OutChan <- byteClearCur
 					if buf.Len() > 0 {
-						buf.Truncate(buf.Len() - 1)
+						var dels []byte
+						last, ok := lo.Last([]rune(buf.String()))
+						for i := 0; ok && i < lipgloss.Width(string(last)); i++ {
+							dels = append(dels, byteClearCur...)
+						}
+						chs.OutChan <- dels
+						buf.Truncate(buf.Len() - len([]byte(string(last))))
 					}
 				}
 				if len(p) <= 0 {
@@ -601,90 +639,50 @@ func connectRedis(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, 
 				}
 				bs = bs[:len(bs)-1]
 				if bytes.Equal(bs, []byte("exit")) {
-					sess.SshParser.AddOutput(byteRN)
 					sess.Once.Do(func() { close(chs.AwayChan) })
 					return nil
 				}
 				buf.Reset()
-				var res any
+				var (
+					res  any
+					rows *sql.Rows
+				)
 				if len(bs) > 0 {
-					parts := lo.Map(reRedis.FindAllString(string(bs), -1), func(p string, _ int) any { return p })
-					res, err = rdb.Do(ctx, parts...).Result()
-				}
-				chs.OutChan <- []byte(fmt.Sprintf("\n%s\r\n%s", lo.Ternary[any](err == nil, lo.Ternary(res == nil, "", res), err), prompt))
-			}
-
-		}
-	})
-	sess.G.Go(func() error {
-		defer rdb.Close()
-		for {
-			select {
-			case <-sess.Gctx.Done():
-				return nil
-			case <-chs.AwayChan:
-				return fmt.Errorf("away")
-			}
-		}
-	})
-
-	sess.G.Wait()
-
-	return
-}
-
-func connectMysql(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, account *model.Account, gateway *model.Gateway) (err error) {
-	chs := sess.Chans
-	defer func() {
-		ggateway.GetGatewayManager().Close(sess.SessionId)
-		if err != nil {
-			chs.ErrChan <- err
-		}
-	}()
-
-	ip, port, err := util.Proxy(false, sess.SessionId, "mysql", asset, gateway)
-	if err != nil {
-		return
-	}
-
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)?charset=utf8mb4&parseTime=True&loc=Local", account.Account, account.Password, ip, port)
-	db, err := gorm.Open(mysqlDriver.Open(dsn))
-	if err != nil {
-		return
-	}
-
-	chs.ErrChan <- err
-
-	sess.G.Go(func() error {
-		buf := &bytes.Buffer{}
-		prompt := fmt.Sprintf("%s@%s:%d> ", account.Account, asset.Name, port)
-		sess.Chans.OutChan <- []byte(prompt)
-		for {
-			select {
-			case <-sess.Gctx.Done():
-				return nil
-			case <-chs.AwayChan:
-				return fmt.Errorf("away")
-			case in := <-chs.InChan:
-				sess.Chans.OutChan <- in
-				buf.Write(in)
-				if idx := bytes.LastIndex(in, byteN); idx < 0 {
-					continue
-				}
-				rows, err := db.WithContext(ctx).Raw(buf.String()).Rows()
-				if err != nil {
-					sess.Chans.OutChan <- []byte(fmt.Sprintf("%s\n\n%s", err, prompt))
-				} else {
-					heads, _ := rows.Columns()
-					rs := make([][]string, 0)
-					for rows.Next() {
-						r := make([]any, 0)
-						rows.Scan(&r)
-						rs = append(rs, lo.Map(r, func(v any, _ int) string { return cast.ToString(v) }))
+					if sess.IsRedis() {
+						parts := lo.Map(reRedis.FindAllString(string(bs), -1), func(p string, _ int) any { return p })
+						res, err = rdb.Do(ctx, parts...).Result()
+					} else if sess.IsMysql() {
+						rows, err = db.WithContext(ctx).Raw(string(bs)).Rows()
+						if err == nil {
+							heads, _ := rows.Columns()
+							n := len(heads)
+							rs := make([][]string, 0)
+							for rows.Next() {
+								r := make([]any, n)
+								r = lo.Map(r, func(v any, _ int) any { return new(any) })
+								if err = rows.Scan(r...); err != nil {
+									break
+								}
+								rs = append(rs, lo.Map(r, func(v any, i int) string { return cast.ToString(v) }))
+							}
+							res = strings.ReplaceAll(table.New().Border(border).Headers(heads...).Rows(rs...).String(), "\n", "\r\n")
+						}
 					}
-					t := table.New().Headers(heads...).Rows(rs...)
-					sess.Chans.OutChan <- []byte(fmt.Sprintf("%s\n\n%s", t.String(), prompt))
 				}
+				chs.OutChan <- []byte(fmt.Sprintf("\n%s\r\n%s", lo.Ternary[any](err == nil, lo.Ternary(res == nil, "", res), err), sess.Prompt))
+				err = nil
+			}
+		}
+	})
+	sess.G.Go(func() (err error) {
+		for {
+			select {
+			case <-sess.Gctx.Done():
+				return
+			case <-chs.AwayChan:
+				return
+			case <-chs.WindowChan:
+				continue
 			}
 		}
 	})

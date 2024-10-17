@@ -124,6 +124,14 @@ func (p *Parser) WriteDb() {
 	}
 }
 
+func (p *Parser) Close(prompt string) {
+	if prompt == "" {
+		prompt = p.prompt
+	}
+	p.AddOutput([]byte("\r\n" + prompt))
+	p.AddInput([]byte("\r"))
+}
+
 func (p *Parser) AddOutput(bs []byte) {
 	p.Output = append(p.Output, bs...)
 }
@@ -159,7 +167,6 @@ func (p *Parser) GetOutput() string {
 		p.lastRes = strings.Join(res[:ln-1], "\n")
 	}
 	p.curRes = res[ln-1]
-	fmt.Println("----------------------------------------------", p.lastRes, ln, res, p.curRes)
 	return p.curRes
 }
 

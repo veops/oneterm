@@ -142,13 +142,13 @@ func (m *view) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.cmdsIdx = len(m.cmds)
 			if cmd == "exit" {
 				return m, tea.Sequence(hisCmd, tea.Quit)
-			} else if strings.HasPrefix(cmd, "ssh") {
+			} else if p, ok := lo.Find(lo.Keys(p2p), func(item string) bool { return strings.HasPrefix(cmd, item) }); ok {
 				pty, _, _ := m.Sess.Pty()
 				m.Ctx.Request.URL.RawQuery = fmt.Sprintf("w=%d&h=%d", pty.Window.Width, pty.Window.Height)
 				m.Ctx.Params = nil
 				m.Ctx.Params = append(m.Ctx.Params, gin.Param{Key: "account_id", Value: cast.ToString(m.combines[cmd][0])})
 				m.Ctx.Params = append(m.Ctx.Params, gin.Param{Key: "asset_id", Value: cast.ToString(m.combines[cmd][1])})
-				m.Ctx.Params = append(m.Ctx.Params, gin.Param{Key: "protocol", Value: fmt.Sprintf("ssh:%d", m.combines[cmd][2])})
+				m.Ctx.Params = append(m.Ctx.Params, gin.Param{Key: "protocol", Value: fmt.Sprintf("%s:%d", p, m.combines[cmd][2])})
 				m.Ctx = m.Ctx.Copy()
 				m.connecting = true
 				return m, tea.Sequence(hisCmd, tea.Exec(&connector{Ctx: m.Ctx, Sess: m.Sess, Vw: m, gctx: m.gctx}, func(err error) tea.Msg {
@@ -351,17 +351,22 @@ func (conn *connector) Run() error {
 		Writer: conn.stdout,
 	}
 
-	_, ch, _ := conn.Sess.Pty()
-	gsess.G.Go(func() error {
+	_, ch, ok := conn.Sess.Pty()
+	if !ok {
+		ch = make(<-chan ssh.Window)
+	}
+	gsess.G.Go(func() (err error) {
 		defer r.Close()
 		defer w.Close()
 		for {
 			select {
+			case <-gsess.Chans.AwayChan:
+				return
 			case <-conn.gctx.Done():
 				gsess.Once.Do(func() { close(gsess.Chans.AwayChan) })
-				return nil
+				return
 			case <-gsess.Gctx.Done():
-				return nil
+				return
 			case w := <-ch:
 				gsess.Chans.WindowChan <- w
 			}

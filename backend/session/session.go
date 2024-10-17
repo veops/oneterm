@@ -59,17 +59,17 @@ type CliRW struct {
 	Writer io.Writer
 }
 
-func (rw *CliRW) Read() []byte {
+func (rw *CliRW) Read() (p []byte, err error) {
 	rn, size, err := rw.Reader.ReadRune()
 	if err != nil {
-		return nil
+		return
 	}
 	if size <= 0 || rn == utf8.RuneError {
-		return nil
+		return
 	}
-	p := make([]byte, utf8.RuneLen(rn))
+	p = make([]byte, utf8.RuneLen(rn))
 	utf8.EncodeRune(p, rn)
-	return p
+	return
 }
 
 func (rw *CliRW) Write(p []byte) (n int, err error) {
@@ -123,6 +123,7 @@ type Session struct {
 	SshParser    *Parser         `json:"-" gorm:"-"`
 	ShareEnd     time.Time       `json:"-" gorm:"-"`
 	Once         sync.Once       `json:"-" gorm:"-"`
+	Prompt       string          `json:"-" gorm:"-"`
 }
 
 func (m *Session) HasMonitors() (has bool) {

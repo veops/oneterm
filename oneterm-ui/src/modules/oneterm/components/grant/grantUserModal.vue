@@ -13,7 +13,12 @@
       ref="employeeTransfer"
       :height="350"
     />
-    <RoleTransfer app_id="cmdb" :height="350" ref="roleTransfer" v-if="type === 'role'" />
+    <RoleTransfer
+      v-if="type === 'role'"
+      app_id="oneterm"
+      :height="350"
+      ref="roleTransfer"
+    />
   </a-modal>
 </template>
 

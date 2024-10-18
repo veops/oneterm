@@ -2,7 +2,7 @@ version: "3.0"
 
 services:
   oneterm-api:
-    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-api:latest # use latest or version like v24.10.1
+    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-api:v24.10.2
     container_name: oneterm-api
     volumes:
       - ./volume/replay:/replay
@@ -63,7 +63,7 @@ services:
           - redis
 
   oneterm-ui:
-    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-ui:latest
+    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-ui:v24.10.2
     container_name: oneterm-ui
     depends_on:
       - oneterm-api

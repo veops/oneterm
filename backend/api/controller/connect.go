@@ -361,9 +361,7 @@ func DoConnect(ctx *gin.Context, ws *websocket.Conn) (sess *gsession.Session, er
 	switch strings.Split(sess.Protocol, ":")[0] {
 	case "ssh":
 		go connectSsh(ctx, sess, asset, account, gateway)
-	case "redis":
-		go connectOther(ctx, sess, asset, account, gateway)
-	case "mysql":
+	case "redis", "mysql":
 		go connectOther(ctx, sess, asset, account, gateway)
 	case "vnc", "rdp":
 		go connectGuacd(ctx, sess, asset, account, gateway)
@@ -558,7 +556,8 @@ func connectOther(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, 
 		}
 	}()
 
-	ip, port, err := util.Proxy(false, sess.SessionId, strings.Split(sess.Protocol, ":")[0], asset, gateway)
+	protocol := strings.Split(sess.Protocol, ":")[0]
+	ip, port, err := util.Proxy(false, sess.SessionId, protocol, asset, gateway)
 	if err != nil {
 		return
 	}
@@ -567,7 +566,8 @@ func connectOther(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, 
 		rdb *redis.Client
 		db  *gorm.DB
 	)
-	if sess.IsRedis() {
+	switch protocol {
+	case "redis":
 		rdb = redis.NewClient(&redis.Options{
 			Addr:        fmt.Sprintf("%s:%d", ip, port),
 			Password:    account.Password,
@@ -577,7 +577,7 @@ func connectOther(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, 
 		if err != nil {
 			return
 		}
-	} else if sess.IsMysql() {
+	case "mysql":
 		dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/?charset=utf8mb4&parseTime=True&loc=Local", account.Account, account.Password, ip, port)
 		db, err = gorm.Open(mysqlDriver.Open(dsn))
 		if err != nil {
@@ -648,12 +648,12 @@ func connectOther(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, 
 					rows *sql.Rows
 				)
 				if len(bs) > 0 {
-					if sess.IsRedis() {
+					switch protocol {
+					case "redis":
 						parts := lo.Map(reRedis.FindAllString(string(bs), -1), func(p string, _ int) any { return p })
 						res, err = rdb.Do(ctx, parts...).Result()
-					} else if sess.IsMysql() {
-						rows, err = db.WithContext(ctx).Raw(string(bs)).Rows()
-						if err == nil {
+					case "mysql":
+						if rows, err = db.WithContext(ctx).Raw(string(bs)).Rows(); err == nil {
 							heads, _ := rows.Columns()
 							n := len(heads)
 							rs := make([][]string, 0)

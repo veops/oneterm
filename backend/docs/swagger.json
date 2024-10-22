@@ -502,7 +502,7 @@
                     },
                     {
                         "type": "string",
-                        "description": "name or cmds",
+                        "description": "name or cmd",
                         "name": "search",
                         "in": "query"
                     },
@@ -538,7 +538,7 @@
                     },
                     {
                         "type": "string",
-                        "description": "name or cmds",
+                        "description": "name or cmd",
                         "name": "search",
                         "in": "query"
                     }
@@ -2540,6 +2540,12 @@
                 "password": {
                     "type": "string"
                 },
+                "permissions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "phrase": {
                     "type": "string"
                 },
@@ -2595,6 +2601,12 @@
                 },
                 "parent_id": {
                     "type": "integer"
+                },
+                "permissions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "protocols": {
                     "type": "array",
@@ -2675,6 +2687,12 @@
                 "name": {
                     "type": "string"
                 },
+                "permissions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "resource_id": {
                     "type": "integer"
                 },
@@ -2747,6 +2765,12 @@
                 },
                 "password": {
                     "type": "string"
+                },
+                "permissions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "phrase": {
                     "type": "string"
@@ -2832,7 +2856,6 @@
                     "type": "string"
                 },
                 "creator_id": {
-                    "description": "ResourceId int       `json:\"resource_id\"`",
                     "type": "integer"
                 },
                 "gateway_id": {
@@ -2850,11 +2873,20 @@
                 "parent_id": {
                     "type": "integer"
                 },
+                "permissions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "protocols": {
                     "type": "array",
                     "items": {
                         "type": "string"
                     }
+                },
+                "resource_id": {
+                    "type": "integer"
                 },
                 "updated_at": {
                     "type": "string"

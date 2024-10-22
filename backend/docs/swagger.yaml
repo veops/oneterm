@@ -50,6 +50,10 @@ definitions:
         type: string
       password:
         type: string
+      permissions:
+        items:
+          type: string
+        type: array
       phrase:
         type: string
       pk:
@@ -87,6 +91,10 @@ definitions:
         type: string
       parent_id:
         type: integer
+      permissions:
+        items:
+          type: string
+        type: array
       protocols:
         items:
           type: string
@@ -139,6 +147,10 @@ definitions:
         type: boolean
       name:
         type: string
+      permissions:
+        items:
+          type: string
+        type: array
       resource_id:
         type: integer
       updated_at:
@@ -187,6 +199,10 @@ definitions:
         type: string
       password:
         type: string
+      permissions:
+        items:
+          type: string
+        type: array
       phrase:
         type: string
       pk:
@@ -243,7 +259,6 @@ definitions:
       created_at:
         type: string
       creator_id:
-        description: ResourceId int       `json:"resource_id"`
         type: integer
       gateway_id:
         type: integer
@@ -255,10 +270,16 @@ definitions:
         type: string
       parent_id:
         type: integer
+      permissions:
+        items:
+          type: string
+        type: array
       protocols:
         items:
           type: string
         type: array
+      resource_id:
+        type: integer
       updated_at:
         type: string
       updater_id:
@@ -774,7 +795,7 @@ paths:
         name: page_size
         required: true
         type: integer
-      - description: name or cmds
+      - description: name or cmd
         in: query
         name: search
         type: string
@@ -798,7 +819,7 @@ paths:
         in: query
         name: info
         type: boolean
-      - description: name or cmds
+      - description: name or cmd
         in: query
         name: search
         type: string

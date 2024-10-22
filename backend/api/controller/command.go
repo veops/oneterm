@@ -85,13 +85,13 @@ func (c *Controller) UpdateCommand(ctx *gin.Context) {
 //	@Tags		command
 //	@Param		page_index	query		int		true	"command id"
 //	@Param		page_size	query		int		true	"command id"
-//	@Param		search		query		string	false	"name or cmds"
+//	@Param		search		query		string	false	"name or cmd"
 //	@Param		id			query		int		false	"command id"
 //	@Param		ids			query		string	false	"command ids"
 //	@Param		name		query		string	false	"command name"
 //	@Param		enable		query		int		false	"command enable"
 //	@Param		info		query		bool	false	"is info mode"
-//	@Param		search		query		string	false	"name or cmds"
+//	@Param		search		query		string	false	"name or cmd"
 //	@Success	200			{object}	HttpResponse{data=ListData{list=[]model.Command}}
 //	@Router		/command [get]
 func (c *Controller) GetCommands(ctx *gin.Context) {
@@ -101,7 +101,7 @@ func (c *Controller) GetCommands(ctx *gin.Context) {
 	db := mysql.DB.Model(&model.Command{})
 	db = filterEqual(ctx, db, "id", "enable")
 	db = filterLike(ctx, db, "name")
-	db = filterSearch(ctx, db, "name", "cmds")
+	db = filterSearch(ctx, db, "name", "cmd")
 	if q, ok := ctx.GetQuery("ids"); ok {
 		db = db.Where("id IN ?", lo.Map(strings.Split(q, ","), func(s string, _ int) int { return cast.ToInt(s) }))
 	}

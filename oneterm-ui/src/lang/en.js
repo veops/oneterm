@@ -179,6 +179,15 @@ export default {
         monetaryAmount: 'monetary amount',
         custom: 'custom',
     },
+    userPanel: {
+      myProfile: 'My Profile',
+      accountPassword: 'Password',
+      notice: 'Notice',
+      switchLanguage: 'Switch Language',
+      bindAccount: 'Bind Account',
+      switchAccount: 'Switch Account',
+      logout: 'Logout'
+    },
     cs: cs_en,
     acl: acl_en,
     oneterm: oneterm_en,

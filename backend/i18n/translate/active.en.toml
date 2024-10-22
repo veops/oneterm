@@ -138,6 +138,10 @@ other = "Node"
 one = "Public Key"
 other = "Public Key"
 
+[MsgUnauthorized]
+one = "Unauthorized"
+other = "Unauthorized"
+
 [MsgWrongMac]
 one = "Bad Request: Invalid Mac address"
 other = "Bad Request: Invalid Mac address"

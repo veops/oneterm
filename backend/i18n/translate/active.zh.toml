@@ -138,6 +138,10 @@ other = "文件夹"
 hash = "sha1-590e3d26e76d9c4e5fe2aaf976d54d1f46cb8b31"
 other = "公钥"
 
+[MsgUnauthorized]
+hash = "sha1-740b83150add8d2de17b3ab10d33605bb00e9589"
+other = "未认证"
+
 [MsgWrongMac]
 hash = "sha1-2b836bb6de89fdc386c739b6ce1d0f61959de02e"
 other = "请求错误: 非法MAC地址"

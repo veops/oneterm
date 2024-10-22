@@ -29,9 +29,10 @@ func init() {
 	}
 
 	err = DB.AutoMigrate(
-		&model.Account{}, &model.Asset{}, &model.Authorization{}, &model.Command{},
-		&model.Config{}, &model.FileHistory{}, &model.Gateway{}, &model.History{},
-		&model.Node{}, &model.PublicKey{}, &model.Session{}, &model.Share{},
+		model.DefaultAccount, model.DefaultAsset, model.DefaultAuthorization, model.DefaultCommand,
+		model.DefaultConfig, model.DefaultFileHistory, model.DefaultGateway, model.DefaultHistory,
+		model.DefaultNode, model.DefaultPublicKey, model.DefaultSession, model.DefaultSessionCmd,
+		model.DefaultShare,
 	)
 	if err != nil {
 		logger.L().Fatal("auto migrate mysql failed", zap.Error(err))

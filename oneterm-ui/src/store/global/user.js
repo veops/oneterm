@@ -48,7 +48,8 @@ const user = {
     sex: '',
     position_name: '',
     direct_supervisor_id: null,
-    auth_enable: {}
+    auth_enable: {},
+    notice_info: {}
   },
 
   mutations: {
@@ -56,7 +57,7 @@ const user = {
       state.token = token
     },
 
-    SET_USER_INFO: (state, { name, welcome, avatar, roles, info, uid, rid, username, mobile, department_id, employee_id, email, nickname, sex, position_name, direct_supervisor_id, annual_leave, virtual_annual_leave, is_internship, current_company, entry_date, acl_uid, last_login }) => {
+    SET_USER_INFO: (state, { name, welcome, avatar, roles, info, uid, rid, username, mobile, department_id, employee_id, email, nickname, sex, position_name, direct_supervisor_id, annual_leave, virtual_annual_leave, is_internship, current_company, entry_date, acl_uid, last_login, notice_info }) => {
       state.name = name
       state.welcome = welcome
       state.avatar = avatar
@@ -81,6 +82,7 @@ const user = {
       state.entry_date = entry_date
       state.acl_uid = acl_uid
       state.last_login = last_login
+      state.notice_info = notice_info
     },
 
     LOAD_ALL_USERS: (state, users) => {
@@ -185,7 +187,8 @@ const user = {
               current_company: res.current_company,
               entry_date: res.entry_date,
               acl_uid: res.acl_uid,
-              last_login: res.last_login
+              last_login: res.last_login,
+              notice_info: res.notice_info
             })
           }).catch(error => {
             reject(error)

@@ -226,6 +226,9 @@ export default {
       }
     },
   },
+  beforeDestroy() {
+    this.$bus.$off('changeSettingPersonCurrent', this.clickSideItemv)
+  },
   mounted() {
     this.$bus.$on('changeSettingPersonCurrent', this.clickSideItem)
     if (this.$route?.query?.current) {
@@ -234,9 +237,6 @@ export default {
     this.getAllFlatEmployees()
     this.getAllFlatDepartment()
     this.getEmployeeByUid()
-  },
-  beforeDestroy() {
-    this.$bus.$off('changeSettingPersonCurrent', this.clickSideItemv)
   },
   methods: {
     ...mapActions(['GetInfo']),

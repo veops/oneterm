@@ -29,12 +29,10 @@
       departmentKey="acl_rid"
       employeeKey="acl_rid"
       :placeholder="`${$t(`placeholder2`)}`"
-      class="custom-treeselect custom-treeselect-bgcAndBorder"
+      class="custom-treeselect custom-treeselect-white"
       :style="{
         '--custom-height': '32px',
         lineHeight: '32px',
-        '--custom-bg-color': '#fff',
-        '--custom-border': '1px solid #d9d9d9',
         '--custom-multiple-lineHeight': '18px',
       }"
       :limit="1"

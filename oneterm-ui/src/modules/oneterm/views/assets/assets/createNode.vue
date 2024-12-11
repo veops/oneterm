@@ -21,12 +21,10 @@
       </a-form-model-item>
       <a-form-model-item :label="$t(`oneterm.node`)" prop="parent_id">
         <treeselect
-          class="custom-treeselect custom-treeselect-bgcAndBorder"
+          class="custom-treeselect custom-treeselect-white"
           :style="{
             '--custom-height': '32px',
             lineHeight: '32px',
-            '--custom-bg-color': '#fff',
-            '--custom-border': '1px solid #d9d9d9',
           }"
           v-model="baseForm.parent_id"
           :multiple="false"
@@ -77,12 +75,10 @@
             </div>
             <div class="slot-field2" :style="{ marginLeft: '150px' }">
               <treeselect
-                class="custom-treeselect custom-treeselect-bgcAndBorder"
+                class="custom-treeselect custom-treeselect-white"
                 :style="{
                   '--custom-height': '24px',
                   lineHeight: '24px',
-                  '--custom-bg-color': '#fff',
-                  '--custom-border': '1px solid #d9d9d9',
                   width: '250px',
                 }"
                 v-model="item.field_name"

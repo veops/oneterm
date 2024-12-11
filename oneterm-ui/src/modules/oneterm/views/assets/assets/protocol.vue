@@ -39,12 +39,10 @@
       :style="{ display: 'flex', alignItems: 'center' }"
     >
       <treeselect
-        class="custom-treeselect custom-treeselect-bgcAndBorder"
+        class="custom-treeselect custom-treeselect-white"
         :style="{
           '--custom-height': '32px',
-          lineHeight: '32px',
-          '--custom-bg-color': '#fff',
-          '--custom-border': '1px solid #d9d9d9',
+          lineHeight: '32px'
         }"
         v-model="form.gateway_id"
         :placeholder="`${$t(`placeholder2`)}`"

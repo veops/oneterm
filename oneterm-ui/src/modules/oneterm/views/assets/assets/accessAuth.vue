@@ -22,12 +22,10 @@
     </a-form-model-item>
     <a-form-model-item :label="$t(`oneterm.assetList.commandFilter`)" prop="cmd_ids">
       <treeselect
-        class="custom-treeselect custom-treeselect-bgcAndBorder"
+        class="custom-treeselect custom-treeselect-white"
         :style="{
           '--custom-height': '32px',
           lineHeight: '32px',
-          '--custom-bg-color': '#fff',
-          '--custom-border': '1px solid #d9d9d9',
           '--custom-multiple-lineHeight': '18px',
         }"
         v-model="form.cmd_ids"

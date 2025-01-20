@@ -9,6 +9,9 @@
 import 'xterm/css/xterm.css'
 import { Terminal } from 'xterm'
 import { FitAddon } from 'xterm-addon-fit'
+
+export const initMessageStorageKey = 'init_oneterm_terminal_msg'
+
 export default {
   name: 'Terminal',
   props: {
@@ -40,10 +43,26 @@ export default {
       interval: null,
       prefix: '',
       inputText: '',
+      initMessage: [],
     }
   },
   async mounted() {
     const { is_monitor } = this.$route.query
+    const initMessage = localStorage.getItem(initMessageStorageKey)
+
+    if (initMessage) {
+      const { timestamp, data } = JSON.parse(initMessage) || {}
+      if (
+        timestamp &&
+        data &&
+        new Date().getTime() - timestamp < 1000 * 30
+      ) {
+        this.initMessage = data
+      }
+
+      localStorage.removeItem(initMessageStorageKey)
+    }
+
     await this.initTerm({ disableStdin: !!is_monitor })
     this.initWebsocket()
   },
@@ -62,6 +81,8 @@ export default {
       this.fitAddon = new FitAddon()
       this.term = new Terminal({
         fontSize: 14,
+        fontFamily: 'Consolas, courier-new, courier, monospace',
+        lineHeight: 1.1,
         cursorBlink: !disableStdin,
         allowProposedApi: true,
         disableStdin: disableStdin,
@@ -70,6 +91,13 @@ export default {
       this.term.loadAddon(this.fitAddon)
       this.term.open(this.$refs.onetermTerminalRef)
       this.term.writeln('\x1b[1;1;32mwelcome to oneterm!\x1b[0m')
+
+      if (this?.initMessage?.length) {
+        this.initMessage.map((msg) => {
+          this.term.writeln(msg)
+        })
+      }
+
       if (!disableStdin) {
         this.term.onData((data) => {
           if (this.websocket) {
@@ -122,6 +150,7 @@ export default {
       this.websocket.onerror = this.errorWebSocket
     },
     websocketOpen() {
+      this.$emit('open')
       window.addEventListener('resize', this.resize)
       this.interval = setInterval(() => {
         this.websocket.send('9')

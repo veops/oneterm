@@ -22,7 +22,7 @@
       <a-form-model-item label="IP" prop="ip">
         <a-input v-model="baseForm.ip" :placeholder="`${$t(`placeholder1`)}`" />
       </a-form-model-item>
-      <a-form-model-item :label="$t(`oneterm.node`)" prop="parent_id">
+      <a-form-model-item :label="$t(`oneterm.catalog`)" prop="parent_id">
         <treeselect
           class="custom-treeselect custom-treeselect-white"
           :style="{

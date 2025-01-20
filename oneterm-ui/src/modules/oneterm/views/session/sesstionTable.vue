@@ -137,6 +137,7 @@ import { mapState } from 'vuex'
 import { getSessionList } from '../../api/session'
 import SessionDetailTable from './sessionDetailTable.vue'
 import { closeConnect } from '../../api/connect'
+import { initMessageStorageKey } from '../terminal/index.vue'
 
 export default {
   name: 'SessionTable',
@@ -244,6 +245,48 @@ export default {
           '_blank'
         )
       } else {
+        const dataList = [
+          {
+            key: this.$t(`user`),
+            value: row?.user_name || ''
+          },
+          {
+            key: this.$t(`oneterm.asset`),
+            value: row?.asset_info || ''
+          },
+          {
+            key: this.$t(`oneterm.gateway`),
+            value: row?.gateway_info || ''
+          },
+          {
+            key: this.$t(`oneterm.account`),
+            value: row?.account_info || ''
+          },
+          {
+            key: this.$t(`oneterm.protocol`),
+            value: row?.protocol || ''
+          },
+          {
+            key: this.$t(`oneterm.sessionTable.clientIp`),
+            value: row?.client_ip || ''
+          }
+        ]
+
+        const message = dataList.map((item) => {
+          return `\x1b[38;2;138;226;52m${item.key}\x1b[38;2;110;172;218m: ${item.value}`
+        }).join('; ')
+
+        const data = [
+          ``,
+          `${message}\x1b[0m`,
+          ``
+        ]
+
+        localStorage.setItem(initMessageStorageKey, JSON.stringify({
+          timestamp: new Date().getTime(),
+          data
+        }))
+
         window.open(`/oneterm/terminal?session_id=${row.session_id}&is_monitor=true`, '_blank')
       }
     },

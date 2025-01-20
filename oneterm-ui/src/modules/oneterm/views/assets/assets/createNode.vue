@@ -16,10 +16,10 @@
       :label-col="{ span: 5 }"
       :wrapper-col="{ span: 16 }"
     >
-      <a-form-model-item :label="$t('oneterm.assetList.nodeName')" prop="name">
+      <a-form-model-item :label="$t('oneterm.assetList.catalogName')" prop="name">
         <a-input v-model="baseForm.name" :placeholder="`${$t(`placeholder1`)}`" />
       </a-form-model-item>
-      <a-form-model-item :label="$t(`oneterm.node`)" prop="parent_id">
+      <a-form-model-item :label="$t(`oneterm.catalog`)" prop="parent_id">
         <treeselect
           class="custom-treeselect custom-treeselect-white"
           :style="{
@@ -207,9 +207,9 @@ export default {
   computed: {
     title() {
       if (this.type === 'create') {
-        return this.$t(`oneterm.assetList.createNode`)
+        return this.$t(`oneterm.assetList.createCatalog`)
       }
-      return this.$t(`oneterm.assetList.editNode`)
+      return this.$t(`oneterm.assetList.editCatalog`)
     },
   },
   mounted() {},

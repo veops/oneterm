@@ -1,7 +1,30 @@
 <template>
   <div class="oneterm-layout">
-    <div class="oneterm-header">{{ title }}</div>
-    <AssetList ref="assetList" @openNode="openNode" @openAsset="openAsset" />
+    <AssetList
+      ref="assetList"
+      @openNode="openNode"
+      @openAsset="openAsset"
+    >
+      <template #title>
+        <div class="asset-list-title">
+          <div class="asset-list-title-text">
+            {{ $t('oneterm.assetList.assetList') }}
+          </div>
+
+          <div
+            class="asset-list-title-create"
+            @click="openNode()"
+          >
+            <span class="asset-list-title-create-icon">
+              <a-icon type="plus"/>
+            </span>
+            <span class="asset-list-title-create-text">
+              {{ $t(`oneterm.assetList.createCatalog`) }}
+            </span>
+          </div>
+        </div>
+      </template>
+    </AssetList>
     <CreateNode ref="createNode" @submitNode="submitNode" />
     <CreateAsset ref="createAsset" @submitAsset="submitAsset" />
   </div>
@@ -75,4 +98,47 @@ export default {
 
 <style lang="less" scoped>
 @import '../../../style/index.less';
+
+.asset-list-title {
+  height: 22px;
+  line-height: 22px;
+  padding-left: 12px;
+  border-left: solid 3px @primary-color;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  &-text {
+    font-size: 15px;
+    font-weight: 700;
+    color: #000000;
+  }
+
+  &-create {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-size: 12px;
+
+    &-icon {
+      border-radius: 50%;
+      width: 14px;
+      height: 14px;
+      margin-right: 2px;
+      background-color: @primary-color_4;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
+      > i {
+        font-size: 12px;
+        color: @primary-color;
+      }
+    }
+
+    &:hover {
+      color: @primary-color;
+    }
+  }
+}
 </style>

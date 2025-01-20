@@ -16,8 +16,7 @@
           />
           <a-avatar
             v-else
-            class="user-rank-box-avatar"
-            :style="{ backgroundColor: '#2F54EB', fontSize: '12px' }"
+            class="user-rank-box-avatar user-rank-box-avatar-default"
             :size="36"
           >
             {{ getUserKeyByUid(item.uid).substring(0, 1) }}
@@ -89,6 +88,11 @@ export default {
 
     &-avatar {
       flex-shrink: 0;
+
+      &-default {
+        background-color: @primary-color;
+        font-size: 12px;
+      }
     }
 
     &-center {

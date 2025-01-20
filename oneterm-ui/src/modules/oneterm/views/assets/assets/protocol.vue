@@ -14,8 +14,10 @@
             </a-select-option>
           </a-select>
           <a-input
-            :placeholder="$t('oneterm.assetList.protocolPlaceholder')"
             v-model="pro.label"
+            :min="0"
+            :placeholder="$t('oneterm.assetList.protocolPlaceholder')"
+            :precision="0"
             style="width: calc(100% - 100px)"
           />
         </a-input-group>
@@ -98,6 +100,11 @@ export default {
           label: 'vnc'
         }
       ],
+      protocolMap: {
+        'ssh': 22,
+        'rdp': 3389,
+        'vnc': 5900,
+      },
       protocols: [{ id: uuidv4(), value: 'ssh', label: '22' }],
       gatewayList: [],
     }
@@ -111,12 +118,7 @@ export default {
     addPro() {
       if (this.protocols.length < 3) {
         const value = ['ssh', 'rdp', 'vnc'].find((key) => this.protocols.every((protocol) => protocol.value !== key))
-        const labelMap = {
-          'ssh': '22',
-          'rdp': '3389',
-          'vnc': '5900',
-        }
-        this.protocols.push({ id: uuidv4(), value, label: labelMap?.[value] || '' })
+        this.protocols.push({ id: uuidv4(), value, label: this.protocolMap?.[value] || 0 })
       }
     },
     deletePro(index) {
@@ -133,20 +135,14 @@ export default {
         ? protocols.map((p) => ({
             id: uuidv4(),
             value: p.split(':')[0],
-            label: p.split(':')[1],
+            label: Number(p.split(':')[1]),
           }))
-        : [{ id: uuidv4(), value: 'ssh', label: '22' }]
+        : [{ id: uuidv4(), value: 'ssh', label: 22 }]
     },
     changeProValue(value, index) {
       const _pro = _.cloneDeep(this.protocols[index])
-      if (value === 'rdp') {
-        _pro.label = '3389'
-      }
-      if (value === 'vnc') {
-        _pro.label = '5900'
-      }
-      if (value === 'ssh') {
-        _pro.label = '22'
+      if (Object.keys(this.protocolMap).includes(value)) {
+        _pro.label = this.protocolMap[value]
       }
       this.$set(this.protocols, index, _pro)
     },

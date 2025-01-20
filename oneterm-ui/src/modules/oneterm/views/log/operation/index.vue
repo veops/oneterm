@@ -25,7 +25,7 @@
               }"
               @chartTimeChange="chartTimeChange"
             >
-              <a-icon type="calendar" slot="displayTimeIcon" style="color: #2f54eb;" />
+              <a-icon type="calendar" slot="displayTimeIcon" class="primary-color" />
             </ChartTime>
             <div class="ops-list-batch-action" v-show="!!selectedRowKeys.length">
               <span @click="toExport">{{ $t('export') }}</span>

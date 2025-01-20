@@ -83,7 +83,7 @@ export default {
     grantTitle() {
       switch (this.dataType) {
         case 'node':
-          return 'oneterm.assetList.grantNode'
+          return 'oneterm.assetList.grantCatalog'
         case 'asset':
           return 'oneterm.assetList.grantAsset'
         case 'account':

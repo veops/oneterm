@@ -6,6 +6,412 @@
   "description": "",
   "glyphs": [
     {
+      "icon_id": "43139007",
+      "name": "ai-top_up",
+      "font_class": "ai-top_up",
+      "unicode": "ea10",
+      "unicode_decimal": 59920
+    },
+    {
+      "icon_id": "43139017",
+      "name": "ai-top_down",
+      "font_class": "ai-top_down",
+      "unicode": "ea0f",
+      "unicode_decimal": 59919
+    },
+    {
+      "icon_id": "43029539",
+      "name": "autoflow-script",
+      "font_class": "autoflow-script",
+      "unicode": "ea0d",
+      "unicode_decimal": 59917
+    },
+    {
+      "icon_id": "43029538",
+      "name": "autoflow-dag",
+      "font_class": "autoflow-dag",
+      "unicode": "ea0e",
+      "unicode_decimal": 59918
+    },
+    {
+      "icon_id": "42960865",
+      "name": "itsm-default_line",
+      "font_class": "itsm-default_line",
+      "unicode": "ea0c",
+      "unicode_decimal": 59916
+    },
+    {
+      "icon_id": "42930714",
+      "name": "veops-servicetree",
+      "font_class": "veops-servicetree",
+      "unicode": "ea0b",
+      "unicode_decimal": 59915
+    },
+    {
+      "icon_id": "42921461",
+      "name": "veops-switch (1)",
+      "font_class": "veops-switch1",
+      "unicode": "ea0a",
+      "unicode_decimal": 59914
+    },
+    {
+      "icon_id": "42857659",
+      "name": "veops-label",
+      "font_class": "veops-label",
+      "unicode": "ea09",
+      "unicode_decimal": 59913
+    },
+    {
+      "icon_id": "42790685",
+      "name": "top_acl",
+      "font_class": "top_acl",
+      "unicode": "ea08",
+      "unicode_decimal": 59912
+    },
+    {
+      "icon_id": "42790687",
+      "name": "top_ticket",
+      "font_class": "top_ticket",
+      "unicode": "ea06",
+      "unicode_decimal": 59910
+    },
+    {
+      "icon_id": "42790686",
+      "name": "top_agent",
+      "font_class": "top_agent",
+      "unicode": "ea07",
+      "unicode_decimal": 59911
+    },
+    {
+      "icon_id": "42732510",
+      "name": "itsm-table_download",
+      "font_class": "itsm-table_download",
+      "unicode": "ea05",
+      "unicode_decimal": 59909
+    },
+    {
+      "icon_id": "42732515",
+      "name": "itsm-image_download",
+      "font_class": "itsm-image_download",
+      "unicode": "ea04",
+      "unicode_decimal": 59908
+    },
+    {
+      "icon_id": "42510712",
+      "name": "veops-rear",
+      "font_class": "veops-rear",
+      "unicode": "ea02",
+      "unicode_decimal": 59906
+    },
+    {
+      "icon_id": "42510708",
+      "name": "veops-front",
+      "font_class": "veops-front",
+      "unicode": "ea03",
+      "unicode_decimal": 59907
+    },
+    {
+      "icon_id": "42497603",
+      "name": "veops-xianggang",
+      "font_class": "veops-xianggang",
+      "unicode": "ea01",
+      "unicode_decimal": 59905
+    },
+    {
+      "icon_id": "42485038",
+      "name": "veops-device (2)",
+      "font_class": "a-veops-device2",
+      "unicode": "ea00",
+      "unicode_decimal": 59904
+    },
+    {
+      "icon_id": "42455620",
+      "name": "veops-room (1)",
+      "font_class": "a-veops-room1",
+      "unicode": "e9ff",
+      "unicode_decimal": 59903
+    },
+    {
+      "icon_id": "42455607",
+      "name": "veops-IDC",
+      "font_class": "veops-IDC",
+      "unicode": "e9fe",
+      "unicode_decimal": 59902
+    },
+    {
+      "icon_id": "42455609",
+      "name": "veops-region",
+      "font_class": "veops-region",
+      "unicode": "e9fd",
+      "unicode_decimal": 59901
+    },
+    {
+      "icon_id": "42448953",
+      "name": "veops-device",
+      "font_class": "veops-device",
+      "unicode": "e9fb",
+      "unicode_decimal": 59899
+    },
+    {
+      "icon_id": "42448948",
+      "name": "veops-cabinet",
+      "font_class": "veops-cabinet",
+      "unicode": "e9fc",
+      "unicode_decimal": 59900
+    },
+    {
+      "icon_id": "42433324",
+      "name": "veops-data_center",
+      "font_class": "veops-data_center",
+      "unicode": "e9f9",
+      "unicode_decimal": 59897
+    },
+    {
+      "icon_id": "42337844",
+      "name": "ops-setting-holiday_management-copy",
+      "font_class": "ops-setting-holidays",
+      "unicode": "e9fa",
+      "unicode_decimal": 59898
+    },
+    {
+      "icon_id": "42335414",
+      "name": "itsm-system_log",
+      "font_class": "ops-itsm-logs",
+      "unicode": "e9f8",
+      "unicode_decimal": 59896
+    },
+    {
+      "icon_id": "42334782",
+      "name": "ops-setting-adjustday",
+      "font_class": "ops-setting-workday",
+      "unicode": "e9f6",
+      "unicode_decimal": 59894
+    },
+    {
+      "icon_id": "42334768",
+      "name": "ops-setting-holiday",
+      "font_class": "ops-setting-holiday",
+      "unicode": "e9f7",
+      "unicode_decimal": 59895
+    },
+    {
+      "icon_id": "42334734",
+      "name": "ops-setting-festival",
+      "font_class": "ops-setting-festival",
+      "unicode": "e9f5",
+      "unicode_decimal": 59893
+    },
+    {
+      "icon_id": "42281202",
+      "name": "itsm-count",
+      "font_class": "itsm-calc",
+      "unicode": "e9f4",
+      "unicode_decimal": 59892
+    },
+    {
+      "icon_id": "42270632",
+      "name": "itsm-satisfaction",
+      "font_class": "itsm-reports_4",
+      "unicode": "e9f3",
+      "unicode_decimal": 59891
+    },
+    {
+      "icon_id": "42205149",
+      "name": "veops-folder",
+      "font_class": "veops-folder",
+      "unicode": "e9f2",
+      "unicode_decimal": 59890
+    },
+    {
+      "icon_id": "42205128",
+      "name": "veops-entire_network_",
+      "font_class": "veops-entire_network_",
+      "unicode": "e9f1",
+      "unicode_decimal": 59889
+    },
+    {
+      "icon_id": "42205094",
+      "name": "veops-subnet",
+      "font_class": "veops-subnet",
+      "unicode": "e9f0",
+      "unicode_decimal": 59888
+    },
+    {
+      "icon_id": "42201912",
+      "name": "veops-map_view",
+      "font_class": "veops-map_view",
+      "unicode": "e9ef",
+      "unicode_decimal": 59887
+    },
+    {
+      "icon_id": "42201676",
+      "name": "veops-recycle",
+      "font_class": "veops-recycle",
+      "unicode": "e9ee",
+      "unicode_decimal": 59886
+    },
+    {
+      "icon_id": "42201586",
+      "name": "veops-catalog",
+      "font_class": "veops-catalog",
+      "unicode": "e9ed",
+      "unicode_decimal": 59885
+    },
+    {
+      "icon_id": "42201534",
+      "name": "veops-ipam",
+      "font_class": "veops-ipam",
+      "unicode": "e9ec",
+      "unicode_decimal": 59884
+    },
+    {
+      "icon_id": "42179262",
+      "name": "cmdb-calc",
+      "font_class": "cmdb-calc",
+      "unicode": "e9eb",
+      "unicode_decimal": 59883
+    },
+    {
+      "icon_id": "42161413",
+      "name": "ai-users",
+      "font_class": "ai-users",
+      "unicode": "e9ea",
+      "unicode_decimal": 59882
+    },
+    {
+      "icon_id": "42161417",
+      "name": "ai-tokens",
+      "font_class": "ai-tokens",
+      "unicode": "e9e9",
+      "unicode_decimal": 59881
+    },
+    {
+      "icon_id": "42155223",
+      "name": "oneterm-mysql",
+      "font_class": "oneterm-mysql",
+      "unicode": "e9e8",
+      "unicode_decimal": 59880
+    },
+    {
+      "icon_id": "42155225",
+      "name": "oneterm-redis",
+      "font_class": "oneterm-redis",
+      "unicode": "e9e7",
+      "unicode_decimal": 59879
+    },
+    {
+      "icon_id": "42154436",
+      "name": "veops-sign_out",
+      "font_class": "veops-sign_out",
+      "unicode": "e9e6",
+      "unicode_decimal": 59878
+    },
+    {
+      "icon_id": "42154310",
+      "name": "veops-company",
+      "font_class": "veops-company",
+      "unicode": "e9e5",
+      "unicode_decimal": 59877
+    },
+    {
+      "icon_id": "42154325",
+      "name": "veops-emails",
+      "font_class": "veops-emails",
+      "unicode": "e9e4",
+      "unicode_decimal": 59876
+    },
+    {
+      "icon_id": "42154350",
+      "name": "veops-switch",
+      "font_class": "veops-switch",
+      "unicode": "e9e3",
+      "unicode_decimal": 59875
+    },
+    {
+      "icon_id": "42154370",
+      "name": "veops-qiyeweixin",
+      "font_class": "qiyeweixin",
+      "unicode": "e9e2",
+      "unicode_decimal": 59874
+    },
+    {
+      "icon_id": "42134185",
+      "name": "veops-progress",
+      "font_class": "veops-progress",
+      "unicode": "e9e1",
+      "unicode_decimal": 59873
+    },
+    {
+      "icon_id": "42134110",
+      "name": "veops-completed",
+      "font_class": "veops-completed",
+      "unicode": "e9e0",
+      "unicode_decimal": 59872
+    },
+    {
+      "icon_id": "42133882",
+      "name": "itsm-ticketTime",
+      "font_class": "itsm-ticketTime",
+      "unicode": "e9df",
+      "unicode_decimal": 59871
+    },
+    {
+      "icon_id": "42122869",
+      "name": "veops-notification",
+      "font_class": "veops-notification",
+      "unicode": "e9dc",
+      "unicode_decimal": 59868
+    },
+    {
+      "icon_id": "42122868",
+      "name": "veops-account_password",
+      "font_class": "a-veops-account1",
+      "unicode": "e9dd",
+      "unicode_decimal": 59869
+    },
+    {
+      "icon_id": "42122861",
+      "name": "veops-personal",
+      "font_class": "veops-personal",
+      "unicode": "e9de",
+      "unicode_decimal": 59870
+    },
+    {
+      "icon_id": "42101103",
+      "name": "itsm-evaluation2",
+      "font_class": "itsm-customer_satisfaction2",
+      "unicode": "e9da",
+      "unicode_decimal": 59866
+    },
+    {
+      "icon_id": "42101098",
+      "name": "itsm-over2",
+      "font_class": "itsm-over2",
+      "unicode": "e9db",
+      "unicode_decimal": 59867
+    },
+    {
+      "icon_id": "42065574",
+      "name": "veops-search",
+      "font_class": "veops-search1",
+      "unicode": "e9d9",
+      "unicode_decimal": 59865
+    },
+    {
+      "icon_id": "42063479",
+      "name": "itsm-evaluation",
+      "font_class": "itsm-customer_satisfaction",
+      "unicode": "e9d8",
+      "unicode_decimal": 59864
+    },
+    {
+      "icon_id": "42062436",
+      "name": "itsm-over",
+      "font_class": "itsm-over",
+      "unicode": "e9d7",
+      "unicode_decimal": 59863
+    },
+    {
       "icon_id": "42050642",
       "name": "itsm-requirement",
       "font_class": "itsm-request",
@@ -1541,14 +1947,14 @@
     {
       "icon_id": "39926816",
       "name": "itsm-duration",
-      "font_class": "itsm-duration",
+      "font_class": "itsm-reports_3",
       "unicode": "e913",
       "unicode_decimal": 59667
     },
     {
       "icon_id": "39926833",
       "name": "itsm-workload (1)",
-      "font_class": "itsm-workload",
+      "font_class": "itsm-reports_2",
       "unicode": "e912",
       "unicode_decimal": 59666
     },

@@ -96,7 +96,7 @@ Star us, and you will receive all releases notifications from GitHub without any
 + docker-compose install
   ```bash
   git clone https://github.com/veops/oneterm.git
-  cd oneterm
+  cd oneterm/deploy
   docker compose up -d
   ```
 + visit

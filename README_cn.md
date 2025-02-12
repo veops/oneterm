@@ -100,7 +100,7 @@ OneTerm 是一款简单、轻量、灵活的企业级堡垒机产品，基于4A�
 + docker-compose 安装
   ```bash
   git clone https://github.com/veops/oneterm.git
-  cd oneterm
+  cd oneterm/deploy
   docker compose up -d
   ```
 + 访问

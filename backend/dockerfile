@@ -2,7 +2,7 @@ FROM golang:alpine
 WORKDIR /oneterm
 COPY . .
 RUN go env -w GOPROXY=https://goproxy.cn,direct \
-    && go build --ldflags "-s -w" -o ./build/oneterm ./main.go
+    && go build --ldflags "-s -w" -o ./build/oneterm ./cmd/server/main.go
 
 FROM alpine:latest
 RUN set -eux && sed -i 's/dl-cdn.alpinelinux.org/mirrors.ustc.edu.cn/g' /etc/apk/repositories
@@ -10,8 +10,8 @@ RUN apk add tzdata
 ENV TZ=Asia/Shanghai
 ENV TERM=xterm-256color
 WORKDIR /oneterm
-COPY --from=0 /oneterm/config.example.yaml ./config.yaml
-COPY --from=0 /oneterm/i18n/translate ./translate
+COPY --from=0 /oneterm/configs/config.example.yaml ./config.yaml
+COPY --from=0 /oneterm/internal/i18n/locales ./locales
 COPY --from=0 /oneterm/build/oneterm .
 CMD [ "./oneterm","run","-c","./config.yaml"]
 

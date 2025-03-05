@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/samber/lo"
 	"github.com/veops/go-ansiterm"
@@ -46,6 +47,7 @@ func NewParser(sessionId string, w, h int) *Parser {
 		OutputStream: stream,
 		isEdit:       false,
 		isPrompt:     true,
+		mu:           &sync.Mutex{},
 	}
 	return p
 }
@@ -63,12 +65,16 @@ type Parser struct {
 	lastCmd      string
 	lastRes      string
 	curRes       string
+	mu           *sync.Mutex
 }
 
 func (p *Parser) AddInput(bs []byte) (cmd string, forbidden bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	if p.isPrompt && !p.isEdit {
 		//TODO: may someone has empty ps1?
-		if ps1 := p.GetOutput(); ps1 != "" {
+		if ps1 := p.getOutputLocked(); ps1 != "" {
 			p.prompt = ps1
 		}
 		p.isPrompt = false
@@ -81,7 +87,7 @@ func (p *Parser) AddInput(bs []byte) (cmd string, forbidden bool) {
 		return
 	}
 	p.isPrompt = true
-	p.curCmd = p.GetCmd()
+	p.curCmd = p.getCmdLocked()
 	p.Reset()
 	filter := ""
 	if filter, forbidden = p.IsForbidden(p.curCmd); forbidden {
@@ -126,34 +132,72 @@ func (p *Parser) WriteDb() {
 }
 
 func (p *Parser) Close(prompt string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	if prompt == "" {
 		prompt = p.prompt
 	}
-	p.AddOutput([]byte("\r\n" + prompt))
-	p.AddInput([]byte("\r"))
+	p.AddOutputLocked([]byte("\r\n" + prompt))
+	p.AddInputLocked([]byte("\r"))
 }
 
 func (p *Parser) AddOutput(bs []byte) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	p.AddOutputLocked(bs)
+}
+
+func (p *Parser) AddOutputLocked(bs []byte) {
 	p.Output = append(p.Output, bs...)
 }
 
+func (p *Parser) AddInputLocked(bs []byte) {
+	p.Input = append(p.Input, bs...)
+}
+
 func (p *Parser) GetCmd() string {
-	s := p.GetOutput()
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	return p.getCmdLocked()
+}
+
+func (p *Parser) getCmdLocked() string {
+	s := p.getOutputLocked()
 	// TODO: some promot may change with its dir
 	return strings.TrimPrefix(s, p.prompt)
 }
 
 func (p *Parser) Resize(w, h int) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	p.OutputStream.Listener.Resize(w, h)
 }
 
 func (p *Parser) Reset() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	p.resetLocked()
+}
+
+func (p *Parser) resetLocked() {
 	p.OutputStream.Listener.Reset()
 	p.Output = nil
 	p.Input = nil
 }
 
 func (p *Parser) GetOutput() string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	return p.getOutputLocked()
+}
+
+func (p *Parser) getOutputLocked() string {
 	p.OutputStream.Feed(p.Output)
 
 	res := p.OutputStream.Listener.Display()
@@ -172,13 +216,16 @@ func (p *Parser) GetOutput() string {
 }
 
 func (p *Parser) State(b []byte) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	if !p.isEdit && IsEditEnterMode(b) {
 		if !isNewScreen(b) {
 			p.isEdit = true
 		}
 	}
 	if p.isEdit && IsEditExitMode(b) {
-		p.Reset()
+		p.resetLocked()
 		p.isEdit = false
 	}
 	return p.isEdit

@@ -36,7 +36,6 @@ func initDB() {
 		logger.L().Fatal("Failed to drop index", zap.Error(err))
 	}
 
-	defer db.Close()
 }
 
 func RunApi() error {

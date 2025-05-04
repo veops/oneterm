@@ -30,7 +30,6 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/veops/oneterm/internal/acl"
-	ggateway "github.com/veops/oneterm/internal/gateway"
 	"github.com/veops/oneterm/internal/guacd"
 	myi18n "github.com/veops/oneterm/internal/i18n"
 	"github.com/veops/oneterm/internal/model"
@@ -385,7 +384,6 @@ func connectSsh(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, ac
 	w, h := cast.ToInt(ctx.Query("w")), cast.ToInt(ctx.Query("h"))
 	chs := sess.Chans
 	defer func() {
-		ggateway.GetGatewayManager().Close(sess.SessionId)
 		if err != nil {
 			chs.ErrChan <- err
 		}
@@ -550,7 +548,6 @@ func connectGuacd(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, 
 func connectOther(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, account *model.Account, gateway *model.Gateway) (err error) {
 	chs := sess.Chans
 	defer func() {
-		ggateway.GetGatewayManager().Close(sess.SessionId)
 		if err != nil {
 			chs.ErrChan <- err
 		}

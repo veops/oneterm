@@ -1,83 +1,53 @@
 package controller
 
 import (
-	"errors"
 	"net/http"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/samber/lo"
 	"github.com/spf13/cast"
-	"golang.org/x/crypto/ssh"
-	"gorm.io/gorm"
 
 	"github.com/veops/oneterm/internal/acl"
 	"github.com/veops/oneterm/internal/model"
+	"github.com/veops/oneterm/internal/service"
 	"github.com/veops/oneterm/pkg/config"
-	dbpkg "github.com/veops/oneterm/pkg/db"
-	"github.com/veops/oneterm/pkg/utils"
 )
 
 var (
+	gatewayService = service.NewGatewayService()
+
 	gatewayPreHooks = []preHook[*model.Gateway]{
+		// Validate public key
 		func(ctx *gin.Context, data *model.Gateway) {
-			if data.AccountType == model.AUTHMETHOD_PUBLICKEY {
-				if data.Phrase == "" {
-					_, err := ssh.ParsePrivateKey([]byte(data.Pk))
-					if err != nil {
-						ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrWrongPk, Data: nil})
-						return
-					}
-				} else {
-					_, err := ssh.ParsePrivateKeyWithPassphrase([]byte(data.Pk), []byte(data.Phrase))
-					if err != nil {
-						ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrWrongPk, Data: nil})
-						return
-					}
-				}
-			}
-		},
-		func(ctx *gin.Context, data *model.Gateway) {
-			data.Password = utils.EncryptAES(data.Password)
-			data.Pk = utils.EncryptAES(data.Pk)
-			data.Phrase = utils.EncryptAES(data.Phrase)
-		},
-	}
-	gatewayPostHooks = []postHook[*model.Gateway]{
-		func(ctx *gin.Context, data []*model.Gateway) {
-			post := make([]*model.GatewayCount, 0)
-			if err := dbpkg.DB.
-				Model(model.DefaultAsset).
-				Select("gateway_id AS id, COUNT(*) AS count").
-				Where("gateway_id IN ?", lo.Map(data, func(d *model.Gateway, _ int) int { return d.Id })).
-				Group("gateway_id").
-				Find(&post).
-				Error; err != nil {
+			if err := gatewayService.ValidatePublicKey(data); err != nil {
+				ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrWrongPk, Data: nil})
 				return
 			}
-			m := lo.SliceToMap(post, func(p *model.GatewayCount) (int, int64) { return p.Id, p.Count })
-			for _, d := range data {
-				d.AssetCount = m[d.Id]
-			}
 		},
-		func(ctx *gin.Context, data []*model.Gateway) {
-			for _, d := range data {
-				d.Password = utils.DecryptAES(d.Password)
-				d.Pk = utils.DecryptAES(d.Pk)
-				d.Phrase = utils.DecryptAES(d.Phrase)
-			}
+		// Encrypt sensitive data
+		func(ctx *gin.Context, data *model.Gateway) {
+			gatewayService.EncryptSensitiveData(data)
 		},
 	}
+
+	gatewayPostHooks = []postHook[*model.Gateway]{
+		// Attach asset count
+		func(ctx *gin.Context, data []*model.Gateway) {
+			if err := gatewayService.AttachAssetCount(ctx, data); err != nil {
+				return
+			}
+		},
+		// Decrypt sensitive data
+		func(ctx *gin.Context, data []*model.Gateway) {
+			gatewayService.DecryptSensitiveData(data)
+		},
+	}
+
 	gatewayDcs = []deleteCheck{
+		// Check dependencies
 		func(ctx *gin.Context, id int) {
-			assetName := ""
-			err := dbpkg.DB.
-				Model(model.DefaultAsset).
-				Select("name").
-				Where("gateway_id = ?", id).
-				First(&assetName).
-				Error
-			if errors.Is(err, gorm.ErrRecordNotFound) {
+			assetName, err := gatewayService.CheckAssetDependencies(ctx, id)
+			if err == nil && assetName == "" {
 				return
 			}
 			code := lo.Ternary(err == nil, http.StatusBadRequest, http.StatusInternalServerError)
@@ -135,29 +105,20 @@ func (c *Controller) GetGateways(ctx *gin.Context) {
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
 	info := cast.ToBool(ctx.Query("info"))
 
-	db := dbpkg.DB.Model(model.DefaultGateway)
-	db = filterEqual(ctx, db, "id", "type")
-	db = filterLike(ctx, db, "name")
-	db = filterSearch(ctx, db, "name", "host", "account", "port")
-	if q, ok := ctx.GetQuery("ids"); ok {
-		db = db.Where("id IN ?", lo.Map(strings.Split(q, ","), func(s string, _ int) int { return cast.ToInt(s) }))
-	}
+	// Build base query using service layer
+	db := gatewayService.BuildQuery(ctx)
 
+	// Apply authorization filter if needed
 	if info && !acl.IsAdmin(currentUser) {
 		assetIds, err := GetAssetIdsByAuthorization(ctx)
 		if err != nil {
 			ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
 			return
 		}
-		sub := dbpkg.DB.
-			Model(model.DefaultAsset).
-			Select("DISTINCT gateway_id").
-			Where("asset_id IN ?", assetIds)
 
-		db = db.Where("id IN ?", sub)
+		// Apply gateway filter by asset IDs
+		db = gatewayService.FilterByAssetIds(db, assetIds)
 	}
-
-	db = db.Order("name")
 
 	doGet(ctx, !info, db, config.RESOURCE_GATEWAY, gatewayPostHooks...)
 }

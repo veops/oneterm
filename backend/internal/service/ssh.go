@@ -7,8 +7,8 @@ import (
 	"github.com/spf13/cast"
 	"golang.org/x/crypto/ssh"
 
-	ggateway "github.com/veops/oneterm/internal/gateway"
 	"github.com/veops/oneterm/internal/model"
+	"github.com/veops/oneterm/internal/tunneling"
 	dbpkg "github.com/veops/oneterm/pkg/db"
 	"github.com/veops/oneterm/pkg/utils"
 )
@@ -75,7 +75,7 @@ func Proxy(isConnectable bool, sessionId string, protocol string, asset *model.A
 		return
 	}
 
-	g, err := ggateway.GetGatewayManager().Open(isConnectable, sessionId, ip, port, gateway)
+	g, err := tunneling.OpenTunnel(isConnectable, sessionId, ip, port, gateway)
 	if err != nil {
 		return
 	}

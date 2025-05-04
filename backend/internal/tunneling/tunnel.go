@@ -1,4 +1,4 @@
-package gateway
+package tunneling
 
 import (
 	"context"
@@ -15,23 +15,7 @@ import (
 	"github.com/veops/oneterm/pkg/logger"
 )
 
-var (
-	manager = &GateWayManager{
-		gatewayTunnels:  map[string]*GatewayTunnel{},
-		sshClients:      map[int]*ssh.Client{},
-		sshClientsCount: map[int]int{},
-		mtx:             sync.Mutex{},
-	}
-)
-
-func GetGatewayManager() *GateWayManager {
-	return manager
-}
-
-func GetGatewayTunnelBySessionId(sessionId string) *GatewayTunnel {
-	return manager.gatewayTunnels[sessionId]
-}
-
+// GatewayTunnel represents a SSH tunnel through a gateway
 type GatewayTunnel struct {
 	listener   net.Listener
 	GatewayId  int
@@ -45,7 +29,8 @@ type GatewayTunnel struct {
 	Opened     chan error
 }
 
-func (gt *GatewayTunnel) Open(isConnectable bool) (err error) {
+// Open opens the gateway tunnel
+func (gt *GatewayTunnel) Open(sshClient *ssh.Client, isConnectable bool) (err error) {
 	go func() {
 		<-time.After(time.Second * 3)
 		logger.L().Debug("timeout 3 second close listener", zap.String("sessionId", gt.SessionId))
@@ -64,7 +49,7 @@ func (gt *GatewayTunnel) Open(isConnectable bool) (err error) {
 	remoteAddr := fmt.Sprintf("%s:%d", gt.RemoteIp, gt.RemotePort)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	gt.RemoteConn, err = manager.sshClients[gt.GatewayId].DialContext(ctx, "tcp", remoteAddr)
+	gt.RemoteConn, err = sshClient.DialContext(ctx, "tcp", remoteAddr)
 	if err != nil {
 		defer func() {
 			if gt.LocalConn != nil {
@@ -86,28 +71,44 @@ func (gt *GatewayTunnel) Open(isConnectable bool) (err error) {
 	return
 }
 
-type GateWayManager struct {
+// TunnelManager manages SSH tunnels through gateways
+type TunnelManager struct {
 	gatewayTunnels  map[string]*GatewayTunnel
 	sshClients      map[int]*ssh.Client
 	sshClientsCount map[int]int
 	mtx             sync.Mutex
 }
 
-func (gm *GateWayManager) Open(isConnectable bool, sessionId, remoteIp string, remotePort int, gateway *model.Gateway) (g *GatewayTunnel, err error) {
-	if gateway == nil {
-		err = fmt.Errorf("gateway is nil")
-		return
+// NewTunnelManager creates a new tunnel manager
+func NewTunnelManager() *TunnelManager {
+	return &TunnelManager{
+		gatewayTunnels:  map[string]*GatewayTunnel{},
+		sshClients:      map[int]*ssh.Client{},
+		sshClientsCount: map[int]int{},
+		mtx:             sync.Mutex{},
 	}
-	gm.mtx.Lock()
-	defer gm.mtx.Unlock()
+}
 
-	sshCli, ok := gm.sshClients[gateway.Id]
+// GetTunnelBySessionId gets a gateway tunnel by session ID
+func (tm *TunnelManager) GetTunnelBySessionId(sessionId string) *GatewayTunnel {
+	return tm.gatewayTunnels[sessionId]
+}
+
+// OpenTunnel opens a new gateway tunnel
+func (tm *TunnelManager) OpenTunnel(isConnectable bool, sessionId, remoteIp string, remotePort int, gateway *model.Gateway) (*GatewayTunnel, error) {
+	if gateway == nil {
+		return nil, fmt.Errorf("gateway is nil")
+	}
+	tm.mtx.Lock()
+	defer tm.mtx.Unlock()
+
+	sshCli, ok := tm.sshClients[gateway.Id]
 	if !ok {
-		var auth ssh.AuthMethod
-		auth, err = gm.getAuth(gateway)
+		auth, err := tm.getAuthMethod(gateway)
 		if err != nil {
-			return
+			return nil, err
 		}
+
 		sshCli, err = ssh.Dial("tcp", fmt.Sprintf("%s:%d", gateway.Host, gateway.Port), &ssh.ClientConfig{
 			User:            gateway.Account,
 			Auth:            []ssh.AuthMethod{auth},
@@ -116,24 +117,27 @@ func (gm *GateWayManager) Open(isConnectable bool, sessionId, remoteIp string, r
 		})
 		if err != nil {
 			logger.L().Error("open gateway sshcli failed", zap.Int("gatewayId", gateway.Id), zap.Error(err))
-			return
+			return nil, err
 		}
 		go func() {
 			logger.L().Debug("ssh proxy wait closed", zap.Int("gatewayId", gateway.Id), zap.Error(sshCli.Wait()))
-			delete(gm.sshClients, gateway.Id)
+			delete(tm.sshClients, gateway.Id)
 		}()
 	}
-	gm.sshClients[gateway.Id] = sshCli
-	gm.sshClientsCount[gateway.Id] += 1
+	tm.sshClients[gateway.Id] = sshCli
+	tm.sshClientsCount[gateway.Id] += 1
+
 	localPort, err := getAvailablePort()
 	if err != nil {
-		return
+		return nil, err
 	}
+
 	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", "localhost", localPort))
 	if err != nil {
-		return
+		return nil, err
 	}
-	g = &GatewayTunnel{
+
+	g := &GatewayTunnel{
 		listener:   listener,
 		GatewayId:  gateway.Id,
 		SessionId:  sessionId,
@@ -143,36 +147,53 @@ func (gm *GateWayManager) Open(isConnectable bool, sessionId, remoteIp string, r
 		RemotePort: remotePort,
 		Opened:     make(chan error),
 	}
-	gm.gatewayTunnels[sessionId] = g
-	go g.Open(isConnectable)
+	tm.gatewayTunnels[sessionId] = g
+
+	go g.Open(sshCli, isConnectable)
 
 	logger.L().Debug("opening gateway", zap.Any("sessionId", sessionId))
 	<-g.Opened
 	logger.L().Debug("opened gateway", zap.Any("sessionId", sessionId))
 
-	return
+	return g, nil
 }
 
-func (gm *GateWayManager) Close(sessionIds ...string) {
-	gm.mtx.Lock()
-	defer gm.mtx.Unlock()
+// CloseTunnels closes gateway tunnels by session IDs
+func (tm *TunnelManager) CloseTunnels(sessionIds ...string) {
+	tm.mtx.Lock()
+	defer tm.mtx.Unlock()
+
 	for _, sid := range sessionIds {
-		gt, ok := gm.gatewayTunnels[sid]
+		gt, ok := tm.gatewayTunnels[sid]
 		if !ok {
-			return
+			continue
 		}
-		gm.sshClientsCount[gt.GatewayId] -= 1
-		if gm.sshClientsCount[gt.GatewayId] <= 0 {
-			if g := gm.sshClients[gt.GatewayId]; g != nil {
+
+		tm.sshClientsCount[gt.GatewayId] -= 1
+		if tm.sshClientsCount[gt.GatewayId] <= 0 {
+			if g := tm.sshClients[gt.GatewayId]; g != nil {
 				g.Close()
 			}
-			delete(gm.sshClients, gt.GatewayId)
-			delete(gm.sshClientsCount, gt.GatewayId)
+			delete(tm.sshClients, gt.GatewayId)
+			delete(tm.sshClientsCount, gt.GatewayId)
 		}
+
+		// Close and delete tunnel
+		if gt.listener != nil {
+			gt.listener.Close()
+		}
+		if gt.LocalConn != nil {
+			gt.LocalConn.Close()
+		}
+		if gt.RemoteConn != nil {
+			gt.RemoteConn.Close()
+		}
+		delete(tm.gatewayTunnels, sid)
 	}
 }
 
-func (gm *GateWayManager) getAuth(gateway *model.Gateway) (ssh.AuthMethod, error) {
+// getAuthMethod gets SSH authentication method based on gateway config
+func (tm *TunnelManager) getAuthMethod(gateway *model.Gateway) (ssh.AuthMethod, error) {
 	switch gateway.AccountType {
 	case model.AUTHMETHOD_PASSWORD:
 		return ssh.Password(gateway.Password), nil
@@ -195,6 +216,7 @@ func (gm *GateWayManager) getAuth(gateway *model.Gateway) (ssh.AuthMethod, error
 	}
 }
 
+// getAvailablePort gets an available local port
 func getAvailablePort() (int, error) {
 	addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
 	if err != nil {

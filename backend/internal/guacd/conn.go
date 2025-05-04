@@ -10,8 +10,8 @@ import (
 	"github.com/samber/lo"
 	"github.com/spf13/cast"
 
-	ggateway "github.com/veops/oneterm/internal/gateway"
 	"github.com/veops/oneterm/internal/model"
+	"github.com/veops/oneterm/internal/tunneling"
 	"github.com/veops/oneterm/pkg/config"
 	"github.com/veops/oneterm/pkg/logger"
 )
@@ -41,7 +41,7 @@ type Tunnel struct {
 	reader       *bufio.Reader
 	writer       *bufio.Writer
 	Config       *Configuration
-	gw           *ggateway.GatewayTunnel
+	gw           *tunneling.GatewayTunnel
 }
 
 func NewTunnel(connectionId, sessionId string, w, h, dpi int, protocol string, asset *model.Asset, account *model.Account, gateway *model.Gateway) (t *Tunnel, err error) {
@@ -101,7 +101,7 @@ func NewTunnel(connectionId, sessionId string, w, h, dpi int, protocol string, a
 		t.Config.Parameters["recording-name"] = t.SessionId
 	}
 	if gateway != nil && gateway.Id != 0 && t.ConnectionId == "" {
-		t.gw, err = ggateway.GetGatewayManager().Open(false, t.SessionId, asset.Ip, cast.ToInt(port), gateway)
+		t.gw, err = tunneling.OpenTunnel(false, t.SessionId, asset.Ip, cast.ToInt(port), gateway)
 		if err != nil {
 			return t, err
 		}
@@ -221,7 +221,7 @@ func (t *Tunnel) assert(opcode string) (instruction *Instruction, err error) {
 }
 
 func (t *Tunnel) Close() {
-	ggateway.GetGatewayManager().Close(t.SessionId)
+	tunneling.CloseTunnels(t.SessionId)
 }
 
 func (t *Tunnel) Disconnect() {

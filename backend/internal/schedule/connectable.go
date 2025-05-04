@@ -10,9 +10,9 @@ import (
 	"github.com/samber/lo"
 	"go.uber.org/zap"
 
-	ggateway "github.com/veops/oneterm/internal/gateway"
 	"github.com/veops/oneterm/internal/model"
 	"github.com/veops/oneterm/internal/service"
+	"github.com/veops/oneterm/internal/tunneling"
 	dbpkg "github.com/veops/oneterm/pkg/db"
 	"github.com/veops/oneterm/pkg/logger"
 	"github.com/veops/oneterm/pkg/utils"
@@ -64,7 +64,7 @@ func UpdateConnectables(ids ...int) (err error) {
 		}
 		sids = append(sids, sid)
 	}
-	defer ggateway.GetGatewayManager().Close(sids...)
+	defer tunneling.CloseTunnels(sids...)
 	if len(oks) > 0 {
 		if err := dbpkg.DB.Model(assets).Where("id IN ?", oks).Update("connectable", true).Error; err != nil {
 			logger.L().Debug("update connectable to ok failed", zap.Error(err))
@@ -99,7 +99,7 @@ func updateConnectable(asset *model.Asset, gateway *model.Gateway) (sid string, 
 	}
 	defer conn.Close()
 	if asset.GatewayId != 0 {
-		t := ggateway.GetGatewayTunnelBySessionId(sid)
+		t := tunneling.GetTunnelBySessionId(sid)
 		if t == nil {
 			return
 		}

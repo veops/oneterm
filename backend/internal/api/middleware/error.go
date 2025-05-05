@@ -8,8 +8,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/nicksnyder/go-i18n/v2/i18n"
 
-	"github.com/veops/oneterm/internal/api/controller"
 	myi18n "github.com/veops/oneterm/internal/i18n"
+	"github.com/veops/oneterm/pkg/errors"
 )
 
 type bodyWriter struct {
@@ -47,7 +47,7 @@ func Error2RespMiddleware() gin.HandlerFunc {
 				e := ctx.Errors.Last().Err
 				obj["message"] = e.Error()
 
-				ae, ok := e.(*controller.ApiError)
+				ae, ok := e.(*errors.ApiError)
 				if ok {
 					lang := ctx.PostForm("lang")
 					accept := ctx.GetHeader("Accept-Language")

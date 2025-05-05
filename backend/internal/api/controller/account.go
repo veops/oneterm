@@ -11,6 +11,7 @@ import (
 	"github.com/veops/oneterm/internal/model"
 	"github.com/veops/oneterm/internal/service"
 	"github.com/veops/oneterm/pkg/config"
+	myErrors "github.com/veops/oneterm/pkg/errors"
 )
 
 var (
@@ -20,7 +21,7 @@ var (
 		// Validate public key
 		func(ctx *gin.Context, data *model.Account) {
 			if err := accountService.ValidatePublicKey(data); err != nil {
-				ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrWrongPvk, Data: nil})
+				ctx.AbortWithError(http.StatusBadRequest, &myErrors.ApiError{Code: myErrors.ErrWrongPvk, Data: nil})
 				return
 			}
 		},
@@ -51,7 +52,7 @@ var (
 				return
 			}
 			code := lo.Ternary(err == nil, http.StatusBadRequest, http.StatusInternalServerError)
-			err = lo.Ternary[error](err == nil, &ApiError{Code: ErrHasDepency, Data: map[string]any{"name": assetName}}, err)
+			err = lo.Ternary[error](err == nil, &myErrors.ApiError{Code: myErrors.ErrHasDepency, Data: map[string]any{"name": assetName}}, err)
 			ctx.AbortWithError(code, err)
 		},
 	}
@@ -116,7 +117,7 @@ func (c *Controller) GetAccounts(ctx *gin.Context) {
 		if !acl.IsAdmin(currentUser) {
 			assetIds, err := GetAssetIdsByAuthorization(ctx)
 			if err != nil {
-				ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+				ctx.AbortWithError(http.StatusInternalServerError, &myErrors.ApiError{Code: myErrors.ErrInternal, Data: map[string]any{"err": err}})
 				return
 			}
 

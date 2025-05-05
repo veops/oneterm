@@ -16,6 +16,7 @@ import (
 	"github.com/veops/oneterm/internal/model"
 	"github.com/veops/oneterm/internal/service"
 	gsession "github.com/veops/oneterm/internal/session"
+	"github.com/veops/oneterm/pkg/errors"
 	"github.com/veops/oneterm/pkg/logger"
 )
 
@@ -85,7 +86,7 @@ func (c *Controller) GetFileHistory(ctx *gin.Context) {
 	// Use global file service
 	histories, count, err := service.DefaultFileService.GetFileHistory(ctx, filters)
 	if err != nil {
-		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+		ctx.AbortWithError(http.StatusInternalServerError, &errors.ApiError{Code: errors.ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
 
@@ -122,14 +123,14 @@ func (c *Controller) FileLS(ctx *gin.Context) {
 	}
 
 	if !hasAuthorization(ctx, sess) {
-		ctx.AbortWithError(http.StatusForbidden, &ApiError{Code: ErrNoPerm, Data: map[string]any{}})
+		ctx.AbortWithError(http.StatusForbidden, &errors.ApiError{Code: errors.ErrNoPerm, Data: map[string]any{}})
 		return
 	}
 
 	// Use global file service
 	info, err := service.DefaultFileService.ReadDir(ctx, sess.Session.AssetId, sess.Session.AccountId, ctx.Query("dir"))
 	if err != nil {
-		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
+		ctx.AbortWithError(http.StatusBadRequest, &errors.ApiError{Code: errors.ErrInvalidArgument, Data: map[string]any{"err": err}})
 		return
 	}
 
@@ -166,13 +167,13 @@ func (c *Controller) FileMkdir(ctx *gin.Context) {
 	}
 
 	if !hasAuthorization(ctx, sess) {
-		ctx.AbortWithError(http.StatusForbidden, &ApiError{Code: ErrNoPerm, Data: map[string]any{}})
+		ctx.AbortWithError(http.StatusForbidden, &errors.ApiError{Code: errors.ErrNoPerm, Data: map[string]any{}})
 		return
 	}
 
 	// Use global file service
 	if err := service.DefaultFileService.MkdirAll(ctx, sess.Session.AssetId, sess.Session.AccountId, ctx.Query("dir")); err != nil {
-		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
+		ctx.AbortWithError(http.StatusInternalServerError, &errors.ApiError{Code: errors.ErrInvalidArgument, Data: map[string]any{"err": err}})
 		return
 	}
 
@@ -213,31 +214,31 @@ func (c *Controller) FileUpload(ctx *gin.Context) {
 	}
 
 	if !hasAuthorization(ctx, sess) {
-		ctx.AbortWithError(http.StatusForbidden, &ApiError{Code: ErrNoPerm, Data: map[string]any{}})
+		ctx.AbortWithError(http.StatusForbidden, &errors.ApiError{Code: errors.ErrNoPerm, Data: map[string]any{}})
 		return
 	}
 
 	f, fh, err := ctx.Request.FormFile("file")
 	if err != nil {
-		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
+		ctx.AbortWithError(http.StatusBadRequest, &errors.ApiError{Code: errors.ErrInvalidArgument, Data: map[string]any{"err": err}})
 		return
 	}
 
 	content, err := io.ReadAll(f)
 	if err != nil {
-		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
+		ctx.AbortWithError(http.StatusBadRequest, &errors.ApiError{Code: errors.ErrInvalidArgument, Data: map[string]any{"err": err}})
 		return
 	}
 
 	// Use global file service
 	rf, err := service.DefaultFileService.Create(ctx, sess.Session.AssetId, sess.Session.AccountId, filepath.Join(ctx.Query("dir"), fh.Filename))
 	if err != nil {
-		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
+		ctx.AbortWithError(http.StatusBadRequest, &errors.ApiError{Code: errors.ErrInvalidArgument, Data: map[string]any{"err": err}})
 		return
 	}
 
 	if _, err = rf.Write(content); err != nil {
-		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+		ctx.AbortWithError(http.StatusBadRequest, &errors.ApiError{Code: errors.ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
 
@@ -281,14 +282,14 @@ func (c *Controller) FileDownload(ctx *gin.Context) {
 	}
 
 	if !hasAuthorization(ctx, sess) {
-		ctx.AbortWithError(http.StatusForbidden, &ApiError{Code: ErrNoPerm, Data: map[string]any{}})
+		ctx.AbortWithError(http.StatusForbidden, &errors.ApiError{Code: errors.ErrNoPerm, Data: map[string]any{}})
 		return
 	}
 
 	// Use global file service
 	rf, err := service.DefaultFileService.Open(ctx, sess.Session.AssetId, sess.Session.AccountId, filepath.Join(ctx.Query("dir"), ctx.Query("filename")))
 	if err != nil {
-		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
+		ctx.AbortWithError(http.StatusInternalServerError, &errors.ApiError{Code: errors.ErrInvalidArgument, Data: map[string]any{"err": err}})
 		return
 	}
 
@@ -296,7 +297,7 @@ func (c *Controller) FileDownload(ctx *gin.Context) {
 
 	content, err := io.ReadAll(rf)
 	if err != nil {
-		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+		ctx.AbortWithError(http.StatusInternalServerError, &errors.ApiError{Code: errors.ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
 

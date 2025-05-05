@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"reflect"
 	"time"
@@ -20,6 +19,7 @@ import (
 	"github.com/veops/oneterm/internal/repository"
 	"github.com/veops/oneterm/pkg/config"
 	dbpkg "github.com/veops/oneterm/pkg/db"
+	myErrors "github.com/veops/oneterm/pkg/errors"
 	"github.com/veops/oneterm/pkg/remote"
 )
 
@@ -66,7 +66,7 @@ func doCreate[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType 
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
 
 	if err = ctx.ShouldBindBodyWithJSON(md); err != nil {
-		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
+		ctx.AbortWithError(http.StatusBadRequest, &myErrors.ApiError{Code: myErrors.ErrInvalidArgument, Data: map[string]any{"err": err}})
 		return
 	}
 
@@ -128,10 +128,10 @@ func doCreate[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType 
 		return
 	}); err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
-			ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrDuplicateName, Data: map[string]any{"err": err}})
+			ctx.AbortWithError(http.StatusBadRequest, &myErrors.ApiError{Code: myErrors.ErrDuplicateName, Data: map[string]any{"err": err}})
 			return
 		}
-		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+		ctx.AbortWithError(http.StatusInternalServerError, &myErrors.ApiError{Code: myErrors.ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
 
@@ -151,7 +151,7 @@ func doDelete[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType 
 
 	id, err := cast.ToIntE(ctx.Param("id"))
 	if err != nil {
-		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
+		ctx.AbortWithError(http.StatusBadRequest, &myErrors.ApiError{Code: myErrors.ErrInvalidArgument, Data: map[string]any{"err": err}})
 		return
 	}
 
@@ -164,11 +164,11 @@ func doDelete[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType 
 			})
 			return
 		}
-		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+		ctx.AbortWithError(http.StatusBadRequest, &myErrors.ApiError{Code: myErrors.ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
 	if needAcl && !hasPerm(ctx, md, resourceType, acl.DELETE) {
-		ctx.AbortWithError(http.StatusForbidden, &ApiError{Code: ErrNoPerm, Data: map[string]any{"perm": acl.DELETE}})
+		ctx.AbortWithError(http.StatusForbidden, &myErrors.ApiError{Code: myErrors.ErrNoPerm, Data: map[string]any{"perm": acl.DELETE}})
 		return
 	}
 	for _, dc := range dcs {
@@ -212,10 +212,10 @@ func doDelete[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType 
 		return
 	}); err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
-			ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrDuplicateName, Data: map[string]any{"err": err}})
+			ctx.AbortWithError(http.StatusBadRequest, &myErrors.ApiError{Code: myErrors.ErrDuplicateName, Data: map[string]any{"err": err}})
 			return
 		}
-		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+		ctx.AbortWithError(http.StatusInternalServerError, &myErrors.ApiError{Code: myErrors.ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
 
@@ -235,12 +235,12 @@ func doUpdate[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType 
 
 	id, err := cast.ToIntE(ctx.Param("id"))
 	if err != nil {
-		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
+		ctx.AbortWithError(http.StatusBadRequest, &myErrors.ApiError{Code: myErrors.ErrInvalidArgument, Data: map[string]any{"err": err}})
 		return
 	}
 
 	if err = ctx.ShouldBindBodyWithJSON(md); err != nil {
-		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
+		ctx.AbortWithError(http.StatusBadRequest, &myErrors.ApiError{Code: myErrors.ErrInvalidArgument, Data: map[string]any{"err": err}})
 		return
 	}
 	md.SetUpdaterId(currentUser.Uid)
@@ -261,7 +261,7 @@ func doUpdate[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType 
 			ctx.JSON(http.StatusOK, defaultHttpResponse)
 			return
 		}
-		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+		ctx.AbortWithError(http.StatusBadRequest, &myErrors.ApiError{Code: myErrors.ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
 	if needAcl {
@@ -269,7 +269,7 @@ func doUpdate[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType 
 		// fmt.Printf("%+v\n", old)
 		// fmt.Printf("%+v\n", md)
 		if !hasPerm(ctx, md, resourceType, acl.WRITE) {
-			ctx.AbortWithError(http.StatusForbidden, &ApiError{Code: ErrNoPerm, Data: map[string]any{"perm": acl.WRITE}})
+			ctx.AbortWithError(http.StatusForbidden, &myErrors.ApiError{Code: myErrors.ErrNoPerm, Data: map[string]any{"perm": acl.WRITE}})
 			return
 		}
 
@@ -316,10 +316,10 @@ func doUpdate[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType 
 		return
 	}); err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
-			ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrDuplicateName, Data: map[string]any{"err": err}})
+			ctx.AbortWithError(http.StatusBadRequest, &myErrors.ApiError{Code: myErrors.ErrDuplicateName, Data: map[string]any{"err": err}})
 			return
 		}
-		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+		ctx.AbortWithError(http.StatusInternalServerError, &myErrors.ApiError{Code: myErrors.ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
 
@@ -337,7 +337,7 @@ func doGet[T any](ctx *gin.Context, needAcl bool, dbFind *gorm.DB, resourceType 
 
 	if needAcl && !acl.IsAdmin(currentUser) {
 		if dbFind, err = handleAcl[T](ctx, dbFind, resourceType); err != nil {
-			ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+			ctx.AbortWithError(http.StatusInternalServerError, &myErrors.ApiError{Code: myErrors.ErrInternal, Data: map[string]any{"err": err}})
 			return
 		}
 	}
@@ -365,7 +365,7 @@ func doGet[T any](ctx *gin.Context, needAcl bool, dbFind *gorm.DB, resourceType 
 			Error
 	})
 	if err = eg.Wait(); err != nil {
-		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+		ctx.AbortWithError(http.StatusInternalServerError, &myErrors.ApiError{Code: myErrors.ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
 
@@ -404,74 +404,13 @@ func handleRemoteErr(ctx *gin.Context, err error) {
 	switch e := err.(type) {
 	case *remote.RemoteError:
 		if e.HttpCode == http.StatusBadRequest {
-			ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrRemoteClient, Data: e.Resp})
+			ctx.AbortWithError(http.StatusBadRequest, &myErrors.ApiError{Code: myErrors.ErrRemoteClient, Data: e.Resp})
 			return
 		}
-		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrRemoteServer, Data: e.Resp})
+		ctx.AbortWithError(http.StatusInternalServerError, &myErrors.ApiError{Code: myErrors.ErrRemoteServer, Data: e.Resp})
 	default:
-		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+		ctx.AbortWithError(http.StatusInternalServerError, &myErrors.ApiError{Code: myErrors.ErrInternal, Data: map[string]any{"err": err}})
 	}
-}
-
-func filterSearch(ctx *gin.Context, db *gorm.DB, fields ...string) *gorm.DB {
-	q, ok := ctx.GetQuery("search")
-	if !ok || len(fields) <= 0 {
-		return db
-	}
-
-	d := dbpkg.DB
-	for _, f := range fields {
-		d = d.Or(fmt.Sprintf("%s LIKE ?", f), fmt.Sprintf("%%%s%%", q))
-	}
-
-	db = db.Where(d)
-
-	return db
-}
-func filterStartEnd(ctx *gin.Context, db *gorm.DB) (*gorm.DB, error) {
-	if q, ok := ctx.GetQuery("start"); ok {
-		t, err := time.Parse(time.RFC3339, q)
-		if err != nil {
-			ctx.AbortWithError(http.StatusBadRequest, err)
-			return db, err
-		}
-		db = db.Where("created_at >= ?", t)
-	}
-	if q, ok := ctx.GetQuery("end"); ok {
-		t, err := time.Parse(time.RFC3339, q)
-		if err != nil {
-			ctx.AbortWithError(http.StatusBadRequest, err)
-			return db, err
-		}
-		db = db.Where("created_at <= ?", t)
-	}
-
-	return db, nil
-}
-func filterEqual(ctx *gin.Context, db *gorm.DB, fields ...string) *gorm.DB {
-	for _, f := range fields {
-		if q, ok := ctx.GetQuery(f); ok {
-			db = db.Where(fmt.Sprintf("%s = ?", f), q)
-		}
-	}
-
-	return db
-}
-func filterLike(ctx *gin.Context, db *gorm.DB, fields ...string) *gorm.DB {
-	likes := false
-	d := dbpkg.DB
-	for _, f := range fields {
-		if q, ok := ctx.GetQuery(f); ok && q != "" {
-			d = d.Or(fmt.Sprintf("%s LIKE ?", f), fmt.Sprintf("%%%s%%", q))
-			likes = true
-		}
-	}
-	if !likes {
-		return db
-	}
-	db = db.Where(d)
-
-	return db
 }
 
 func toMap(data any) model.Map[string, any] {
@@ -542,7 +481,7 @@ func handlePermissions[T any](ctx *gin.Context, data []T, resourceTypeName strin
 	case []*model.Node:
 		resId2perms, err = handleSelfChildPerms(ctx, resId2perms)
 		if err != nil {
-			ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+			ctx.AbortWithError(http.StatusInternalServerError, &myErrors.ApiError{Code: myErrors.ErrInternal, Data: map[string]any{"err": err}})
 			return
 		}
 	case []*model.Asset:
@@ -553,7 +492,7 @@ func handlePermissions[T any](ctx *gin.Context, data []T, resourceTypeName strin
 		}
 		nodeResId2perms := lo.SliceToMap(res, func(r *acl.Resource) (int, []string) { return r.ResourceId, r.Permissions })
 		if nodeResId2perms, err = handleSelfChildPerms(ctx, nodeResId2perms); err != nil {
-			ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+			ctx.AbortWithError(http.StatusInternalServerError, &myErrors.ApiError{Code: myErrors.ErrInternal, Data: map[string]any{"err": err}})
 			return
 		}
 		var nodeId2ResId map[int]int

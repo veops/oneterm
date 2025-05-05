@@ -7,6 +7,7 @@ import (
 
 	"github.com/veops/oneterm/internal/model"
 	"github.com/veops/oneterm/internal/service"
+	"github.com/veops/oneterm/pkg/errors"
 )
 
 var (
@@ -30,7 +31,7 @@ var (
 func (c *Controller) GetHistories(ctx *gin.Context) {
 	db, err := historyService.BuildQuery(ctx)
 	if err != nil {
-		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+		ctx.AbortWithError(http.StatusInternalServerError, &errors.ApiError{Code: errors.ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
 
@@ -45,7 +46,7 @@ func (c *Controller) GetHistories(ctx *gin.Context) {
 func (c *Controller) GetHistoryTypeMapping(ctx *gin.Context) {
 	mapping, err := historyService.GetTypeMapping(ctx)
 	if err != nil {
-		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+		ctx.AbortWithError(http.StatusInternalServerError, &errors.ApiError{Code: errors.ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
 

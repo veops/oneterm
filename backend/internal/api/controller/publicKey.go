@@ -7,6 +7,7 @@ import (
 
 	"github.com/veops/oneterm/internal/model"
 	"github.com/veops/oneterm/internal/service"
+	"github.com/veops/oneterm/pkg/errors"
 )
 
 var (
@@ -15,7 +16,7 @@ var (
 	publicKeyPreHooks = []preHook[*model.PublicKey]{
 		func(ctx *gin.Context, data *model.PublicKey) {
 			if err := publicKeyService.ValidatePublicKey(data); err != nil {
-				ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrWrongPk, Data: nil})
+				ctx.AbortWithError(http.StatusBadRequest, &errors.ApiError{Code: errors.ErrWrongPk, Data: nil})
 			}
 		},
 		func(ctx *gin.Context, data *model.PublicKey) {

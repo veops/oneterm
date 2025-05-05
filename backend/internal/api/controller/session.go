@@ -8,6 +8,7 @@ import (
 
 	"github.com/veops/oneterm/internal/model"
 	"github.com/veops/oneterm/internal/service"
+	"github.com/veops/oneterm/pkg/errors"
 )
 
 var (
@@ -16,7 +17,6 @@ var (
 	sessionPostHooks = []postHook[*model.Session]{
 		func(ctx *gin.Context, data []*model.Session) {
 			if err := sessionService.AttachCmdCounts(ctx, data); err != nil {
-				// Error already logged in service
 			}
 		},
 		func(ctx *gin.Context, data []*model.Session) {
@@ -34,12 +34,12 @@ var (
 func (c *Controller) CreateSessionCmd(ctx *gin.Context) {
 	data := &model.SessionCmd{}
 	if err := ctx.BindJSON(data); err != nil {
-		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
+		ctx.AbortWithError(http.StatusBadRequest, &errors.ApiError{Code: errors.ErrInvalidArgument, Data: map[string]any{"err": err}})
 		return
 	}
 
 	if err := sessionService.CreateSessionCmd(ctx, data); err != nil {
-		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+		ctx.AbortWithError(http.StatusBadRequest, &errors.ApiError{Code: errors.ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
 
@@ -63,7 +63,7 @@ func (c *Controller) CreateSessionCmd(ctx *gin.Context) {
 func (c *Controller) GetSessions(ctx *gin.Context) {
 	db, err := sessionService.BuildQuery(ctx)
 	if err != nil {
-		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
+		ctx.AbortWithError(http.StatusBadRequest, &errors.ApiError{Code: errors.ErrInvalidArgument, Data: map[string]any{"err": err}})
 		return
 	}
 
@@ -123,13 +123,13 @@ func (c *Controller) GetSessionOptionClientIp(ctx *gin.Context) {
 func (c *Controller) CreateSessionReplay(ctx *gin.Context) {
 	file, _, err := ctx.Request.FormFile("replay.cast")
 	if err != nil {
-		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
+		ctx.AbortWithError(http.StatusBadRequest, &errors.ApiError{Code: errors.ErrInvalidArgument, Data: map[string]any{"err": err}})
 		return
 	}
 
 	sessionId := ctx.Param("session_id")
 	if err := sessionService.CreateSessionReplay(ctx, sessionId, file); err != nil {
-		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+		ctx.AbortWithError(http.StatusInternalServerError, &errors.ApiError{Code: errors.ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
 
@@ -147,7 +147,7 @@ func (c *Controller) GetSessionReplay(ctx *gin.Context) {
 
 	filename, err := sessionService.GetSessionReplayFilename(ctx, sessionId)
 	if err != nil {
-		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+		ctx.AbortWithError(http.StatusInternalServerError, &errors.ApiError{Code: errors.ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
 

@@ -9,6 +9,7 @@ import (
 	"github.com/veops/oneterm/internal/acl"
 	"github.com/veops/oneterm/internal/model"
 	"github.com/veops/oneterm/internal/service"
+	"github.com/veops/oneterm/pkg/errors"
 )
 
 var (
@@ -26,13 +27,13 @@ func (c *Controller) CreateShare(ctx *gin.Context) {
 	shares := make([]*model.Share, 0)
 
 	if err := ctx.ShouldBindBodyWithJSON(&shares); err != nil {
-		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
+		ctx.AbortWithError(http.StatusBadRequest, &errors.ApiError{Code: errors.ErrInvalidArgument, Data: map[string]any{"err": err}})
 		return
 	}
 
 	for _, s := range shares {
 		if !shareService.HasPermission(ctx, s, acl.GRANT) {
-			ctx.AbortWithError(http.StatusForbidden, &ApiError{Code: ErrNoPerm, Data: map[string]any{"perm": acl.GRANT}})
+			ctx.AbortWithError(http.StatusForbidden, &errors.ApiError{Code: errors.ErrNoPerm, Data: map[string]any{"perm": acl.GRANT}})
 			return
 		}
 		s.CreatorId = currentUser.GetUid()
@@ -41,7 +42,7 @@ func (c *Controller) CreateShare(ctx *gin.Context) {
 
 	uuids, err := shareService.CreateShares(ctx, shares)
 	if err != nil {
-		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+		ctx.AbortWithError(http.StatusInternalServerError, &errors.ApiError{Code: errors.ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
 
@@ -58,12 +59,12 @@ func (c *Controller) DeleteShare(ctx *gin.Context) {
 	id := cast.ToInt(ctx.Param("id"))
 	share, err := shareService.GetShareByID(ctx, id)
 	if err != nil {
-		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
+		ctx.AbortWithError(http.StatusBadRequest, &errors.ApiError{Code: errors.ErrInvalidArgument, Data: map[string]any{"err": err}})
 		return
 	}
 
 	if !shareService.HasPermission(ctx, share, acl.GRANT) {
-		ctx.AbortWithError(http.StatusForbidden, &ApiError{Code: ErrNoPerm, Data: map[string]any{"perm": acl.GRANT}})
+		ctx.AbortWithError(http.StatusForbidden, &errors.ApiError{Code: errors.ErrNoPerm, Data: map[string]any{"perm": acl.GRANT}})
 		return
 	}
 
@@ -88,7 +89,7 @@ func (c *Controller) GetShare(ctx *gin.Context) {
 
 	db, err := shareService.BuildQuery(ctx, isAdmin)
 	if err != nil {
-		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+		ctx.AbortWithError(http.StatusInternalServerError, &errors.ApiError{Code: errors.ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
 
@@ -108,7 +109,7 @@ func (c *Controller) ConnectShare(ctx *gin.Context) {
 	uuid := ctx.Param("uuid")
 	share, err := shareService.ValidateShareForConnection(ctx, uuid)
 	if err != nil {
-		ctx.Set("shareErr", &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
+		ctx.Set("shareErr", &errors.ApiError{Code: errors.ErrInvalidArgument, Data: map[string]any{"err": err}})
 	}
 
 	shareService.SetupConnectionParams(ctx, share)

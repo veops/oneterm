@@ -11,6 +11,7 @@ import (
 	"github.com/veops/oneterm/internal/acl"
 	"github.com/veops/oneterm/internal/model"
 	"github.com/veops/oneterm/internal/service"
+	myErrors "github.com/veops/oneterm/pkg/errors"
 )
 
 var (
@@ -26,13 +27,13 @@ var (
 func (c *Controller) PostConfig(ctx *gin.Context) {
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
 	if !acl.IsAdmin(currentUser) {
-		ctx.AbortWithError(http.StatusForbidden, &ApiError{Code: ErrNoPerm, Data: map[string]any{"perm": acl.WRITE}})
+		ctx.AbortWithError(http.StatusForbidden, &myErrors.ApiError{Code: myErrors.ErrNoPerm, Data: map[string]any{"perm": acl.WRITE}})
 		return
 	}
 
 	cfg := &model.Config{}
 	if err := ctx.ShouldBindBodyWithJSON(cfg); err != nil {
-		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
+		ctx.AbortWithError(http.StatusBadRequest, &myErrors.ApiError{Code: myErrors.ErrInvalidArgument, Data: map[string]any{"err": err}})
 		return
 	}
 
@@ -40,7 +41,7 @@ func (c *Controller) PostConfig(ctx *gin.Context) {
 	cfg.UpdaterId = currentUser.GetUid()
 
 	if err := configService.SaveConfig(ctx, cfg); err != nil {
-		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+		ctx.AbortWithError(http.StatusInternalServerError, &myErrors.ApiError{Code: myErrors.ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
 
@@ -56,14 +57,14 @@ func (c *Controller) PostConfig(ctx *gin.Context) {
 func (c *Controller) GetConfig(ctx *gin.Context) {
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
 	if !cast.ToBool(ctx.Query("info")) && !acl.IsAdmin(currentUser) {
-		ctx.AbortWithError(http.StatusForbidden, &ApiError{Code: ErrNoPerm, Data: map[string]any{"perm": acl.READ}})
+		ctx.AbortWithError(http.StatusForbidden, &myErrors.ApiError{Code: myErrors.ErrNoPerm, Data: map[string]any{"perm": acl.READ}})
 		return
 	}
 
 	cfg, err := configService.GetConfig(ctx)
 	if err != nil {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
-			ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+			ctx.AbortWithError(http.StatusInternalServerError, &myErrors.ApiError{Code: myErrors.ErrInternal, Data: map[string]any{"err": err}})
 			return
 		}
 	}

@@ -37,6 +37,7 @@ import (
 	gsession "github.com/veops/oneterm/internal/session"
 	"github.com/veops/oneterm/internal/tunneling"
 	dbpkg "github.com/veops/oneterm/pkg/db"
+	myErrors "github.com/veops/oneterm/pkg/errors"
 	"github.com/veops/oneterm/pkg/logger"
 )
 
@@ -163,7 +164,7 @@ func HandleTerm(sess *gsession.Session) (err error) {
 				return
 			case <-sess.IdleTk.C:
 				writeErrMsg(sess, "idle timeout\n\n")
-				return &ApiError{Code: ErrIdleTimeout, Data: map[string]any{"second": model.GlobalConfig.Load().Timeout}}
+				return &myErrors.ApiError{Code: myErrors.ErrIdleTimeout, Data: map[string]any{"second": model.GlobalConfig.Load().Timeout}}
 			case <-tk1m.C:
 				if dbpkg.DB.Model(asset).Where("id = ?", sess.AssetId).First(asset).Error != nil {
 					continue
@@ -171,11 +172,11 @@ func HandleTerm(sess *gsession.Session) (err error) {
 				if checkTime(asset.AccessAuth) && (sess.ShareId == 0 || time.Now().Before(sess.ShareEnd)) {
 					continue
 				}
-				return &ApiError{Code: ErrAccessTime}
+				return &myErrors.ApiError{Code: myErrors.ErrAccessTime}
 			case closeBy := <-chs.CloseChan:
 				writeErrMsg(sess, "closed by admin\n\n")
 				logger.L().Info("closed by", zap.String("admin", closeBy))
-				return &ApiError{Code: ErrAdminClose, Data: map[string]any{"admin": closeBy}}
+				return &myErrors.ApiError{Code: myErrors.ErrAdminClose, Data: map[string]any{"admin": closeBy}}
 			case err = <-chs.ErrChan:
 				writeErrMsg(sess, err.Error())
 				return
@@ -257,7 +258,7 @@ func handleGuacd(sess *gsession.Session) (err error) {
 			case <-sess.Gctx.Done():
 				return nil
 			case <-sess.IdleTk.C:
-				return &ApiError{Code: ErrIdleTimeout, Data: map[string]any{"second": model.GlobalConfig.Load().Timeout}}
+				return &myErrors.ApiError{Code: myErrors.ErrIdleTimeout, Data: map[string]any{"second": model.GlobalConfig.Load().Timeout}}
 			case <-tk.C:
 				if dbpkg.DB.Model(asset).Where("id = ?", sess.AssetId).First(asset).Error != nil {
 					continue
@@ -265,9 +266,9 @@ func handleGuacd(sess *gsession.Session) (err error) {
 				if checkTime(asset.AccessAuth) && (sess.ShareId == 0 || time.Now().Before(sess.ShareEnd)) {
 					continue
 				}
-				return &ApiError{Code: ErrAccessTime}
+				return &myErrors.ApiError{Code: myErrors.ErrAccessTime}
 			case closeBy := <-chs.CloseChan:
-				return &ApiError{Code: ErrAdminClose, Data: map[string]any{"admin": closeBy}}
+				return &myErrors.ApiError{Code: myErrors.ErrAdminClose, Data: map[string]any{"admin": closeBy}}
 			case err := <-chs.ErrChan:
 				return err
 			case out := <-chs.OutChan:
@@ -350,11 +351,11 @@ func DoConnect(ctx *gin.Context, ws *websocket.Conn) (sess *gsession.Session, er
 	}
 
 	if !checkTime(asset.AccessAuth) {
-		err = &ApiError{Code: ErrAccessTime}
+		err = &myErrors.ApiError{Code: myErrors.ErrAccessTime}
 		return
 	}
 	if !hasAuthorization(ctx, sess) {
-		err = &ApiError{Code: ErrUnauthorized}
+		err = &myErrors.ApiError{Code: myErrors.ErrUnauthorized}
 		return
 	}
 
@@ -371,7 +372,7 @@ func DoConnect(ctx *gin.Context, ws *websocket.Conn) (sess *gsession.Session, er
 
 	if err = <-sess.Chans.ErrChan; err != nil {
 		logger.L().Error("failed to connect", zap.Error(err))
-		err = &ApiError{Code: ErrConnectServer, Data: map[string]any{"err": err}}
+		err = &myErrors.ApiError{Code: myErrors.ErrConnectServer, Data: map[string]any{"err": err}}
 		return
 	}
 
@@ -754,12 +755,12 @@ func (c *Controller) ConnectMonitor(ctx *gin.Context) {
 	}()
 
 	if !acl.IsAdmin(currentUser) {
-		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrNoPerm, Data: map[string]any{"perm": "monitor session"}})
+		ctx.AbortWithError(http.StatusBadRequest, &myErrors.ApiError{Code: myErrors.ErrNoPerm, Data: map[string]any{"perm": "monitor session"}})
 		return
 	}
 
 	if sess = gsession.GetOnlineSessionById(sessionId); sess == nil {
-		err = &ApiError{Code: ErrInvalidSessionId, Data: map[string]any{"sessionId": sessionId}}
+		err = &myErrors.ApiError{Code: myErrors.ErrInvalidSessionId, Data: map[string]any{"sessionId": sessionId}}
 		return
 	}
 
@@ -860,7 +861,7 @@ func monitGuacd(ctx *gin.Context, sess *gsession.Session, chs *gsession.SessionC
 func (c *Controller) ConnectClose(ctx *gin.Context) {
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
 	if !acl.IsAdmin(currentUser) {
-		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrNoPerm, Data: map[string]any{"perm": "close session"}})
+		ctx.AbortWithError(http.StatusBadRequest, &myErrors.ApiError{Code: myErrors.ErrNoPerm, Data: map[string]any{"perm": "close session"}})
 		return
 	}
 
@@ -876,7 +877,7 @@ func (c *Controller) ConnectClose(ctx *gin.Context) {
 		return
 	}
 	if err != nil {
-		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": "invalid session id"}})
+		ctx.AbortWithError(http.StatusBadRequest, &myErrors.ApiError{Code: myErrors.ErrInvalidArgument, Data: map[string]any{"err": "invalid session id"}})
 		return
 	}
 
@@ -961,9 +962,9 @@ func handleError(ctx *gin.Context, sess *gsession.Session, err error, ws *websoc
 		return
 	}
 	logger.L().Debug("", zap.String("session_id", sess.SessionId), zap.Error(err))
-	ae, ok := err.(*ApiError)
+	ae, ok := err.(*myErrors.ApiError)
 	if sess.IsGuacd() {
-		ws.WriteMessage(websocket.TextMessage, guacd.NewInstruction("error", lo.Ternary(ok, (ae).MessageBase64(ctx), err.Error()), cast.ToString(ErrAdminClose)).Bytes())
+		ws.WriteMessage(websocket.TextMessage, guacd.NewInstruction("error", lo.Ternary(ok, (ae).MessageBase64(ctx), err.Error()), cast.ToString(myErrors.ErrAdminClose)).Bytes())
 	} else {
 		writeErrMsg(sess, lo.Ternary(ok, ae.MessageWithCtx(ctx), err.Error()))
 	}

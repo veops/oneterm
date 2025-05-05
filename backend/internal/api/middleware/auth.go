@@ -7,12 +7,12 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/veops/oneterm/internal/acl"
-	"github.com/veops/oneterm/internal/api/controller"
+	"github.com/veops/oneterm/pkg/errors"
 	"github.com/veops/oneterm/pkg/logger"
 )
 
 var (
-	errUnauthorized = &controller.ApiError{Code: controller.ErrUnauthorized}
+	errUnauthorized = &errors.ApiError{Code: errors.ErrUnauthorized}
 )
 
 func AuthMiddleware() gin.HandlerFunc {

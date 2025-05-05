@@ -13,6 +13,7 @@ import (
 	"github.com/veops/oneterm/internal/repository"
 	"github.com/veops/oneterm/internal/service"
 	"github.com/veops/oneterm/pkg/config"
+	"github.com/veops/oneterm/pkg/errors"
 )
 
 var (
@@ -31,7 +32,7 @@ var (
 //	@Router		/node [post]
 func (c *Controller) CreateNode(ctx *gin.Context) {
 	if err := nodeService.ClearCache(ctx); err != nil {
-		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+		ctx.AbortWithError(http.StatusInternalServerError, &errors.ApiError{Code: errors.ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
 	doCreate(ctx, true, &model.Node{}, config.RESOURCE_NODE)
@@ -45,7 +46,7 @@ func (c *Controller) CreateNode(ctx *gin.Context) {
 //	@Router		/node/:id [delete]
 func (c *Controller) DeleteNode(ctx *gin.Context) {
 	if err := nodeService.ClearCache(ctx); err != nil {
-		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+		ctx.AbortWithError(http.StatusInternalServerError, &errors.ApiError{Code: errors.ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
 	doDelete(ctx, true, &model.Node{}, config.RESOURCE_NODE, nodeDcs...)
@@ -60,7 +61,7 @@ func (c *Controller) DeleteNode(ctx *gin.Context) {
 //	@Router		/node/:id [put]
 func (c *Controller) UpdateNode(ctx *gin.Context) {
 	if err := nodeService.ClearCache(ctx); err != nil {
-		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+		ctx.AbortWithError(http.StatusInternalServerError, &errors.ApiError{Code: errors.ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
 	doUpdate(ctx, true, &model.Node{}, config.RESOURCE_NODE, nodePreHooks...)
@@ -85,7 +86,7 @@ func (c *Controller) GetNodes(ctx *gin.Context) {
 
 	db, err := nodeService.BuildQuery(ctx, currentUser, info)
 	if err != nil {
-		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+		ctx.AbortWithError(http.StatusInternalServerError, &errors.ApiError{Code: errors.ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
 
@@ -94,7 +95,7 @@ func (c *Controller) GetNodes(ctx *gin.Context) {
 
 func nodePreHookCheckCycle(ctx *gin.Context, data *model.Node) {
 	if err := nodeService.CheckCycle(ctx, data, cast.ToInt(ctx.Param("id"))); err != nil {
-		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInvalidArgument})
+		ctx.AbortWithError(http.StatusBadRequest, &errors.ApiError{Code: errors.ErrInvalidArgument})
 	}
 }
 
@@ -113,12 +114,12 @@ func nodePostHookHasChild(ctx *gin.Context, data []*model.Node) {
 func nodeDelHook(ctx *gin.Context, id int) {
 	assetName, err := nodeService.CheckDependencies(ctx, id)
 	if err != nil {
-		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+		ctx.AbortWithError(http.StatusInternalServerError, &errors.ApiError{Code: errors.ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
 
 	if assetName != "" {
-		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrHasDepency, Data: map[string]any{"name": assetName}})
+		ctx.AbortWithError(http.StatusBadRequest, &errors.ApiError{Code: errors.ErrHasDepency, Data: map[string]any{"name": assetName}})
 	}
 }
 

@@ -14,6 +14,7 @@ import (
 	"github.com/veops/oneterm/internal/service"
 	gsession "github.com/veops/oneterm/internal/session"
 	"github.com/veops/oneterm/pkg/config"
+	myErrors "github.com/veops/oneterm/pkg/errors"
 )
 
 // UpsertAuthorization godoc
@@ -26,12 +27,12 @@ func (c *Controller) UpsertAuthorization(ctx *gin.Context) {
 	auth := &model.Authorization{}
 	err := ctx.ShouldBindBodyWithJSON(auth)
 	if err != nil {
-		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
+		ctx.AbortWithError(http.StatusBadRequest, &myErrors.ApiError{Code: myErrors.ErrInvalidArgument, Data: map[string]any{"err": err}})
 		return
 	}
 
 	if !service.DefaultAuthService.HasPermAuthorization(ctx, auth, acl.GRANT) {
-		err = &ApiError{Code: ErrNoPerm, Data: map[string]any{"perm": acl.GRANT}}
+		err = &myErrors.ApiError{Code: myErrors.ErrNoPerm, Data: map[string]any{"perm": acl.GRANT}}
 		ctx.AbortWithError(http.StatusForbidden, err)
 		return
 	}
@@ -42,7 +43,7 @@ func (c *Controller) UpsertAuthorization(ctx *gin.Context) {
 		if ctx.IsAborted() {
 			return
 		}
-		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+		ctx.AbortWithError(http.StatusInternalServerError, &myErrors.ApiError{Code: myErrors.ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
 
@@ -66,21 +67,21 @@ func (c *Controller) DeleteAuthorization(ctx *gin.Context) {
 	auth, err := service.DefaultAuthService.GetAuthorizationById(ctx, authId)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
+			ctx.AbortWithError(http.StatusBadRequest, &myErrors.ApiError{Code: myErrors.ErrInvalidArgument, Data: map[string]any{"err": err}})
 		} else {
-			ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+			ctx.AbortWithError(http.StatusInternalServerError, &myErrors.ApiError{Code: myErrors.ErrInternal, Data: map[string]any{"err": err}})
 		}
 		return
 	}
 
 	if !service.DefaultAuthService.HasPermAuthorization(ctx, auth, acl.GRANT) {
-		ctx.AbortWithError(http.StatusForbidden, &ApiError{Code: ErrNoPerm, Data: map[string]any{"perm": acl.GRANT}})
+		ctx.AbortWithError(http.StatusForbidden, &myErrors.ApiError{Code: myErrors.ErrNoPerm, Data: map[string]any{"perm": acl.GRANT}})
 		return
 	}
 
 	// Delete authorization
 	if err := service.DefaultAuthService.DeleteAuthorization(ctx, auth); err != nil {
-		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+		ctx.AbortWithError(http.StatusInternalServerError, &myErrors.ApiError{Code: myErrors.ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
 
@@ -113,13 +114,13 @@ func (c *Controller) GetAuthorizations(ctx *gin.Context) {
 	}
 
 	if !service.DefaultAuthService.HasPermAuthorization(ctx, auth, acl.GRANT) {
-		ctx.AbortWithError(http.StatusForbidden, &ApiError{Code: ErrNoPerm, Data: map[string]any{"perm": acl.GRANT}})
+		ctx.AbortWithError(http.StatusForbidden, &myErrors.ApiError{Code: myErrors.ErrNoPerm, Data: map[string]any{"perm": acl.GRANT}})
 		return
 	}
 
 	auths, count, err := service.DefaultAuthService.GetAuthorizations(ctx, nodeId, assetId, accountId)
 	if err != nil {
-		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+		ctx.AbortWithError(http.StatusInternalServerError, &myErrors.ApiError{Code: myErrors.ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
 

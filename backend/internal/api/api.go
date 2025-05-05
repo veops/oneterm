@@ -39,21 +39,16 @@ func initDB() {
 
 }
 
-// 初始化服务
 func initServices() {
-	// 初始化授权服务
 	service.InitAuthorizationService()
 
-	// 初始化文件服务
 	service.InitFileService()
 
-	// 其他服务初始化...
 }
 
 func RunApi() error {
 	initDB()
 
-	// 初始化服务层
 	initServices()
 
 	r := gin.New()

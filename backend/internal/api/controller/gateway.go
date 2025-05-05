@@ -11,6 +11,7 @@ import (
 	"github.com/veops/oneterm/internal/model"
 	"github.com/veops/oneterm/internal/service"
 	"github.com/veops/oneterm/pkg/config"
+	"github.com/veops/oneterm/pkg/errors"
 )
 
 var (
@@ -20,7 +21,7 @@ var (
 		// Validate public key
 		func(ctx *gin.Context, data *model.Gateway) {
 			if err := gatewayService.ValidatePublicKey(data); err != nil {
-				ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrWrongPk, Data: nil})
+				ctx.AbortWithError(http.StatusBadRequest, &errors.ApiError{Code: errors.ErrWrongPk, Data: nil})
 				return
 			}
 		},
@@ -51,7 +52,7 @@ var (
 				return
 			}
 			code := lo.Ternary(err == nil, http.StatusBadRequest, http.StatusInternalServerError)
-			err = lo.Ternary[error](err == nil, &ApiError{Code: ErrHasDepency, Data: map[string]any{"name": assetName}}, err)
+			err = lo.Ternary[error](err == nil, &errors.ApiError{Code: errors.ErrHasDepency, Data: map[string]any{"name": assetName}}, err)
 			ctx.AbortWithError(code, err)
 		},
 	}
@@ -112,7 +113,7 @@ func (c *Controller) GetGateways(ctx *gin.Context) {
 	if info && !acl.IsAdmin(currentUser) {
 		assetIds, err := GetAssetIdsByAuthorization(ctx)
 		if err != nil {
-			ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+			ctx.AbortWithError(http.StatusInternalServerError, &errors.ApiError{Code: errors.ErrInternal, Data: map[string]any{"err": err}})
 			return
 		}
 

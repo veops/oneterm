@@ -11,6 +11,7 @@ import (
 	"github.com/veops/oneterm/internal/model"
 	"github.com/veops/oneterm/internal/service"
 	"github.com/veops/oneterm/pkg/config"
+	"github.com/veops/oneterm/pkg/errors"
 	"github.com/veops/oneterm/pkg/logger"
 )
 
@@ -110,7 +111,7 @@ func (c *Controller) GetAssets(ctx *gin.Context) {
 	// Build base query using service layer
 	db, err := assetService.BuildQuery(ctx)
 	if err != nil {
-		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+		ctx.AbortWithError(http.StatusInternalServerError, &errors.ApiError{Code: errors.ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
 
@@ -119,7 +120,7 @@ func (c *Controller) GetAssets(ctx *gin.Context) {
 		db, err = assetService.FilterByParentId(db, cast.ToInt(q))
 		if err != nil {
 			logger.L().Error("parent id filtering failed", zap.Error(err))
-			ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+			ctx.AbortWithError(http.StatusInternalServerError, &errors.ApiError{Code: errors.ErrInternal, Data: map[string]any{"err": err}})
 			return
 		}
 	}
@@ -132,7 +133,7 @@ func (c *Controller) GetAssets(ctx *gin.Context) {
 		if !acl.IsAdmin(currentUser) {
 			ids, err := GetAssetIdsByAuthorization(ctx)
 			if err != nil {
-				ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+				ctx.AbortWithError(http.StatusInternalServerError, &errors.ApiError{Code: errors.ErrInternal, Data: map[string]any{"err": err}})
 				return
 			}
 			db = db.Where("id IN ?", ids)

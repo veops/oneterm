@@ -13,6 +13,7 @@ import (
 	"github.com/veops/oneterm/internal/model"
 	"github.com/veops/oneterm/internal/service"
 	"github.com/veops/oneterm/pkg/config"
+	myErrors "github.com/veops/oneterm/pkg/errors"
 )
 
 var (
@@ -25,7 +26,7 @@ var (
 			}
 			_, err := regexp.Compile(data.Cmd)
 			if err != nil {
-				ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrBadRequest, Data: map[string]any{"err": err}})
+				ctx.AbortWithError(http.StatusBadRequest, &myErrors.ApiError{Code: myErrors.ErrBadRequest, Data: map[string]any{"err": err}})
 			}
 		},
 	}
@@ -36,12 +37,12 @@ var (
 				if errors.Is(err, gorm.ErrRecordNotFound) {
 					return
 				}
-				ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+				ctx.AbortWithError(http.StatusInternalServerError, &myErrors.ApiError{Code: myErrors.ErrInternal, Data: map[string]any{"err": err}})
 				return
 			}
 
 			if assetName != "" {
-				ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrHasDepency, Data: map[string]any{"name": assetName}})
+				ctx.AbortWithError(http.StatusBadRequest, &myErrors.ApiError{Code: myErrors.ErrHasDepency, Data: map[string]any{"name": assetName}})
 			}
 		},
 	}
@@ -98,7 +99,7 @@ func (c *Controller) GetCommands(ctx *gin.Context) {
 
 	db, err := commandService.BuildQuery(ctx)
 	if err != nil {
-		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+		ctx.AbortWithError(http.StatusInternalServerError, &myErrors.ApiError{Code: myErrors.ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
 

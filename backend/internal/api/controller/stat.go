@@ -1,20 +1,15 @@
 package controller
 
 import (
-	"fmt"
 	"net/http"
-	"sort"
-	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/samber/lo"
-	"golang.org/x/sync/errgroup"
 
-	"github.com/veops/oneterm/internal/acl"
-	"github.com/veops/oneterm/internal/model"
-	"github.com/veops/oneterm/internal/repository"
-	"github.com/veops/oneterm/pkg/cache"
-	dbpkg "github.com/veops/oneterm/pkg/db"
+	"github.com/veops/oneterm/internal/service"
+)
+
+var (
+	statService = service.NewStatService()
 )
 
 // StatAssetType godoc
@@ -23,31 +18,11 @@ import (
 //	@Success	200	{object}	HttpResponse{data=ListData{list=[]model.StatAssetType}}
 //	@Router		/stat/assettype [get]
 func (c *Controller) StatAssetType(ctx *gin.Context) {
-	stat := make([]*model.StatAssetType, 0)
-	key := "stat-assettype"
-	if cache.Get(ctx, key, stat) == nil {
-		ctx.JSON(http.StatusOK, NewHttpResponseWithData(toListData(stat)))
-		return
-	}
-
-	m, err := nodeCountAsset()
+	stat, err := statService.GetAssetTypes(ctx)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
-	if err = dbpkg.DB.
-		Model(stat).
-		Where("parent_id = 0").
-		Find(&stat).
-		Error; err != nil {
-		ctx.AbortWithError(http.StatusInternalServerError, err)
-		return
-	}
-	for _, s := range stat {
-		s.Count = m[s.Id]
-	}
-
-	cache.SetEx(ctx, key, stat, time.Minute)
 
 	ctx.JSON(http.StatusOK, NewHttpResponseWithData(toListData(stat)))
 }
@@ -58,39 +33,11 @@ func (c *Controller) StatAssetType(ctx *gin.Context) {
 //	@Success	200	{object}	HttpResponse{data=model.StatCount}
 //	@Router		/stat/count [get]
 func (c *Controller) StatCount(ctx *gin.Context) {
-	stat := &model.StatCount{}
-	key := "stat-count"
-	if cache.Get(ctx, key, stat) == nil {
-		ctx.JSON(http.StatusOK, NewHttpResponseWithData(stat))
-		return
-	}
-
-	eg := &errgroup.Group{}
-	eg.Go(func() error {
-		return dbpkg.DB.
-			Model(model.DefaultSession).
-			Select("COUNT(DISTINCT asset_id, account_id) as connect, COUNT(DISTINCT uid) as user, COUNT(DISTINCT gateway_id) as gateway, COUNT(*) as session").
-			Where("status = 1").
-			First(&stat).
-			Error
-	})
-	eg.Go(func() error {
-		return dbpkg.DB.Model(model.DefaultAsset).Count(&stat.TotalAsset).Error
-	})
-	eg.Go(func() error {
-		return dbpkg.DB.Model(model.DefaultAsset).Where("connectable = 1").Count(&stat.Asset).Error
-	})
-	eg.Go(func() error {
-		return dbpkg.DB.Model(model.DefaultGateway).Count(&stat.TotalGateway).Error
-	})
-
-	if err := eg.Wait(); err != nil {
+	stat, err := statService.GetStatCount(ctx)
+	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
-	stat.Gateway = lo.Ternary(stat.Gateway <= stat.TotalGateway, stat.Gateway, stat.TotalGateway)
-
-	cache.SetEx(ctx, key, stat, time.Minute)
 
 	ctx.JSON(http.StatusOK, NewHttpResponseWithData(stat))
 }
@@ -102,42 +49,13 @@ func (c *Controller) StatCount(ctx *gin.Context) {
 //	@Success	200	{object}	HttpResponse{data=ListData{list=[]model.StatAccount}}
 //	@Router		/stat/account [get]
 func (c *Controller) StatAccount(ctx *gin.Context) {
-	start, end := time.Now(), time.Now()
-	switch ctx.Query("type") {
-	case "day":
-		start = start.Add(-time.Hour * 24)
-	case "week":
-		start = start.Add(-time.Hour * 24 * 7)
-	case "month":
-		start = start.Add(-time.Hour * 24 * 30)
-	default:
-		ctx.AbortWithError(http.StatusBadRequest, fmt.Errorf("wrong time range %s", ctx.Query("type")))
-		return
-	}
+	timeRange := ctx.Query("type")
 
-	stat := make([]*model.StatAccount, 0)
-	key := "stat-account-" + ctx.Query("type")
-	if cache.Get(ctx, key, stat) == nil {
-		ctx.JSON(http.StatusOK, NewHttpResponseWithData(toListData(stat)))
-		return
-	}
-
-	err := dbpkg.DB.
-		Model(&model.Account{}).
-		Select("account.name, COUNT(*) AS count").
-		Joins("LEFT JOIN session ON account.id = session.account_id").
-		Group("account.id").
-		Order("count DESC").
-		Limit(10).
-		Where("session.created_at >= ? AND session.created_at <= ?", start, end).
-		Find(&stat).
-		Error
+	stat, err := statService.GetStatAccount(ctx, timeRange)
 	if err != nil {
-		ctx.AbortWithError(http.StatusInternalServerError, err)
+		ctx.AbortWithError(http.StatusBadRequest, err)
 		return
 	}
-
-	cache.SetEx(ctx, key, stat, time.Minute)
 
 	ctx.JSON(http.StatusOK, NewHttpResponseWithData(toListData(stat)))
 }
@@ -149,54 +67,13 @@ func (c *Controller) StatAccount(ctx *gin.Context) {
 //	@Success	200	{object}	HttpResponse{data=ListData{list=[]model.StatAsset}}
 //	@Router		/stat/asset [get]
 func (c *Controller) StatAsset(ctx *gin.Context) {
-	start, end := time.Now(), time.Now()
-	interval := time.Hour * 24
-	dateFmt := "%Y-%m-%d"
-	timeFmt := time.DateOnly
-	switch ctx.Query("type") {
-	case "day":
-		start = start.Add(-time.Hour * 24)
-		interval = time.Hour
-		dateFmt = "%Y-%m-%d %H:00:00"
-		timeFmt = time.DateTime
-	case "week":
-		start = start.Add(-time.Hour * 24 * 7)
-	case "month":
-		start = start.Add(-time.Hour * 24 * 30)
-	default:
-		ctx.AbortWithError(http.StatusBadRequest, fmt.Errorf("wrong time range %s", ctx.Query("type")))
-		return
-	}
+	timeRange := ctx.Query("type")
 
-	stat := make([]*model.StatAsset, 0)
-	key := "stat-asset-" + ctx.Query("type")
-	if cache.Get(ctx, key, stat) == nil {
-		ctx.JSON(http.StatusOK, NewHttpResponseWithData(toListData(stat)))
-		return
-	}
-	err := dbpkg.DB.
-		Model(model.DefaultSession).
-		Select("COUNT(DISTINCT asset_id, uid) AS connect, COUNT(*) AS session, COUNT(DISTINCT asset_id) AS asset, COUNT(DISTINCT uid) AS user, DATE_FORMAT(created_at, ?) AS time", dateFmt).
-		Where("session.created_at >= ? AND session.created_at <= ?", start, end).
-		Group("time").
-		Find(&stat).
-		Error
+	stat, err := statService.GetStatAsset(ctx, timeRange)
 	if err != nil {
-		ctx.AbortWithError(http.StatusInternalServerError, err)
+		ctx.AbortWithError(http.StatusBadRequest, err)
 		return
 	}
-
-	for ; !start.After(end); start = start.Add(interval) {
-		t := start.Truncate(interval).Format(timeFmt)
-		if lo.ContainsBy(stat, func(s *model.StatAsset) bool { return t == s.Time }) {
-			continue
-		}
-		stat = append(stat, &model.StatAsset{Time: t})
-	}
-
-	sort.Slice(stat, func(i, j int) bool { return stat[i].Time < stat[j].Time })
-
-	cache.SetEx(ctx, key, stat, time.Minute)
 
 	ctx.JSON(http.StatusOK, NewHttpResponseWithData(toListData(stat)))
 }
@@ -207,34 +84,8 @@ func (c *Controller) StatAsset(ctx *gin.Context) {
 //	@Success	200	{object}	HttpResponse{data=model.StatCountOfUser}
 //	@Router		/stat/count/ofuser [get]
 func (c *Controller) StatCountOfUser(ctx *gin.Context) {
-	currentUser, _ := acl.GetSessionFromCtx(ctx)
-	stat := &model.StatCountOfUser{}
-
-	eg := &errgroup.Group{}
-	eg.Go(func() error {
-		return dbpkg.DB.
-			Model(model.DefaultSession).
-			Select("COUNT(DISTINCT asset_id, account_id) as connect, COUNT(DISTINCT asset_id) as asset, COUNT(*) as session").
-			Where("status = 1").
-			Where("uid = ?", currentUser.GetUid()).
-			First(&stat).
-			Error
-	})
-	eg.Go(func() error {
-		isAdmin := acl.IsAdmin(currentUser)
-		assets, err := repository.GetAllFromCacheDb(ctx, model.DefaultAsset)
-		if !isAdmin {
-			assetIds, err := GetAssetIdsByAuthorization(ctx)
-			if err != nil {
-				return err
-			}
-			assets = lo.Filter(assets, func(a *model.Asset, _ int) bool { return lo.Contains(assetIds, a.Id) })
-		}
-		stat.TotalAsset = int64(len(assets))
-		return err
-	})
-
-	if err := eg.Wait(); err != nil {
+	stat, err := statService.GetStatCountOfUser(ctx)
+	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
@@ -245,65 +96,28 @@ func (c *Controller) StatCountOfUser(ctx *gin.Context) {
 // StatRankOfUser godoc
 //
 //	@Tags		stat
-//	@Success	200	{object}	HttpResponse{data=ListData{list=[]model.StatAsset}}
+//	@Success	200	{object}	HttpResponse{data=ListData{list=[]model.StatRankOfUser}}
 //	@Router		/stat/rank/ofuser [get]
 func (c *Controller) StatRankOfUser(ctx *gin.Context) {
-	stat := make([]*model.StatRankOfUser, 0)
-	key := "stat-rank-user"
-	if cache.Get(ctx, key, stat) == nil {
-		ctx.JSON(http.StatusOK, NewHttpResponseWithData(toListData(stat)))
-		return
-	}
-
-	if err := dbpkg.DB.
-		Model(model.DefaultSession).
-		Select("uid, COUNT(*) AS count, MAX(created_at) AS last_time").
-		Group("uid").
-		Order("count DESC").
-		Limit(3).
-		Find(&stat).
-		Error; err != nil {
+	stat, err := statService.GetStatRankOfUser(ctx, 10) // Limit to top 10
+	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
 
-	cache.SetEx(ctx, key, stat, time.Minute)
-
 	ctx.JSON(http.StatusOK, NewHttpResponseWithData(toListData(stat)))
 }
 
+// Helper functions
+
+// toListData converts a slice to a ListData struct
 func toListData[T any](data []T) *ListData {
+	items := make([]any, len(data))
+	for i, v := range data {
+		items[i] = v
+	}
 	return &ListData{
 		Count: int64(len(data)),
-		List:  lo.Map(data, func(d T, _ int) any { return d }),
+		List:  items,
 	}
-}
-
-func nodeCountAsset() (m map[int]int64, err error) {
-	assets := make([]*model.AssetIdPid, 0)
-	if err = dbpkg.DB.Model(model.DefaultAsset).Find(&assets).Error; err != nil {
-		return
-	}
-	nodes := make([]*model.Node, 0)
-	if err = dbpkg.DB.Model(model.DefaultNode).Find(&nodes).Error; err != nil {
-		return
-	}
-	m = make(map[int]int64)
-	for _, a := range assets {
-		m[a.ParentId] += 1
-	}
-	g := make(map[int][]int)
-	for _, n := range nodes {
-		g[n.ParentId] = append(g[n.ParentId], n.Id)
-	}
-	var dfs func(int) int64
-	dfs = func(x int) int64 {
-		for _, y := range g[x] {
-			m[x] += dfs(y)
-		}
-		return m[x]
-	}
-	dfs(0)
-
-	return
 }

@@ -58,7 +58,7 @@ func (r *accountRepository) FilterByAssetIds(db *gorm.DB, assetIds []int) *gorm.
 		return db.Where("0 = 1") // Return empty result if no asset IDs
 	}
 
-	// 查询与指定资产关联的账户ID
+	// Query account IDs associated with specified assets
 	subQuery := dbpkg.DB.Model(&model.Authorization{}).
 		Select("account_id").
 		Where("asset_id IN ?", assetIds).
@@ -110,16 +110,16 @@ func (r *accountRepository) CheckAssetDependencies(ctx context.Context, id int) 
 
 // GetAccountIdsByAuthorization gets account IDs by authorization and asset IDs
 func (r *accountRepository) GetAccountIdsByAuthorization(ctx context.Context, assetIds []int, authorizationIds []int) ([]int, error) {
-	// 从资产的授权列表中获取账户ID
+	// Get account IDs from assets' authorization lists
 	ss := make([]model.Slice[string], 0)
 	if err := dbpkg.DB.Model(model.DefaultAsset).Where("id IN ?", assetIds).Pluck("JSON_KEYS(authorization)", &ss).Error; err != nil {
 		return nil, err
 	}
 
-	// 处理从资产中获取的账户IDs
+	// Process account IDs obtained from assets
 	accountIds := lo.Uniq(lo.Map(lo.Flatten(ss), func(s string, _ int) int { return cast.ToInt(s) }))
 
-	// 合并从授权中获取的账户IDs
+	// Merge with account IDs from authorizations
 	return lo.Uniq(append(accountIds, authorizationIds...)), nil
 }
 

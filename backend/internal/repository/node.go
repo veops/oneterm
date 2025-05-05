@@ -7,6 +7,19 @@ import (
 	"github.com/veops/oneterm/internal/model"
 )
 
+// NodeRepository defines the interface for node repository
+type NodeRepository interface {
+	// Add required methods
+	// These can be empty implementations for now
+}
+
+type nodeRepository struct{}
+
+// NewNodeRepository creates a new node repository
+func NewNodeRepository() NodeRepository {
+	return &nodeRepository{}
+}
+
 // HandleSelfChild gets IDs of nodes that are children of the specified node IDs
 func HandleSelfChild(ctx context.Context, ids ...int) (res []int, err error) {
 	nodes, err := GetAllFromCacheDb(ctx, model.DefaultNode)

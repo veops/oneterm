@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"io/fs"
@@ -17,7 +16,6 @@ import (
 	"github.com/veops/oneterm/internal/model"
 	"github.com/veops/oneterm/internal/service"
 	gsession "github.com/veops/oneterm/internal/session"
-	dbpkg "github.com/veops/oneterm/pkg/db"
 	"github.com/veops/oneterm/pkg/logger"
 )
 
@@ -37,19 +35,74 @@ import (
 //	@Success	200			{object}	HttpResponse{data=ListData{list=[]model.Session}}
 //	@Router		/file/history [get]
 func (c *Controller) GetFileHistory(ctx *gin.Context) {
-	db := dbpkg.DB.Model(&model.FileHistory{})
+	// Create filter conditions
+	filters := make(map[string]interface{})
+
+	// Get user permissions
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
 	if !acl.IsAdmin(currentUser) {
-		db = db.Where("uid = ?", currentUser.Uid)
+		filters["uid"] = currentUser.Uid
 	}
-	db = filterSearch(ctx, db, "user_name")
-	db, err := filterStartEnd(ctx, db)
+
+	// Add other filter conditions
+	if search := ctx.Query("search"); search != "" {
+		filters["user_name LIKE ?"] = "%" + search + "%"
+	}
+
+	if status := ctx.Query("status"); status != "" {
+		filters["status"] = cast.ToInt(status)
+	}
+
+	if uid := ctx.Query("uid"); uid != "" {
+		filters["uid"] = cast.ToInt(uid)
+	}
+
+	if assetId := ctx.Query("asset_id"); assetId != "" {
+		filters["asset_id"] = cast.ToInt(assetId)
+	}
+
+	if accountId := ctx.Query("account_id"); accountId != "" {
+		filters["account_id"] = cast.ToInt(accountId)
+	}
+
+	if clientIp := ctx.Query("client_ip"); clientIp != "" {
+		filters["client_ip"] = clientIp
+	}
+
+	if action := ctx.Query("action"); action != "" {
+		filters["action"] = cast.ToInt(action)
+	}
+
+	// Process time range
+	if start := ctx.Query("start"); start != "" {
+		filters["created_at >= ?"] = start
+	}
+
+	if end := ctx.Query("end"); end != "" {
+		filters["created_at <= ?"] = end
+	}
+
+	// Use global file service
+	histories, count, err := service.DefaultFileService.GetFileHistory(ctx, filters)
 	if err != nil {
+		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
-	db = filterEqual(ctx, db, "status", "uid", "asset_id", "account_id", "client_ip")
 
-	doGet[*model.FileHistory](ctx, false, db, "")
+	// Convert to slice of any type
+	historiesAny := make([]any, 0, len(histories))
+	for _, h := range histories {
+		historiesAny = append(historiesAny, h)
+	}
+
+	result := &ListData{
+		Count: count,
+		List:  historiesAny,
+	}
+
+	ctx.JSON(http.StatusOK, HttpResponse{
+		Data: result,
+	})
 }
 
 // FileLS godoc
@@ -73,12 +126,8 @@ func (c *Controller) FileLS(ctx *gin.Context) {
 		return
 	}
 
-	cli, err := service.GetFileManager().GetFileClient(cast.ToInt(ctx.Param("asset_id")), cast.ToInt(ctx.Param("account_id")))
-	if err != nil {
-		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
-		return
-	}
-	info, err := cli.ReadDir(ctx.Query("dir"))
+	// Use global file service
+	info, err := service.DefaultFileService.ReadDir(ctx, sess.Session.AssetId, sess.Session.AccountId, ctx.Query("dir"))
 	if err != nil {
 		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
 		return
@@ -121,28 +170,27 @@ func (c *Controller) FileMkdir(ctx *gin.Context) {
 		return
 	}
 
-	cli, err := service.GetFileManager().GetFileClient(cast.ToInt(ctx.Param("asset_id")), cast.ToInt(ctx.Param("account_id")))
-	if err != nil {
-		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{}})
-		return
-	}
-
-	if err = cli.MkdirAll(ctx.Query("dir")); err != nil {
+	// Use global file service
+	if err := service.DefaultFileService.MkdirAll(ctx, sess.Session.AssetId, sess.Session.AccountId, ctx.Query("dir")); err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
 		return
 	}
+
+	// Create history record
 	h := &model.FileHistory{
 		Uid:       currentUser.GetUid(),
 		UserName:  currentUser.GetUserName(),
-		AssetId:   cast.ToInt(ctx.Param("asset_id")),
-		AccountId: cast.ToInt(ctx.Param("account_id")),
+		AssetId:   sess.Session.AssetId,
+		AccountId: sess.Session.AccountId,
 		ClientIp:  ctx.ClientIP(),
 		Action:    model.FILE_ACTION_MKDIR,
 		Dir:       ctx.Query("dir"),
 	}
-	if err = dbpkg.DB.Model(h).Create(h).Error; err != nil {
+
+	if err := service.DefaultFileService.AddFileHistory(ctx, h); err != nil {
 		logger.L().Error("record mkdir failed", zap.Error(err), zap.Any("history", h))
 	}
+
 	ctx.JSON(http.StatusOK, defaultHttpResponse)
 }
 
@@ -181,32 +229,31 @@ func (c *Controller) FileUpload(ctx *gin.Context) {
 		return
 	}
 
-	cli, err := service.GetFileManager().GetFileClient(cast.ToInt(ctx.Param("asset_id")), cast.ToInt(ctx.Param("account_id")))
-	if err != nil {
-		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{}})
-		return
-	}
-	rf, err := cli.Create(filepath.Join(ctx.Query("dir"), fh.Filename))
+	// Use global file service
+	rf, err := service.DefaultFileService.Create(ctx, sess.Session.AssetId, sess.Session.AccountId, filepath.Join(ctx.Query("dir"), fh.Filename))
 	if err != nil {
 		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
 		return
 	}
+
 	if _, err = rf.Write(content); err != nil {
 		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
 
+	// Create history record
 	h := &model.FileHistory{
 		Uid:       currentUser.GetUid(),
 		UserName:  currentUser.GetUserName(),
-		AssetId:   cast.ToInt(ctx.Param("asset_id")),
-		AccountId: cast.ToInt(ctx.Param("account_id")),
+		AssetId:   sess.Session.AssetId,
+		AccountId: sess.Session.AccountId,
 		ClientIp:  ctx.ClientIP(),
 		Action:    model.FILE_ACTION_UPLOAD,
 		Dir:       ctx.Query("dir"),
 		Filename:  fh.Filename,
 	}
-	if err = dbpkg.DB.Model(h).Create(h).Error; err != nil {
+
+	if err = service.DefaultFileService.AddFileHistory(ctx, h); err != nil {
 		logger.L().Error("record upload failed", zap.Error(err), zap.Any("history", h))
 	}
 
@@ -238,37 +285,40 @@ func (c *Controller) FileDownload(ctx *gin.Context) {
 		return
 	}
 
-	cli, err := service.GetFileManager().GetFileClient(cast.ToInt(ctx.Param("asset_id")), cast.ToInt(ctx.Param("account_id")))
-	if err != nil {
-		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{}})
-		return
-	}
-	rf, err := cli.Open(filepath.Join(ctx.Query("dir"), ctx.Query("filename")))
+	// Use global file service
+	rf, err := service.DefaultFileService.Open(ctx, sess.Session.AssetId, sess.Session.AccountId, filepath.Join(ctx.Query("dir"), ctx.Query("filename")))
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
 		return
 	}
 
-	ctx.Writer.WriteHeader(http.StatusOK)
-	ctx.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", ctx.Query("filename")))
-	ctx.Header("Content-Type", "application/text/plain")
-	buf := &bytes.Buffer{}
-	rf.WriteTo(buf)
-	ctx.Header("Accept-Length", fmt.Sprintf("%d", len(buf.Bytes())))
-	ctx.Writer.Write(buf.Bytes())
+	defer rf.Close()
 
+	content, err := io.ReadAll(rf)
+	if err != nil {
+		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+		return
+	}
+
+	// Create history record
 	h := &model.FileHistory{
 		Uid:       currentUser.GetUid(),
 		UserName:  currentUser.GetUserName(),
-		AssetId:   cast.ToInt(ctx.Param("asset_id")),
-		AccountId: cast.ToInt(ctx.Param("account_id")),
+		AssetId:   sess.Session.AssetId,
+		AccountId: sess.Session.AccountId,
 		ClientIp:  ctx.ClientIP(),
-		Action:    model.FILE_ACTION_UPLOAD,
+		Action:    model.FILE_ACTION_DOWNLOAD,
 		Dir:       ctx.Query("dir"),
 		Filename:  ctx.Query("filename"),
 	}
 
-	if err = dbpkg.DB.Model(h).Create(h).Error; err != nil {
+	if err = service.DefaultFileService.AddFileHistory(ctx, h); err != nil {
 		logger.L().Error("record download failed", zap.Error(err), zap.Any("history", h))
 	}
+
+	rw := ctx.Writer
+	rw.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", ctx.Query("filename")))
+	rw.Header().Set("Content-Type", "application/octet-stream")
+	rw.Header().Set("Content-Length", fmt.Sprintf("%d", len(content)))
+	rw.Write(content)
 }

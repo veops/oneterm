@@ -1,7 +1,10 @@
 package service
 
 import (
+	"context"
 	"fmt"
+	"io"
+	"io/fs"
 	"sync"
 	"time"
 
@@ -9,7 +12,10 @@ import (
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 
+	"github.com/veops/oneterm/internal/model"
+	"github.com/veops/oneterm/internal/repository"
 	"github.com/veops/oneterm/internal/tunneling"
+	dbpkg "github.com/veops/oneterm/pkg/db"
 )
 
 var (
@@ -18,7 +24,16 @@ var (
 		lastTime: map[string]time.Time{},
 		mtx:      sync.Mutex{},
 	}
+
+	// Global file service instance
+	DefaultFileService IFileService
 )
+
+// InitFileService initializes the global file service
+func InitFileService() {
+	repo := repository.NewFileRepository(dbpkg.DB)
+	DefaultFileService = NewFileService(repo)
+}
 
 func init() {
 	go func() {
@@ -99,4 +114,71 @@ func (fm *FileManager) GetFileClient(assetId, accountId int) (cli *sftp.Client, 
 	fm.sftps[key] = cli
 
 	return
+}
+
+// File service interface
+type IFileService interface {
+	ReadDir(ctx context.Context, assetId, accountId int, dir string) ([]fs.FileInfo, error)
+	MkdirAll(ctx context.Context, assetId, accountId int, dir string) error
+	Create(ctx context.Context, assetId, accountId int, path string) (io.WriteCloser, error)
+	Open(ctx context.Context, assetId, accountId int, path string) (io.ReadCloser, error)
+	AddFileHistory(ctx context.Context, history *model.FileHistory) error
+	GetFileHistory(ctx context.Context, filters map[string]interface{}) ([]*model.FileHistory, int64, error)
+}
+
+// File service implementation
+type FileService struct {
+	repo repository.IFileRepository
+}
+
+func NewFileService(repo repository.IFileRepository) IFileService {
+	return &FileService{
+		repo: repo,
+	}
+}
+
+// ReadDir gets directory listing
+func (s *FileService) ReadDir(ctx context.Context, assetId, accountId int, dir string) ([]fs.FileInfo, error) {
+	cli, err := GetFileManager().GetFileClient(assetId, accountId)
+	if err != nil {
+		return nil, err
+	}
+	return cli.ReadDir(dir)
+}
+
+// MkdirAll creates a directory
+func (s *FileService) MkdirAll(ctx context.Context, assetId, accountId int, dir string) error {
+	cli, err := GetFileManager().GetFileClient(assetId, accountId)
+	if err != nil {
+		return err
+	}
+	return cli.MkdirAll(dir)
+}
+
+// Create creates a file
+func (s *FileService) Create(ctx context.Context, assetId, accountId int, path string) (io.WriteCloser, error) {
+	cli, err := GetFileManager().GetFileClient(assetId, accountId)
+	if err != nil {
+		return nil, err
+	}
+	return cli.Create(path)
+}
+
+// Open opens a file
+func (s *FileService) Open(ctx context.Context, assetId, accountId int, path string) (io.ReadCloser, error) {
+	cli, err := GetFileManager().GetFileClient(assetId, accountId)
+	if err != nil {
+		return nil, err
+	}
+	return cli.Open(path)
+}
+
+// AddFileHistory adds a file history record
+func (s *FileService) AddFileHistory(ctx context.Context, history *model.FileHistory) error {
+	return s.repo.AddFileHistory(ctx, history)
+}
+
+// GetFileHistory gets file history records
+func (s *FileService) GetFileHistory(ctx context.Context, filters map[string]interface{}) ([]*model.FileHistory, int64, error) {
+	return s.repo.GetFileHistory(ctx, filters)
 }

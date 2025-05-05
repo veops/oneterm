@@ -1,55 +1,26 @@
 package controller
 
 import (
-	"fmt"
-	"io"
 	"net/http"
-	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/samber/lo"
-	"go.uber.org/zap"
 
-	"github.com/veops/oneterm/internal/acl"
 	"github.com/veops/oneterm/internal/model"
-	dbpkg "github.com/veops/oneterm/pkg/db"
-	"github.com/veops/oneterm/pkg/logger"
+	"github.com/veops/oneterm/internal/service"
 )
 
 var (
+	sessionService = service.NewSessionService()
+
 	sessionPostHooks = []postHook[*model.Session]{
 		func(ctx *gin.Context, data []*model.Session) {
-			sessionIds := lo.Map(data, func(d *model.Session, _ int) string { return d.SessionId })
-			if len(sessionIds) <= 0 {
-				return
-			}
-			post := make([]*model.CmdCount, 0)
-			if err := dbpkg.DB.
-				Model(&model.SessionCmd{}).
-				Select("session_id, COUNT(*) AS count").
-				Where("session_id IN ?", sessionIds).
-				Group("session_id").
-				Find(&post).
-				Error; err != nil {
-				logger.L().Error("gateway posthookfailed", zap.Error(err))
-				return
-			}
-			m := lo.SliceToMap(post, func(p *model.CmdCount) (string, int64) { return p.SessionId, p.Count })
-			for _, d := range data {
-				d.CmdCount = m[d.SessionId]
+			if err := sessionService.AttachCmdCounts(ctx, data); err != nil {
+				// Error already logged in service
 			}
 		},
 		func(ctx *gin.Context, data []*model.Session) {
-			now := time.Now()
-			for _, d := range data {
-				t := now
-				if d.ClosedAt != nil {
-					t = *d.ClosedAt
-				}
-				d.Duration = int64(t.Sub(d.CreatedAt).Seconds())
-			}
+			sessionService.CalculateDurations(data)
 		},
 	}
 )
@@ -66,9 +37,8 @@ func (c *Controller) CreateSessionCmd(ctx *gin.Context) {
 		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
 		return
 	}
-	if err := dbpkg.DB.
-		Create(data).
-		Error; err != nil {
+
+	if err := sessionService.CreateSessionCmd(ctx, data); err != nil {
 		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
@@ -91,17 +61,11 @@ func (c *Controller) CreateSessionCmd(ctx *gin.Context) {
 //	@Success	200			{object}	HttpResponse{data=ListData{list=[]model.Session}}
 //	@Router		/session [get]
 func (c *Controller) GetSessions(ctx *gin.Context) {
-	db := dbpkg.DB.Model(model.DefaultSession)
-	currentUser, _ := acl.GetSessionFromCtx(ctx)
-	if !acl.IsAdmin(currentUser) {
-		db = db.Where("uid = ?", currentUser.Uid)
-	}
-	db = filterSearch(ctx, db, "user_name", "asset_info", "gateway_info", "account_info")
-	db, err := filterStartEnd(ctx, db)
+	db, err := sessionService.BuildQuery(ctx)
 	if err != nil {
+		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
 		return
 	}
-	db = filterEqual(ctx, db, "status", "uid", "asset_id", "client_ip")
 
 	doGet(ctx, false, db, "", sessionPostHooks...)
 }
@@ -116,10 +80,7 @@ func (c *Controller) GetSessions(ctx *gin.Context) {
 //	@Success	200			{object}	HttpResponse{data=ListData{list=[]model.SessionCmd}}
 //	@Router		/session/:session_id/cmd [get]
 func (c *Controller) GetSessionCmds(ctx *gin.Context) {
-	db := dbpkg.DB.Model(&model.SessionCmd{})
-	db = db.Where("session_id = ?", ctx.Param("session_id"))
-	db = filterSearch(ctx, db, "cmd", "result")
-
+	db := sessionService.BuildCmdQuery(ctx, ctx.Param("session_id"))
 	doGet[*model.SessionCmd](ctx, false, db, "")
 }
 
@@ -129,12 +90,8 @@ func (c *Controller) GetSessionCmds(ctx *gin.Context) {
 //	@Success	200	{object}	HttpResponse{data=ListData{list=[]model.SessionOptionAsset}}
 //	@Router		/session/option/asset [get]
 func (c *Controller) GetSessionOptionAsset(ctx *gin.Context) {
-	opts := make([]*model.SessionOptionAsset, 0)
-	if err := dbpkg.DB.
-		Model(model.DefaultAsset).
-		Select("id, name").
-		Find(&opts).
-		Error; err != nil {
+	opts, err := sessionService.GetSessionOptionAssets(ctx)
+	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
@@ -148,12 +105,8 @@ func (c *Controller) GetSessionOptionAsset(ctx *gin.Context) {
 //	@Success	200	{object}	HttpResponse{data=[]string}
 //	@Router		/session/option/clientip [get]
 func (c *Controller) GetSessionOptionClientIp(ctx *gin.Context) {
-	opts := make([]string, 0)
-	if err := dbpkg.DB.
-		Model(model.DefaultSession).
-		Distinct("client_ip").
-		Find(&opts).
-		Error; err != nil {
+	opts, err := sessionService.GetSessionOptionClientIps(ctx)
+	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
@@ -174,19 +127,11 @@ func (c *Controller) CreateSessionReplay(ctx *gin.Context) {
 		return
 	}
 
-	content, err := io.ReadAll(file)
-	if err != nil {
-		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
-		return
-	}
-
-	f, err := os.Create(filepath.Join("/replay", fmt.Sprintf("%s.cast", ctx.Param("session_id"))))
-	if err != nil {
+	sessionId := ctx.Param("session_id")
+	if err := sessionService.CreateSessionReplay(ctx, sessionId, file); err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
-	defer f.Close()
-	f.Write(content)
 
 	ctx.JSON(http.StatusOK, defaultHttpResponse)
 }
@@ -199,13 +144,12 @@ func (c *Controller) CreateSessionReplay(ctx *gin.Context) {
 //	@Router		/session/replay/:session_id [get]
 func (c *Controller) GetSessionReplay(ctx *gin.Context) {
 	sessionId := ctx.Param("session_id")
-	session := &model.Session{}
-	if err := dbpkg.DB.Model(session).Where("session_id = ?", sessionId).First(session).Error; err != nil {
+
+	filename, err := sessionService.GetSessionReplayFilename(ctx, sessionId)
+	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+		return
 	}
-	filename := sessionId
-	if !session.IsGuacd() {
-		filename += ".cast"
-	}
+
 	ctx.FileAttachment(filepath.Join("/replay", filename), filename)
 }

@@ -2,40 +2,33 @@ package controller
 
 import (
 	"net/http"
-	"strings"
 
 	"github.com/gin-gonic/gin"
-	"golang.org/x/crypto/ssh"
 
-	"github.com/veops/oneterm/internal/acl"
 	"github.com/veops/oneterm/internal/model"
-	dbpkg "github.com/veops/oneterm/pkg/db"
-	"github.com/veops/oneterm/pkg/utils"
+	"github.com/veops/oneterm/internal/service"
 )
 
 var (
+	publicKeyService = service.NewPublicKeyService()
+
 	publicKeyPreHooks = []preHook[*model.PublicKey]{
 		func(ctx *gin.Context, data *model.PublicKey) {
-			if _, comment, _, _, err := ssh.ParseAuthorizedKey([]byte(data.Pk)); err != nil {
+			if err := publicKeyService.ValidatePublicKey(data); err != nil {
 				ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrWrongPk, Data: nil})
-			} else {
-				data.Pk = strings.TrimSpace(strings.TrimSuffix(data.Pk, comment))
 			}
 		},
 		func(ctx *gin.Context, data *model.PublicKey) {
-			data.Pk = utils.EncryptAES(data.Pk)
+			publicKeyService.EncryptPublicKey(data)
 		},
 		func(ctx *gin.Context, data *model.PublicKey) {
-			currentUser, _ := acl.GetSessionFromCtx(ctx)
-			data.Uid = currentUser.GetUid()
-			data.UserName = currentUser.GetUserName()
+			publicKeyService.SetUserInfo(ctx, data)
 		},
 	}
+
 	publicKeyPostHooks = []postHook[*model.PublicKey]{
 		func(ctx *gin.Context, data []*model.PublicKey) {
-			for _, d := range data {
-				d.Pk = utils.DecryptAES(d.Pk)
-			}
+			publicKeyService.DecryptPublicKeys(data)
 		},
 	}
 )
@@ -82,14 +75,6 @@ func (c *Controller) UpdatePublicKey(ctx *gin.Context) {
 //	@Success	200			{object}	HttpResponse{data=ListData{list=[]model.PublicKey}}
 //	@Router		/public_key [get]
 func (c *Controller) GetPublicKeys(ctx *gin.Context) {
-	currentUser, _ := acl.GetSessionFromCtx(ctx)
-
-	db := dbpkg.DB.Model(&model.PublicKey{})
-	db = filterSearch(ctx, db, "name", "mac")
-	db = filterEqual(ctx, db, "id")
-	db = filterLike(ctx, db, "name")
-
-	db = db.Where("uid = ?", currentUser.Uid)
-
+	db := publicKeyService.BuildQuery(ctx)
 	doGet(ctx, false, db, "", publicKeyPostHooks...)
 }

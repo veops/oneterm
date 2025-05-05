@@ -4,11 +4,13 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/nicksnyder/go-i18n/v2/i18n"
 
-	myi18n "github.com/veops/oneterm/internal/i18n"
 	"github.com/veops/oneterm/internal/model"
-	dbpkg "github.com/veops/oneterm/pkg/db"
+	"github.com/veops/oneterm/internal/service"
+)
+
+var (
+	historyService = service.NewHistoryService()
 )
 
 // GetHistories godoc
@@ -26,13 +28,11 @@ import (
 //	@Success	200			{object}	HttpResponse{data=ListData{list=[]model.History}}
 //	@Router		/history [get]
 func (c *Controller) GetHistories(ctx *gin.Context) {
-	db := dbpkg.DB.Model(&model.History{})
-	db = filterSearch(ctx, db, "old", "new")
-	db, err := filterStartEnd(ctx, db)
+	db, err := historyService.BuildQuery(ctx)
 	if err != nil {
+		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
-	db = filterEqual(ctx, db, "type", "target_id", "action_type", "uid")
 
 	doGet[*model.History](ctx, false, db, "")
 }
@@ -43,24 +43,11 @@ func (c *Controller) GetHistories(ctx *gin.Context) {
 //	@Success	200	{object}	HttpResponse{data=map[string]string}
 //	@Router		/history/type/mapping [get]
 func (c *Controller) GetHistoryTypeMapping(ctx *gin.Context) {
-	lang := ctx.PostForm("lang")
-	accept := ctx.GetHeader("Accept-Language")
-	localizer := i18n.NewLocalizer(myi18n.Bundle, lang, accept)
-	cfg := &i18n.LocalizeConfig{}
-	key2msg := map[string]*i18n.Message{
-		"account":    myi18n.MsgTypeMappingAccount,
-		"asset":      myi18n.MsgTypeMappingAsset,
-		"command":    myi18n.MsgTypeMappingCommand,
-		"gateway":    myi18n.MsgTypeMappingGateway,
-		"node":       myi18n.MsgTypeMappingNode,
-		"public_key": myi18n.MsgTypeMappingPublicKey,
-	}
-	data := make(map[string]string)
-	for k, v := range key2msg {
-		cfg.DefaultMessage = v
-		msg, _ := localizer.Localize(cfg)
-		data[k] = msg
+	mapping, err := historyService.GetTypeMapping(ctx)
+	if err != nil {
+		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+		return
 	}
 
-	ctx.JSON(http.StatusOK, NewHttpResponseWithData(data))
+	ctx.JSON(http.StatusOK, NewHttpResponseWithData(mapping))
 }

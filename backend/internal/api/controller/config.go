@@ -3,7 +3,6 @@ package controller
 import (
 	"errors"
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/cast"
@@ -11,8 +10,11 @@ import (
 
 	"github.com/veops/oneterm/internal/acl"
 	"github.com/veops/oneterm/internal/model"
-	"github.com/veops/oneterm/pkg/cache"
-	dbpkg "github.com/veops/oneterm/pkg/db"
+	"github.com/veops/oneterm/internal/service"
+)
+
+var (
+	configService = service.NewConfigService()
 )
 
 // PostConfig godoc
@@ -33,22 +35,14 @@ func (c *Controller) PostConfig(ctx *gin.Context) {
 		ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrInvalidArgument, Data: map[string]any{"err": err}})
 		return
 	}
-	cfg.Id = 0
+
 	cfg.CreatorId = currentUser.GetUid()
 	cfg.UpdaterId = currentUser.GetUid()
 
-	if err := dbpkg.DB.Model(cfg).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("deleted_at = 0").Delete(&model.Config{}).Error; err != nil {
-			return err
-		}
-		return tx.Create(cfg).Error
-	}); err != nil {
+	if err := configService.SaveConfig(ctx, cfg); err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
-
-	model.GlobalConfig.Store(cfg)
-	cache.SetEx(ctx, "config", cfg, time.Hour)
 
 	ctx.JSON(http.StatusOK, defaultHttpResponse)
 }
@@ -66,8 +60,8 @@ func (c *Controller) GetConfig(ctx *gin.Context) {
 		return
 	}
 
-	cfg := &model.Config{}
-	if err := dbpkg.DB.Model(cfg).First(&cfg).Error; err != nil {
+	cfg, err := configService.GetConfig(ctx)
+	if err != nil {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
 			return

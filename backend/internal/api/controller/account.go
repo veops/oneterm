@@ -1,84 +1,53 @@
 package controller
 
 import (
-	"errors"
 	"net/http"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/samber/lo"
 	"github.com/spf13/cast"
-	"golang.org/x/crypto/ssh"
-	"gorm.io/gorm"
 
 	"github.com/veops/oneterm/internal/acl"
 	"github.com/veops/oneterm/internal/model"
+	"github.com/veops/oneterm/internal/service"
 	"github.com/veops/oneterm/pkg/config"
-	dbpkg "github.com/veops/oneterm/pkg/db"
-	"github.com/veops/oneterm/pkg/utils"
 )
 
 var (
+	accountService = service.NewAccountService()
+
 	accountPreHooks = []preHook[*model.Account]{
+		// Validate public key
 		func(ctx *gin.Context, data *model.Account) {
-			if data.AccountType == model.AUTHMETHOD_PUBLICKEY {
-				if data.Phrase == "" {
-					_, err := ssh.ParsePrivateKey([]byte(data.Pk))
-					if err != nil {
-						ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrWrongPvk, Data: nil})
-						return
-					}
-				} else {
-					_, err := ssh.ParsePrivateKeyWithPassphrase([]byte(data.Pk), []byte(data.Phrase))
-					if err != nil {
-						ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrWrongPvk, Data: nil})
-						return
-					}
-				}
+			if err := accountService.ValidatePublicKey(data); err != nil {
+				ctx.AbortWithError(http.StatusBadRequest, &ApiError{Code: ErrWrongPvk, Data: nil})
+				return
 			}
 		},
+		// Encrypt sensitive data
 		func(ctx *gin.Context, data *model.Account) {
-			data.Password = utils.EncryptAES(data.Password)
-			data.Pk = utils.EncryptAES(data.Pk)
-			data.Phrase = utils.EncryptAES(data.Phrase)
+			accountService.EncryptSensitiveData(data)
 		},
 	}
 
 	accountPostHooks = []postHook[*model.Account]{
+		// Attach asset count
 		func(ctx *gin.Context, data []*model.Account) {
-			acs := make([]*model.AccountCount, 0)
-			if err := dbpkg.DB.
-				Model(&model.Authorization{}).
-				Select("account_id AS id, COUNT(*) as count").
-				Group("account_id").
-				Where("account_id IN ?", lo.Map(data, func(d *model.Account, _ int) int { return d.Id })).
-				Find(&acs).
-				Error; err != nil {
+			if err := accountService.AttachAssetCount(ctx, data); err != nil {
 				return
 			}
-			m := lo.SliceToMap(acs, func(ac *model.AccountCount) (int, int64) { return ac.Id, ac.Count })
-			for _, d := range data {
-				d.AssetCount = m[d.Id]
-			}
 		},
+		// Decrypt sensitive data
 		func(ctx *gin.Context, data []*model.Account) {
-			for _, d := range data {
-				d.Password = utils.DecryptAES(d.Password)
-				d.Pk = utils.DecryptAES(d.Pk)
-				d.Phrase = utils.DecryptAES(d.Phrase)
-			}
+			accountService.DecryptSensitiveData(data)
 		},
 	}
+
 	accountDcs = []deleteCheck{
+		// Check dependencies
 		func(ctx *gin.Context, id int) {
-			assetName := ""
-			err := dbpkg.DB.
-				Model(model.DefaultAsset).
-				Select("name").
-				Where("id = (?)", dbpkg.DB.Model(&model.Authorization{}).Select("asset_id").Where("account_id = ?", id).Limit(1)).
-				First(&assetName).
-				Error
-			if errors.Is(err, gorm.ErrRecordNotFound) {
+			assetName, err := accountService.CheckAssetDependencies(ctx, id)
+			if err == nil && assetName == "" {
 				return
 			}
 			code := lo.Ternary(err == nil, http.StatusBadRequest, http.StatusInternalServerError)
@@ -136,45 +105,37 @@ func (c *Controller) GetAccounts(ctx *gin.Context) {
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
 	info := cast.ToBool(ctx.Query("info"))
 
-	db := dbpkg.DB.Model(&model.Account{})
-	db = filterEqual(ctx, db, "id", "type")
-	db = filterLike(ctx, db, "name")
-	db = filterSearch(ctx, db, "name", "account")
-	if q, ok := ctx.GetQuery("ids"); ok {
-		db = db.Where("id IN ?", lo.Map(strings.Split(q, ","), func(s string, _ int) int { return cast.ToInt(s) }))
-	}
+	// Build base query using service layer
+	db := accountService.BuildQuery(ctx)
 
+	// Apply select fields for info mode
 	if info {
 		db = db.Select("id", "name", "account")
+
+		// Apply authorization filter if needed
 		if !acl.IsAdmin(currentUser) {
-			ids, err := GetAccountIdsByAuthorization(ctx)
+			assetIds, err := GetAssetIdsByAuthorization(ctx)
 			if err != nil {
 				ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
 				return
 			}
-			db = db.Where("id IN ?", ids)
+
+			// Filter accounts by asset IDs
+			db = accountService.FilterByAssetIds(db, assetIds)
 		}
 	}
-
-	db = db.Order("name")
 
 	doGet(ctx, !info, db, config.RESOURCE_ACCOUNT, accountPostHooks...)
 }
 
-func GetAccountIdsByAuthorization(ctx *gin.Context) (ids []int, err error) {
+// GetAccountIdsByAuthorization gets account IDs by authorization
+func GetAccountIdsByAuthorization(ctx *gin.Context) ([]int, error) {
 	assetIds, err := GetAssetIdsByAuthorization(ctx)
 	if err != nil {
-		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
-		return
+		return nil, err
 	}
-	ss := make([]model.Slice[string], 0)
-	if err = dbpkg.DB.Model(model.DefaultAsset).Where("id IN ?", assetIds).Pluck("JSON_KEYS(authorization)", &ss).Error; err != nil {
-		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
-		return
-	}
-	ids = lo.Uniq(lo.Map(lo.Flatten(ss), func(s string, _ int) int { return cast.ToInt(s) }))
-	_, _, accountIds := getIdsByAuthorizationIds(ctx)
-	ids = lo.Uniq(append(ids, accountIds...))
 
-	return
+	_, _, authorizationIds := getIdsByAuthorizationIds(ctx)
+
+	return accountService.GetAccountIdsByAuthorization(ctx, assetIds, authorizationIds)
 }

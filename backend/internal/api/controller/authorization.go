@@ -159,7 +159,7 @@ func getNodeAssetAccoutIdsByAction(ctx context.Context, action string) (nodeIds,
 		}
 		nodes = lo.Filter(nodes, func(n *model.Node, _ int) bool { return lo.Contains(resIds, n.ResourceId) })
 		nodeIds = lo.Map(nodes, func(n *model.Node, _ int) int { return n.Id })
-		nodeIds, err = handleSelfChild(ctx, nodeIds...)
+		nodeIds, err = repository.HandleSelfChild(ctx, nodeIds...)
 		return
 	})
 
@@ -403,7 +403,7 @@ func hasAuthorization(ctx *gin.Context, sess *gsession.Session) (ok bool) {
 	ctx.Set(kAuthorizationIds, authIds)
 
 	nodeIds, assetIds, accountIds := getIdsByAuthorizationIds(ctx)
-	tmp, err := handleSelfChild(ctx, nodeIds...)
+	tmp, err := repository.HandleSelfChild(ctx, nodeIds...)
 	if err != nil {
 		logger.L().Error("", zap.Error(err))
 		return
@@ -420,4 +420,16 @@ func hasAuthorization(ctx *gin.Context, sess *gsession.Session) (ok bool) {
 	}
 
 	return lo.Contains(ids, sess.AssetId)
+}
+
+func getIdsByAuthorizationIds(ctx *gin.Context) (nodeIds, assetIds, accountIds []int) {
+	authorizationIds, ok := ctx.Value(kAuthorizationIds).([]*model.AuthorizationIds)
+	if !ok || len(authorizationIds) == 0 {
+		return
+	}
+	return assetService.GetIdsByAuthorizationIds(ctx, authorizationIds)
+}
+
+func getAssetIdsByNodeAccount(ctx context.Context, nodeIds, accountIds []int) ([]int, error) {
+	return assetService.GetAssetIdsByNodeAccount(ctx, nodeIds, accountIds)
 }

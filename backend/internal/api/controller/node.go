@@ -102,7 +102,7 @@ func (c *Controller) GetNodes(ctx *gin.Context) {
 	}
 
 	if id, ok := ctx.GetQuery("self_parent"); ok {
-		ids, err := handleSelfParent(ctx, cast.ToInt(id))
+		ids, err := repository.HandleSelfParent(ctx, cast.ToInt(id))
 		if err != nil {
 			return
 		}
@@ -116,7 +116,7 @@ func (c *Controller) GetNodes(ctx *gin.Context) {
 			if err != nil {
 				return
 			}
-			if ids, err = handleSelfParent(ctx, ids...); err != nil {
+			if ids, err = repository.HandleSelfParent(ctx, ids...); err != nil {
 				return
 			}
 			db = db.Where("id IN ?", ids)
@@ -216,7 +216,7 @@ func nodePostHookHasChild(ctx *gin.Context, data []*model.Node) {
 			assetIds, _ := GetAssetIdsByAuthorization(ctx)
 			assets = lo.Filter(assets, func(a *model.Asset, _ int) bool { return lo.Contains(assetIds, a.Id) })
 			pids := lo.Map(assets, func(a *model.Asset, _ int) int { return a.ParentId })
-			pids, _ = handleSelfParent(ctx, pids...)
+			pids, _ = repository.HandleSelfParent(ctx, pids...)
 			nodes = lo.Filter(nodes, func(n *model.Node, _ int) bool { return lo.Contains(pids, n.Id) })
 			ps := lo.SliceToMap(nodes, func(a *model.Node) (int, bool) { return a.ParentId, true })
 			for _, n := range data {
@@ -229,14 +229,14 @@ func nodePostHookHasChild(ctx *gin.Context, data []*model.Node) {
 				assetResIds, err = acl.GetRoleResourceIds(ctx, currentUser.GetRid(), config.RESOURCE_ASSET)
 				assets = lo.Filter(assets, func(a *model.Asset, _ int) bool { return lo.Contains(assetResIds, a.ResourceId) })
 				pids = lo.Map(assets, func(n *model.Asset, _ int) int { return n.ParentId })
-				pids, _ = handleSelfParent(ctx, pids...)
+				pids, _ = repository.HandleSelfParent(ctx, pids...)
 				return
 			})
 			eg.Go(func() (err error) {
 				nodeResIds, err = acl.GetRoleResourceIds(ctx, currentUser.GetRid(), config.RESOURCE_NODE)
 				ns := lo.Filter(nodes, func(n *model.Node, _ int) bool { return lo.Contains(nodeResIds, n.ResourceId) })
-				nids, _ = handleSelfChild(ctx, lo.Map(ns, func(n *model.Node, _ int) int { return n.Id })...)
-				nids, _ = handleSelfParent(ctx, nids...)
+				nids, _ = repository.HandleSelfChild(ctx, lo.Map(ns, func(n *model.Node, _ int) int { return n.Id })...)
+				nids, _ = repository.HandleSelfParent(ctx, nids...)
 				return
 			})
 			eg.Wait()
@@ -261,61 +261,6 @@ func nodeDelHook(ctx *gin.Context, id int) {
 	ctx.AbortWithError(http.StatusBadRequest, err)
 }
 
-func handleSelfChild(ctx context.Context, ids ...int) (res []int, err error) {
-	nodes, err := repository.GetAllFromCacheDb(ctx, model.DefaultNode)
-	if err != nil {
-		return
-	}
-
-	g := make(map[int][]int)
-	for _, n := range nodes {
-		g[n.ParentId] = append(g[n.ParentId], n.Id)
-	}
-	var dfs func(int, bool)
-	dfs = func(x int, b bool) {
-		if b {
-			res = append(res, x)
-		}
-		for _, y := range g[x] {
-			dfs(y, b || lo.Contains(ids, x))
-		}
-	}
-	dfs(0, false)
-
-	res = lo.Uniq(append(res, ids...))
-
-	return
-}
-
-func handleSelfParent(ctx context.Context, ids ...int) (res []int, err error) {
-	nodes, err := repository.GetAllFromCacheDb(ctx, model.DefaultNode)
-	if err != nil {
-		return
-	}
-
-	g := make(map[int][]int)
-	for _, n := range nodes {
-		g[n.ParentId] = append(g[n.ParentId], n.Id)
-	}
-	t := make([]int, 0)
-	var dfs func(int)
-	dfs = func(x int) {
-		t = append(t, x)
-		if lo.Contains(ids, x) {
-			res = append(res, t...)
-		}
-		for _, y := range g[x] {
-			dfs(y)
-		}
-		t = t[:len(t)-1]
-	}
-	dfs(0)
-
-	res = lo.Uniq(append(res, ids...))
-
-	return
-}
-
 func handleNoSelfChild(ctx context.Context, ids ...int) (res []int, err error) {
 	nodes, err := repository.GetAllFromCacheDb(ctx, model.DefaultNode)
 	if err != nil {
@@ -323,7 +268,7 @@ func handleNoSelfChild(ctx context.Context, ids ...int) (res []int, err error) {
 	}
 	allids := lo.Map(nodes, func(n *model.Node, _ int) int { return n.Id })
 
-	res, err = handleSelfChild(ctx, ids...)
+	res, err = repository.HandleSelfChild(ctx, ids...)
 	if err != nil {
 		return
 	}
@@ -339,7 +284,7 @@ func handleNoSelfParent(ctx context.Context, ids ...int) (res []int, err error) 
 	}
 	allids := lo.Map(nodes, func(n *model.Node, _ int) int { return n.Id })
 
-	res, err = handleSelfParent(ctx, ids...)
+	res, err = repository.HandleSelfParent(ctx, ids...)
 	if err != nil {
 		return
 	}

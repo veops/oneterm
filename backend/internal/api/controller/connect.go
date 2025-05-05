@@ -35,6 +35,7 @@ import (
 	"github.com/veops/oneterm/internal/model"
 	"github.com/veops/oneterm/internal/service"
 	gsession "github.com/veops/oneterm/internal/session"
+	"github.com/veops/oneterm/internal/tunneling"
 	dbpkg "github.com/veops/oneterm/pkg/db"
 	"github.com/veops/oneterm/pkg/logger"
 )
@@ -389,7 +390,7 @@ func connectSsh(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, ac
 		}
 	}()
 
-	ip, port, err := service.Proxy(false, sess.SessionId, "ssh", asset, gateway)
+	ip, port, err := tunneling.Proxy(false, sess.SessionId, "ssh", asset, gateway)
 	if err != nil {
 		return
 	}
@@ -554,7 +555,7 @@ func connectOther(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, 
 	}()
 
 	protocol := strings.Split(sess.Protocol, ":")[0]
-	ip, port, err := service.Proxy(false, sess.SessionId, protocol, asset, gateway)
+	ip, port, err := tunneling.Proxy(false, sess.SessionId, protocol, asset, gateway)
 	if err != nil {
 		return
 	}

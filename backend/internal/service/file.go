@@ -8,6 +8,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
+
+	"github.com/veops/oneterm/internal/tunneling"
 )
 
 var (
@@ -73,7 +75,7 @@ func (fm *FileManager) GetFileClient(assetId, accountId int) (cli *sftp.Client, 
 		return
 	}
 
-	ip, port, err := Proxy(false, uuid.New().String(), "sftp,ssh", asset, gateway)
+	ip, port, err := tunneling.Proxy(false, uuid.New().String(), "sftp,ssh", asset, gateway)
 	if err != nil {
 		return
 	}

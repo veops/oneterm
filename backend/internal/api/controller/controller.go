@@ -501,9 +501,9 @@ func hasPerm[T model.Model](ctx context.Context, md T, resourceTypeName, action 
 	pids := make([]int, 0)
 	switch t := any(md).(type) {
 	case *model.Asset:
-		pids, _ = handleSelfParent(ctx, t.ParentId)
+		pids, _ = repository.HandleSelfParent(ctx, t.ParentId)
 	case *model.Node:
-		pids, _ = handleSelfParent(ctx, t.Id)
+		pids, _ = repository.HandleSelfParent(ctx, t.Id)
 	}
 
 	if len(pids) > 0 {
@@ -619,7 +619,7 @@ func handleNodeIds(ctx *gin.Context, dbFind *gorm.DB, resIds []int) (db *gorm.DB
 	}
 	nodes = lo.Filter(nodes, func(n *model.Node, _ int) bool { return lo.Contains(resIds, n.ResourceId) })
 	ids := lo.Map(nodes, func(n *model.Node, _ int) int { return n.Id })
-	if ids, err = handleSelfChild(ctx, ids...); err != nil {
+	if ids, err = repository.HandleSelfChild(ctx, ids...); err != nil {
 		return
 	}
 
@@ -633,7 +633,7 @@ func handleNodeIds(ctx *gin.Context, dbFind *gorm.DB, resIds []int) (db *gorm.DB
 	}
 	ids = append(ids, lo.Map(assets, func(a *model.AssetIdPid, _ int) int { return a.ParentId })...)
 
-	ids, err = handleSelfParent(ctx, ids...)
+	ids, err = repository.HandleSelfParent(ctx, ids...)
 	if err != nil {
 		return
 	}
@@ -656,7 +656,7 @@ func handleAssetIds(ctx *gin.Context, dbFind *gorm.DB, resIds []int) (db *gorm.D
 	}
 	nodes = lo.Filter(nodes, func(n *model.Node, _ int) bool { return lo.Contains(nodeResIds, n.ResourceId) })
 	nodeIds := lo.Map(nodes, func(n *model.Node, _ int) int { return n.Id })
-	if nodeIds, err = handleSelfChild(ctx, nodeIds...); err != nil {
+	if nodeIds, err = repository.HandleSelfChild(ctx, nodeIds...); err != nil {
 		return
 	}
 

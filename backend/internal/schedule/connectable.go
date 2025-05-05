@@ -11,7 +11,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/veops/oneterm/internal/model"
-	"github.com/veops/oneterm/internal/service"
 	"github.com/veops/oneterm/internal/tunneling"
 	dbpkg "github.com/veops/oneterm/pkg/db"
 	"github.com/veops/oneterm/pkg/logger"
@@ -81,7 +80,7 @@ func UpdateConnectables(ids ...int) (err error) {
 func updateConnectable(asset *model.Asset, gateway *model.Gateway) (sid string, ok bool) {
 	sid = uuid.New().String()
 	ps := strings.Join(lo.Map(asset.Protocols, func(p string, _ int) string { return strings.Split(p, ":")[0] }), ",")
-	ip, port, err := service.Proxy(true, sid, ps, asset, gateway)
+	ip, port, err := tunneling.Proxy(true, sid, ps, asset, gateway)
 	if err != nil {
 		logger.L().Debug("connectable proxy failed", zap.String("protocol", ps), zap.Error(err))
 		return
@@ -109,4 +108,9 @@ func updateConnectable(asset *model.Asset, gateway *model.Gateway) (sid string, 
 	}
 	ok = true
 	return
+}
+
+// UpdateAssetConnectables is used by service/asset.go to update connectables
+func UpdateAssetConnectables(ids ...int) error {
+	return UpdateConnectables(ids...)
 }

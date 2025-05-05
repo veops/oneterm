@@ -1,22 +1,16 @@
 package controller
 
 import (
-	"context"
-	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/samber/lo"
 	"github.com/spf13/cast"
 	"go.uber.org/zap"
 
 	"github.com/veops/oneterm/internal/acl"
 	"github.com/veops/oneterm/internal/model"
-	"github.com/veops/oneterm/internal/repository"
-	"github.com/veops/oneterm/internal/schedule"
+	"github.com/veops/oneterm/internal/service"
 	"github.com/veops/oneterm/pkg/config"
-	dbpkg "github.com/veops/oneterm/pkg/db"
 	"github.com/veops/oneterm/pkg/logger"
 )
 
@@ -28,16 +22,36 @@ const (
 )
 
 var (
+	assetService = service.NewAssetService()
+
 	assetPreHooks = []preHook[*model.Asset]{
+		// Preprocess asset data
 		func(ctx *gin.Context, data *model.Asset) {
-			data.Ip = strings.TrimSpace(data.Ip)
-			data.Protocols = lo.Map(data.Protocols, func(s string, _ int) string { return strings.TrimSpace(s) })
-			if data.Authorization == nil {
-				data.Authorization = make(model.Map[int, model.Slice[int]])
-			}
+			assetService.PreprocessAssetData(data)
 		},
 	}
-	assetPostHooks = []postHook[*model.Asset]{assetPostHookCount, assetPostHookAuth}
+	assetPostHooks = []postHook[*model.Asset]{
+		// Attach node chain
+		func(ctx *gin.Context, data []*model.Asset) {
+			if err := assetService.AttachNodeChain(ctx, data); err != nil {
+				logger.L().Error("attach node chain failed", zap.Error(err))
+				return
+			}
+		},
+		// Apply authorization filters
+		func(ctx *gin.Context, data []*model.Asset) {
+			currentUser, _ := acl.GetSessionFromCtx(ctx)
+			if acl.IsAdmin(currentUser) {
+				return
+			}
+
+			authorizationIds, _ := ctx.Value(kAuthorizationIds).([]*model.AuthorizationIds)
+			nodeIds, _ := ctx.Value(kNodeIds).([]int)
+			accountIds, _ := ctx.Value(kAccountIds).([]int)
+
+			assetService.ApplyAuthorizationFilters(ctx, data, authorizationIds, nodeIds, accountIds)
+		},
+	}
 )
 
 // CreateAsset godoc
@@ -50,7 +64,7 @@ func (c *Controller) CreateAsset(ctx *gin.Context) {
 	asset := &model.Asset{}
 	doCreate(ctx, true, asset, config.RESOURCE_ASSET, assetPreHooks...)
 
-	schedule.UpdateConnectables(asset.Id)
+	assetService.UpdateConnectables(asset.Id)
 }
 
 // DeleteAsset godoc
@@ -71,8 +85,8 @@ func (c *Controller) DeleteAsset(ctx *gin.Context) {
 //	@Success	200		{object}	HttpResponse
 //	@Router		/asset/:id [put]
 func (c *Controller) UpdateAsset(ctx *gin.Context) {
-	doUpdate(ctx, true, &model.Asset{}, config.RESOURCE_ASSET)
-	schedule.UpdateConnectables(cast.ToInt(ctx.Param("id")))
+	doUpdate(ctx, true, &model.Asset{}, config.RESOURCE_ASSET, assetPreHooks...)
+	assetService.UpdateConnectables(cast.ToInt(ctx.Param("id")))
 }
 
 // GetAssets godoc
@@ -93,25 +107,28 @@ func (c *Controller) GetAssets(ctx *gin.Context) {
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
 	info := cast.ToBool(ctx.Query("info"))
 
-	db := dbpkg.DB.Model(model.DefaultAsset)
-	db = filterEqual(ctx, db, "id")
-	db = filterLike(ctx, db, "name", "ip")
-	db = filterSearch(ctx, db, "name", "ip")
-	if q, ok := ctx.GetQuery("ids"); ok {
-		db = db.Where("id IN ?", lo.Map(strings.Split(q, ","), func(s string, _ int) int { return cast.ToInt(s) }))
-	}
-	if q, ok := ctx.GetQuery("parent_id"); ok {
-		parentIds, err := handleParentId(ctx, cast.ToInt(q))
-		if err != nil {
-			logger.L().Error("parent id found failed", zap.Error(err))
-			return
-		}
-		db = db.Where("parent_id IN ?", parentIds)
+	// Build base query using service layer
+	db, err := assetService.BuildQuery(ctx)
+	if err != nil {
+		ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+		return
 	}
 
+	// Apply parent_id filter if needed
+	if q, ok := ctx.GetQuery("parent_id"); ok {
+		db, err = assetService.FilterByParentId(db, cast.ToInt(q))
+		if err != nil {
+			logger.L().Error("parent id filtering failed", zap.Error(err))
+			ctx.AbortWithError(http.StatusInternalServerError, &ApiError{Code: ErrInternal, Data: map[string]any{"err": err}})
+			return
+		}
+	}
+
+	// Apply info mode settings
 	if info {
 		db = db.Select("id", "parent_id", "name", "ip", "protocols", "connectable", "authorization")
 
+		// Apply authorization filter if needed
 		if !acl.IsAdmin(currentUser) {
 			ids, err := GetAssetIdsByAuthorization(ctx)
 			if err != nil {
@@ -122,149 +139,16 @@ func (c *Controller) GetAssets(ctx *gin.Context) {
 		}
 	}
 
-	db = db.Order("name")
-
 	doGet(ctx, !info, db, config.RESOURCE_ASSET, assetPostHooks...)
 }
 
-func assetPostHookCount(ctx *gin.Context, data []*model.Asset) {
-	nodes, err := repository.GetAllFromCacheDb(ctx, model.DefaultNode)
-	if err != nil {
-		return
-	}
-
-	g := make(map[int][]model.Pair[int, string])
-	for _, n := range nodes {
-		g[n.ParentId] = append(g[n.ParentId], model.Pair[int, string]{First: n.Id, Second: n.Name})
-	}
-	m := make(map[int]string)
-	var dfs func(int, string)
-	dfs = func(x int, s string) {
-		m[x] = s
-		for _, node := range g[x] {
-			dfs(node.First, fmt.Sprintf("%s/%s", s, node.Second))
-		}
-	}
-	dfs(0, "")
-
-	for _, d := range data {
-		d.NodeChain = m[d.ParentId]
-	}
-}
-
-func assetPostHookAuth(ctx *gin.Context, data []*model.Asset) {
-	currentUser, _ := acl.GetSessionFromCtx(ctx)
-	if acl.IsAdmin(currentUser) {
-		return
-	}
-	info := cast.ToBool(ctx.Query("info"))
-	noInfoIds := make([]int, 0)
-	if !info {
-		t := dbpkg.DB.Model(model.DefaultAsset)
-		assetResIds, _ := acl.GetRoleResourceIds(ctx, currentUser.GetRid(), config.RESOURCE_ASSET)
-		t, _ = handleAssetIds(ctx, t, assetResIds)
-		t.Pluck("id", &noInfoIds)
-	}
-
-	authorizationIds, _ := ctx.Value(kAuthorizationIds).([]*model.AuthorizationIds)
-	nodeIds, _, accountIds := getIdsByAuthorizationIds(ctx)
-	nodeIds, _ = handleSelfChild(ctx, nodeIds...)
-
-	for _, a := range data {
-		if lo.Contains(nodeIds, a.ParentId) || lo.Contains(noInfoIds, a.Id) {
-			continue
-		}
-		if lo.ContainsBy(authorizationIds, func(item *model.AuthorizationIds) bool {
-			return item.AssetId == a.Id && item.NodeId == 0 && item.AccountId == 0
-		}) {
-			continue
-		}
-		ids := lo.Map(lo.Filter(authorizationIds, func(item *model.AuthorizationIds, _ int) bool {
-			return item.AssetId == a.Id && item.AccountId != 0 && item.NodeId == 0
-		}),
-			func(item *model.AuthorizationIds, _ int) int { return item.AccountId })
-
-		for k := range a.Authorization {
-			if !lo.Contains(ids, k) && !lo.Contains(accountIds, k) {
-				delete(a.Authorization, k)
-			}
-		}
-	}
-}
-
-func handleParentId(ctx context.Context, parentId int) (pids []int, err error) {
-	nodes, err := repository.GetAllFromCacheDb(ctx, model.DefaultNode)
-	if err != nil {
-		return
-	}
-
-	g := make(map[int][]int)
-	for _, n := range nodes {
-		g[n.ParentId] = append(g[n.ParentId], n.Id)
-	}
-	var dfs func(int)
-	dfs = func(x int) {
-		pids = append(pids, x)
-		for _, y := range g[x] {
-			dfs(y)
-		}
-	}
-	dfs(parentId)
-
-	return
-}
-
-func GetAssetIdsByAuthorization(ctx *gin.Context) (ids []int, err error) {
+// GetAssetIdsByAuthorization gets asset IDs by authorization
+func GetAssetIdsByAuthorization(ctx *gin.Context) ([]int, error) {
 	authIds, err := getAuthorizationIds(ctx)
 	if err != nil {
-		return
+		return nil, err
 	}
-	ctx.Set(kAuthorizationIds, authIds)
 
-	nodeIds, ids, accountIds := getIdsByAuthorizationIds(ctx)
-
-	tmp, err := handleSelfChild(ctx, nodeIds...)
-	if err != nil {
-		return
-	}
-	nodeIds = append(nodeIds, tmp...)
-	ctx.Set(kNodeIds, nodeIds)
-	ctx.Set(kAccountIds, accountIds)
-	tmp, err = getAssetIdsByNodeAccount(ctx, nodeIds, accountIds)
-	if err != nil {
-		return
-	}
-	ids = lo.Uniq(append(ids, tmp...))
-
-	return
-}
-
-func getIdsByAuthorizationIds(ctx *gin.Context) (nodeIds, assetIds, accountIds []int) {
-	authIds, _ := ctx.Value(kAuthorizationIds).([]*model.AuthorizationIds)
-	info := cast.ToBool(ctx.Query("info"))
-	for _, a := range authIds {
-		if a.NodeId != 0 && a.AssetId == 0 && a.AccountId == 0 {
-			nodeIds = append(nodeIds, a.NodeId)
-		}
-		if a.AssetId != 0 && a.NodeId == 0 && (info || a.AccountId == 0) {
-			assetIds = append(assetIds, a.AssetId)
-		}
-		if a.AccountId != 0 && a.AssetId == 0 && (info || a.NodeId == 0) {
-			accountIds = append(accountIds, a.AccountId)
-		}
-	}
-	return
-}
-
-func getAssetIdsByNodeAccount(ctx context.Context, nodeIds, accountIds []int) (assetIds []int, err error) {
-	assets, err := repository.GetAllFromCacheDb(ctx, model.DefaultAsset)
-	if err != nil {
-		return
-	}
-	assets = lo.Filter(assets, func(a *model.Asset, _ int) bool {
-		return lo.Contains(nodeIds, a.ParentId) || len(lo.Intersect(lo.Keys(a.Authorization), accountIds)) > 0
-	})
-	assetIds = lo.Map(assets, func(a *model.Asset, _ int) int { return a.Id })
-
-	return
+	_, assetIds, _, err := assetService.GetAssetIdsByAuthorization(ctx, authIds)
+	return assetIds, err
 }

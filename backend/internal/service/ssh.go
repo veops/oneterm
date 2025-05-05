@@ -2,13 +2,10 @@ package service
 
 import (
 	"fmt"
-	"strings"
 
-	"github.com/spf13/cast"
 	"golang.org/x/crypto/ssh"
 
 	"github.com/veops/oneterm/internal/model"
-	"github.com/veops/oneterm/internal/tunneling"
 	dbpkg "github.com/veops/oneterm/pkg/db"
 	"github.com/veops/oneterm/pkg/utils"
 )
@@ -57,28 +54,4 @@ func GetAuth(account *model.Account) (ssh.AuthMethod, error) {
 	default:
 		return nil, fmt.Errorf("invalid authmethod %d", account.AccountType)
 	}
-}
-
-func Proxy(isConnectable bool, sessionId string, protocol string, asset *model.Asset, gateway *model.Gateway) (ip string, port int, err error) {
-	ip, port = asset.Ip, 0
-	for _, tp := range strings.Split(protocol, ",") {
-		for _, p := range asset.Protocols {
-			if strings.HasPrefix(strings.ToLower(p), tp) {
-				if port = cast.ToInt(strings.Split(p, ":")[1]); port != 0 {
-					break
-				}
-			}
-		}
-	}
-
-	if asset.GatewayId == 0 || gateway == nil {
-		return
-	}
-
-	g, err := tunneling.OpenTunnel(isConnectable, sessionId, ip, port, gateway)
-	if err != nil {
-		return
-	}
-	ip, port = g.LocalIp, g.LocalPort
-	return
 }

@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/spf13/cast"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/ssh"
 
@@ -230,4 +232,29 @@ func getAvailablePort() (int, error) {
 	defer l.Close()
 
 	return l.Addr().(*net.TCPAddr).Port, nil
+}
+
+// Proxy establishes a proxy connection to an asset through a gateway if necessary
+func Proxy(isConnectable bool, sessionId string, protocol string, asset *model.Asset, gateway *model.Gateway) (ip string, port int, err error) {
+	ip, port = asset.Ip, 0
+	for _, tp := range strings.Split(protocol, ",") {
+		for _, p := range asset.Protocols {
+			if strings.HasPrefix(strings.ToLower(p), tp) {
+				if port = cast.ToInt(strings.Split(p, ":")[1]); port != 0 {
+					break
+				}
+			}
+		}
+	}
+
+	if asset.GatewayId == 0 || gateway == nil {
+		return
+	}
+
+	g, err := OpenTunnel(isConnectable, sessionId, ip, port, gateway)
+	if err != nil {
+		return
+	}
+	ip, port = g.LocalIp, g.LocalPort
+	return
 }

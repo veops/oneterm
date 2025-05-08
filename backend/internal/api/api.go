@@ -24,11 +24,11 @@ var (
 func initDB() {
 	cfg := db.ConfigFromGlobal()
 
-	if err := db.Init(cfg,
+	if err := db.Init(cfg, true,
 		model.DefaultAccount, model.DefaultAsset, model.DefaultAuthorization, model.DefaultCommand,
 		model.DefaultConfig, model.DefaultFileHistory, model.DefaultGateway, model.DefaultHistory,
 		model.DefaultNode, model.DefaultPublicKey, model.DefaultSession, model.DefaultSessionCmd,
-		model.DefaultShare,
+		model.DefaultShare, model.DefaultQuickCommand,
 	); err != nil {
 		logger.L().Fatal("Failed to init database", zap.Error(err))
 	}

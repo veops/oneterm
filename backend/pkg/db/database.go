@@ -110,7 +110,7 @@ func Open(cfg Config) (*gorm.DB, error) {
 	return db, nil
 }
 
-func Init(cfg Config, models ...interface{}) error {
+func Init(cfg Config, autoMigrate bool, models ...interface{}) error {
 	var err error
 
 	dbOnce.Do(func() {
@@ -120,13 +120,13 @@ func Init(cfg Config, models ...interface{}) error {
 			return
 		}
 
-		if len(models) > 0 {
-			if err = DB.AutoMigrate(models...); err != nil {
-				err = fmt.Errorf("auto migrate failed: %w", err)
-				return
-			}
-		}
 	})
+
+	if len(models) > 0 && autoMigrate {
+		if err = DB.AutoMigrate(models...); err != nil {
+			err = fmt.Errorf("auto migrate failed: %w", err)
+		}
+	}
 
 	return err
 }
@@ -174,7 +174,6 @@ func DropIndex(value interface{}, indexName string) error {
 	return nil
 }
 
-// Initialize (backward compatibility)
 func init() {
 	if config.Cfg == nil {
 		return
@@ -197,7 +196,7 @@ func init() {
 			ConnMaxIdleTime: time.Minute * 10,
 		}
 
-		if err := Init(cfg); err != nil {
+		if err := Init(cfg, false); err != nil {
 			logger.L().Fatal("init database failed", zap.Error(err))
 		}
 		return
@@ -207,7 +206,7 @@ func init() {
 	if config.Cfg.Database.Host != "" {
 		cfg := ConfigFromGlobal()
 
-		if err := Init(cfg); err != nil {
+		if err := Init(cfg, false); err != nil {
 			logger.L().Fatal("init database failed", zap.Error(err))
 		}
 	}

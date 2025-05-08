@@ -27,6 +27,7 @@ import (
 	"github.com/veops/oneterm/internal/session"
 	"github.com/veops/oneterm/internal/sshsrv/textinput"
 	"github.com/veops/oneterm/pkg/cache"
+	"github.com/veops/oneterm/pkg/errors"
 	"github.com/veops/oneterm/pkg/logger"
 )
 
@@ -181,8 +182,8 @@ func (m *view) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case errMsg:
 		if msg != nil {
 			str := msg.Error()
-			if ae, ok := msg.(*controller.ApiError); ok {
-				str = controller.Err2Msg[ae.Code].One
+			if ae, ok := msg.(*errors.ApiError); ok {
+				str = errors.Err2Msg[ae.Code].One
 			}
 			return m, tea.Printf("  [ERROR] %s\n\n", errStyle.Render(str))
 		}

@@ -102,7 +102,7 @@ func (s *SessionService) CreateSessionReplay(ctx *gin.Context, sessionId string,
 		return err
 	}
 
-	f, err := os.Create(filepath.Join("/replay", fmt.Sprintf("%s.cast", sessionId)))
+	f, err := os.Create(filepath.Join("/tmp/replay", fmt.Sprintf("%s.cast", sessionId)))
 	if err != nil {
 		return err
 	}

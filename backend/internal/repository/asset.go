@@ -287,3 +287,28 @@ func (r *assetRepository) filterSearch(ctx *gin.Context, db *gorm.DB, fields ...
 	db = db.Where(d)
 	return db
 }
+
+// HandleAssetIds filters asset queries based on resource IDs
+func HandleAssetIds(ctx context.Context, dbFind *gorm.DB, resIds []int) (db *gorm.DB, err error) {
+	currentUser, _ := acl.GetSessionFromCtx(ctx)
+
+	nodes, err := GetAllFromCacheDb(ctx, model.DefaultNode)
+	if err != nil {
+		return
+	}
+	nodeResIds, err := acl.GetRoleResourceIds(ctx, currentUser.GetRid(), config.RESOURCE_NODE)
+	if err != nil {
+		return
+	}
+	nodes = lo.Filter(nodes, func(n *model.Node, _ int) bool { return lo.Contains(nodeResIds, n.ResourceId) })
+	nodeIds := lo.Map(nodes, func(n *model.Node, _ int) int { return n.Id })
+	if nodeIds, err = HandleSelfChild(ctx, nodeIds...); err != nil {
+		return
+	}
+
+	d := dbpkg.DB.Where("resource_id IN ?", resIds).Or("parent_id IN?", nodeIds)
+
+	db = dbFind.Where(d)
+
+	return
+}

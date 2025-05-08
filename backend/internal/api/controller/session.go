@@ -151,5 +151,5 @@ func (c *Controller) GetSessionReplay(ctx *gin.Context) {
 		return
 	}
 
-	ctx.FileAttachment(filepath.Join("/replay", filename), filename)
+	ctx.FileAttachment(filepath.Join("/tmp/replay", filename), filename)
 }

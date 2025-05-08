@@ -9,7 +9,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/samber/lo"
 	"github.com/spf13/cast"
+	"github.com/veops/oneterm/internal/acl"
 	"github.com/veops/oneterm/internal/model"
+	"github.com/veops/oneterm/pkg/config"
 	dbpkg "github.com/veops/oneterm/pkg/db"
 	"gorm.io/gorm"
 )
@@ -162,4 +164,26 @@ func (r *accountRepository) filterSearch(ctx *gin.Context, db *gorm.DB, fields .
 
 	db = db.Where(d)
 	return db
+}
+
+// HandleAccountIds filters account queries based on resource IDs
+func HandleAccountIds(ctx context.Context, dbFind *gorm.DB, resIds []int) (db *gorm.DB, err error) {
+	currentUser, _ := acl.GetSessionFromCtx(ctx)
+
+	assetResIds, err := acl.GetRoleResourceIds(ctx, currentUser.GetRid(), config.RESOURCE_ASSET)
+	if err != nil {
+		return
+	}
+	t, _ := HandleAssetIds(ctx, dbpkg.DB.Model(model.DefaultAsset), assetResIds)
+	ss := make([]model.Slice[string], 0)
+	if err = t.Pluck("JSON_KEYS(authorization)", &ss).Error; err != nil {
+		return
+	}
+	ids := lo.Uniq(lo.Map(lo.Flatten(ss), func(s string, _ int) int { return cast.ToInt(s) }))
+
+	d := dbpkg.DB.Where("resource_id IN ?", resIds).Or("id IN ?", ids)
+
+	db = dbFind.Where(d)
+
+	return
 }

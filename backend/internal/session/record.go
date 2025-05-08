@@ -18,7 +18,7 @@ type Asciinema struct {
 }
 
 func NewAsciinema(id string, w, h int) (ret *Asciinema, err error) {
-	f, err := os.Create(filepath.Join("/replay", fmt.Sprintf("%s.cast", id)))
+	f, err := os.Create(filepath.Join("/tmp/replay", fmt.Sprintf("%s.cast", id)))
 	if err != nil {
 		logger.L().Error("open cast failed", zap.String("id", id), zap.Error(err))
 		return

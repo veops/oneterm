@@ -88,7 +88,7 @@ func (p *Parser) AddInput(bs []byte) (cmd string, forbidden bool) {
 	}
 	p.isPrompt = true
 	p.curCmd = p.getCmdLocked()
-	p.Reset()
+	p.resetLocked()
 	filter := ""
 	if filter, forbidden = p.IsForbidden(p.curCmd); forbidden {
 		cmd = filter

@@ -533,11 +533,11 @@ func handleAcl[T any](ctx *gin.Context, dbFind *gorm.DB, resourceType string) (d
 	}
 	switch any(*new(T)).(type) {
 	case *model.Node:
-		db, err = handleNodeIds(ctx, dbFind, resIds)
+		db, err = repository.HandleNodeIds(ctx, dbFind, resIds)
 	case *model.Asset:
-		db, err = handleAssetIds(ctx, dbFind, resIds)
+		db, err = repository.HandleAssetIds(ctx, dbFind, resIds)
 	case *model.Account:
-		db, err = handleAccountIds(ctx, dbFind, resIds)
+		db, err = repository.HandleAccountIds(ctx, dbFind, resIds)
 	case *model.Gateway:
 		db = dbFind
 	case *model.Command:
@@ -545,84 +545,6 @@ func handleAcl[T any](ctx *gin.Context, dbFind *gorm.DB, resourceType string) (d
 	default:
 		db = dbFind.Where("resource_id IN ?", resIds)
 	}
-
-	return
-}
-
-func handleNodeIds(ctx *gin.Context, dbFind *gorm.DB, resIds []int) (db *gorm.DB, err error) {
-	currentUser, _ := acl.GetSessionFromCtx(ctx)
-
-	nodes, err := repository.GetAllFromCacheDb(ctx, model.DefaultNode)
-	if err != nil {
-		return
-	}
-	nodes = lo.Filter(nodes, func(n *model.Node, _ int) bool { return lo.Contains(resIds, n.ResourceId) })
-	ids := lo.Map(nodes, func(n *model.Node, _ int) int { return n.Id })
-	if ids, err = repository.HandleSelfChild(ctx, ids...); err != nil {
-		return
-	}
-
-	assetResIds, err := acl.GetRoleResourceIds(ctx, currentUser.GetRid(), config.RESOURCE_ASSET)
-	if err != nil {
-		return
-	}
-	assets := make([]*model.AssetIdPid, 0)
-	if err = dbpkg.DB.Model(assets).Where("resource_id IN ?", assetResIds).Find(&assets).Error; err != nil {
-		return
-	}
-	ids = append(ids, lo.Map(assets, func(a *model.AssetIdPid, _ int) int { return a.ParentId })...)
-
-	ids, err = repository.HandleSelfParent(ctx, ids...)
-	if err != nil {
-		return
-	}
-
-	db = dbFind.Where("id IN ?", ids)
-
-	return
-}
-
-func handleAssetIds(ctx *gin.Context, dbFind *gorm.DB, resIds []int) (db *gorm.DB, err error) {
-	currentUser, _ := acl.GetSessionFromCtx(ctx)
-
-	nodes, err := repository.GetAllFromCacheDb(ctx, model.DefaultNode)
-	if err != nil {
-		return
-	}
-	nodeResIds, err := acl.GetRoleResourceIds(ctx, currentUser.GetRid(), config.RESOURCE_NODE)
-	if err != nil {
-		return
-	}
-	nodes = lo.Filter(nodes, func(n *model.Node, _ int) bool { return lo.Contains(nodeResIds, n.ResourceId) })
-	nodeIds := lo.Map(nodes, func(n *model.Node, _ int) int { return n.Id })
-	if nodeIds, err = repository.HandleSelfChild(ctx, nodeIds...); err != nil {
-		return
-	}
-
-	d := dbpkg.DB.Where("resource_id IN ?", resIds).Or("parent_id IN?", nodeIds)
-
-	db = dbFind.Where(d)
-
-	return
-}
-
-func handleAccountIds(ctx *gin.Context, dbFind *gorm.DB, resIds []int) (db *gorm.DB, err error) {
-	currentUser, _ := acl.GetSessionFromCtx(ctx)
-
-	assetResIds, err := acl.GetRoleResourceIds(ctx, currentUser.GetRid(), config.RESOURCE_ASSET)
-	if err != nil {
-		return
-	}
-	t, _ := handleAssetIds(ctx, dbpkg.DB.Model(model.DefaultAsset), assetResIds)
-	ss := make([]model.Slice[string], 0)
-	if err = t.Pluck("JSON_KEYS(authorization)", &ss).Error; err != nil {
-		return
-	}
-	ids := lo.Uniq(lo.Map(lo.Flatten(ss), func(s string, _ int) int { return cast.ToInt(s) }))
-
-	d := dbpkg.DB.Where("resource_id IN ?", resIds).Or("id IN ?", ids)
-
-	db = dbFind.Where(d)
 
 	return
 }

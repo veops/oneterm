@@ -4,7 +4,11 @@ import (
 	"context"
 
 	"github.com/samber/lo"
+	"github.com/veops/oneterm/internal/acl"
 	"github.com/veops/oneterm/internal/model"
+	"github.com/veops/oneterm/pkg/config"
+	dbpkg "github.com/veops/oneterm/pkg/db"
+	"gorm.io/gorm"
 )
 
 // NodeRepository defines the interface for node repository
@@ -77,4 +81,38 @@ func HandleSelfParent(ctx context.Context, ids ...int) (res []int, err error) {
 	res = lo.Uniq(append(res, ids...))
 
 	return res, nil
+}
+
+// HandleNodeIds filters node queries based on resource IDs
+func HandleNodeIds(ctx context.Context, dbFind *gorm.DB, resIds []int) (db *gorm.DB, err error) {
+	currentUser, _ := acl.GetSessionFromCtx(ctx)
+
+	nodes, err := GetAllFromCacheDb(ctx, model.DefaultNode)
+	if err != nil {
+		return
+	}
+	nodes = lo.Filter(nodes, func(n *model.Node, _ int) bool { return lo.Contains(resIds, n.ResourceId) })
+	ids := lo.Map(nodes, func(n *model.Node, _ int) int { return n.Id })
+	if ids, err = HandleSelfChild(ctx, ids...); err != nil {
+		return
+	}
+
+	assetResIds, err := acl.GetRoleResourceIds(ctx, currentUser.GetRid(), config.RESOURCE_ASSET)
+	if err != nil {
+		return
+	}
+	assets := make([]*model.AssetIdPid, 0)
+	if err = dbpkg.DB.Model(assets).Where("resource_id IN ?", assetResIds).Find(&assets).Error; err != nil {
+		return
+	}
+	ids = append(ids, lo.Map(assets, func(a *model.AssetIdPid, _ int) int { return a.ParentId })...)
+
+	ids, err = HandleSelfParent(ctx, ids...)
+	if err != nil {
+		return
+	}
+
+	db = dbFind.Where("id IN ?", ids)
+
+	return
 }

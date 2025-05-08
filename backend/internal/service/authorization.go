@@ -222,6 +222,9 @@ func (s *AuthorizationService) HandleAuthorization(ctx context.Context, tx *gorm
 		switch action {
 		case model.ACTION_CREATE, model.ACTION_UPDATE:
 			for _, v := range auths {
+				if v == nil {
+					continue
+				}
 				v.AssetId = asset.Id
 				v.NodeId = 0
 				v.SetUpdaterId(currentUser.GetUid())
@@ -235,6 +238,9 @@ func (s *AuthorizationService) HandleAuthorization(ctx context.Context, tx *gorm
 			}
 		case model.ACTION_DELETE:
 			for _, v := range pres {
+				if v == nil {
+					continue
+				}
 				if err = tx.Delete(v).Error; err != nil {
 					return
 				}
@@ -244,6 +250,9 @@ func (s *AuthorizationService) HandleAuthorization(ctx context.Context, tx *gorm
 	}
 
 	for _, v := range auths {
+		if v == nil {
+			continue
+		}
 		if v.Id == 0 && v.AssetId == 0 && v.AccountId == 0 && v.NodeId == 0 {
 			err = errors.New("invalid authorization")
 			return

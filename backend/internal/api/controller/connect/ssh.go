@@ -197,6 +197,7 @@ func HandleTerm(sess *gsession.Session) (err error) {
 							Width:  cast.ToInt(wh[0]),
 							Height: cast.ToInt(wh[1]),
 						}
+						continue
 					}
 				}
 				if cmd, forbidden := sess.SshParser.AddInput(in); forbidden {

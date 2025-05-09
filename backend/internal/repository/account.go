@@ -3,7 +3,6 @@ package repository
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -38,9 +37,9 @@ func (r *accountRepository) BuildQuery(ctx *gin.Context) *gorm.DB {
 	db := dbpkg.DB.Model(&model.Account{})
 
 	// Apply filters
-	db = r.filterEqual(ctx, db, "id", "type")
-	db = r.filterLike(ctx, db, "name")
-	db = r.filterSearch(ctx, db, "name", "account")
+	db = dbpkg.FilterEqual(ctx, db, "id", "type")
+	db = dbpkg.FilterLike(ctx, db, "name")
+	db = dbpkg.FilterSearch(ctx, db, "name", "account")
 
 	// Handle IDs parameter
 	if q, ok := ctx.GetQuery("ids"); ok {
@@ -123,47 +122,6 @@ func (r *accountRepository) GetAccountIdsByAuthorization(ctx context.Context, as
 
 	// Merge with account IDs from authorizations
 	return lo.Uniq(append(accountIds, authorizationIds...)), nil
-}
-
-// Filter helpers
-func (r *accountRepository) filterEqual(ctx *gin.Context, db *gorm.DB, fields ...string) *gorm.DB {
-	for _, f := range fields {
-		if q, ok := ctx.GetQuery(f); ok {
-			db = db.Where(fmt.Sprintf("%s = ?", f), q)
-		}
-	}
-	return db
-}
-
-func (r *accountRepository) filterLike(ctx *gin.Context, db *gorm.DB, fields ...string) *gorm.DB {
-	likes := false
-	d := dbpkg.DB
-	for _, f := range fields {
-		if q, ok := ctx.GetQuery(f); ok && q != "" {
-			d = d.Or(fmt.Sprintf("%s LIKE ?", f), fmt.Sprintf("%%%s%%", q))
-			likes = true
-		}
-	}
-	if !likes {
-		return db
-	}
-	db = db.Where(d)
-	return db
-}
-
-func (r *accountRepository) filterSearch(ctx *gin.Context, db *gorm.DB, fields ...string) *gorm.DB {
-	q, ok := ctx.GetQuery("search")
-	if !ok || len(fields) <= 0 {
-		return db
-	}
-
-	d := dbpkg.DB
-	for _, f := range fields {
-		d = d.Or(fmt.Sprintf("%s LIKE ?", f), fmt.Sprintf("%%%s%%", q))
-	}
-
-	db = db.Where(d)
-	return db
 }
 
 // HandleAccountIds filters account queries based on resource IDs

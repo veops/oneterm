@@ -9,8 +9,9 @@ import (
 
 // HistoryRepository defines the interface for history repository
 type HistoryRepository interface {
-	GetHistories(ctx context.Context, filters map[string]interface{}) ([]*model.History, error)
+	GetHistories(ctx context.Context, filters map[string]any) ([]*model.History, error)
 	GetHistory(ctx context.Context, id int) (*model.History, error)
+	CreateHistory(ctx context.Context, history *model.History) error
 }
 
 type historyRepository struct{}
@@ -30,7 +31,7 @@ func (r *historyRepository) GetHistory(ctx context.Context, id int) (*model.Hist
 }
 
 // GetHistories retrieves history records based on filters
-func (r *historyRepository) GetHistories(ctx context.Context, filters map[string]interface{}) ([]*model.History, error) {
+func (r *historyRepository) GetHistories(ctx context.Context, filters map[string]any) ([]*model.History, error) {
 	var histories []*model.History
 	db := dbpkg.DB.Model(&model.History{})
 
@@ -43,4 +44,9 @@ func (r *historyRepository) GetHistories(ctx context.Context, filters map[string
 	}
 
 	return histories, nil
+}
+
+// CreateHistory creates a new history record
+func (r *historyRepository) CreateHistory(ctx context.Context, history *model.History) error {
+	return dbpkg.DB.Create(history).Error
 }

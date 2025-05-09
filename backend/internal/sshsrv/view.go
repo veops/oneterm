@@ -22,6 +22,7 @@ import (
 
 	"github.com/veops/oneterm/internal/acl"
 	"github.com/veops/oneterm/internal/api/controller"
+	"github.com/veops/oneterm/internal/api/controller/connect"
 	"github.com/veops/oneterm/internal/model"
 	"github.com/veops/oneterm/internal/repository"
 	"github.com/veops/oneterm/internal/session"
@@ -334,7 +335,7 @@ func (conn *connector) SetStderr(w io.Writer) {
 }
 
 func (conn *connector) Run() error {
-	gsess, err := controller.DoConnect(conn.Ctx, nil)
+	gsess, err := connect.DoConnect(conn.Ctx, nil)
 	if err != nil {
 		return err
 	}
@@ -373,7 +374,7 @@ func (conn *connector) Run() error {
 			}
 		}
 	})
-	controller.HandleTerm(gsess)
+	connect.HandleTerm(gsess)
 
 	if err = gsess.G.Wait(); err != nil {
 		logger.L().Error("sshsrv run stopped", zap.String("sessionId", gsess.SessionId), zap.Error(err))

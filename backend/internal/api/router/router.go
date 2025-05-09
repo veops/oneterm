@@ -20,6 +20,7 @@ func SetupRouter(r *gin.Engine) {
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	c := controller.Controller{}
+
 	v1 := r.Group("/api/oneterm/v1", middleware.Error2RespMiddleware(), middleware.AuthMiddleware())
 	{
 		account := v1.Group("account")
@@ -132,7 +133,19 @@ func SetupRouter(r *gin.Engine) {
 			authorization.DELETE("/:id", c.DeleteAccount)
 			authorization.GET("", c.GetAuthorizations)
 		}
-	}
 
-	return
+		quickCommand := v1.Group("/quick_command")
+		{
+			quickCommand.POST("", c.CreateQuickCommand)
+			quickCommand.GET("", c.GetQuickCommands)
+			quickCommand.DELETE("/:id", c.DeleteQuickCommand)
+			quickCommand.PUT("/:id", c.UpdateQuickCommand)
+		}
+
+		preference := v1.Group("/preference")
+		{
+			preference.GET("", c.GetPreference)
+			preference.PUT("", c.UpdatePreference)
+		}
+	}
 }

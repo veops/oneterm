@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/veops/oneterm/internal/model"
+	gsession "github.com/veops/oneterm/internal/session"
 	dbpkg "github.com/veops/oneterm/pkg/db"
 	"gorm.io/gorm"
 )
@@ -19,6 +20,8 @@ type SessionRepository interface {
 	GetSessionOptionClientIps(ctx context.Context) ([]string, error)
 	CreateSessionCmd(ctx context.Context, cmd *model.SessionCmd) error
 	GetSessionCmdCounts(ctx context.Context, sessionIds []string) (map[string]int64, error)
+	GetOnlineSessionByID(ctx context.Context, sessionID string) (*gsession.Session, error)
+	GetSshParserCommands(ctx context.Context, cmdIDs []int) ([]*model.Command, error)
 }
 
 type sessionRepository struct{}
@@ -147,4 +150,26 @@ func (r *sessionRepository) GetSessionCmdCounts(ctx context.Context, sessionIds 
 	}
 
 	return result, nil
+}
+
+// GetOnlineSessionByID retrieves an online session by ID
+func (r *sessionRepository) GetOnlineSessionByID(ctx context.Context, sessionID string) (*gsession.Session, error) {
+	session := &gsession.Session{}
+	err := dbpkg.DB.
+		Model(session).
+		Where("session_id = ?", sessionID).
+		Where("status = ?", model.SESSIONSTATUS_ONLINE).
+		First(session).
+		Error
+	return session, err
+}
+
+// GetSshParserCommands retrieves SSH parser commands by IDs
+func (r *sessionRepository) GetSshParserCommands(ctx context.Context, cmdIDs []int) ([]*model.Command, error) {
+	var commands []*model.Command
+	err := dbpkg.DB.
+		Where("id IN ? AND enable=?", cmdIDs, true).
+		Find(&commands).
+		Error
+	return commands, err
 }

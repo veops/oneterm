@@ -24,6 +24,11 @@ func NewAssetService() *AssetService {
 	}
 }
 
+// GetById retrieves an asset by its ID
+func (s *AssetService) GetById(ctx context.Context, id int) (*model.Asset, error) {
+	return s.repo.GetById(ctx, id)
+}
+
 // PreprocessAssetData preprocesses asset data before saving
 func (s *AssetService) PreprocessAssetData(asset *model.Asset) {
 	asset.Ip = strings.TrimSpace(asset.Ip)

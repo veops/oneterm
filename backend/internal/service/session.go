@@ -15,6 +15,7 @@ import (
 	"github.com/veops/oneterm/internal/acl"
 	"github.com/veops/oneterm/internal/model"
 	"github.com/veops/oneterm/internal/repository"
+	gsession "github.com/veops/oneterm/internal/session"
 	"github.com/veops/oneterm/pkg/logger"
 	"gorm.io/gorm"
 )
@@ -29,6 +30,16 @@ func NewSessionService() *SessionService {
 	return &SessionService{
 		repo: repository.NewSessionRepository(),
 	}
+}
+
+// GetOnlineSessionByID retrieves an online session by ID
+func (s *SessionService) GetOnlineSessionByID(ctx context.Context, sessionID string) (*gsession.Session, error) {
+	return s.repo.GetOnlineSessionByID(ctx, sessionID)
+}
+
+// GetSshParserCommands retrieves SSH parser commands by IDs
+func (s *SessionService) GetSshParserCommands(ctx context.Context, cmdIDs []int) ([]*model.Command, error) {
+	return s.repo.GetSshParserCommands(ctx, cmdIDs)
 }
 
 // AttachCmdCounts attaches command counts to sessions

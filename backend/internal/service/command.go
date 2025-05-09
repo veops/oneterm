@@ -46,9 +46,9 @@ func (s *CommandService) BuildQuery(ctx *gin.Context) (*gorm.DB, error) {
 	db := dbpkg.DB.Model(&model.Command{})
 
 	// Apply filters
-	db = s.filterEqual(ctx, db, "id", "enable")
-	db = s.filterLike(ctx, db, "name")
-	db = s.filterSearch(ctx, db, "name", "cmd")
+	db = dbpkg.FilterEqual(ctx, db, "id", "enable")
+	db = dbpkg.FilterLike(ctx, db, "name")
+	db = dbpkg.FilterSearch(ctx, db, "name", "cmd")
 
 	// Handle IDs filter
 	if q, ok := ctx.GetQuery("ids"); ok {
@@ -94,45 +94,4 @@ func (s *CommandService) GetAuthorizedCommandIds(ctx context.Context, currentUse
 	}
 
 	return lo.Uniq(ids), nil
-}
-
-// Helper methods for filtering
-func (s *CommandService) filterEqual(ctx *gin.Context, db *gorm.DB, fields ...string) *gorm.DB {
-	for _, f := range fields {
-		if q, ok := ctx.GetQuery(f); ok {
-			db = db.Where(fmt.Sprintf("%s = ?", f), q)
-		}
-	}
-	return db
-}
-
-func (s *CommandService) filterLike(ctx *gin.Context, db *gorm.DB, fields ...string) *gorm.DB {
-	likes := false
-	d := dbpkg.DB
-	for _, f := range fields {
-		if q, ok := ctx.GetQuery(f); ok && q != "" {
-			d = d.Or(fmt.Sprintf("%s LIKE ?", f), fmt.Sprintf("%%%s%%", q))
-			likes = true
-		}
-	}
-	if !likes {
-		return db
-	}
-	db = db.Where(d)
-	return db
-}
-
-func (s *CommandService) filterSearch(ctx *gin.Context, db *gorm.DB, fields ...string) *gorm.DB {
-	q, ok := ctx.GetQuery("search")
-	if !ok || len(fields) <= 0 {
-		return db
-	}
-
-	d := dbpkg.DB
-	for _, f := range fields {
-		d = d.Or(fmt.Sprintf("%s LIKE ?", f), fmt.Sprintf("%%%s%%", q))
-	}
-
-	db = db.Where(d)
-	return db
 }

@@ -1,7 +1,9 @@
 package service
 
 import (
-	"fmt"
+	"context"
+	"encoding/json"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/nicksnyder/go-i18n/v2/i18n"
@@ -25,12 +27,42 @@ func NewHistoryService() *HistoryService {
 	}
 }
 
+// CreateHistory creates a new history record
+func (s *HistoryService) CreateHistory(ctx context.Context, history *model.History) error {
+	return s.repo.CreateHistory(ctx, history)
+}
+
+// CreateHistoryRecord creates a history record with common fields
+func (s *HistoryService) CreateHistoryRecord(ctx context.Context, actionType int, modelObj model.Model, oldModel model.Model, userId int) *model.History {
+	var clientIP string
+	if ginCtx, ok := ctx.(*gin.Context); ok {
+		clientIP = ginCtx.ClientIP()
+	}
+
+	return &model.History{
+		RemoteIp:   clientIP,
+		Type:       modelObj.TableName(),
+		TargetId:   modelObj.GetId(),
+		ActionType: actionType,
+		Old:        toMap(oldModel),
+		New:        toMap(modelObj),
+		CreatorId:  userId,
+		CreatedAt:  time.Now(),
+	}
+}
+
+// CreateAndSaveHistory creates and saves a history record in one operation
+func (s *HistoryService) CreateAndSaveHistory(ctx context.Context, actionType int, modelObj model.Model, oldModel model.Model, userId int) error {
+	history := s.CreateHistoryRecord(ctx, actionType, modelObj, oldModel, userId)
+	return s.CreateHistory(ctx, history)
+}
+
 // BuildQuery constructs history query with basic filters
 func (s *HistoryService) BuildQuery(ctx *gin.Context) (*gorm.DB, error) {
 	db := dbpkg.DB.Model(&model.History{})
 
 	// Apply search filter
-	db = s.filterSearch(ctx, db, "old", "new")
+	db = dbpkg.FilterSearch(ctx, db, "old", "new")
 
 	// Apply date range filter
 	db, err := s.filterStartEnd(ctx, db)
@@ -39,7 +71,7 @@ func (s *HistoryService) BuildQuery(ctx *gin.Context) (*gorm.DB, error) {
 	}
 
 	// Apply exact match filters
-	db = s.filterEqual(ctx, db, "type", "target_id", "action_type", "uid")
+	db = dbpkg.FilterEqual(ctx, db, "type", "target_id", "action_type", "uid")
 
 	return db, nil
 }
@@ -74,30 +106,6 @@ func (s *HistoryService) GetTypeMapping(ctx *gin.Context) (map[string]string, er
 }
 
 // Helper methods for filtering
-func (s *HistoryService) filterEqual(ctx *gin.Context, db *gorm.DB, fields ...string) *gorm.DB {
-	for _, f := range fields {
-		if q, ok := ctx.GetQuery(f); ok {
-			db = db.Where(fmt.Sprintf("%s = ?", f), q)
-		}
-	}
-	return db
-}
-
-func (s *HistoryService) filterSearch(ctx *gin.Context, db *gorm.DB, fields ...string) *gorm.DB {
-	q, ok := ctx.GetQuery("search")
-	if !ok || len(fields) <= 0 {
-		return db
-	}
-
-	d := dbpkg.DB
-	for _, f := range fields {
-		d = d.Or(fmt.Sprintf("%s LIKE ?", f), fmt.Sprintf("%%%s%%", q))
-	}
-
-	db = db.Where(d)
-	return db
-}
-
 func (s *HistoryService) filterStartEnd(ctx *gin.Context, db *gorm.DB) (*gorm.DB, error) {
 	if start, ok := ctx.GetQuery("start"); ok {
 		db = db.Where("created_at >= ?", start)
@@ -106,4 +114,15 @@ func (s *HistoryService) filterStartEnd(ctx *gin.Context, db *gorm.DB) (*gorm.DB
 		db = db.Where("created_at <= ?", end)
 	}
 	return db, nil
+}
+
+// toMap converts an object to a map
+func toMap(data any) model.Map[string, any] {
+	if data == nil {
+		return nil
+	}
+	bs, _ := json.Marshal(data)
+	res := make(map[string]any)
+	json.Unmarshal(bs, &res)
+	return res
 }

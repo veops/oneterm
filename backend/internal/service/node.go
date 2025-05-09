@@ -75,10 +75,10 @@ func (s *NodeService) CheckCycle(ctx context.Context, data *model.Node, nodeId i
 func (s *NodeService) BuildQuery(ctx *gin.Context, currentUser interface{}, info bool) (*gorm.DB, error) {
 	db := dbpkg.DB.Model(model.DefaultNode)
 
-	// Apply filters
-	db = s.filterEqual(ctx, db, "id", "parent_id")
-	db = s.filterLike(ctx, db, "name")
-	db = s.filterSearch(ctx, db, "name")
+	// 改用通用过滤器
+	db = dbpkg.FilterEqual(ctx, db, "parent_id", "id")
+	db = dbpkg.FilterLike(ctx, db, "name")
+	db = dbpkg.FilterSearch(ctx, db, "name", "id")
 
 	// Handle IDs filter
 	if q, ok := ctx.GetQuery("ids"); ok {
@@ -368,47 +368,6 @@ func (s *NodeService) handleNoSelfChild(ctx context.Context, id int) ([]int, err
 	return lo.Filter(lo.Map(nodes, func(n *model.Node, _ int) int { return n.Id }), func(i int, _ int) bool {
 		return !lo.Contains(ids, i)
 	}), nil
-}
-
-// Helper methods for filtering
-func (s *NodeService) filterEqual(ctx *gin.Context, db *gorm.DB, fields ...string) *gorm.DB {
-	for _, f := range fields {
-		if q, ok := ctx.GetQuery(f); ok {
-			db = db.Where(f+" = ?", q)
-		}
-	}
-	return db
-}
-
-func (s *NodeService) filterLike(ctx *gin.Context, db *gorm.DB, fields ...string) *gorm.DB {
-	likes := false
-	d := dbpkg.DB
-	for _, f := range fields {
-		if q, ok := ctx.GetQuery(f); ok && q != "" {
-			d = d.Or(f+" LIKE ?", "%"+q+"%")
-			likes = true
-		}
-	}
-	if !likes {
-		return db
-	}
-	db = db.Where(d)
-	return db
-}
-
-func (s *NodeService) filterSearch(ctx *gin.Context, db *gorm.DB, fields ...string) *gorm.DB {
-	q, ok := ctx.GetQuery("search")
-	if !ok || len(fields) <= 0 {
-		return db
-	}
-
-	d := dbpkg.DB
-	for _, f := range fields {
-		d = d.Or(f+" LIKE ?", "%"+q+"%")
-	}
-
-	db = db.Where(d)
-	return db
 }
 
 func (s *NodeService) handleAssetIds(ctx context.Context, dbFind *gorm.DB, resIds []int) (*gorm.DB, error) {

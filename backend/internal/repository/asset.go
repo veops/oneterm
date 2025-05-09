@@ -24,6 +24,7 @@ const (
 
 // AssetRepository interface for asset data access
 type AssetRepository interface {
+	GetById(ctx context.Context, id int) (*model.Asset, error)
 	AttachNodeChain(ctx context.Context, assets []*model.Asset) error
 	ApplyAuthorizationFilters(ctx *gin.Context, assets []*model.Asset, authorizationIds []*model.AuthorizationIds, nodeIds, accountIds []int)
 	BuildQuery(ctx *gin.Context) (*gorm.DB, error)
@@ -41,14 +42,21 @@ func NewAssetRepository() AssetRepository {
 	return &assetRepository{}
 }
 
+// GetById retrieves an asset by its ID
+func (r *assetRepository) GetById(ctx context.Context, id int) (*model.Asset, error) {
+	asset := &model.Asset{}
+	err := dbpkg.DB.Where("id = ?", id).First(asset).Error
+	return asset, err
+}
+
 // BuildQuery builds the base query for assets with filters
 func (r *assetRepository) BuildQuery(ctx *gin.Context) (*gorm.DB, error) {
 	db := dbpkg.DB.Model(model.DefaultAsset)
 
 	// Apply filters
-	db = r.filterEqual(ctx, db, "id")
-	db = r.filterLike(ctx, db, "name", "ip")
-	db = r.filterSearch(ctx, db, "name", "ip")
+	db = dbpkg.FilterEqual(ctx, db, "id")
+	db = dbpkg.FilterLike(ctx, db, "name", "ip")
+	db = dbpkg.FilterSearch(ctx, db, "name", "ip")
 
 	// Handle IDs parameter
 	if q, ok := ctx.GetQuery("ids"); ok {
@@ -245,47 +253,6 @@ func (r *assetRepository) handleAssetIds(ctx *gin.Context, dbFind *gorm.DB, resI
 	db = dbFind.Where(d)
 
 	return db, nil
-}
-
-// Filter helpers
-func (r *assetRepository) filterEqual(ctx *gin.Context, db *gorm.DB, fields ...string) *gorm.DB {
-	for _, f := range fields {
-		if q, ok := ctx.GetQuery(f); ok {
-			db = db.Where(fmt.Sprintf("%s = ?", f), q)
-		}
-	}
-	return db
-}
-
-func (r *assetRepository) filterLike(ctx *gin.Context, db *gorm.DB, fields ...string) *gorm.DB {
-	likes := false
-	d := dbpkg.DB
-	for _, f := range fields {
-		if q, ok := ctx.GetQuery(f); ok && q != "" {
-			d = d.Or(fmt.Sprintf("%s LIKE ?", f), fmt.Sprintf("%%%s%%", q))
-			likes = true
-		}
-	}
-	if !likes {
-		return db
-	}
-	db = db.Where(d)
-	return db
-}
-
-func (r *assetRepository) filterSearch(ctx *gin.Context, db *gorm.DB, fields ...string) *gorm.DB {
-	q, ok := ctx.GetQuery("search")
-	if !ok || len(fields) <= 0 {
-		return db
-	}
-
-	d := dbpkg.DB
-	for _, f := range fields {
-		d = d.Or(fmt.Sprintf("%s LIKE ?", f), fmt.Sprintf("%%%s%%", q))
-	}
-
-	db = db.Where(d)
-	return db
 }
 
 // HandleAssetIds filters asset queries based on resource IDs

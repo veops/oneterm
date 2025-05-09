@@ -237,6 +237,9 @@ definitions:
       type:
         type: string
     type: object
+  model.JSON:
+    additionalProperties: true
+    type: object
   model.Map-int-model_Slice-int:
     additionalProperties:
       items:
@@ -305,6 +308,30 @@ definitions:
       updater_id:
         type: integer
       username:
+        type: string
+    type: object
+  model.QuickCommand:
+    properties:
+      command:
+        description: Actual command to execute
+        type: string
+      created_at:
+        type: string
+      creator_id:
+        description: Creator ID
+        type: integer
+      description:
+        description: Command description
+        type: string
+      id:
+        type: integer
+      is_global:
+        description: Whether it's a global command
+        type: boolean
+      name:
+        description: Command name
+        type: string
+      updated_at:
         type: string
     type: object
   model.Range:
@@ -480,6 +507,49 @@ definitions:
       session:
         type: integer
       total_asset:
+        type: integer
+    type: object
+  model.StatRankOfUser:
+    properties:
+      count:
+        type: integer
+      last_time:
+        type: string
+      uid:
+        type: integer
+    type: object
+  model.UserPreference:
+    properties:
+      created_at:
+        type: string
+      cursor_style:
+        description: Cursor style (block, bar, underline)
+        type: string
+      font_family:
+        description: Font family
+        type: string
+      font_size:
+        description: Font size
+        type: integer
+      id:
+        type: integer
+      letter_spacing:
+        description: Letter spacing
+        type: number
+      line_height:
+        description: Line height
+        type: number
+      settings:
+        allOf:
+        - $ref: '#/definitions/model.JSON'
+        description: Additional settings in JSON format
+      theme:
+        description: Theme name
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        description: User ID with unique index
         type: integer
     type: object
   model.VncConfig:
@@ -1435,6 +1505,44 @@ paths:
             $ref: '#/definitions/controller.HttpResponse'
       tags:
       - node
+  /preference:
+    get:
+      description: Get terminal preferences for the current user
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/controller.HttpResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.UserPreference'
+              type: object
+      summary: Get user preferences
+      tags:
+      - Preference
+    put:
+      description: Update terminal preferences for the current user
+      parameters:
+      - description: User preferences
+        in: body
+        name: preference
+        required: true
+        schema:
+          $ref: '#/definitions/model.UserPreference'
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/controller.HttpResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.UserPreference'
+              type: object
+      summary: Update user preferences
+      tags:
+      - Preference
   /public_key:
     get:
       parameters:
@@ -1529,6 +1637,104 @@ paths:
             $ref: '#/definitions/controller.HttpResponse'
       tags:
       - public_key
+  /quick_command:
+    get:
+      description: Get all quick commands available to the user
+      parameters:
+      - description: page index
+        in: query
+        name: page_index
+        required: true
+        type: integer
+      - description: page size
+        in: query
+        name: page_size
+        required: true
+        type: integer
+      - description: name or command
+        in: query
+        name: search
+        type: string
+      - description: command id
+        in: query
+        name: id
+        type: integer
+      - description: command name
+        in: query
+        name: name
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/controller.HttpResponse'
+            - properties:
+                data:
+                  allOf:
+                  - $ref: '#/definitions/controller.ListData'
+                  - properties:
+                      list:
+                        items:
+                          $ref: '#/definitions/model.QuickCommand'
+                        type: array
+                    type: object
+              type: object
+      tags:
+      - QuickCommand
+    post:
+      description: Create a new quick command
+      parameters:
+      - description: Quick command data
+        in: body
+        name: quick_command
+        required: true
+        schema:
+          $ref: '#/definitions/model.QuickCommand'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - QuickCommand
+  /quick_command/{id}:
+    delete:
+      description: Delete a quick command by ID
+      parameters:
+      - description: Quick command ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - QuickCommand
+    put:
+      description: Update an existing quick command by ID
+      parameters:
+      - description: Quick command ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Updated quick command data
+        in: body
+        name: quick_command
+        required: true
+        schema:
+          $ref: '#/definitions/model.QuickCommand'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - QuickCommand
   /session:
     get:
       parameters:
@@ -1957,7 +2163,7 @@ paths:
                   - properties:
                       list:
                         items:
-                          $ref: '#/definitions/model.StatAsset'
+                          $ref: '#/definitions/model.StatRankOfUser'
                         type: array
                     type: object
               type: object

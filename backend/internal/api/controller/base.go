@@ -2,7 +2,6 @@ package controller
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"reflect"
@@ -17,8 +16,8 @@ import (
 	"github.com/veops/oneterm/internal/acl"
 	"github.com/veops/oneterm/internal/model"
 	"github.com/veops/oneterm/internal/repository"
+	"github.com/veops/oneterm/internal/service"
 	"github.com/veops/oneterm/pkg/config"
-	dbpkg "github.com/veops/oneterm/pkg/db"
 	myErrors "github.com/veops/oneterm/pkg/errors"
 	"github.com/veops/oneterm/pkg/remote"
 )
@@ -35,10 +34,16 @@ type preHook[T any] func(*gin.Context, T)
 type postHook[T any] func(*gin.Context, []T)
 type deleteCheck func(*gin.Context, int)
 
-type Controller struct{}
+type Controller struct {
+	baseService    service.BaseService
+	historyService *service.HistoryService
+}
 
 func NewController() *Controller {
-	return &Controller{}
+	return &Controller{
+		baseService:    service.NewBaseService(),
+		historyService: service.NewHistoryService(),
+	}
 }
 
 type HttpResponse struct {
@@ -64,6 +69,8 @@ func doCreate[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType 
 	defer repository.DeleteAllFromCacheDb(ctx, md)
 
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
+	baseService := service.NewBaseService()
+	historyService := service.NewHistoryService()
 
 	if err = ctx.ShouldBindBodyWithJSON(md); err != nil {
 		ctx.AbortWithError(http.StatusBadRequest, &myErrors.ApiError{Code: myErrors.ErrInvalidArgument, Data: map[string]any{"err": err}})
@@ -94,7 +101,7 @@ func doCreate[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType 
 	md.SetCreatorId(currentUser.Uid)
 	md.SetUpdaterId(currentUser.Uid)
 
-	if err = dbpkg.DB.Transaction(func(tx *gorm.DB) (err error) {
+	if err = baseService.ExecuteInTransaction(ctx, func(tx *gorm.DB) (err error) {
 		if err = tx.Model(md).Create(md).Error; err != nil {
 			return
 		}
@@ -112,19 +119,8 @@ func doCreate[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType 
 			}
 		}
 
-		if err = tx.Create(&model.History{
-			RemoteIp:   ctx.ClientIP(),
-			Type:       md.TableName(),
-			TargetId:   md.GetId(),
-			ActionType: model.ACTION_CREATE,
-			Old:        nil,
-			New:        toMap(md),
-			CreatorId:  currentUser.Uid,
-			CreatedAt:  time.Now(),
-		}).Error; err != nil {
-			return
-		}
-
+		// Create history using history service
+		err = historyService.CreateAndSaveHistory(ctx, model.ACTION_CREATE, md, nil, currentUser.Uid)
 		return
 	}); err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
@@ -148,6 +144,8 @@ func doDelete[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType 
 	defer repository.DeleteAllFromCacheDb(ctx, md)
 
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
+	baseService := service.NewBaseService()
+	historyService := service.NewHistoryService()
 
 	id, err := cast.ToIntE(ctx.Param("id"))
 	if err != nil {
@@ -155,7 +153,8 @@ func doDelete[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType 
 		return
 	}
 
-	if err = dbpkg.DB.Model(md).Where("id = ?", id).First(md).Error; err != nil {
+	// Use service to get model by ID
+	if err = baseService.GetById(ctx, id, md); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			ctx.JSON(http.StatusOK, HttpResponse{
 				Data: map[string]any{
@@ -167,10 +166,12 @@ func doDelete[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType 
 		ctx.AbortWithError(http.StatusBadRequest, &myErrors.ApiError{Code: myErrors.ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
+
 	if needAcl && !hasPerm(ctx, md, resourceType, acl.DELETE) {
 		ctx.AbortWithError(http.StatusForbidden, &myErrors.ApiError{Code: myErrors.ErrNoPerm, Data: map[string]any{"perm": acl.DELETE}})
 		return
 	}
+
 	for _, dc := range dcs {
 		if dc == nil {
 			continue
@@ -180,6 +181,7 @@ func doDelete[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType 
 			return
 		}
 	}
+
 	if needAcl {
 		if err = acl.DeleteResource(ctx, currentUser.GetUid(), md.GetResourceId()); err != nil {
 			handleRemoteErr(ctx, err)
@@ -187,7 +189,7 @@ func doDelete[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType 
 		}
 	}
 
-	if err = dbpkg.DB.Transaction(func(tx *gorm.DB) (err error) {
+	if err = baseService.ExecuteInTransaction(ctx, func(tx *gorm.DB) (err error) {
 		switch t := any(md).(type) {
 		case *model.Asset:
 			if err = handleAuthorization(ctx, tx, model.ACTION_DELETE, t, nil, nil); err != nil {
@@ -199,16 +201,9 @@ func doDelete[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType 
 		if err = tx.Delete(md, id).Error; err != nil {
 			return
 		}
-		err = tx.Create(&model.History{
-			RemoteIp:   ctx.ClientIP(),
-			Type:       md.TableName(),
-			TargetId:   md.GetId(),
-			ActionType: model.ACTION_DELETE,
-			Old:        toMap(md),
-			New:        nil,
-			CreatorId:  currentUser.Uid,
-			CreatedAt:  time.Now(),
-		}).Error
+
+		// Create history using history service
+		err = historyService.CreateAndSaveHistory(ctx, model.ACTION_DELETE, md, nil, currentUser.Uid)
 		return
 	}); err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
@@ -232,6 +227,8 @@ func doUpdate[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType 
 	defer repository.DeleteAllFromCacheDb(ctx, md)
 
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
+	baseService := service.NewBaseService()
+	historyService := service.NewHistoryService()
 
 	id, err := cast.ToIntE(ctx.Param("id"))
 	if err != nil {
@@ -256,7 +253,7 @@ func doUpdate[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType 
 	}
 
 	old := getEmpty(md)
-	if err = dbpkg.DB.Model(md).Where("id = ?", id).First(old).Error; err != nil {
+	if err = baseService.GetById(ctx, id, old); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			ctx.JSON(http.StatusOK, defaultHttpResponse)
 			return
@@ -264,10 +261,9 @@ func doUpdate[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType 
 		ctx.AbortWithError(http.StatusBadRequest, &myErrors.ApiError{Code: myErrors.ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
+
 	if needAcl {
 		md.SetResourceId(old.GetResourceId())
-		// fmt.Printf("%+v\n", old)
-		// fmt.Printf("%+v\n", md)
 		if !hasPerm(ctx, md, resourceType, acl.WRITE) {
 			ctx.AbortWithError(http.StatusForbidden, &myErrors.ApiError{Code: myErrors.ErrNoPerm, Data: map[string]any{"perm": acl.WRITE}})
 			return
@@ -282,7 +278,7 @@ func doUpdate[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType 
 	}
 	md.SetId(id)
 
-	if err = dbpkg.DB.Transaction(func(tx *gorm.DB) (err error) {
+	if err = baseService.ExecuteInTransaction(ctx, func(tx *gorm.DB) (err error) {
 		omits := []string{"resource_id", "created_at", "deleted_at"}
 		selects := []string{"*"}
 		switch t := any(md).(type) {
@@ -300,19 +296,12 @@ func doUpdate[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType 
 			}
 		}
 
-		if err = dbpkg.DB.Select(selects).Omit(omits...).Save(md).Error; err != nil {
+		if err = tx.Select(selects).Omit(omits...).Save(md).Error; err != nil {
 			return
 		}
-		err = dbpkg.DB.Create(&model.History{
-			RemoteIp:   ctx.ClientIP(),
-			Type:       md.TableName(),
-			TargetId:   md.GetId(),
-			ActionType: model.ACTION_UPDATE,
-			Old:        toMap(old),
-			New:        toMap(md),
-			CreatorId:  currentUser.Uid,
-			CreatedAt:  time.Now(),
-		}).Error
+
+		// Create history using history service
+		err = historyService.CreateAndSaveHistory(ctx, model.ACTION_UPDATE, md, old, currentUser.Uid)
 		return
 	}); err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
@@ -369,13 +358,6 @@ func doGet[T any](ctx *gin.Context, needAcl bool, dbFind *gorm.DB, resourceType 
 		return
 	}
 
-	// switch t := any(list).(type) {
-	// case []*model.Node:
-	// 	if t, err = nodePostHookParent(ctx, t); err != nil {
-	// 		return
-	// 	}
-	// 	list = lo.Map(t, func(n *model.Node, _ int) T { return any(n).(T) })
-	// }
 	for _, hook := range postHooks {
 		if hook == nil {
 			continue
@@ -411,13 +393,6 @@ func handleRemoteErr(ctx *gin.Context, err error) {
 	default:
 		ctx.AbortWithError(http.StatusInternalServerError, &myErrors.ApiError{Code: myErrors.ErrInternal, Data: map[string]any{"err": err}})
 	}
-}
-
-func toMap(data any) model.Map[string, any] {
-	bs, _ := json.Marshal(data)
-	res := make(map[string]any)
-	json.Unmarshal(bs, &res)
-	return res
 }
 
 func getEmpty[T model.Model](data T) T {

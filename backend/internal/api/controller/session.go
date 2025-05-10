@@ -8,6 +8,7 @@ import (
 
 	"github.com/veops/oneterm/internal/model"
 	"github.com/veops/oneterm/internal/service"
+	"github.com/veops/oneterm/pkg/config"
 	"github.com/veops/oneterm/pkg/errors"
 )
 
@@ -151,5 +152,5 @@ func (c *Controller) GetSessionReplay(ctx *gin.Context) {
 		return
 	}
 
-	ctx.FileAttachment(filepath.Join("/tmp/replay", filename), filename)
+	ctx.FileAttachment(filepath.Join(config.Cfg.Session.ReplayDir, filename), filename)
 }

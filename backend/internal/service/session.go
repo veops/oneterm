@@ -16,6 +16,7 @@ import (
 	"github.com/veops/oneterm/internal/model"
 	"github.com/veops/oneterm/internal/repository"
 	gsession "github.com/veops/oneterm/internal/session"
+	"github.com/veops/oneterm/pkg/config"
 	"github.com/veops/oneterm/pkg/logger"
 	"gorm.io/gorm"
 )
@@ -113,7 +114,12 @@ func (s *SessionService) CreateSessionReplay(ctx *gin.Context, sessionId string,
 		return err
 	}
 
-	f, err := os.Create(filepath.Join("/tmp/replay", fmt.Sprintf("%s.cast", sessionId)))
+	replayDir := config.Cfg.Session.ReplayDir
+	if err := os.MkdirAll(replayDir, 0755); err != nil {
+		return err
+	}
+
+	f, err := os.Create(filepath.Join(replayDir, fmt.Sprintf("%s.cast", sessionId)))
 	if err != nil {
 		return err
 	}

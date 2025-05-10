@@ -48,3 +48,6 @@ auth:
     iv: 0123456789abcdef
 
 secretKey: xW2FAUfgffjmerTEBXADmURDOQ43ojLN
+
+session:
+  replayDir: /replay/

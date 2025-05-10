@@ -34,6 +34,9 @@ var (
 			Path:          "app.log",
 			ConsoleEnable: true,
 		},
+		Session: SessionConfig{
+			ReplayDir: "/replay",
+		},
 	}
 )
 
@@ -139,6 +142,10 @@ type GuacdConfig struct {
 	Port int    `yaml:"port"`
 }
 
+type SessionConfig struct {
+	ReplayDir string `yaml:"replayDir"`
+}
+
 type ConfigYaml struct {
 	Mode      string         `yaml:"mode"`
 	I18nDir   string         `yaml:"i18nDir"`
@@ -149,6 +156,7 @@ type ConfigYaml struct {
 	Guacd     GuacdConfig    `yaml:"guacd"`
 	Http      HttpConfig     `yaml:"http"`
 	Ssh       SshConfig      `yaml:"ssh"`
+	Session   SessionConfig  `yaml:"session"`
 	Auth      Auth           `yaml:"auth"`
 	SecretKey string         `yaml:"secretKey"`
 }

@@ -9,6 +9,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/veops/oneterm/pkg/config"
 	"github.com/veops/oneterm/pkg/logger"
 )
 
@@ -18,7 +19,13 @@ type Asciinema struct {
 }
 
 func NewAsciinema(id string, w, h int) (ret *Asciinema, err error) {
-	f, err := os.Create(filepath.Join("/tmp/replay", fmt.Sprintf("%s.cast", id)))
+	replayDir := config.Cfg.Session.ReplayDir
+	if err = os.MkdirAll(replayDir, 0755); err != nil {
+		logger.L().Error("create replay directory failed", zap.String("dir", replayDir), zap.Error(err))
+		return
+	}
+
+	f, err := os.Create(filepath.Join(replayDir, fmt.Sprintf("%s.cast", id)))
 	if err != nil {
 		logger.L().Error("open cast failed", zap.String("id", id), zap.Error(err))
 		return

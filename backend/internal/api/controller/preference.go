@@ -6,7 +6,6 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/veops/oneterm/internal/acl"
-	"github.com/veops/oneterm/internal/model"
 	"github.com/veops/oneterm/internal/service"
 	myErrors "github.com/veops/oneterm/pkg/errors"
 )
@@ -47,9 +46,9 @@ func (c *Controller) GetPreference(ctx *gin.Context) {
 func (c *Controller) UpdatePreference(ctx *gin.Context) {
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
 
-	// Parse request body
-	var pref model.UserPreference
-	if err := ctx.ShouldBindBodyWithJSON(&pref); err != nil {
+	// Create a temporary map to bind JSON data
+	var prefMap map[string]any
+	if err := ctx.ShouldBindBodyWithJSON(&prefMap); err != nil {
 		ctx.AbortWithError(http.StatusBadRequest, &myErrors.ApiError{
 			Code: myErrors.ErrInvalidArgument,
 			Data: map[string]any{"err": err},
@@ -57,8 +56,8 @@ func (c *Controller) UpdatePreference(ctx *gin.Context) {
 		return
 	}
 
-	// Update preferences
-	if err := prefService.UpdateUserPreference(ctx, currentUser.Uid, &pref); err != nil {
+	// Update preferences with the map data
+	if err := prefService.UpdateUserPreference(ctx, currentUser.Uid, prefMap); err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, &myErrors.ApiError{
 			Code: myErrors.ErrInternal,
 			Data: map[string]any{"err": err},

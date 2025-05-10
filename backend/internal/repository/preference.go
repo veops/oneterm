@@ -11,7 +11,7 @@ import (
 // UserPreferenceRepository defines the interface for user preference operations
 type UserPreferenceRepository interface {
 	GetByUserID(ctx context.Context, userID int) (*model.UserPreference, error)
-	UpsertPreference(ctx context.Context, pref *model.UserPreference) error
+	UpsertPreference(ctx context.Context, pref *model.UserPreference, fields []string) error
 }
 
 // userPreferenceRepository implements UserPreferenceRepository
@@ -37,8 +37,7 @@ func (r *userPreferenceRepository) GetByUserID(ctx context.Context, userID int) 
 }
 
 // UpsertPreference creates or updates user preferences
-func (r *userPreferenceRepository) UpsertPreference(ctx context.Context, pref *model.UserPreference) error {
-	// Check if user has existing preferences
+func (r *userPreferenceRepository) UpsertPreference(ctx context.Context, pref *model.UserPreference, fields []string) error {
 	existing, err := r.GetByUserID(ctx, pref.UserID)
 	if err != nil {
 		return err
@@ -57,11 +56,16 @@ func (r *userPreferenceRepository) UpsertPreference(ctx context.Context, pref *m
 			pref.Settings = existing.Settings
 		}
 
-		// Use a DB transaction to update
-		return dbpkg.DB.Transaction(func(tx *gorm.DB) error {
-			// Only update fields that were provided in JSON
-			return tx.Model(existing).Updates(pref).Error
-		})
+		// Nothing to update
+		if len(fields) == 0 {
+			return nil
+		}
+
+		// Set ID to ensure we update the correct record
+		pref.ID = existing.ID
+
+		// Use Select to update only specified fields, including zero values
+		return dbpkg.DB.Model(pref).Select(fields).Updates(pref).Error
 	}
 
 	// Create new record if it doesn't exist

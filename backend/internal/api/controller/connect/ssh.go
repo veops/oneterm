@@ -135,12 +135,12 @@ func connectSsh(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, ac
 // HandleTerm handles terminal sessions
 func HandleTerm(sess *gsession.Session) (err error) {
 	defer func() {
-		logger.L().Debug("defer HandleSsh", zap.String("sessionId", sess.SessionId))
+		logger.L().Debug("defer HandleTerm", zap.String("sessionId", sess.SessionId))
 		sess.SshParser.Close(sess.Prompt)
 		sess.Status = model.SESSIONSTATUS_OFFLINE
 		sess.ClosedAt = lo.ToPtr(time.Now())
 		if err = gsession.UpsertSession(sess); err != nil {
-			logger.L().Error("offline ssh session failed", zap.String("sessionId", sess.SessionId), zap.Error(err))
+			logger.L().Error("offline session failed", zap.String("sessionId", sess.SessionId), zap.Error(err))
 			return
 		}
 	}()

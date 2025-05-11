@@ -57,6 +57,7 @@ type Parser struct {
 	Input        []byte
 	Output       []byte
 	SessionId    string
+	Protocol     string
 	Cmds         []*model.Command
 	isPrompt     bool
 	prompt       string
@@ -82,19 +83,49 @@ func (p *Parser) AddInput(bs []byte) (cmd string, forbidden bool) {
 		p.lastCmd = ""
 		p.lastRes = ""
 	}
+
+	// Track command input, directly use curCmd field
+	if len(bs) > 0 {
+		if bytes.Equal(bs, []byte("\r")) {
+			// Command ends, keep curCmd unchanged
+		} else if len(bs) == 1 && (bs[0] == '\b' || bs[0] == 127) { // Backspace key
+			if len(p.curCmd) > 0 {
+				p.curCmd = p.curCmd[:len(p.curCmd)-1]
+			}
+		} else {
+			// Check if all characters are printable
+			input := string(bs)
+			allPrintable := true
+			for _, ch := range input {
+				if ch < 32 || ch > 126 {
+					allPrintable = false
+					break
+				}
+			}
+			if allPrintable {
+				p.curCmd += input
+			}
+		}
+	}
+
 	p.Input = append(p.Input, bs...)
 	if !bytes.HasSuffix(p.Input, []byte("\r")) {
 		return
 	}
+
 	p.isPrompt = true
-	p.curCmd = p.getCmdLocked()
+	// Save current command
+	currentCmd := strings.TrimSpace(p.curCmd)
+	// Reset command buffer
+	p.curCmd = ""
 	p.resetLocked()
+
 	filter := ""
-	if filter, forbidden = p.IsForbidden(p.curCmd); forbidden {
+	if filter, forbidden = p.IsForbidden(currentCmd); forbidden {
 		cmd = filter
 		return
 	}
-	p.lastCmd = p.curCmd
+	p.lastCmd = currentCmd
 	return
 }
 
@@ -117,7 +148,7 @@ func (p *Parser) IsForbidden(cmd string) (string, bool) {
 }
 
 func (p *Parser) WriteDb() {
-	if p.lastCmd == "" {
+	if p.lastCmd == "" || strings.TrimSpace(p.lastCmd) == "" {
 		return
 	}
 	m := &model.SessionCmd{
@@ -165,6 +196,12 @@ func (p *Parser) GetCmd() string {
 }
 
 func (p *Parser) getCmdLocked() string {
+	// If the current command being built is not empty, return it
+	if p.curCmd != "" {
+		return p.curCmd
+	}
+
+	// Otherwise extract from output
 	s := p.getOutputLocked()
 	// TODO: some promot may change with its dir
 	return strings.TrimPrefix(s, p.prompt)
@@ -209,7 +246,20 @@ func (p *Parser) getOutputLocked() string {
 
 	p.lastRes = ""
 	if ln > 1 {
-		p.lastRes = strings.Join(res[:ln-1], "\n")
+		// Process result based on protocol type
+		if strings.HasPrefix(p.Protocol, "ssh") {
+			// For SSH sessions, keep the original logic, retain all lines
+			p.lastRes = strings.Join(res[:ln-1], "\n")
+		} else {
+			// For non-SSH sessions (like Redis, MySQL), remove first and last line
+			startIdx := 1
+			endIdx := ln - 1
+
+			// Ensure there are enough lines to process
+			if ln > 2 {
+				p.lastRes = strings.Join(res[startIdx:endIdx], "\n")
+			}
+		}
 	}
 	p.curRes = res[ln-1]
 	return p.curRes

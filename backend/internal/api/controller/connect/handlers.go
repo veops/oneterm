@@ -181,6 +181,7 @@ func DoConnect(ctx *gin.Context, ws *websocket.Conn) (sess *gsession.Session, er
 	if !sess.IsGuacd() {
 		w, h := cast.ToInt(ctx.Query("w")), cast.ToInt(ctx.Query("h"))
 		sess.SshParser = gsession.NewParser(sess.SessionId, w, h)
+		sess.SshParser.Protocol = sess.Protocol
 
 		sessionService := service.NewSessionService()
 		cmds, err := sessionService.GetSshParserCommands(ctx, []int(asset.AccessAuth.CmdIds))
@@ -238,7 +239,5 @@ func DoConnect(ctx *gin.Context, ws *websocket.Conn) (sess *gsession.Session, er
 
 // This is an external function in authorization.go, but needed here to avoid circular imports
 func hasAuthorization(ctx *gin.Context, sess *gsession.Session) bool {
-	// Implementation handled externally by the imported authorization package
-	// This is just a placeholder to satisfy the compiler
-	return true // Always return true for now, will be handled by proper authorization checks
+	return service.DefaultAuthService.HasAuthorization(ctx, sess)
 }

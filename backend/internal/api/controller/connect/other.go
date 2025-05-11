@@ -2,28 +2,25 @@ package connect
 
 import (
 	"bufio"
-	"bytes"
-	"database/sql"
 	"fmt"
+	"io"
+	"os"
+	"os/exec"
 	"strings"
-	"time"
+	"sync/atomic"
 	"unicode/utf8"
 
-	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/lipgloss/table"
+	"github.com/creack/pty"
 	"github.com/gin-gonic/gin"
-	"github.com/redis/go-redis/v9"
-	"github.com/samber/lo"
-	"github.com/spf13/cast"
-	mysqlDriver "gorm.io/driver/mysql"
-	"gorm.io/gorm"
+	"go.uber.org/zap"
 
 	"github.com/veops/oneterm/internal/model"
 	gsession "github.com/veops/oneterm/internal/session"
 	"github.com/veops/oneterm/internal/tunneling"
+	"github.com/veops/oneterm/pkg/logger"
 )
 
-// connectOther connects to other protocols (MySQL, Redis, etc.)
+// connectOther connects to other protocols (Redis, MySQL, etc.)
 func connectOther(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, account *model.Account, gateway *model.Gateway) (err error) {
 	chs := sess.Chans
 	defer func() {
@@ -32,138 +29,189 @@ func connectOther(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, 
 		}
 	}()
 
-	protocol := strings.Split(sess.Protocol, ":")[0]
-	ip, port, err := tunneling.Proxy(false, sess.SessionId, protocol, asset, gateway)
-	if err != nil {
-		return
-	}
+	// Handle Redis connections
+	if sess.IsRedis() {
+		logger.L().Info("Starting Redis connection", zap.String("sessionId", sess.SessionId))
 
-	var (
-		rdb *redis.Client
-		db  *gorm.DB
-	)
-	switch protocol {
-	case "redis":
-		rdb = redis.NewClient(&redis.Options{
-			Addr:        fmt.Sprintf("%s:%d", ip, port),
-			Password:    account.Password,
-			DialTimeout: time.Second,
+		// Setup proxy and connection parameters
+		protocol := strings.Split(sess.Protocol, ":")[0]
+		ip, port, err := tunneling.Proxy(false, sess.SessionId, protocol, asset, gateway)
+		if err != nil {
+			logger.L().Error("Failed to setup tunnel", zap.Error(err))
+			return err
+		}
+
+		// Build redis-cli command
+		args := []string{"-h", ip, "-p", fmt.Sprintf("%d", port)}
+		if account.Password != "" {
+			args = append(args, "-a", account.Password)
+		}
+		logger.L().Info("Starting redis-cli", zap.String("host", ip), zap.Int("port", port))
+
+		// Create command and pseudo-terminal
+		cmd := exec.CommandContext(sess.Gctx, "redis-cli", args...)
+		cmd.Env = append(os.Environ(), "TERM=xterm-256color")
+		ptmx, err := pty.Start(cmd)
+		if err != nil {
+			logger.L().Error("Failed to start redis-cli with pty", zap.Error(err))
+			return fmt.Errorf("failed to start redis-cli: %w", err)
+		}
+
+		// Set standard terminal size
+		_ = pty.Setsize(ptmx, &pty.Winsize{
+			Cols: 80,
+			Rows: 24,
 		})
-		_, err = rdb.Ping(ctx).Result()
-		if err != nil {
-			return
-		}
-	case "mysql":
-		dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/?charset=utf8mb4&parseTime=True&loc=Local", account.Account, account.Password, ip, port)
-		db, err = gorm.Open(mysqlDriver.Open(dsn))
-		if err != nil {
-			return
-		}
-	}
 
-	chs.ErrChan <- err
+		// Simplified IO channel setup - direct connection
+		chs.Rin, chs.Win = io.Pipe()
 
-	sess.G.Go(func() error {
-		reader := bufio.NewReader(chs.Rin)
-		buf := &bytes.Buffer{}
-		pt := ""
-		ss := strings.Split(sess.Protocol, ":")
-		if len(ss) == 2 {
-			pt = ss[1]
-		}
-		sess.Prompt = fmt.Sprintf("%s@%s:%s> ", account.Account, asset.Name, pt)
-		chs.OutChan <- append(byteRN, []byte(sess.Prompt)...)
-		for {
-			select {
-			case <-sess.Gctx.Done():
-				return nil
-			default:
-				rn, size, err := reader.ReadRune()
-				if err != nil {
-					return err
-				}
-				if size <= 0 || rn == utf8.RuneError {
-					continue
-				}
-				p := make([]byte, utf8.RuneLen(rn))
-				utf8.EncodeRune(p, rn)
-				p = bytes.ReplaceAll(p, byteT, byteS)
-				for bytes.HasSuffix(p, byteDel) {
-					p = p[:len(p)-1]
-					if buf.Len() > 0 {
-						var dels []byte
-						last, ok := lo.Last([]rune(buf.String()))
-						for i := 0; ok && i < lipgloss.Width(string(last)); i++ {
-							dels = append(dels, byteClearCur...)
-						}
-						chs.OutChan <- dels
-						buf.Truncate(buf.Len() - len([]byte(string(last))))
-					}
-				}
-				if len(p) <= 0 {
-					continue
-				}
-				chs.OutChan <- p
-				buf.Write(p)
-				bs := buf.Bytes()
-				if idx := bytes.LastIndex(bs, byteClearAll); idx >= 0 {
-					buf.Reset()
-					continue
-				}
-				if idx := bytes.LastIndex(bs, byteR); idx < 0 {
-					continue
-				}
-				bs = bs[:len(bs)-1]
-				if bytes.Equal(bs, []byte("exit")) {
-					sess.Once.Do(func() { close(chs.AwayChan) })
+		// Create a reader to read PTY output
+		ptmxReader := bufio.NewReader(ptmx)
+
+		// Add an atomic variable to track if exit message has been sent
+		var exitMessageSent int32
+
+		// Monitor process exit
+		sess.G.Go(func() error {
+			err := cmd.Wait()
+			logger.L().Info("Redis cli process exited", zap.Error(err))
+
+			// Only send termination message if not already sent
+			if atomic.CompareAndSwapInt32(&exitMessageSent, 0, 1) {
+				// Send termination message
+				terminationMsg := "\r\n\033[31mThe connection is closed!\033[0m\r\n"
+				chs.OutBuf.WriteString(terminationMsg)
+			}
+
+			sess.Once.Do(func() {
+				logger.L().Info("Closing AwayChan from Redis process monitor")
+				close(chs.AwayChan)
+			})
+			return fmt.Errorf("redis-cli process terminated: %w", err)
+		})
+
+		// Goroutine 1: Process input, detect exit command
+		sess.G.Go(func() error {
+			defer ptmx.Close()
+			buf := make([]byte, 1024)
+			var inputBuffer string
+
+			for {
+				select {
+				case <-sess.Gctx.Done():
 					return nil
-				}
-				buf.Reset()
-				var (
-					res  any
-					rows *sql.Rows
-				)
-				if len(bs) > 0 {
-					switch protocol {
-					case "redis":
-						parts := lo.Map(reRedis.FindAllString(string(bs), -1), func(p string, _ int) any { return p })
-						res, err = rdb.Do(ctx, parts...).Result()
-					case "mysql":
-						if rows, err = db.WithContext(ctx).Raw(string(bs)).Rows(); err == nil {
-							heads, _ := rows.Columns()
-							n := len(heads)
-							rs := make([][]string, 0)
-							for rows.Next() {
-								r := make([]any, n)
-								r = lo.Map(r, func(v any, _ int) any { return new(any) })
-								if err = rows.Scan(r...); err != nil {
+				default:
+					n, err := chs.Rin.Read(buf)
+					if err != nil {
+						if err == io.EOF {
+							return nil
+						}
+						return err
+					}
+					if n > 0 {
+						input := string(buf[:n])
+
+						// Accumulate user input to detect complete commands
+						if input != "\r" {
+							// Check if all characters are printable
+							allPrintable := true
+							for _, ch := range input {
+								if ch < 32 || ch > 126 {
+									allPrintable = false
 									break
 								}
-								rs = append(rs, lo.Map(r, func(v any, i int) string { return cast.ToString(v) }))
 							}
-							res = strings.ReplaceAll(table.New().Border(border).Headers(heads...).Rows(rs...).String(), "\n", "\r\n")
+							if allPrintable {
+								inputBuffer += input
+							}
+						}
+
+						// Detect command end (enter key)
+						if input == "\r" {
+							processCmd := strings.TrimSpace(inputBuffer)
+
+							// Check for exit command
+							if strings.EqualFold(processCmd, "exit") || strings.EqualFold(processCmd, "quit") {
+								// Send command to Redis CLI for normal exit
+								if _, err := ptmx.Write(buf[:n]); err != nil {
+									return err
+								}
+
+								// Mark exit message as sent, but don't send it here. Let the process exit handler send it.
+								atomic.StoreInt32(&exitMessageSent, 1)
+
+								inputBuffer = ""
+								continue
+							}
+
+							// Reset command buffer
+							inputBuffer = ""
+						}
+
+						// Forward input to Redis CLI
+						if _, err := ptmx.Write(buf[:n]); err != nil {
+							return err
 						}
 					}
 				}
-				chs.OutChan <- []byte(fmt.Sprintf("\n%s\r\n%s", lo.Ternary[any](err == nil, lo.Ternary(res == nil, "", res), err), sess.Prompt))
-				err = nil
 			}
-		}
-	})
-	sess.G.Go(func() (err error) {
-		for {
-			select {
-			case <-sess.Gctx.Done():
-				return
-			case <-chs.AwayChan:
-				return
-			case <-chs.WindowChan:
-				continue
+		})
+
+		// Goroutine 2: Read Redis CLI output and send to OutChan
+		sess.G.Go(func() error {
+			for {
+				select {
+				case <-sess.Gctx.Done():
+					return nil
+				default:
+					rn, size, err := ptmxReader.ReadRune()
+					if err != nil {
+						if err == io.EOF {
+							return nil
+						}
+						return err
+					}
+					if size <= 0 || rn == utf8.RuneError {
+						continue
+					}
+
+					p := make([]byte, utf8.RuneLen(rn))
+					utf8.EncodeRune(p, rn)
+
+					// Send to OutChan for HandleTerm processing
+					chs.OutChan <- p
+				}
 			}
-		}
-	})
+		})
 
-	sess.G.Wait()
+		// Goroutine 3: Handle window size changes
+		sess.G.Go(func() error {
+			for {
+				select {
+				case <-sess.Gctx.Done():
+					return nil
+				case <-chs.AwayChan:
+					return fmt.Errorf("away")
+				case window := <-chs.WindowChan:
+					// Adjust Redis terminal size
+					_ = pty.Setsize(ptmx, &pty.Winsize{
+						Cols: uint16(window.Width),
+						Rows: uint16(window.Height),
+					})
 
-	return
+					// Adjust parser size
+					if sess.SshParser != nil {
+						sess.SshParser.Resize(window.Width, window.Height)
+					}
+				}
+			}
+		})
+
+		// Notify connection is ready
+		chs.ErrChan <- nil
+		return nil
+	}
+
+	return fmt.Errorf("unsupported protocol: %s", sess.Protocol)
 }

@@ -3,12 +3,10 @@ package connect
 import (
 	"fmt"
 	"net/http"
-	"regexp"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/nicksnyder/go-i18n/v2/i18n"
@@ -33,16 +31,8 @@ var (
 		},
 	}
 	byteClearAll = []byte("\x15\r")
-	byteClearCur = []byte("\b\x1b[J")
-	byteDel      = []byte{'\x7f'}
-	byteR        = []byte{'\r'}
-	byteN        = []byte{'\n'}
-	byteT        = []byte{'\t'}
-	byteS        = []byte{' '}
-	byteRN       = append(byteR, byteN...)
 
-	reRedis = regexp.MustCompile(`("[^"]*"|'[^']*'|\S+)`)
-	border  = lipgloss.RoundedBorder()
+	wsWriteMutex = &sync.Mutex{}
 )
 
 // WriteToMonitors sends data to all monitoring sessions
@@ -117,6 +107,19 @@ func OfflineSession(ctx *gin.Context, sessionId string, closer string) {
 // HandleError handles errors from sessions
 func HandleError(ctx *gin.Context, sess *gsession.Session, err error, ws *websocket.Conn, chs *gsession.SessionChans) {
 	defer func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.L().Error("Recovered from panic in HandleError",
+					zap.Any("panic", r),
+					zap.String("sessionId", func() string {
+						if sess != nil {
+							return sess.SessionId
+						}
+						return ""
+					}()))
+			}
+		}()
+
 		if sess == nil || sess.Chans == nil {
 			return
 		}
@@ -124,7 +127,12 @@ func HandleError(ctx *gin.Context, sess *gsession.Session, err error, ws *websoc
 		if chs != nil {
 			ch = chs.AwayChan
 		}
-		sess.Once.Do(func() { close(ch) })
+
+		sess.Once.Do(func() {
+			logger.L().Debug("Closing AwayChan from HandleError",
+				zap.String("sessionId", sess.SessionId))
+			close(ch)
+		})
 	}()
 
 	if err == nil {
@@ -150,19 +158,24 @@ func WriteErrMsg(sess *gsession.Session, msg string) {
 }
 
 // Write writes data to the session output
-func Write(sess *gsession.Session) (err error) {
+// skipRecording: If true, it will skip recording to avoid duplicate recordings of manually recorded content
+func Write(sess *gsession.Session, skipRecording ...bool) (err error) {
 	chs := sess.Chans
 	out := chs.OutBuf.Bytes()
 
 	if sess.SessionType == model.SESSIONTYPE_WEB && sess.Ws != nil {
 		if len(out) > 0 || sess.IsGuacd() {
+			wsWriteMutex.Lock()
+			defer wsWriteMutex.Unlock()
 			err = sess.Ws.WriteMessage(websocket.TextMessage, out)
 		}
 	} else if sess.SessionType == model.SESSIONTYPE_CLIENT && len(out) > 0 {
 		_, err = sess.CliRw.Write(out)
 	}
 
-	if sess.SshRecoder != nil && len(out) > 0 && !sess.IsGuacd() {
+	// Only write to recording if skipRecording is not specified or explicitly set to false
+	shouldSkip := len(skipRecording) > 0 && skipRecording[0]
+	if sess.SshRecoder != nil && len(out) > 0 && !sess.IsGuacd() && !shouldSkip {
 		sess.SshRecoder.Write(out)
 	}
 

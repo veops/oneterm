@@ -59,7 +59,12 @@ func (s *AssetService) FilterByParentId(db *gorm.DB, parentId int) (*gorm.DB, er
 }
 
 // GetAssetIdsByAuthorization gets asset IDs by authorization
-func (s *AssetService) GetAssetIdsByAuthorization(ctx *gin.Context, authorizationIds []*model.AuthorizationIds) ([]int, []int, []int, error) {
+func (s *AssetService) GetAssetIdsByAuthorization(ctx *gin.Context) ([]int, []int, []int, error) {
+	authorizationIds, err := DefaultAuthService.GetAuthorizationIds(ctx)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
 	return s.repo.GetAssetIdsByAuthorization(ctx, authorizationIds)
 }
 

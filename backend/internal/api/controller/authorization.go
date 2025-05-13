@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/samber/lo"
 	"github.com/spf13/cast"
 	"gorm.io/gorm"
 
@@ -13,7 +12,6 @@ import (
 	"github.com/veops/oneterm/internal/model"
 	"github.com/veops/oneterm/internal/service"
 	gsession "github.com/veops/oneterm/internal/session"
-	"github.com/veops/oneterm/pkg/config"
 	myErrors "github.com/veops/oneterm/pkg/errors"
 )
 
@@ -145,46 +143,8 @@ func handleAuthorization(ctx *gin.Context, tx *gorm.DB, action int, asset *model
 	return service.DefaultAuthService.HandleAuthorization(ctx, tx, action, asset, auths...)
 }
 
-func getAuthorizations(ctx *gin.Context) (res []*acl.Resource, err error) {
-	currentUser, _ := acl.GetSessionFromCtx(ctx)
-
-	res, err = acl.GetRoleResources(ctx, currentUser.GetRid(), config.RESOURCE_AUTHORIZATION)
-	if err != nil {
-		return
-	}
-
-	return
-}
-
-func getAutorizationResourceIds(ctx *gin.Context) (resourceIds []int, err error) {
-	res, err := getAuthorizations(ctx)
-	if err != nil {
-		return
-	}
-
-	resourceIds = lo.Map(res, func(r *acl.Resource, _ int) int { return r.ResourceId })
-
-	return
-}
-
-func getAuthorizationIds(ctx *gin.Context) (authIds []*model.AuthorizationIds, err error) {
-	// Get authorization resource IDs (reserved for possible future extensions)
-	_, err = getAutorizationResourceIds(ctx)
-	if err != nil {
-		handleRemoteErr(ctx, err)
-		return
-	}
-
-	// Use service layer to get authorization IDs
-	authIds, err = service.DefaultAuthService.GetAuthorizationIds(ctx)
-	// AuthorizationIds type has no ResourceId field, cannot filter by resourceIds
-	// More complex processing logic is needed here, but for now we return all IDs to maintain consistency
-
-	return
-}
-
 // hasAuthorization checks if the session has authorization
-func hasAuthorization(ctx *gin.Context, sess *gsession.Session) bool {
+func hasAuthorization(ctx *gin.Context, sess *gsession.Session) (ok bool, err error) {
 	return service.DefaultAuthService.HasAuthorization(ctx, sess)
 }
 

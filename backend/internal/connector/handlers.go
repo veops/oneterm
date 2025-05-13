@@ -1,4 +1,4 @@
-package connect
+package connector
 
 import (
 	"errors"
@@ -18,6 +18,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/veops/oneterm/internal/acl"
+	"github.com/veops/oneterm/internal/connector/db"
 	"github.com/veops/oneterm/internal/model"
 	"github.com/veops/oneterm/internal/service"
 	gsession "github.com/veops/oneterm/internal/session"
@@ -36,6 +37,14 @@ func Connect(ctx *gin.Context) {
 		return
 	}
 	defer ws.Close()
+
+	if shareErr, exists := ctx.Get("shareErr"); exists && shareErr != nil {
+		if apiErr, ok := shareErr.(*myErrors.ApiError); ok {
+			errMsg := apiErr.MessageWithCtx(ctx)
+			ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("\r\n \033[31m Invalid share link: %s \x1b[0m", errMsg)))
+			return
+		}
+	}
 
 	var sess *gsession.Session
 	defer func() {
@@ -174,8 +183,11 @@ func DoConnect(ctx *gin.Context, ws *websocket.Conn) (sess *gsession.Session, er
 	}
 	if sess.ShareId != 0 {
 		sess.ShareEnd, _ = ctx.Value("shareEnd").(time.Time)
-		if err, _ = ctx.Value("shareErr").(error); err != nil {
-			return
+		if shareErr, exists := ctx.Get("shareErr"); exists && shareErr != nil {
+			if apiErr, ok := shareErr.(*myErrors.ApiError); ok {
+				err = apiErr
+				return
+			}
 		}
 	}
 	if !sess.IsGuacd() {
@@ -209,16 +221,19 @@ func DoConnect(ctx *gin.Context, ws *websocket.Conn) (sess *gsession.Session, er
 		err = &myErrors.ApiError{Code: myErrors.ErrAccessTime}
 		return
 	}
-	if !hasAuthorization(ctx, sess) {
-		err = &myErrors.ApiError{Code: myErrors.ErrUnauthorized}
-		return
+	if ok, err := service.DefaultAuthService.HasAuthorization(ctx, sess); err != nil {
+		err = &myErrors.ApiError{Code: myErrors.ErrInvalidArgument, Data: map[string]any{"err": err}}
+		return sess, err
+	} else if !ok {
+		err = &myErrors.ApiError{Code: myErrors.ErrUnauthorized, Data: map[string]any{"perm": "connect"}}
+		return sess, err
 	}
 
 	switch strings.Split(sess.Protocol, ":")[0] {
 	case "ssh":
 		go connectSsh(ctx, sess, asset, account, gateway)
-	case "redis", "mysql":
-		go connectOther(ctx, sess, asset, account, gateway)
+	case "redis", "mysql", "mongodb", "postgresql":
+		go db.ConnectDB(sess, asset, account, gateway)
 	case "vnc", "rdp", "telnet":
 		go connectGuacd(ctx, sess, asset, account, gateway)
 	default:
@@ -235,9 +250,4 @@ func DoConnect(ctx *gin.Context, ws *websocket.Conn) (sess *gsession.Session, er
 	gsession.UpsertSession(sess)
 
 	return
-}
-
-// This is an external function in authorization.go, but needed here to avoid circular imports
-func hasAuthorization(ctx *gin.Context, sess *gsession.Session) bool {
-	return service.DefaultAuthService.HasAuthorization(ctx, sess)
 }

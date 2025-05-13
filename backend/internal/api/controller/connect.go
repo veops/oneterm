@@ -3,7 +3,7 @@ package controller
 import (
 	"github.com/gin-gonic/gin"
 
-	"github.com/veops/oneterm/internal/api/controller/connect"
+	"github.com/veops/oneterm/internal/connector"
 )
 
 // Connect handles WebSocket connections for terminal sessions
@@ -15,7 +15,7 @@ import (
 // @Success	200	{object}	HttpResponse{}
 // @Router		/connect/:asset_id/:account_id/:protocol [get]
 func (c *Controller) Connect(ctx *gin.Context) {
-	connect.Connect(ctx)
+	connector.Connect(ctx)
 }
 
 // ConnectMonitor handles WebSocket connections for monitoring sessions
@@ -23,7 +23,7 @@ func (c *Controller) Connect(ctx *gin.Context) {
 // @Success	200	{object}	HttpResponse
 // @Router		/connect/monitor/:session_id [get]
 func (c *Controller) ConnectMonitor(ctx *gin.Context) {
-	connect.ConnectMonitor(ctx)
+	connector.ConnectMonitor(ctx)
 }
 
 // ConnectClose handles closing a session
@@ -31,5 +31,5 @@ func (c *Controller) ConnectMonitor(ctx *gin.Context) {
 // @Success	200	{object}	HttpResponse
 // @Router		/connect/close/:session_id [post]
 func (c *Controller) ConnectClose(ctx *gin.Context) {
-	connect.ConnectClose(ctx)
+	connector.ConnectClose(ctx)
 }

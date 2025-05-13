@@ -137,7 +137,7 @@ func (s *NodeService) AttachAssetCount(ctx *gin.Context, data []*model.Node) err
 	if !acl.IsAdmin(currentUser) {
 		info := cast.ToBool(ctx.Query("info"))
 		if info {
-			assetIds, err := s.GetAssetIdsByAuthorization(ctx)
+			_, assetIds, _, err := NewAssetService().GetAssetIdsByAuthorization(ctx)
 			if err != nil {
 				return err
 			}
@@ -216,7 +216,7 @@ func (s *NodeService) AttachHasChild(ctx *gin.Context, data []*model.Node) error
 		}
 
 		if info {
-			assetIds, err := s.GetAssetIdsByAuthorization(ctx)
+			_, assetIds, _, err := NewAssetService().GetAssetIdsByAuthorization(ctx)
 			if err != nil {
 				return err
 			}
@@ -312,7 +312,7 @@ func (s *NodeService) CheckDependencies(ctx context.Context, id int) (string, er
 
 // GetNodeIdsByAuthorization gets node IDs that the user is authorized to access
 func (s *NodeService) GetNodeIdsByAuthorization(ctx *gin.Context) ([]int, error) {
-	assetIds, err := s.GetAssetIdsByAuthorization(ctx)
+	_, assetIds, _, err := NewAssetService().GetAssetIdsByAuthorization(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -326,31 +326,6 @@ func (s *NodeService) GetNodeIdsByAuthorization(ctx *gin.Context) ([]int, error)
 	ids := lo.Uniq(lo.Map(assets, func(a *model.Asset, _ int) int { return a.ParentId }))
 
 	return ids, nil
-}
-
-// GetAssetIdsByAuthorization gets asset IDs that the user is authorized to access
-func (s *NodeService) GetAssetIdsByAuthorization(ctx *gin.Context) ([]int, error) {
-	// Implementation without controller dependency
-	currentUser, _ := acl.GetSessionFromCtx(ctx)
-
-	// Get authorization resource IDs
-	resources, err := acl.GetRoleResources(ctx, currentUser.GetRid(), config.RESOURCE_AUTHORIZATION)
-	if err != nil {
-		return nil, err
-	}
-
-	resourceIds := lo.Map(resources, func(r *acl.Resource, _ int) int { return r.ResourceId })
-
-	// Get authorization IDs
-	authIds := []*model.AuthorizationIds{}
-	if err := dbpkg.DB.Model(&model.AuthorizationIds{}).Where("resource_id IN ?", resourceIds).Find(&authIds).Error; err != nil {
-		return nil, err
-	}
-
-	// Use asset service to get IDs by authorization IDs
-	assetService := NewAssetService()
-	_, assetIds, _ := assetService.GetIdsByAuthorizationIds(ctx, authIds)
-	return assetIds, nil
 }
 
 // HandleNoSelfChild gets all node IDs except self and children

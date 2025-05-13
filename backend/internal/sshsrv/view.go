@@ -22,9 +22,10 @@ import (
 
 	"github.com/veops/oneterm/internal/acl"
 	"github.com/veops/oneterm/internal/api/controller"
-	"github.com/veops/oneterm/internal/api/controller/connect"
+	myConnector "github.com/veops/oneterm/internal/connector"
 	"github.com/veops/oneterm/internal/model"
 	"github.com/veops/oneterm/internal/repository"
+	"github.com/veops/oneterm/internal/service"
 	"github.com/veops/oneterm/internal/session"
 	"github.com/veops/oneterm/internal/sshsrv/textinput"
 	"github.com/veops/oneterm/pkg/cache"
@@ -242,7 +243,7 @@ func (m *view) refresh() {
 		}
 		if !acl.IsAdmin(m.currentUser) {
 			var assetIds, accountIds []int
-			if assetIds, err = controller.GetAssetIdsByAuthorization(m.Ctx); err != nil {
+			if _, assetIds, _, err = service.NewAssetService().GetAssetIdsByAuthorization(m.Ctx); err != nil {
 				return
 			}
 			assets = lo.Filter(assets, func(a *model.Asset, _ int) bool { return lo.Contains(assetIds, a.Id) })
@@ -335,7 +336,7 @@ func (conn *connector) SetStderr(w io.Writer) {
 }
 
 func (conn *connector) Run() error {
-	gsess, err := connect.DoConnect(conn.Ctx, nil)
+	gsess, err := myConnector.DoConnect(conn.Ctx, nil)
 	if err != nil {
 		return err
 	}
@@ -374,7 +375,7 @@ func (conn *connector) Run() error {
 			}
 		}
 	})
-	connect.HandleTerm(gsess)
+	myConnector.HandleTerm(gsess)
 
 	if err = gsess.G.Wait(); err != nil {
 		logger.L().Error("sshsrv run stopped", zap.String("sessionId", gsess.SessionId), zap.Error(err))

@@ -122,7 +122,10 @@ func (c *Controller) FileLS(ctx *gin.Context) {
 		},
 	}
 
-	if !hasAuthorization(ctx, sess) {
+	if ok, err := hasAuthorization(ctx, sess); err != nil {
+		ctx.AbortWithError(http.StatusBadRequest, &errors.ApiError{Code: errors.ErrInvalidArgument, Data: map[string]any{"err": err}})
+		return
+	} else if !ok {
 		ctx.AbortWithError(http.StatusForbidden, &errors.ApiError{Code: errors.ErrNoPerm, Data: map[string]any{}})
 		return
 	}
@@ -166,7 +169,10 @@ func (c *Controller) FileMkdir(ctx *gin.Context) {
 		},
 	}
 
-	if !hasAuthorization(ctx, sess) {
+	if ok, err := hasAuthorization(ctx, sess); err != nil {
+		ctx.AbortWithError(http.StatusBadRequest, &errors.ApiError{Code: errors.ErrInvalidArgument, Data: map[string]any{"err": err}})
+		return
+	} else if !ok {
 		ctx.AbortWithError(http.StatusForbidden, &errors.ApiError{Code: errors.ErrNoPerm, Data: map[string]any{}})
 		return
 	}
@@ -213,7 +219,10 @@ func (c *Controller) FileUpload(ctx *gin.Context) {
 		},
 	}
 
-	if !hasAuthorization(ctx, sess) {
+	if ok, err := hasAuthorization(ctx, sess); err != nil {
+		ctx.AbortWithError(http.StatusBadRequest, &errors.ApiError{Code: errors.ErrInvalidArgument, Data: map[string]any{"err": err}})
+		return
+	} else if !ok {
 		ctx.AbortWithError(http.StatusForbidden, &errors.ApiError{Code: errors.ErrNoPerm, Data: map[string]any{}})
 		return
 	}
@@ -281,7 +290,10 @@ func (c *Controller) FileDownload(ctx *gin.Context) {
 		},
 	}
 
-	if !hasAuthorization(ctx, sess) {
+	if ok, err := hasAuthorization(ctx, sess); err != nil {
+		ctx.AbortWithError(http.StatusBadRequest, &errors.ApiError{Code: errors.ErrInvalidArgument, Data: map[string]any{"err": err}})
+		return
+	} else if !ok {
 		ctx.AbortWithError(http.StatusForbidden, &errors.ApiError{Code: errors.ErrNoPerm, Data: map[string]any{}})
 		return
 	}

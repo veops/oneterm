@@ -17,8 +17,7 @@ type IAuthorizationRepository interface {
 	GetAuthorizationById(ctx context.Context, id int) (*model.Authorization, error)
 	GetAuthorizationByFields(ctx context.Context, nodeId, assetId, accountId int) (*model.Authorization, error)
 	GetAuthsByAsset(ctx context.Context, asset *model.Asset) ([]*model.Authorization, error)
-	GetAuthorizationIds(ctx context.Context) ([]*model.AuthorizationIds, error)
-	GetAssetIdsByNodeAccount(ctx context.Context, nodeIds, accountIds []int) ([]int, error)
+	GetAuthorizationIds(ctx context.Context, resourceIds []int) ([]*model.AuthorizationIds, error)
 	GetAuthorizationIdsByAssetAccount(ctx context.Context, assetId, accountId int) ([]*model.AuthorizationIds, error)
 }
 
@@ -111,33 +110,10 @@ func (r *AuthorizationRepository) GetAuthsByAsset(ctx context.Context, asset *mo
 	return data, err
 }
 
-func (r *AuthorizationRepository) GetAuthorizationIds(ctx context.Context) ([]*model.AuthorizationIds, error) {
+func (r *AuthorizationRepository) GetAuthorizationIds(ctx context.Context, resourceIds []int) ([]*model.AuthorizationIds, error) {
 	var authIds []*model.AuthorizationIds
-	err := r.db.Model(&model.Authorization{}).Find(&authIds).Error
+	err := r.db.Model(&model.Authorization{}).Find(&authIds).Where("resource_id IN ?", resourceIds).Error
 	return authIds, err
-}
-
-func (r *AuthorizationRepository) GetAssetIdsByNodeAccount(ctx context.Context, nodeIds, accountIds []int) ([]int, error) {
-	if len(nodeIds) == 0 || len(accountIds) == 0 {
-		return nil, nil
-	}
-
-	var ids []struct {
-		AssetId int `gorm:"column:asset_id"`
-	}
-	err := r.db.Model(&model.Authorization{}).
-		Select("DISTINCT asset_id").
-		Where("node_id IN ? AND account_id IN ?", nodeIds, accountIds).
-		Find(&ids).Error
-	if err != nil {
-		return nil, err
-	}
-
-	assetIds := make([]int, 0, len(ids))
-	for _, id := range ids {
-		assetIds = append(assetIds, id.AssetId)
-	}
-	return assetIds, nil
 }
 
 func (r *AuthorizationRepository) GetAuthorizationIdsByAssetAccount(ctx context.Context, assetId, accountId int) ([]*model.AuthorizationIds, error) {

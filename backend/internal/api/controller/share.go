@@ -110,6 +110,8 @@ func (c *Controller) ConnectShare(ctx *gin.Context) {
 	share, err := shareService.ValidateShareForConnection(ctx, uuid)
 	if err != nil {
 		ctx.Set("shareErr", &errors.ApiError{Code: errors.ErrInvalidArgument, Data: map[string]any{"err": err}})
+		c.Connect(ctx)
+		return
 	}
 
 	shareService.SetupConnectionParams(ctx, share)

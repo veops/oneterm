@@ -145,11 +145,6 @@ func (c *Controller) GetAssets(ctx *gin.Context) {
 
 // GetAssetIdsByAuthorization gets asset IDs by authorization
 func GetAssetIdsByAuthorization(ctx *gin.Context) ([]int, error) {
-	authIds, err := getAuthorizationIds(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	_, assetIds, _, err := assetService.GetAssetIdsByAuthorization(ctx, authIds)
+	_, assetIds, _, err := assetService.GetAssetIdsByAuthorization(ctx)
 	return assetIds, err
 }

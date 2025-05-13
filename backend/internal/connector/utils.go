@@ -1,4 +1,4 @@
-package connect
+package connector
 
 import (
 	"fmt"
@@ -38,8 +38,9 @@ var (
 // WriteToMonitors sends data to all monitoring sessions
 func WriteToMonitors(monitors *sync.Map, out []byte) {
 	monitors.Range(func(k, v any) bool {
-		if cs, ok := v.(*gsession.SessionChans); ok {
-			cs.OutBuf.Write(out)
+		ws, ok := v.(*websocket.Conn)
+		if ok && ws != nil {
+			ws.WriteMessage(websocket.TextMessage, out)
 		}
 		return true
 	})

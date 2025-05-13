@@ -93,7 +93,7 @@ func (p *Parser) AddInput(bs []byte) (cmd string, forbidden bool) {
 				p.curCmd = p.curCmd[:len(p.curCmd)-1]
 			}
 		} else {
-			// Check if all characters are printable
+			// Check if all characters are printable and record input
 			input := string(bs)
 			allPrintable := true
 			for _, ch := range input {
@@ -252,6 +252,7 @@ func (p *Parser) getOutputLocked() string {
 			p.lastRes = strings.Join(res[:ln-1], "\n")
 		} else {
 			// For non-SSH sessions (like Redis, MySQL), remove first and last line
+			// to avoid recording the prompt as part of the command result
 			startIdx := 1
 			endIdx := ln - 1
 

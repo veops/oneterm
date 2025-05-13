@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/gin-gonic/gin"
 	"github.com/samber/lo"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
@@ -18,9 +19,8 @@ import (
 	"github.com/veops/oneterm/pkg/logger"
 )
 
-// Define constants if they don't exist in the acl package
 const (
-	USE = "use" // Add USE constant, if it already exists in acl package, please use acl.USE
+	kAuthorizationIds = "authorizationIds"
 )
 
 var (
@@ -41,13 +41,11 @@ type IAuthorizationService interface {
 	GetAuthorizations(ctx context.Context, nodeId, assetId, accountId int) ([]*model.Authorization, int64, error)
 	GetAuthorizationById(ctx context.Context, id int) (*model.Authorization, error)
 	HasPermAuthorization(ctx context.Context, auth *model.Authorization, action string) bool
-	HasAuthorization(ctx context.Context, sess *gsession.Session) bool
+	HasAuthorization(ctx *gin.Context, sess *gsession.Session) (bool, error)
 	GetAuthsByAsset(ctx context.Context, asset *model.Asset) ([]*model.Authorization, error)
 	HandleAuthorization(ctx context.Context, tx *gorm.DB, action int, asset *model.Asset, auths ...*model.Authorization) error
 	GetNodeAssetAccountIdsByAction(ctx context.Context, action string) (nodeIds, assetIds, accountIds []int, err error)
-	GetAuthorizationIds(ctx context.Context) ([]*model.AuthorizationIds, error)
-	GetIdsByAuthorizationIds(ctx context.Context) (nodeIds, assetIds, accountIds []int)
-	GetAssetIdsByNodeAccount(ctx context.Context, nodeIds, accountIds []int) ([]int, error)
+	GetAuthorizationIds(ctx *gin.Context) ([]*model.AuthorizationIds, error)
 }
 
 type AuthorizationService struct {
@@ -212,135 +210,189 @@ func (s *AuthorizationService) HandleAuthorization(ctx context.Context, tx *gorm
 
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
 
+	eg := &errgroup.Group{}
+
 	if asset != nil && asset.Id > 0 {
 		var pres []*model.Authorization
 		pres, err = s.GetAuthsByAsset(ctx, asset)
 		if err != nil {
 			return
 		}
-
 		switch action {
-		case model.ACTION_CREATE, model.ACTION_UPDATE:
-			for _, v := range auths {
-				if v == nil {
-					continue
-				}
-				v.AssetId = asset.Id
-				v.NodeId = 0
-				v.SetUpdaterId(currentUser.GetUid())
-				v.SetResourceId(v.ResourceId)
-				if v.Id <= 0 {
-					v.SetCreatorId(currentUser.GetUid())
-				}
-				if err = tx.Save(v).Error; err != nil {
-					return
+		case model.ACTION_CREATE:
+			auths = lo.Map(lo.Keys(asset.Authorization), func(id int, _ int) *model.Authorization {
+				return &model.Authorization{AssetId: asset.Id, AccountId: id, Rids: asset.Authorization[id]}
+			})
+		case model.ACTION_DELETE:
+			auths = pres
+		case model.ACTION_UPDATE:
+			for _, pre := range pres {
+				p := pre
+				if v, ok := asset.Authorization[p.AccountId]; ok {
+					p.Rids = v
+					auths = append(auths, p)
+				} else {
+					eg.Go(func() (err error) {
+						if err = acl.DeleteResource(ctx, currentUser.GetUid(), p.ResourceId); err != nil {
+							return
+						}
+
+						if err = tx.Delete(p).Error; err != nil {
+							return
+						}
+						return
+					})
 				}
 			}
-		case model.ACTION_DELETE:
-			for _, v := range pres {
-				if v == nil {
-					continue
-				}
-				if err = tx.Delete(v).Error; err != nil {
-					return
+			preAccountsIds := lo.Map(pres, func(p *model.Authorization, _ int) int { return p.AccountId })
+			for k, v := range asset.Authorization {
+				if !lo.Contains(preAccountsIds, k) {
+					auths = append(auths, &model.Authorization{AssetId: asset.Id, AccountId: k, Rids: v})
 				}
 			}
 		}
+	}
+
+	for _, a := range lo.Filter(auths, func(item *model.Authorization, _ int) bool { return item != nil }) {
+		auth := a
+		switch action {
+		case model.ACTION_CREATE:
+			eg.Go(func() (err error) {
+				resourceId := 0
+				if resourceId, err = acl.CreateAcl(ctx, currentUser, config.RESOURCE_AUTHORIZATION, auth.GetName()); err != nil {
+					return
+				}
+				if err = acl.BatchGrantRoleResource(ctx, currentUser.GetUid(), auth.Rids, resourceId, []string{acl.READ}); err != nil {
+					return
+				}
+				auth.CreatorId = currentUser.GetUid()
+				auth.UpdaterId = currentUser.GetUid()
+				auth.ResourceId = resourceId
+				return tx.Create(auth).Error
+			})
+		case model.ACTION_DELETE:
+			eg.Go(func() (err error) {
+				return acl.DeleteResource(ctx, currentUser.GetUid(), auth.ResourceId)
+			})
+		case model.ACTION_UPDATE:
+			eg.Go(func() (err error) {
+				pre, err := s.GetAuthorizationById(ctx, auth.GetId())
+				if err != nil {
+					if !errors.Is(err, gorm.ErrRecordNotFound) {
+						return
+					}
+					resourceId := 0
+					if resourceId, err = acl.CreateAcl(ctx, currentUser, config.RESOURCE_AUTHORIZATION, auth.GetName()); err != nil {
+						return
+					}
+					auth.ResourceId = resourceId
+					if err = tx.Create(auth).Error; err != nil {
+						return
+					}
+				}
+				revokeRids := lo.Without(pre.Rids, auth.Rids...)
+				if len(revokeRids) > 0 {
+					if err = acl.BatchRevokeRoleResource(ctx, currentUser.GetUid(), revokeRids, auth.ResourceId, []string{acl.READ}); err != nil {
+						return
+					}
+				}
+				grantRids := lo.Without(auth.Rids, pre.Rids...)
+				if len(grantRids) > 0 {
+					if err = acl.BatchGrantRoleResource(ctx, currentUser.GetUid(), grantRids, auth.ResourceId, []string{acl.READ}); err != nil {
+						return
+					}
+				}
+				return tx.Model(auth).Update("rids", auth.Rids).Error
+			})
+		}
+	}
+
+	err = eg.Wait()
+
+	return
+}
+
+func getAuthorizations(ctx *gin.Context) (res []*acl.Resource, err error) {
+	currentUser, _ := acl.GetSessionFromCtx(ctx)
+
+	res, err = acl.GetRoleResources(ctx, currentUser.GetRid(), config.RESOURCE_AUTHORIZATION)
+	if err != nil {
 		return
 	}
 
-	for _, v := range auths {
-		if v == nil {
-			continue
-		}
-		if v.Id == 0 && v.AssetId == 0 && v.AccountId == 0 && v.NodeId == 0 {
-			err = errors.New("invalid authorization")
-			return
-		}
-		if v.Id <= 0 {
-			v.SetCreatorId(currentUser.GetUid())
-		}
-		v.SetUpdaterId(currentUser.GetUid())
+	return
+}
 
-		switch action {
-		case model.ACTION_CREATE, model.ACTION_UPDATE:
-			if err = tx.Save(v).Error; err != nil {
-				return
-			}
-		case model.ACTION_DELETE:
-			if err = tx.Delete(v).Error; err != nil {
-				return
-			}
-		}
+func getAutorizationResourceIds(ctx *gin.Context) (resourceIds []int, err error) {
+	res, err := getAuthorizations(ctx)
+	if err != nil {
+		return
 	}
+
+	resourceIds = lo.Map(res, func(r *acl.Resource, _ int) int { return r.ResourceId })
+
 	return
 }
 
-func (s *AuthorizationService) GetAuthorizationIds(ctx context.Context) (authIds []*model.AuthorizationIds, err error) {
-	authIds, err = s.repo.GetAuthorizationIds(ctx)
+func (s *AuthorizationService) GetAuthorizationIds(ctx *gin.Context) (authIds []*model.AuthorizationIds, err error) {
+	resourceIds, err := getAutorizationResourceIds(ctx)
+	if err != nil {
+		return
+	}
+	authIds, err = s.repo.GetAuthorizationIds(ctx, resourceIds)
 	return
 }
 
-func (s *AuthorizationService) HasAuthorization(ctx context.Context, sess *gsession.Session) (ok bool) {
+func (s *AuthorizationService) HasAuthorization(ctx *gin.Context, sess *gsession.Session) (ok bool, err error) {
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
+
+	if sess.ShareId != 0 {
+		return true, nil
+	}
 
 	if ok = acl.IsAdmin(currentUser); ok {
 		return
 	}
 
-	nodeIds, assetIds, accountIds, err := s.GetNodeAssetAccountIdsByAction(ctx, USE)
-	if err != nil {
-		return
+	if sess.Session.Asset == nil {
+		if err := s.db.Model(sess.Session.Asset).Where("id=?", sess.AssetId).First(&sess.Session.Asset).Error; err != nil {
+			return false, err
+		}
 	}
 
-	assetId := sess.Session.AssetId
-	accountId := sess.Session.AccountId
-
-	if assetId > 0 && accountId > 0 {
-		if !lo.Contains(assetIds, assetId) {
-			return
-		}
-		if !lo.Contains(accountIds, accountId) {
-			ok = false
-			authIds, err := s.repo.GetAuthorizationIdsByAssetAccount(ctx, assetId, accountId)
-			if err != nil {
-				logger.L().Error("get authrization failed", zap.Error(err))
-				return
-			}
-			for _, v := range authIds {
-				if v.NodeId > 0 && lo.Contains(nodeIds, v.NodeId) {
-					ok = true
-					break
-				}
-			}
-			return
-		}
-		ok = true
-		return
-	}
-
-	return
-}
-
-func (s *AuthorizationService) GetIdsByAuthorizationIds(ctx context.Context) (nodeIds, assetIds, accountIds []int) {
 	authIds, err := s.GetAuthorizationIds(ctx)
 	if err != nil {
-		return
+		return false, err
 	}
-	for _, v := range authIds {
-		if v.NodeId > 0 {
-			nodeIds = append(nodeIds, v.NodeId)
-		}
-		if v.AssetId > 0 {
-			assetIds = append(assetIds, v.AssetId)
-		}
-		if v.AccountId > 0 {
-			accountIds = append(accountIds, v.AccountId)
-		}
+	if ok = lo.ContainsBy(authIds, func(item *model.AuthorizationIds) bool {
+		return item.NodeId == 0 && item.AssetId == sess.AssetId && item.AccountId == sess.AccountId
+	}); ok {
+		return true, nil
 	}
-	return
-}
+	ctx.Set(kAuthorizationIds, authIds)
 
-func (s *AuthorizationService) GetAssetIdsByNodeAccount(ctx context.Context, nodeIds, accountIds []int) ([]int, error) {
-	return s.repo.GetAssetIdsByNodeAccount(ctx, nodeIds, accountIds)
+	authorizationIds, ok := ctx.Value(kAuthorizationIds).([]*model.AuthorizationIds)
+	if !ok || len(authorizationIds) == 0 {
+		return false, errors.New("authorizationIds not found")
+	}
+	assetService := NewAssetService()
+	nodeIds, assetIds, accountIds := assetService.GetIdsByAuthorizationIds(ctx, authorizationIds)
+	tmp, err := repository.HandleSelfChild(ctx, nodeIds...)
+	if err != nil {
+		logger.L().Error("", zap.Error(err))
+		return false, err
+	}
+	nodeIds = append(nodeIds, tmp...)
+	if ok = lo.Contains(nodeIds, sess.Session.Asset.ParentId) || lo.Contains(assetIds, sess.AssetId) || lo.Contains(accountIds, sess.AccountId); ok {
+		return true, nil
+	}
+
+	ids, err := assetService.GetAssetIdsByNodeAccount(ctx, nodeIds, accountIds)
+	if err != nil {
+		logger.L().Error("", zap.Error(err))
+		return false, err
+	}
+
+	return lo.Contains(ids, sess.AssetId), nil
+
 }

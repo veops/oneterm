@@ -289,7 +289,9 @@ func (s *AuthorizationService) HandleAuthorization(ctx context.Context, tx *gorm
 					if err = tx.Create(auth).Error; err != nil {
 						return
 					}
+					pre = &model.Authorization{Rids: []int{}}
 				}
+
 				revokeRids := lo.Without(pre.Rids, auth.Rids...)
 				if len(revokeRids) > 0 {
 					if err = acl.BatchRevokeRoleResource(ctx, currentUser.GetUid(), revokeRids, auth.ResourceId, []string{acl.READ}); err != nil {

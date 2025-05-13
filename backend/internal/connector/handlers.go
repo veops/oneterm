@@ -18,7 +18,8 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/veops/oneterm/internal/acl"
-	"github.com/veops/oneterm/internal/connector/db"
+	"github.com/veops/oneterm/internal/connector/protocols"
+	"github.com/veops/oneterm/internal/connector/protocols/db"
 	"github.com/veops/oneterm/internal/model"
 	"github.com/veops/oneterm/internal/service"
 	gsession "github.com/veops/oneterm/internal/session"
@@ -29,7 +30,7 @@ import (
 func Connect(ctx *gin.Context) {
 	ctx.Set("sessionType", model.SESSIONTYPE_WEB)
 
-	ws, err := Upgrader.Upgrade(ctx.Writer, ctx.Request, http.Header{
+	ws, err := protocols.Upgrader.Upgrade(ctx.Writer, ctx.Request, http.Header{
 		"sec-websocket-protocol": {ctx.GetHeader("sec-websocket-protocol")},
 	})
 	if err != nil {
@@ -48,7 +49,7 @@ func Connect(ctx *gin.Context) {
 
 	var sess *gsession.Session
 	defer func() {
-		HandleError(ctx, sess, err, ws, nil)
+		protocols.HandleError(ctx, sess, err, ws, nil)
 	}()
 
 	sess, err = DoConnect(ctx, ws)
@@ -57,9 +58,9 @@ func Connect(ctx *gin.Context) {
 	}
 
 	if sess.IsGuacd() {
-		HandleGuacd(sess)
+		protocols.HandleGuacd(sess)
 	} else {
-		HandleTerm(sess)
+		protocols.HandleTerm(sess)
 	}
 }
 
@@ -68,7 +69,7 @@ func ConnectMonitor(ctx *gin.Context) {
 
 	sessionId := ctx.Param("session_id")
 	var sess *gsession.Session
-	ws, err := Upgrader.Upgrade(ctx.Writer, ctx.Request, http.Header{
+	ws, err := protocols.Upgrader.Upgrade(ctx.Writer, ctx.Request, http.Header{
 		"sec-websocket-protocol": {ctx.GetHeader("sec-websocket-protocol")},
 	})
 	if err != nil {
@@ -79,7 +80,7 @@ func ConnectMonitor(ctx *gin.Context) {
 
 	chs := gsession.NewSessionChans()
 	defer func() {
-		HandleError(ctx, sess, err, ws, chs)
+		protocols.HandleError(ctx, sess, err, ws, chs)
 	}()
 
 	if !acl.IsAdmin(currentUser) {
@@ -95,7 +96,7 @@ func ConnectMonitor(ctx *gin.Context) {
 	g, gctx := errgroup.WithContext(ctx)
 	if sess.IsGuacd() {
 		g.Go(func() error {
-			return MonitGuacd(ctx, sess, chs, ws)
+			return protocols.MonitGuacd(ctx, sess, chs, ws)
 		})
 	}
 
@@ -144,7 +145,7 @@ func ConnectClose(ctx *gin.Context) {
 	}
 
 	logger.L().Info("closing...", zap.String("sessionId", session.SessionId), zap.Int("type", session.SessionType))
-	defer OfflineSession(ctx, session.SessionId, currentUser.GetUserName())
+	defer protocols.OfflineSession(ctx, session.SessionId, currentUser.GetUserName())
 
 	session.Status = model.SESSIONSTATUS_OFFLINE
 	session.ClosedAt = lo.ToPtr(time.Now())
@@ -217,7 +218,7 @@ func DoConnect(ctx *gin.Context, ws *websocket.Conn) (sess *gsession.Session, er
 		sess.ClientIp = ctx.RemoteIP()
 	}
 
-	if !CheckTime(asset.AccessAuth) {
+	if !protocols.CheckTime(asset.AccessAuth) {
 		err = &myErrors.ApiError{Code: myErrors.ErrAccessTime}
 		return
 	}
@@ -231,11 +232,13 @@ func DoConnect(ctx *gin.Context, ws *websocket.Conn) (sess *gsession.Session, er
 
 	switch strings.Split(sess.Protocol, ":")[0] {
 	case "ssh":
-		go connectSsh(ctx, sess, asset, account, gateway)
+		go protocols.ConnectSsh(ctx, sess, asset, account, gateway)
 	case "redis", "mysql", "mongodb", "postgresql":
 		go db.ConnectDB(sess, asset, account, gateway)
-	case "vnc", "rdp", "telnet":
-		go connectGuacd(ctx, sess, asset, account, gateway)
+	case "telnet":
+		go protocols.ConnectTelnet(ctx, sess, asset, account, gateway)
+	case "vnc", "rdp":
+		go protocols.ConnectGuacd(ctx, sess, asset, account, gateway)
 	default:
 		logger.L().Error("wrong protocol " + sess.Protocol)
 	}

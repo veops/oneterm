@@ -1,4 +1,4 @@
-package connector
+package protocols
 
 import (
 	"fmt"
@@ -19,8 +19,8 @@ import (
 	"github.com/veops/oneterm/pkg/logger"
 )
 
-// connectGuacd connects to Guacamole server
-func connectGuacd(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, account *model.Account, gateway *model.Gateway) (err error) {
+// ConnectGuacd connects to Guacamole server
+func ConnectGuacd(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, account *model.Account, gateway *model.Gateway) (err error) {
 	chs := sess.Chans
 	defer func() {
 		if err != nil {

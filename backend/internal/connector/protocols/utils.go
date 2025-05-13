@@ -1,4 +1,4 @@
-package connector
+package protocols
 
 import (
 	"fmt"
@@ -69,40 +69,6 @@ func CheckTime(data model.AccessAuth) bool {
 		}
 	}
 	return !has || in == data.Allow
-}
-
-// OfflineSession makes a session offline
-func OfflineSession(ctx *gin.Context, sessionId string, closer string) {
-	logger.L().Debug("offline", zap.String("session_id", sessionId), zap.String("closer", closer))
-	defer gsession.GetOnlineSession().Delete(sessionId)
-	session := gsession.GetOnlineSessionById(sessionId)
-	if session == nil {
-		return
-	}
-	if closer != "" && session.Chans != nil {
-		select {
-		case session.Chans.CloseChan <- closer:
-			break
-		case <-time.After(time.Second):
-			break
-		}
-	}
-	session.Monitors.Range(func(key, value any) bool {
-		ws, ok := value.(*websocket.Conn)
-		if ok && ws != nil {
-			lang := ctx.PostForm("lang")
-			accept := ctx.GetHeader("Accept-Language")
-			localizer := i18n.NewLocalizer(myi18n.Bundle, lang, accept)
-			cfg := &i18n.LocalizeConfig{
-				TemplateData:   map[string]any{"sessionId": sessionId},
-				DefaultMessage: myi18n.MsgSessionEnd,
-			}
-			msg, _ := localizer.Localize(cfg)
-			ws.WriteMessage(websocket.TextMessage, []byte(msg))
-			ws.Close()
-		}
-		return true
-	})
 }
 
 // HandleError handles errors from sessions
@@ -250,4 +216,38 @@ func (instr *Instruction) Bytes() []byte {
 // IsActive checks if a message indicates user activity
 func IsActive(message []byte) bool {
 	return len(message) > 0
+}
+
+// OfflineSession makes a session offline
+func OfflineSession(ctx *gin.Context, sessionId string, closer string) {
+	logger.L().Debug("offline", zap.String("session_id", sessionId), zap.String("closer", closer))
+	defer gsession.GetOnlineSession().Delete(sessionId)
+	session := gsession.GetOnlineSessionById(sessionId)
+	if session == nil {
+		return
+	}
+	if closer != "" && session.Chans != nil {
+		select {
+		case session.Chans.CloseChan <- closer:
+			break
+		case <-time.After(time.Second):
+			break
+		}
+	}
+	session.Monitors.Range(func(key, value any) bool {
+		ws, ok := value.(*websocket.Conn)
+		if ok && ws != nil {
+			lang := ctx.PostForm("lang")
+			accept := ctx.GetHeader("Accept-Language")
+			localizer := i18n.NewLocalizer(myi18n.Bundle, lang, accept)
+			cfg := &i18n.LocalizeConfig{
+				TemplateData:   map[string]any{"sessionId": sessionId},
+				DefaultMessage: myi18n.MsgSessionEnd,
+			}
+			msg, _ := localizer.Localize(cfg)
+			ws.WriteMessage(websocket.TextMessage, []byte(msg))
+			ws.Close()
+		}
+		return true
+	})
 }

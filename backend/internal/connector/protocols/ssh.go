@@ -1,4 +1,4 @@
-package connector
+package protocols
 
 import (
 	"bufio"
@@ -23,8 +23,8 @@ import (
 	"github.com/veops/oneterm/pkg/logger"
 )
 
-// connectSsh connects to SSH server
-func connectSsh(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, account *model.Account, gateway *model.Gateway) (err error) {
+// ConnectSsh connects to SSH server
+func ConnectSsh(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, account *model.Account, gateway *model.Gateway) (err error) {
 	w, h := cast.ToInt(ctx.Query("w")), cast.ToInt(ctx.Query("h"))
 	chs := sess.Chans
 	defer func() {

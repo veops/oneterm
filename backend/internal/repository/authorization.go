@@ -112,7 +112,7 @@ func (r *AuthorizationRepository) GetAuthsByAsset(ctx context.Context, asset *mo
 
 func (r *AuthorizationRepository) GetAuthorizationIds(ctx context.Context, resourceIds []int) ([]*model.AuthorizationIds, error) {
 	var authIds []*model.AuthorizationIds
-	err := r.db.Model(&model.Authorization{}).Find(&authIds).Where("resource_id IN ?", resourceIds).Error
+	err := r.db.Model(&model.Authorization{}).Where("resource_id IN ?", resourceIds).Find(&authIds).Error
 	return authIds, err
 }
 

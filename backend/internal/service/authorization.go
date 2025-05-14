@@ -321,7 +321,6 @@ func getAuthorizations(ctx *gin.Context) (res []*acl.Resource, err error) {
 	if err != nil {
 		return
 	}
-
 	return
 }
 

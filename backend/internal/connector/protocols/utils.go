@@ -30,7 +30,6 @@ var (
 			return true
 		},
 	}
-	byteClearAll = []byte("\x15\r")
 
 	wsWriteMutex = &sync.Mutex{}
 )
@@ -174,7 +173,7 @@ func Read(sess *gsession.Session) error {
 				case websocket.TextMessage:
 					chs.InChan <- msg
 					if msg[0] != '9' && ((sess.IsGuacd() && len(msg) > 0) || (!sess.IsGuacd() && IsActive(msg))) {
-						sess.SetIdle()
+						sess.SetIdle() // TODO: performance issue
 					}
 				}
 			} else if sess.SessionType == model.SESSIONTYPE_CLIENT {
@@ -183,7 +182,7 @@ func Read(sess *gsession.Session) error {
 					return err
 				}
 				chs.InChan <- p
-				sess.SetIdle()
+				sess.SetIdle() // TODO: performance issue
 			}
 		}
 	}

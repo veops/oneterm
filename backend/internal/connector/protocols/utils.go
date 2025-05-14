@@ -173,7 +173,7 @@ func Read(sess *gsession.Session) error {
 				switch t {
 				case websocket.TextMessage:
 					chs.InChan <- msg
-					if (sess.IsGuacd() && len(msg) > 0 && msg[0] != '9') || (!sess.IsGuacd() && IsActive(msg)) {
+					if msg[0] != '9' && ((sess.IsGuacd() && len(msg) > 0) || (!sess.IsGuacd() && IsActive(msg))) {
 						sess.SetIdle()
 					}
 				}

@@ -22,6 +22,7 @@ func SetupRouter(r *gin.Engine) {
 	c := controller.Controller{}
 
 	v1 := r.Group("/api/oneterm/v1", middleware.Error2RespMiddleware(), middleware.AuthMiddleware())
+	v1AuthAbandoned := r.Group("/api/oneterm/v1", middleware.Error2RespMiddleware())
 	{
 		account := v1.Group("account")
 		{
@@ -108,8 +109,11 @@ func SetupRouter(r *gin.Engine) {
 
 		config := v1.Group("config")
 		{
-			config.GET("", c.GetConfig)
 			config.POST("", c.PostConfig)
+		}
+		config2 := v1AuthAbandoned.Group("config")
+		{
+			config2.GET("", c.GetConfig)
 		}
 
 		history := v1.Group("history")

@@ -126,9 +126,8 @@ func ConnectMonitor(ctx *gin.Context) {
 		}
 	})
 
-	if err = g.Wait(); err != nil {
-		logger.L().Error("monitor failed", zap.Error(err))
-	}
+	g.Wait()
+	logger.L().Info("monitor exit", zap.String("sessionId", sess.SessionId))
 }
 
 func ConnectClose(ctx *gin.Context) {

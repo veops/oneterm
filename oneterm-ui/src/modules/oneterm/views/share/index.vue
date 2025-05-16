@@ -5,7 +5,7 @@
       :shareId="shareId"
     />
     <GuacamolePanel
-      v-else-if="protocol === 'rdp' || protocol === 'vnc'"
+      v-else-if="['rdp', 'vnc'].includes(protocol)"
       :shareId="shareId"
     />
   </div>

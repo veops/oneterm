@@ -10,7 +10,10 @@
     ></div>
 
     <OperationMenu
+      v-if="showOperationMenu"
       :openFullScreen="openFullScreen"
+      :showClipboardBtn="showClipboardBtn"
+      :showFullScreenBtn="!isFullScreen"
       @toggleFullScreen="toggleFullScreen"
       @handleClipboardOk="handleClipboardOk"
     />
@@ -67,6 +70,18 @@ export default {
       is_monitor: this.$route.query.is_monitor,
       messageKey: 'message',
       resizeObserver: null, // guacamoleClient container size observer
+      controlConfig: {}
+    }
+  },
+  computed: {
+    showClipboardBtn() {
+      const protocol = this.protocol || this.$route?.params?.protocol || ''
+      return this?.controlConfig?.[`${protocol?.split?.(':')?.[0]}_config`]?.paste
+    },
+    showOperationMenu() {
+      const is_monitor = this.$route?.query?.is_monitor || false
+
+      return !is_monitor && (this.showClipboardBtn || !this.isFullScreen)
     }
   },
   async mounted() {
@@ -120,9 +135,9 @@ export default {
       // 处理从虚拟机收到的剪贴板内容
       client.onclipboard = this.handleClipboardReceived
 
-      // 处理客户端的状态变化事件
-      client.onstatechange = (state) => {
-        this.onClientStateChange(state)
+      if (this?.controlConfig?.[`${queryProtocol?.split?.(':')?.[0]}_config`]?.copy) {
+        // 处理从虚拟机收到的剪贴板内容
+        client.onclipboard = this.handleClipboardReceived
       }
 
       client.onerror = this.onError
@@ -311,8 +326,10 @@ export default {
 
     async getConfig() {
       try {
-        const res = await getConfig()
-        console.log('getConfig', res)
+        const res = await getConfig({
+          info: true
+        })
+        this.controlConfig = res?.data || {}
       } catch (e) {
         console.log('getConfig fail', e)
       }

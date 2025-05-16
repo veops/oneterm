@@ -91,7 +91,9 @@ export default {
   },
   methods: {
     async getConfig() {
-      await getConfig().then((res) => {
+      await getConfig({
+        info: true
+      }).then((res) => {
         const { timeout = 5, rdp_config, vnc_config } = res?.data
         this.form = {
           timeout,

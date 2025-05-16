@@ -9,7 +9,10 @@
       </div>
 
       <a-menu slot="overlay">
-        <a-menu-item @click="toggleFullScreen" >
+        <a-menu-item
+          v-if="showFullScreenBtn"
+          @click="toggleFullScreen"
+        >
           <template v-if="openFullScreen">
             <a-icon type="fullscreen-exit" />
             {{ $t('oneterm.workStation.exitFullScreen') }}
@@ -20,7 +23,10 @@
           </template>
         </a-menu-item>
 
-        <a-menu-item @click="openClipboardModal" >
+        <a-menu-item
+          v-if="showClipboardBtn"
+          @click="openClipboardModal"
+        >
           <a-icon type="copy" />
           {{ $t('oneterm.guacamole.clipboard') }}
         </a-menu-item>
@@ -44,6 +50,14 @@ export default {
   },
   props: {
     openFullScreen: {
+      type: Boolean,
+      default: false
+    },
+    showClipboardBtn: {
+      type: Boolean,
+      default: false
+    },
+    showFullScreenBtn: {
       type: Boolean,
       default: false
     }

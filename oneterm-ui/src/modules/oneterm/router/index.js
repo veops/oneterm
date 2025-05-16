@@ -110,14 +110,14 @@ const genOnetermRoutes = () => {
               path: '/oneterm/terminal',
               name: 'oneterm_terminal',
               hidden: true,
-              component: () => import('../views/terminal'),
+              component: () => import('../views/connect/terminal/index.vue'),
               meta: { title: '终端', keepAlive: false }
           },
           {
               path: '/oneterm/guacamole/:asset_id/:account_id/:protocol',
               name: 'oneterm_guacamole',
               hidden: true,
-              component: () => import('../views/terminal/guacamoleClient.vue'),
+              component: () => import('../views/connect/guacamoleClient/index.vue'),
               meta: { title: '终端', keepAlive: false }
           },
           {

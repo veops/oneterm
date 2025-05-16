@@ -60,7 +60,10 @@ export default {
               this.$t('oneterm.connectedUsers'),
             ],
             bottom: 0,
-            itemGap: 60
+            itemGap: 60,
+            icon: 'circle',
+            itemWidth: 8,
+            itemHeight: 8
           },
           grid: {
             top: '3%',
@@ -79,16 +82,24 @@ export default {
           yAxis: [
             {
               type: 'value',
+              splitLine: {
+                lineStyle: {
+                  width: 0.5,
+                }
+              }
             },
           ],
           series: [
             {
               name: this.$t('oneterm.connect'),
               type: 'line',
-              symbol: 'circle',
+              symbol: 'none',
               symbolSize: 5,
               areaStyle: {
-                color: 'rgba(56, 125, 255, 0.05)',
+                color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                  { offset: 0, color: 'rgba(56, 125, 255, 0.7)' },
+                  { offset: 1, color: 'rgba(56, 125, 255, 0.1)' }
+                ])
               },
               emphasis: {
                 focus: 'series',
@@ -96,17 +107,20 @@ export default {
               smooth: true,
               color: 'rgba(56, 125, 255, 1)',
               lineStyle: {
-                width: 1.5
+                width: 1.2
               },
               data: data.map((item) => item.connect),
             },
             {
               name: this.$t('oneterm.session'),
               type: 'line',
-              symbol: 'circle',
+              symbol: 'none',
               symbolSize: 5,
               areaStyle: {
-                color: 'rgba(35, 184, 153, 0.05)',
+                color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                  { offset: 0, color: 'rgba(35, 184, 153, 0.7)' },
+                  { offset: 1, color: 'rgba(35, 184, 153, 0.1)' }
+                ])
               },
               emphasis: {
                 focus: 'series',
@@ -114,17 +128,20 @@ export default {
               smooth: true,
               color: 'rgba(35, 184, 153, 1)',
               lineStyle: {
-                width: 1.5
+                width: 1.2
               },
               data: data.map((item) => item.session),
             },
             {
               name: this.$t('oneterm.connectedAssets'),
               type: 'line',
-              symbol: 'circle',
+              symbol: 'none',
               symbolSize: 5,
               areaStyle: {
-                color: 'rgba(254, 124, 75, 0.05)',
+                color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                  { offset: 0, color: 'rgba(254, 124, 75, 0.7)' },
+                  { offset: 1, color: 'rgba(254, 124, 75, 0.1)' }
+                ])
               },
               emphasis: {
                 focus: 'series',
@@ -132,17 +149,20 @@ export default {
               smooth: true,
               color: 'rgba(254, 124, 75, 1)',
               lineStyle: {
-                width: 1.5
+                width: 1.2
               },
               data: data.map((item) => item.asset),
             },
             {
               name: this.$t('oneterm.connectedUsers'),
               type: 'line',
-              symbol: 'circle',
+              symbol: 'none',
               symbolSize: 5,
               areaStyle: {
-                color: 'rgba(78, 194, 239, 0.05)',
+                color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                  { offset: 0, color: 'rgba(78, 194, 239, 0.7)' },
+                  { offset: 1, color: 'rgba(78, 194, 239, 0.1)' }
+                ])
               },
               emphasis: {
                 focus: 'series',
@@ -150,7 +170,7 @@ export default {
               smooth: true,
               color: 'rgba(78, 194, 239, 1)',
               lineStyle: {
-                width: 1.5
+                width: 1.2
               },
               data: data.map((item) => item.user),
             },

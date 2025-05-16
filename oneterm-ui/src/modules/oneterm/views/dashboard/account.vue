@@ -40,6 +40,11 @@ export default {
           },
           yAxis: {
             type: 'value',
+            splitLine: {
+              lineStyle: {
+                width: 0.5,
+              }
+            }
           },
           tooltip: {
             trigger: 'axis',

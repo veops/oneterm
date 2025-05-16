@@ -1,8 +1,8 @@
 @font-face {
   font-family: "iconfont"; /* Project id 3857903 */
-  src: url('iconfont.woff2?t=1737341489119') format('woff2'),
-       url('iconfont.woff?t=1737341489119') format('woff'),
-       url('iconfont.ttf?t=1737341489119') format('truetype');
+  src: url('iconfont.woff2?t=1747379868882') format('woff2'),
+       url('iconfont.woff?t=1747379868882') format('woff'),
+       url('iconfont.ttf?t=1747379868882') format('truetype');
 }
 
 .iconfont {
@@ -11,6 +11,58 @@
   font-style: normal;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+.a-mongoDB1:before {
+  content: "\ea1b";
+}
+
+.a-postgreSQL1:before {
+  content: "\ea1c";
+}
+
+.a-telnet1:before {
+  content: "\ea1d";
+}
+
+.a-command_interception1:before {
+  content: "\ea17";
+}
+
+.quick_commands:before {
+  content: "\ea18";
+}
+
+.terminal_settings:before {
+  content: "\ea19";
+}
+
+.basic_settings:before {
+  content: "\ea1a";
+}
+
+.ops-oneterm-asset-management:before {
+  content: "\ea16";
+}
+
+.ai-seek:before {
+  content: "\ea15";
+}
+
+.ai-hate1:before {
+  content: "\ea13";
+}
+
+.ai-like1:before {
+  content: "\ea14";
+}
+
+.ai-like2:before {
+  content: "\ea11";
+}
+
+.ai-hate2:before {
+  content: "\ea12";
 }
 
 .ai-top_up:before {

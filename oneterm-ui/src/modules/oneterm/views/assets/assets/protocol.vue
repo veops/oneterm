@@ -3,22 +3,31 @@
     <a-form-model-item :label="$t('oneterm.protocol')">
       <div class="protocol-box" v-for="(pro, index) in protocols" :key="pro.id">
         <a-input-group compact>
-          <a-select v-model="pro.value" style="width: 100px" @change="(value) => changeProValue(value, index)">
-            <a-select-option
-              v-for="(item) in protocolSelectOption"
-              :key="item.key"
-              :value="item.key"
-              :disabled="protocols.some((protocol) => protocol.value === item.key && protocol.value !== pro.value)"
+          <a-select v-model="pro.value" style="width: 150px" @change="(value) => changeProValue(value, index)">
+            <a-select-opt-group
+              v-for="(protocolGroup, protocolGroupIndex) in protocolSelectOption"
+              :key="protocolGroupIndex"
             >
-              {{ item.label }}
-            </a-select-option>
+              <div slot="label">{{ $t(protocolGroup.title) }}</div>
+              <a-select-option
+                v-for="(protocol) in protocolGroup.list"
+                :key="protocol.key"
+                :value="protocol.key"
+                :disabled="protocols.some((protocol) => protocol.value === protocol.key && protocol.value !== pro.value)"
+              >
+                <div class="protocol-select-item">
+                  <ops-icon :type="protocol.icon" />
+                  <span class="protocol-select-item-text">{{ protocol.label }}</span>
+                </div>
+              </a-select-option>
+            </a-select-opt-group>
           </a-select>
           <a-input
             v-model="pro.label"
             :min="0"
             :placeholder="$t('oneterm.assetList.protocolPlaceholder')"
             :precision="0"
-            style="width: calc(100% - 100px)"
+            style="width: calc(100% - 150px)"
           />
         </a-input-group>
         <a-space>
@@ -88,22 +97,65 @@ export default {
       rules: {},
       protocolSelectOption: [
         {
-          key: 'ssh',
-          label: 'ssh'
+          title: 'oneterm.assetList.basic',
+          list: [
+            {
+              key: 'ssh',
+              label: 'ssh',
+              icon: 'a-oneterm-ssh2'
+            },
+            {
+              key: 'rdp',
+              label: 'rdp',
+              icon: 'a-oneterm-ssh1'
+            },
+            {
+              key: 'vnc',
+              label: 'vnc',
+              icon: 'oneterm-rdp'
+            },
+            {
+              key: 'telnet',
+              label: 'telnet',
+              icon: 'a-telnet1'
+            },
+          ]
         },
         {
-          key: 'rdp',
-          label: 'rdp'
-        },
-        {
-          key: 'vnc',
-          label: 'vnc'
+          title: 'oneterm.assetList.database',
+          list: [
+            {
+              key: 'redis',
+              label: 'redis',
+              icon: 'oneterm-redis'
+            },
+            {
+              key: 'mysql',
+              label: 'mysql',
+              icon: 'oneterm-mysql'
+            },
+            {
+              key: 'mongodb',
+              label: 'mongodb',
+              icon: 'a-mongoDB1'
+            },
+            {
+              key: 'postgresql',
+              label: 'postgresql',
+              icon: 'a-postgreSQL1'
+            }
+          ]
         }
       ],
       protocolMap: {
         'ssh': 22,
         'rdp': 3389,
         'vnc': 5900,
+        'telnet': 23,
+        'redis': 6379,
+        'mysql': 3306,
+        'mongodb': 27017,
+        'postgresql': 5432
       },
       protocols: [{ id: uuidv4(), value: 'ssh', label: '22' }],
       gatewayList: [],
@@ -156,6 +208,15 @@ export default {
   .ant-space {
     position: absolute;
     right: -45px;
+  }
+}
+
+/deep/ .protocol-select-item {
+  display: flex;
+  align-items: center;
+
+  &-text {
+    margin-left: 6px;
   }
 }
 </style>

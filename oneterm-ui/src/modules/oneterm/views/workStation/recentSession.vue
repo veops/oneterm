@@ -6,6 +6,7 @@
     :bodyStyle="{
       height: '100%'
     }"
+    :zIndex="1003"
     @close="handleCancel"
   >
     <div class="recent-session">
@@ -124,6 +125,11 @@ export default {
             'ssh': 'a-oneterm-ssh2',
             'rdp': 'a-oneterm-ssh1',
             'vnc': 'oneterm-rdp',
+            'telnet': 'a-telnet1',
+            'redis': 'oneterm-redis',
+            'mysql': 'oneterm-mysql',
+            'mongodb': 'a-mongoDB1',
+            'postgresql': 'a-postgreSQL1',
           }
 
           const tableData = res?.data?.list || []

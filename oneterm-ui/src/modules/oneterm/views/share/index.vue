@@ -1,7 +1,7 @@
 <template>
   <div v-if="shareId" >
     <Terminal
-      v-if="protocol === 'ssh'"
+      v-if="['ssh', 'telnet', 'mysql', 'redis', 'postgresql', 'mongodb'].includes(protocol)"
       :shareId="shareId"
     />
     <GuacamolePanel
@@ -12,8 +12,8 @@
 </template>
 
 <script>
-import Terminal from '../terminal/index.vue'
-import GuacamolePanel from '../terminal/guacamoleClient.vue'
+import Terminal from '@/modules/oneterm/views/connect/terminal/index.vue'
+import GuacamolePanel from '@/modules/oneterm/views/connect/guacamoleClient/index.vue'
 
 export default {
   name: 'Share',

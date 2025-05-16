@@ -13,15 +13,9 @@
             {{ $t('oneterm.assetList.assetTree') }}
           </div>
 
-          <a-button
-            type="primary"
-            class="ops-button-ghost"
-            ghost
-            size="small"
-            @click="openRecentSession"
-          >
-            {{ $t('oneterm.workStation.viewRecentSession') }}
-          </a-button>
+          <a @click="openRecentSession">
+            {{ $t('oneterm.workStation.recentSession') }}
+          </a>
         </div>
       </template>
 
@@ -47,11 +41,12 @@
               <template #tab>
                 <div class="oneterm-workstation-tab-terminal">
                   <span
+                    v-if="!['displaySetting', 'themeSetting'].includes(item.id)"
                     :class="['oneterm-workstation-tab-terminal-status', !item.socketStatus ? 'oneterm-workstation-tab-terminal-status_error' : '']"
                   ></span>
 
-                  <a-tooltip :title="item.assetName">
-                    <span class="oneterm-workstation-tab-terminal-title">{{ item.assetName }}</span>
+                  <a-tooltip :title="item.name">
+                    <span class="oneterm-workstation-tab-terminal-title">{{ item.name }}</span>
                   </a-tooltip>
 
                   <a-icon
@@ -60,6 +55,7 @@
                     @click.stop="closeTerminal(item, index)"
                   />
                   <ops-icon
+                    v-if="['ssh', 'telnet', 'mysql', 'redis', 'postgresql', 'mongodb'].includes(item.protocolType)"
                     class="oneterm-workstation-tab-terminal-icon"
                     type="veops-copy"
                     @click.stop="copyTerminal(item)"
@@ -67,15 +63,30 @@
                 </div>
               </template>
 
+              <DisplaySetting
+                v-if="item.id === 'displaySetting'"
+                class="oneterm-workstation-panel"
+                @ok="getPreference"
+              />
+
+              <ThemeSetting
+                v-else-if="item.id === 'themeSetting'"
+                class="oneterm-workstation-panel"
+                @ok="getPreference"
+              />
+
               <TerminalPanel
-                v-if="['ssh'].includes(item.protocolType)"
+                v-else-if="['ssh', 'telnet', 'mysql', 'redis', 'postgresql', 'mongodb'].includes(item.protocolType)"
                 :assetId="item.assetId"
                 :accountId="item.accountId"
                 :protocol="item.protocol"
                 :isFullScreen="false"
+                :showOperationMenu="true"
+                :preferenceSetting="preferenceSetting"
                 class="oneterm-workstation-data"
                 @close="handleTerminalError(item)"
                 @open="getOfUserStat(1000)"
+                @openSystemSetting="openSystemSetting"
               />
 
               <GuacamolePanel
@@ -84,8 +95,9 @@
                 :accountId="item.accountId"
                 :protocol="item.protocol"
                 :isFullScreen="false"
-                class="oneterm-workstation-data"
+                class="oneterm-workstation-panel"
                 @close="handleTerminalError(item)"
+                @open="getOfUserStat(1000)"
               />
             </a-tab-pane>
           </template>
@@ -104,20 +116,35 @@
 import { v4 as uuidv4 } from 'uuid'
 import { mapState } from 'vuex'
 import { getOfUserStat } from '../../api/stat'
+import { getPreference } from '@/modules/oneterm/api/preference.js'
+import { defaultPreferenceSetting } from '../systemSettings/terminalDisplay/constants.js'
+
 import RecentSession from './recentSession.vue'
 import AssetList from '../../views/assets/assets/assetList.vue'
-import TerminalPanel from '../terminal/index.vue'
-import GuacamolePanel from '../terminal/guacamoleClient.vue'
+import TerminalPanel from '@/modules/oneterm/views/connect/terminal/index.vue'
+import GuacamolePanel from '@/modules/oneterm/views/connect/guacamoleClient/index.vue'
+import DisplaySetting from '../systemSettings/terminalDisplay/displaySetting.vue'
+import ThemeSetting from '../systemSettings/terminalDisplay/themeSetting.vue'
 
 export default {
   name: 'WorkStation',
-  components: { RecentSession, AssetList, TerminalPanel, GuacamolePanel },
+  components: {
+    RecentSession,
+    AssetList,
+    TerminalPanel,
+    GuacamolePanel,
+    DisplaySetting,
+    ThemeSetting
+  },
   data() {
     return {
       userStat: {},
       expandKeys: ['session', 'asset'],
       terminalList: [],
       tabActiveKey: '1',
+      preferenceSetting: {
+        ...defaultPreferenceSetting,
+      }
     }
   },
   computed: {
@@ -135,6 +162,7 @@ export default {
   },
   mounted() {
     this.getOfUserStat()
+    this.getPreference()
   },
   methods: {
     async getOfUserStat(delayTime) {
@@ -153,6 +181,17 @@ export default {
       }
     },
 
+    async getPreference() {
+      const res = await getPreference()
+      const data = res?.data || {}
+
+      const preferenceSetting = {}
+      Object.keys(defaultPreferenceSetting).map((key) => {
+        preferenceSetting[key] = data?.[key] ?? defaultPreferenceSetting[key]
+      })
+      this.preferenceSetting = preferenceSetting
+    },
+
     toggle(key) {
       const _idx = this.expandKeys.findIndex((item) => item === key)
       if (_idx > -1) {
@@ -167,7 +206,8 @@ export default {
       this.terminalList.push({
         ...data,
         socketStatus: true,
-        id
+        id,
+        name: data.assetName
       })
 
       this.tabActiveKey = id
@@ -179,7 +219,7 @@ export default {
           protocolType: data.protocolType,
           protocol: data.protocol,
           assetId: data.assetId,
-          assetName: data.assetName,
+          name: data.assetName,
           accountId: id,
           socketStatus: true,
           id: uuidv4()
@@ -201,6 +241,7 @@ export default {
       const id = uuidv4()
       this.terminalList.push({
         ...item,
+        name: item.assetName,
         socketStatus: true,
         id
       })
@@ -218,6 +259,32 @@ export default {
 
     openRecentSession() {
       this.$refs.recentSessionRef.open()
+    },
+
+    openSystemSetting(id) {
+      const index = this.terminalList.findIndex((item) => item.id === id)
+      if (index >= 0) {
+        this.tabActiveKey = index
+      } else {
+        let name = ''
+        switch (id) {
+          case 'displaySetting':
+            name = 'oneterm.terminalDisplay.displaySetting'
+            break
+          case 'themeSetting':
+            name = 'oneterm.terminalDisplay.themeSetting'
+            break
+          default:
+            break
+        }
+
+        this.terminalList.push({
+          id,
+          name: this.$t(name)
+        })
+      }
+
+      this.tabActiveKey = id
     }
   },
 }
@@ -250,8 +317,8 @@ export default {
     padding-top: 0px;
   }
 
-  .oneterm-workstation-data {
-    height: calc(100vh - 172px) !important;
+  .oneterm-workstation-panel {
+    height: calc(100vh - 172px);
     margin: 0px;
     background-color: #FFFFFF;
   }
@@ -307,6 +374,8 @@ export default {
   }
 
   /deep/ .ant-tabs-tab {
+    padding: 12px 8px;
+
     &:hover {
       .oneterm-workstation-tab-terminal-icon {
         opacity: 1;

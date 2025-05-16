@@ -16,8 +16,13 @@ type SshConfig struct {
 	Paste bool `json:"paste" gorm:"column:paste"`
 }
 type RdpConfig struct {
-	Copy  bool `json:"copy" gorm:"column:copy"`
-	Paste bool `json:"paste" gorm:"column:paste"`
+	Copy            bool   `json:"copy" gorm:"column:copy"`
+	Paste           bool   `json:"paste" gorm:"column:paste"`
+	EnableDrive     bool   `json:"enable_drive" gorm:"column:enable_drive"`
+	DrivePath       string `json:"drive_path" gorm:"column:drive_path"`
+	CreateDrivePath bool   `json:"create_drive_path" gorm:"column:create_drive_path"`
+	DisableUpload   bool   `json:"disable_upload" gorm:"column:disable_upload"`
+	DisableDownload bool   `json:"disable_download" gorm:"column:disable_download"`
 }
 type VncConfig struct {
 	Copy  bool `json:"copy" gorm:"column:copy"`

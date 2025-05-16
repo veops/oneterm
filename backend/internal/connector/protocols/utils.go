@@ -111,6 +111,9 @@ func HandleError(ctx *gin.Context, sess *gsession.Session, err error, ws *websoc
 	if sess != nil && sess.IsGuacd() && ws != nil {
 		ws.WriteMessage(websocket.TextMessage, NewInstruction("error", lo.Ternary(ok, (ae).MessageBase64(ctx), err.Error()), cast.ToString(myErrors.ErrAdminClose)).Bytes())
 	} else if sess != nil {
+		if ctx.Query("is_monitor") == "true" {
+			return
+		}
 		WriteErrMsg(sess, lo.Ternary(ok, ae.MessageWithCtx(ctx), err.Error()))
 	}
 }

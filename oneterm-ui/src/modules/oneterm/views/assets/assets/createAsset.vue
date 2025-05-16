@@ -19,7 +19,7 @@
       <a-form-model-item :label="$t(`oneterm.name`)" prop="name">
         <a-input v-model="baseForm.name" :placeholder="`${$t(`placeholder1`)}`" />
       </a-form-model-item>
-      <a-form-model-item label="IP" prop="ip">
+      <a-form-model-item :label="$t('oneterm.assetList.ip')" prop="ip">
         <a-input v-model="baseForm.ip" :placeholder="`${$t(`placeholder1`)}`" />
       </a-form-model-item>
       <a-form-model-item :label="$t(`oneterm.catalog`)" prop="parent_id">

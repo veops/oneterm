@@ -137,7 +137,7 @@ import { mapState } from 'vuex'
 import { getSessionList } from '../../api/session'
 import SessionDetailTable from './sessionDetailTable.vue'
 import { closeConnect } from '../../api/connect'
-import { initMessageStorageKey } from '../terminal/index.vue'
+import { initMessageStorageKey } from '@/modules/oneterm/views/connect/terminal/index.vue'
 
 export default {
   name: 'SessionTable',

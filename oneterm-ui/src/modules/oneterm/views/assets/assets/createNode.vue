@@ -192,7 +192,7 @@ export default {
         },
         {
           field_name: undefined,
-          attribute: { value: 'ip', label: 'IP' },
+          attribute: { value: 'ip', label: this.$t('oneterm.assetList.ip') },
         },
       ],
       fieldMapObj: {
@@ -259,7 +259,7 @@ export default {
                   },
                   {
                     field_name: undefined,
-                    attribute: { value: 'ip', label: 'IP' },
+                    attribute: { value: 'ip', label: this.$t('oneterm.assetList.ip') },
                   },
                 ]
               : Object.keys(mapping).map((key) => {
@@ -286,7 +286,7 @@ export default {
         },
         {
           field_name: undefined,
-          attribute: { value: 'ip', label: 'IP' },
+          attribute: { value: 'ip', label: this.$t('oneterm.assetList.ip') },
         },
       ]
       if (id) {

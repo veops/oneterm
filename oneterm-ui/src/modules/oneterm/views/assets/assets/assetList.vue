@@ -145,18 +145,19 @@
             <ops-table
               size="small"
               ref="opsTable"
-              :data="tableData"
               show-overflow
               show-header-overflow
+              height="auto"
+              resizable
+              :data="tableData"
+              :loading="loading"
+              :checkbox-config="{ reserve: true, highlight: true, range: true }"
+              :expand-config="{iconOpen: 'vxe-icon-square-minus', iconClose: 'vxe-icon-square-plus'}"
+              :row-config="{ keyField: 'id', isHover: true }"
+              @cell-click="onCellClick"
               @checkbox-change="onSelectChange"
               @checkbox-all="onSelectChange"
               @checkbox-range-end="onSelectRangeEnd"
-              :checkbox-config="{ reserve: true, highlight: true, range: true }"
-              :expand-config="{iconOpen: 'vxe-icon-square-minus', iconClose: 'vxe-icon-square-plus'}"
-              :row-config="{ keyField: 'id' }"
-              height="auto"
-              resizable
-              :loading="loading"
             >
               <vxe-column type="checkbox" width="60px" v-if="!forMyAsset"></vxe-column>
               <vxe-column :type="forMyAsset ? 'expand' : ''" :title="$t(`oneterm.name`)" field="name">
@@ -180,14 +181,14 @@
               <vxe-column :title="$t(`oneterm.assetList.ip`)" field="ip"> </vxe-column>
               <vxe-column :title="$t(`oneterm.assetList.catalogName`)" field="node_chain"> </vxe-column>
               <vxe-column
-                :title="$t(`oneterm.assetList.connectable`)"
+                :title="$t(`status`)"
                 field="connectable"
                 align="center"
                 min-width="105px"
               >
                 <template #default="{row}">
-                  <span class="oneterm-table-right" v-if="row.connectable">{{ $t(`oneterm.assetList.connected`) }}</span>
-                  <span class="oneterm-table-right oneterm-table-error" v-else>{{ $t(`oneterm.assetList.error`) }}</span>
+                  <span class="oneterm-table-right" v-if="row.connectable">{{ $t(`oneterm.assetList.online`) }}</span>
+                  <span class="oneterm-table-right oneterm-table-error" v-else>{{ $t(`oneterm.assetList.offline`) }}</span>
                 </template>
               </vxe-column>
               <vxe-column :title="$t(`operation`)" :width="100" align="center">
@@ -506,6 +507,11 @@ export default {
             'ssh': 'a-oneterm-ssh2',
             'rdp': 'a-oneterm-ssh1',
             'vnc': 'oneterm-rdp',
+            'telnet': 'a-telnet1',
+            'redis': 'oneterm-redis',
+            'mysql': 'oneterm-mysql',
+            'mongodb': 'a-mongoDB1',
+            'postgresql': 'a-postgreSQL1',
           }
 
           const tableData = res?.data?.list || []
@@ -726,6 +732,11 @@ export default {
       const permissions = this?.roles?.permissions || []
       const isAdmin = permissions?.includes?.('oneterm_admin') || permissions?.includes?.('acl_admin')
       return asset?.permissions?.some((item) => item === operaiton) || isAdmin
+    },
+
+    onCellClick(e) {
+      const opsTable = this.$refs.opsTable.getVxetableRef()
+      opsTable.toggleRowExpand(e.row)
     }
   },
 }

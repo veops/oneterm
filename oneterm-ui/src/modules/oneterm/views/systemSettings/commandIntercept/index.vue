@@ -1,7 +1,7 @@
 <template>
-  <div class="assets-command">
+  <div class="command-intercept">
     <a-spin :tip="loadTip" :spinning="loading">
-      <div class="assets-command-header">
+      <div class="command-intercept-header">
         <a-space>
           <a-input-search
             allow-clear
@@ -38,9 +38,9 @@
         resizable
       >
         <vxe-column type="checkbox" width="60px"></vxe-column>
-        <vxe-column :title="$t(`oneterm.name`)" field="name"> </vxe-column>
+        <vxe-column :title="$t(`oneterm.name`)" field="name"></vxe-column>
         <vxe-column :title="$t(`oneterm.command`)" field="cmd"></vxe-column>
-        <vxe-column :title="$t(`oneterm.assetList.enable`)" field="enable">
+        <vxe-column :title="$t(`oneterm.commandIntercept.enable`)" field="enable">
           <template #default="{row}">
             <a-switch :checked="Boolean(row.enable)" @change="changeEnable(row)" />
           </template>
@@ -61,12 +61,12 @@
           </template>
         </vxe-column>
       </ops-table>
-      <div class="assets-command-pagination">
+      <div class="command-intercept-pagination">
         <a-pagination
           size="small"
           show-size-changer
-          :current="tablePage.currentPage"
-          :total="tablePage.totalResult"
+          :current="currentPage"
+          :total="totalResult"
           :show-total="
             (total, range) =>
               $t('pagination.total', {
@@ -75,7 +75,7 @@
                 total,
               })
           "
-          :page-size="tablePage.pageSize"
+          :page-size="pageSize"
           :default-current="1"
           @change="pageOrSizeChange"
           @showSizeChange="pageOrSizeChange"
@@ -89,21 +89,20 @@
 <script>
 import moment from 'moment'
 import { mapState } from 'vuex'
+import { getCommandList, deleteCommandById, putCommandById } from '@/modules/oneterm/api/command.js'
+
 import CommandModal from './commandModal.vue'
-import { getCommandList, deleteCommandById, putCommandById } from '../../../api/command'
 
 export default {
-  name: 'Command',
+  name: 'CommandIntercept',
   components: { CommandModal },
   data() {
     return {
       filterName: '',
       tableData: [],
-      tablePage: {
-        currentPage: 1,
-        pageSize: 20,
-        totalResult: 0,
-      },
+      currentPage: 1,
+      pageSize: 20,
+      totalResult: 0,
       selectedRowKeys: [],
       loading: false,
       loadTip: '',
@@ -114,7 +113,7 @@ export default {
       windowHeight: (state) => state.windowHeight,
     }),
     tableHeight() {
-      return this.windowHeight - 248
+      return this.windowHeight - 207
     },
   },
   mounted() {
@@ -122,21 +121,16 @@ export default {
   },
   methods: {
     moment,
-    updateTableData(currentPage = 1, pageSize = this.tablePage.pageSize) {
+    updateTableData() {
       this.loading = true
       getCommandList({
-        page_index: currentPage,
-        page_size: pageSize,
+        page_index: this.currentPage,
+        page_size: this.pageSize,
         search: this.filterName,
       })
         .then((res) => {
           this.tableData = res?.data?.list || []
-          this.tablePage = {
-            ...this.tablePage,
-            currentPage,
-            pageSize,
-            totalResult: res?.data?.count ?? 0,
-          }
+          this.totalResult = res?.data?.count ?? 0
         })
         .finally(() => {
           this.loading = false
@@ -151,7 +145,9 @@ export default {
       this.selectedRowKeys = records.map((i) => i.id)
     },
     pageOrSizeChange(currentPage, pageSize) {
-      this.updateTableData(currentPage, pageSize)
+      this.currentPage = currentPage
+      this.pageSize = pageSize
+      this.updateTableData()
     },
     openModal(data) {
       this.$refs.commandModal.open(data)
@@ -211,19 +207,18 @@ export default {
 </script>
 
 <style lang="less" scoped>
-@import '../../../style/index.less';
-.assets-command {
+.command-intercept {
   background-color: #fff;
-  height: calc(100vh - 48px - 40px - 40px);
-  border-bottom-left-radius: 15px;
-  border-bottom-right-radius: 15px;
+  height: 100%;
+  border-radius: 6px;
   padding: 18px;
-  .assets-command-header {
+
+  &-header {
     display: flex;
     justify-content: space-between;
     margin-bottom: 16px;
   }
-  .assets-command-pagination {
+  &-pagination {
     text-align: right;
     margin-top: 8px;
   }

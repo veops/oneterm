@@ -17,9 +17,6 @@ const genOnetermRoutes = () => {
             if (detailPermissions['oneterm'].some(item => item.name === 'Dashboard')) {
                 return '/oneterm/dashboard'
             }
-            if (detailPermissions['oneterm'].some(item => item.name === 'Public_Key')) {
-                return '/oneterm/publickey'
-            }
 
             return '/oneterm/workstation'
         },
@@ -28,27 +25,21 @@ const genOnetermRoutes = () => {
               path: '/oneterm/dashboard',
               name: 'onterm_dashboard',
               component: () => import('../views/dashboard'),
-              meta: { title: 'dashboard', appName: 'oneterm', icon: 'ops-oneterm-dashboard', selectedIcon: 'ops-oneterm-dashboard-selected', keepAlive: false, permission: ['oneterm_admin', 'admin'] }
+              meta: { title: 'dashboard', appName: 'oneterm', icon: 'ops-oneterm-dashboard-selected', selectedIcon: 'ops-oneterm-dashboard-selected', keepAlive: false, permission: ['oneterm_admin', 'admin'] }
           },
           {
               path: '/oneterm/workstation',
               name: 'onterm_work_station',
               component: () => import('../views/workStation'),
               meta: {
-                title: 'oneterm.menu.workStation', icon: 'ops-oneterm-workstation', selectedIcon: 'ops-oneterm-workstation-selected', keepAlive: false
+                title: 'oneterm.menu.workStation', icon: 'ops-oneterm-workstation-selected', selectedIcon: 'ops-oneterm-workstation-selected', keepAlive: false
               }
-          },
-          {
-              path: '/oneterm/publickey',
-              name: 'onterm_public_key',
-              component: () => import('../views/publicKey'),
-              meta: { title: 'oneterm.menu.publicKey', keepAlive: false, icon: 'ops-oneterm-publickey', selectedIcon: 'ops-oneterm-publickey-selected' }
           },
           {
               path: '/oneterm/assets',
               name: 'oneterm_assets',
               component: RouteView,
-              meta: { title: 'oneterm.menu.assetManagement', appName: 'oneterm', icon: 'ops-oneterm-assets', selectedIcon: 'ops-oneterm-assets-selected', permission: ['oneterm_admin', 'admin'] },
+              meta: { title: 'oneterm.menu.assetManagement', appName: 'oneterm', icon: 'ops-oneterm-assets-management', selectedIcon: 'ops-oneterm-assets-management', permission: ['oneterm_admin', 'admin'] },
               redirect: '/oneterm/assets/assets',
               children: [{
                   path: '/oneterm/assetlist',
@@ -65,18 +56,13 @@ const genOnetermRoutes = () => {
                   name: 'oneterm_gateway',
                   meta: { title: 'oneterm.menu.gateways', icon: 'ops-oneterm-gateway', selectedIcon: 'ops-oneterm-gateway-selected', appName: 'oneterm', permission: ['oneterm_admin', 'admin'] },
                   component: () => import('../views/assets/gateway')
-              }, {
-                  path: '/oneterm/security',
-                  name: 'oneterm_security',
-                  meta: { title: 'oneterm.menu.security', icon: 'ops-oneterm-command', selectedIcon: 'ops-oneterm-command-selected', appName: 'oneterm', permission: ['oneterm_admin', 'admin'] },
-                  component: () => import('../views/assets/security')
               }]
           },
           {
             path: '/oneterm/audit',
             name: 'oneterm_session',
             component: RouteView,
-            meta: { title: 'oneterm.menu.auditCentre', icon: 'ops-oneterm-log', selectedIcon: 'ops-oneterm-log-selected', appName: 'oneterm', permission: ['oneterm_admin', 'admin'] },
+            meta: { title: 'oneterm.menu.auditCentre', icon: 'ops-oneterm-log-selected', selectedIcon: 'ops-oneterm-log-selected', appName: 'oneterm', permission: ['oneterm_admin', 'admin'] },
             redirect: '/oneterm/session/online',
             hideChildrenInMenu: false,
             children: [
@@ -114,34 +100,40 @@ const genOnetermRoutes = () => {
               }
             ]
           },
-            {
-                path: '/oneterm/terminal',
-                name: 'oneterm_terminal',
-                hidden: true,
-                component: () => import('../views/terminal'),
-                meta: { title: '终端', keepAlive: false }
-            },
-            {
-                path: '/oneterm/guacamole/:asset_id/:account_id/:protocol',
-                name: 'oneterm_guacamole',
-                hidden: true,
-                component: () => import('../views/terminal/guacamoleClient.vue'),
-                meta: { title: '终端', keepAlive: false }
-            },
-            {
-                path: '/oneterm/replay/:session_id',
-                name: 'oneterm_replay',
-                hidden: true,
-                component: () => import('../views/replay'),
-                meta: { title: '回放', keepAlive: false }
-            },
-            {
-                path: '/oneterm/replay/guacamole/:session_id',
-                name: 'oneterm_replay_guacamole',
-                hidden: true,
-                component: () => import('../views/replay/guacamoleReplay.vue'),
-                meta: { title: '回放', keepAlive: false }
-            },
+          {
+              path: '/oneterm/settings',
+              name: 'onterm_settings',
+              component: () => import('../views/systemSettings'),
+              meta: { title: 'oneterm.menu.systemSettings', appName: 'oneterm', icon: 'veops-setting2', selectedIcon: 'veops-setting2', keepAlive: false, permission: ['oneterm_admin', 'admin'] }
+          },
+          {
+              path: '/oneterm/terminal',
+              name: 'oneterm_terminal',
+              hidden: true,
+              component: () => import('../views/terminal'),
+              meta: { title: '终端', keepAlive: false }
+          },
+          {
+              path: '/oneterm/guacamole/:asset_id/:account_id/:protocol',
+              name: 'oneterm_guacamole',
+              hidden: true,
+              component: () => import('../views/terminal/guacamoleClient.vue'),
+              meta: { title: '终端', keepAlive: false }
+          },
+          {
+              path: '/oneterm/replay/:session_id',
+              name: 'oneterm_replay',
+              hidden: true,
+              component: () => import('../views/replay'),
+              meta: { title: '回放', keepAlive: false }
+          },
+          {
+              path: '/oneterm/replay/guacamole/:session_id',
+              name: 'oneterm_replay_guacamole',
+              hidden: true,
+              component: () => import('../views/replay/guacamoleReplay.vue'),
+              meta: { title: '回放', keepAlive: false }
+          },
         ]
     }
 }

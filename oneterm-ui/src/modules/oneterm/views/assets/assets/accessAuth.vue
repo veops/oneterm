@@ -20,7 +20,7 @@
     <a-form-model-item :label="$t(`oneterm.assetList.effectiveDate`)" prop="startAndEnd">
       <a-range-picker v-model="form.startAndEnd" />
     </a-form-model-item>
-    <a-form-model-item :label="$t(`oneterm.assetList.commandFilter`)" prop="cmd_ids">
+    <a-form-model-item :label="$t(`oneterm.assetList.commandIntercept`)" prop="cmd_ids">
       <treeselect
         class="custom-treeselect custom-treeselect-white"
         :style="{

@@ -14,7 +14,7 @@
   </a-modal>
 </template>
 <script>
-import { addPublicKey, putPublicKeyById } from '../../api/publicKey'
+import { addPublicKey, putPublicKeyById } from '@/modules/oneterm/api/publicKey.js'
 export default {
   name: 'EditModal',
   data() {

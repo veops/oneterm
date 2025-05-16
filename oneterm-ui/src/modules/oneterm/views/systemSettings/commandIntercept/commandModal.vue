@@ -4,13 +4,13 @@
       <a-form-model-item :label="$t(`oneterm.name`)" prop="name">
         <a-input v-model="form.name" :placeholder="`${$t(`placeholder1`)}`" />
       </a-form-model-item>
-      <a-form-model-item :label="$t(`oneterm.command`)" prop="cmds">
+      <a-form-model-item :label="$t(`oneterm.command`)" prop="cmd">
         <a-input v-model="form.cmd" :placeholder="`${$t(`placeholder1`)}`" />
       </a-form-model-item>
-      <a-form-model-item :label="$t(`oneterm.assetList.enable`)" prop="enable">
+      <a-form-model-item :label="$t(`oneterm.commandIntercept.enable`)" prop="enable">
         <a-switch v-model="form.enable" />
       </a-form-model-item>
-      <a-form-model-item :label="$t(`oneterm.assetList.regexp`)" prop="enable">
+      <a-form-model-item :label="$t(`oneterm.commandIntercept.regexp`)" prop="enable">
         <a-switch v-model="form.is_re" />
       </a-form-model-item>
     </a-form-model>
@@ -27,7 +27,7 @@ export default {
       visible: false,
       form: {
         name: '',
-        cmd: [],
+        cmd: '',
         enable: true,
         is_re: true,
       },
@@ -40,9 +40,9 @@ export default {
   computed: {
     title() {
       if (this.form.id) {
-        return this.$t('oneterm.assetList.editCommand')
+        return this.$t('oneterm.commandIntercept.editCommand')
       }
-      return this.$t('oneterm.assetList.createCommand')
+      return this.$t('oneterm.commandIntercept.createCommand')
     },
   },
   methods: {

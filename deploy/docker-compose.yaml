@@ -1,16 +1,23 @@
-version: "3.0"
-
 services:
   oneterm-api:
-    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-api:v25.2.1
+    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-api:v25.5.1
     container_name: oneterm-api
     volumes:
       - ./volume/replay:/replay
       - ./config.yaml:/oneterm/config.yaml
     depends_on:
-      - mysql
-      - redis
-      - oneterm-guacd
+      oneterm-guacd:
+        condition: service_healthy
+      acl-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8888"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command:
+      - "./server"
+      - "config.yaml"
     restart: always
     networks:
       new:
@@ -21,19 +28,26 @@ services:
       - "2222:2222"
 
   oneterm-guacd:
-    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-guacd:latest
+    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-guacd:1.5.4
     container_name: oneterm-guacd
     user: root
     restart: always
     volumes:
       - ./volume/replay:/replay
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "4822"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "14822:4822"
     networks:
       new:
         aliases:
           - oneterm-guacd
 
   mysql:
-    image: registry.cn-hangzhou.aliyuncs.com/veops/mysql:latest
+    image: registry.cn-hangzhou.aliyuncs.com/veops/mysql:8.2.0
     container_name: oneterm-mysql
     environment:
       TZ: Asia/Shanghai
@@ -44,6 +58,13 @@ services:
       - ./mysqld.cnf:/etc/mysql/conf.d/mysqld.cnf
       - ./acl.sql:/docker-entrypoint-initdb.d/2-acl.sql
       - ./create-users.sql:/docker-entrypoint-initdb.d/1-create-users.sql
+    ports:
+      - "13306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-P", "3306", "-u", "root", "-p123456"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     restart: always
     networks:
@@ -52,21 +73,29 @@ services:
           - mysql
 
   redis:
-    image: registry.cn-hangzhou.aliyuncs.com/veops/redis:latest
+    image: registry.cn-hangzhou.aliyuncs.com/veops/redis:7.2.3
     container_name: oneterm-redis
     restart: always
     environment:
       TZ: Asia/Shanghai
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "16379:6379"
     networks:
       new:
         aliases:
           - redis
 
   oneterm-ui:
-    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-ui:v25.2.1
+    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-ui:v25.5.1
     container_name: oneterm-ui
     depends_on:
-      - oneterm-api
+      oneterm-api:
+        condition: service_healthy
     environment:
       TZ: Asia/Shanghai
       ONETERM_API_HOST: oneterm-api:8888
@@ -88,8 +117,13 @@ services:
       - "8666:80"
 
   acl-api:
-    image: registry.cn-hangzhou.aliyuncs.com/veops/acl-api:latest
+    image: registry.cn-hangzhou.aliyuncs.com/veops/acl-api:2.0
     container_name: oneterm-acl-api
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       TZ: Asia/Shanghai
       WAIT_HOSTS: mysql:3306, redis:6379
@@ -100,18 +134,24 @@ services:
       - /bin/sh
       - -c
       - |
-        sleep 2
-        flask db-setup
-        flask common-check-new-columns
-        flask init-acl
-        flask init-department
+        if [ ! -f /var/run/.initialized ]; then
+          flask db-setup
+          flask common-check-new-columns
+          flask init-acl
+          flask init-department
+          touch /var/run/.initialized
+        fi
+
+        nohup bash -c 'flask db-setup && flask common-check-new-columns' >/dev/null 2>&1 &
 
         gunicorn --workers=3 autoapp:app -b 0.0.0.0:5000 -D --access-logfile logs/access.log --error-logfile logs/error.log
 
         celery -A celery_worker.celery worker -E -Q acl_async --logfile=one_acl_async.log --autoscale=2,1 
-    depends_on:
-      - mysql
-      - redis
+    healthcheck:
+      test: "ps aux|grep -v grep|grep -v '1 root'|grep gunicorn || exit 1"
+      interval: 5s
+      timeout: 5s
+      retries: 5
     networks:
       new:
         aliases:

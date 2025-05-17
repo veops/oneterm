@@ -83,7 +83,7 @@
                 :isFullScreen="false"
                 :showOperationMenu="true"
                 :preferenceSetting="preferenceSetting"
-                class="oneterm-workstation-data"
+                class="oneterm-workstation-panel"
                 @close="handleTerminalError(item)"
                 @open="getOfUserStat(1000)"
                 @openSystemSetting="openSystemSetting"

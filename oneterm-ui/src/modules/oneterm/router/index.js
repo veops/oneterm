@@ -39,7 +39,7 @@ const genOnetermRoutes = () => {
               path: '/oneterm/assets',
               name: 'oneterm_assets',
               component: RouteView,
-              meta: { title: 'oneterm.menu.assetManagement', appName: 'oneterm', icon: 'ops-oneterm-assets-management', selectedIcon: 'ops-oneterm-assets-management', permission: ['oneterm_admin', 'admin'] },
+              meta: { title: 'oneterm.menu.assetManagement', appName: 'oneterm', icon: 'ops-oneterm-asset-management', selectedIcon: 'ops-oneterm-asset-management', permission: ['oneterm_admin', 'admin'] },
               redirect: '/oneterm/assets/assets',
               children: [{
                   path: '/oneterm/assetlist',

@@ -6,7 +6,7 @@ export const getAppAclRouter = (appName) => {
         name: `${appName}_acl`,
         component: RouteView,
         redirect: `/${appName}/acl/users`,
-        meta: { title: 'commonMenu.permission', icon: 'safety-certificate', permission: [`${appName}_admin`, 'admin'] }, // permission: 'admin'
+        meta: { title: 'commonMenu.permission', icon: 'ops-setting-auth', permission: [`${appName}_admin`, 'admin'] }, // permission: 'admin'
         children: [
             {
                 path: `/${appName}/acl/roles`,

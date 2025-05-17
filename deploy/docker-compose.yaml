@@ -148,7 +148,7 @@ services:
 
         celery -A celery_worker.celery worker -E -Q acl_async --logfile=one_acl_async.log --autoscale=2,1 
     healthcheck:
-      test: "ps aux|grep -v grep|grep -v '1 root'|grep gunicorn || exit 1"
+      test: ["CMD", "nc", "-z", "localhost", "5000"]
       interval: 5s
       timeout: 5s
       retries: 5

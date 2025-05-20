@@ -17,10 +17,6 @@ import (
 	"github.com/veops/oneterm/pkg/remote"
 )
 
-func init() {
-	migrateNode()
-}
-
 type ResourceType struct {
 	Name  string   `json:"name"`
 	Perms []string `json:"perms"`
@@ -30,7 +26,7 @@ type ResourceTypeResp struct {
 	Groups []*ResourceType `json:"groups"`
 }
 
-func migrateNode() {
+func MigrateNode() {
 	ctx := context.Background()
 
 	rts, err := GetResourceTypes(ctx)

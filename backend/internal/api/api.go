@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 
+	"github.com/veops/oneterm/internal/acl"
 	"github.com/veops/oneterm/internal/api/router"
 	"github.com/veops/oneterm/internal/model"
 	"github.com/veops/oneterm/internal/service"
@@ -36,6 +37,8 @@ func initDB() {
 	if err := db.DropIndex(&model.Authorization{}, "asset_account_id_del"); err != nil {
 		logger.L().Fatal("Failed to drop index", zap.Error(err))
 	}
+
+	acl.MigrateNode()
 
 }
 

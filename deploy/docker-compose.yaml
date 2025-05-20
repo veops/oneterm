@@ -1,6 +1,6 @@
 services:
   oneterm-api:
-    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-api:v25.5.1
+    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-api:v25.5.1-fix
     container_name: oneterm-api
     volumes:
       - ./volume/replay:/replay

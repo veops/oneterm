@@ -23,7 +23,10 @@ func (w bodyWriter) Write(b []byte) (int, error) {
 
 func Error2RespMiddleware() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		if strings.Contains(ctx.Request.URL.String(), "session/replay") {
+		// Skip middleware for session replay and file download endpoints
+		urlPath := ctx.Request.URL.String()
+		if strings.Contains(urlPath, "session/replay") ||
+			strings.Contains(urlPath, "/file/download/") {
 			ctx.Next()
 			return
 		}

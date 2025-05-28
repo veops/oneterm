@@ -151,5 +151,14 @@ func SetupRouter(r *gin.Engine) {
 			preference.GET("", c.GetPreference)
 			preference.PUT("", c.UpdatePreference)
 		}
+
+		// RDP file transfer routes
+		rdpGroup := v1.Group("/rdp")
+		{
+			rdpGroup.GET("/sessions/:session_id/files", c.RDPFileList)
+			rdpGroup.POST("/sessions/:session_id/files/upload", c.RDPFileUpload)
+			rdpGroup.GET("/sessions/:session_id/files/download", c.RDPFileDownload)
+			rdpGroup.POST("/sessions/:session_id/files/mkdir", c.RDPFileMkdir)
+		}
 	}
 }

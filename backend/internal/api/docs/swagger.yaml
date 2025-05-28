@@ -15,6 +15,13 @@ definitions:
         items: {}
         type: array
     type: object
+  controller.RDPMkdirRequest:
+    properties:
+      path:
+        type: string
+    required:
+    - path
+    type: object
   model.AccessAuth:
     properties:
       allow:
@@ -257,6 +264,10 @@ definitions:
         type: integer
       authorization:
         $ref: '#/definitions/model.Map-int-model_Slice-int'
+      children:
+        items:
+          $ref: '#/definitions/model.Node'
+        type: array
       comment:
         type: string
       created_at:
@@ -346,6 +357,16 @@ definitions:
   model.RdpConfig:
     properties:
       copy:
+        type: boolean
+      create_drive_path:
+        type: boolean
+      disable_download:
+        type: boolean
+      disable_upload:
+        type: boolean
+      drive_path:
+        type: string
+      enable_drive:
         type: boolean
       paste:
         type: boolean
@@ -668,6 +689,108 @@ paths:
             $ref: '#/definitions/controller.HttpResponse'
       tags:
       - account
+  /api/v1/rdp/sessions/{session_id}/files:
+    get:
+      description: Get file list for RDP session drive
+      parameters:
+      - description: Session ID
+        in: path
+        name: session_id
+        required: true
+        type: string
+      - description: Directory path
+        in: query
+        name: path
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      summary: List RDP session files
+      tags:
+      - RDP File
+  /api/v1/rdp/sessions/{session_id}/files/download:
+    get:
+      consumes:
+      - application/json
+      description: Download file from RDP session drive
+      parameters:
+      - description: Session ID
+        in: path
+        name: session_id
+        required: true
+        type: string
+      - description: File path
+        in: query
+        name: path
+        required: true
+        type: string
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+      summary: Download file from RDP session
+      tags:
+      - RDP File
+  /api/v1/rdp/sessions/{session_id}/files/mkdir:
+    post:
+      consumes:
+      - application/json
+      description: Create directory in RDP session drive
+      parameters:
+      - description: Session ID
+        in: path
+        name: session_id
+        required: true
+        type: string
+      - description: Directory creation request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/controller.RDPMkdirRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      summary: Create directory in RDP session
+      tags:
+      - RDP File
+  /api/v1/rdp/sessions/{session_id}/files/upload:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Upload file to RDP session drive
+      parameters:
+      - description: Session ID
+        in: path
+        name: session_id
+        required: true
+        type: string
+      - description: File to upload
+        in: formData
+        name: file
+        required: true
+        type: file
+      - description: Target directory path
+        in: formData
+        name: path
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      summary: Upload file to RDP session
+      tags:
+      - RDP File
   /asset:
     get:
       parameters:
@@ -1054,14 +1177,9 @@ paths:
         name: dir
         required: true
         type: string
-      - description: filename
+      - description: names (comma-separated for multiple files)
         in: query
-        name: filename
-        required: true
-        type: string
-      - description: file field name
-        in: formData
-        name: file
+        name: names
         required: true
         type: string
       responses:
@@ -1110,7 +1228,7 @@ paths:
         type: integer
       - description: account id
         in: query
-        name: accout_id
+        name: account_id
         type: integer
       - description: client_ip
         in: query
@@ -1136,7 +1254,7 @@ paths:
       tags:
       - file
   /file/ls/:asset_id/:account_id:
-    post:
+    get:
       parameters:
       - description: asset_id
         in: path
@@ -1153,6 +1271,10 @@ paths:
         name: dir
         required: true
         type: string
+      - description: 'show hidden files (default: false)'
+        in: query
+        name: show_hidden
+        type: boolean
       responses:
         "200":
           description: OK
@@ -1184,7 +1306,7 @@ paths:
           schema:
             $ref: '#/definitions/controller.HttpResponse'
       tags:
-      - account
+      - file
   /file/upload/:asset_id/:account_id:
     post:
       parameters:
@@ -1436,6 +1558,10 @@ paths:
         in: query
         name: self_parent
         type: integer
+      - description: return tree structure with children
+        in: query
+        name: recursive
+        type: boolean
       responses:
         "200":
           description: OK

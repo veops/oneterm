@@ -188,6 +188,160 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/rdp/sessions/{session_id}/files": {
+            "get": {
+                "description": "Get file list for RDP session drive",
+                "tags": [
+                    "RDP File"
+                ],
+                "summary": "List RDP session files",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Session ID",
+                        "name": "session_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Directory path",
+                        "name": "path",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controller.HttpResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/rdp/sessions/{session_id}/files/download": {
+            "get": {
+                "description": "Download file from RDP session drive",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/octet-stream"
+                ],
+                "tags": [
+                    "RDP File"
+                ],
+                "summary": "Download file from RDP session",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Session ID",
+                        "name": "session_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "File path",
+                        "name": "path",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "file"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/rdp/sessions/{session_id}/files/mkdir": {
+            "post": {
+                "description": "Create directory in RDP session drive",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "RDP File"
+                ],
+                "summary": "Create directory in RDP session",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Session ID",
+                        "name": "session_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Directory creation request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controller.RDPMkdirRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controller.HttpResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/rdp/sessions/{session_id}/files/upload": {
+            "post": {
+                "description": "Upload file to RDP session drive",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "tags": [
+                    "RDP File"
+                ],
+                "summary": "Upload file to RDP session",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Session ID",
+                        "name": "session_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "File to upload",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Target directory path",
+                        "name": "path",
+                        "in": "formData"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controller.HttpResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/asset": {
             "get": {
                 "tags": [
@@ -823,16 +977,9 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "filename",
-                        "name": "filename",
+                        "description": "names (comma-separated for multiple files)",
+                        "name": "names",
                         "in": "query",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "file field name",
-                        "name": "file",
-                        "in": "formData",
                         "required": true
                     }
                 ],
@@ -905,7 +1052,7 @@ const docTemplate = `{
                     {
                         "type": "integer",
                         "description": "account id",
-                        "name": "accout_id",
+                        "name": "account_id",
                         "in": "query"
                     },
                     {
@@ -953,7 +1100,7 @@ const docTemplate = `{
             }
         },
         "/file/ls/:asset_id/:account_id": {
-            "post": {
+            "get": {
                 "tags": [
                     "file"
                 ],
@@ -978,6 +1125,12 @@ const docTemplate = `{
                         "name": "dir",
                         "in": "query",
                         "required": true
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "show hidden files (default: false)",
+                        "name": "show_hidden",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -993,7 +1146,7 @@ const docTemplate = `{
         "/file/mkdir/:asset_id/:account_id": {
             "post": {
                 "tags": [
-                    "account"
+                    "file"
                 ],
                 "parameters": [
                     {
@@ -1431,6 +1584,12 @@ const docTemplate = `{
                         "type": "integer",
                         "description": "include itself and its parent",
                         "name": "self_parent",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "return tree structure with children",
+                        "name": "recursive",
                         "in": "query"
                     }
                 ],
@@ -2724,6 +2883,17 @@ const docTemplate = `{
                 }
             }
         },
+        "controller.RDPMkdirRequest": {
+            "type": "object",
+            "required": [
+                "path"
+            ],
+            "properties": {
+                "path": {
+                    "type": "string"
+                }
+            }
+        },
         "model.AccessAuth": {
             "type": "object",
             "properties": {
@@ -3090,6 +3260,12 @@ const docTemplate = `{
                 "authorization": {
                     "$ref": "#/definitions/model.Map-int-model_Slice-int"
                 },
+                "children": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.Node"
+                    }
+                },
                 "comment": {
                     "type": "string"
                 },
@@ -3222,6 +3398,21 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "copy": {
+                    "type": "boolean"
+                },
+                "create_drive_path": {
+                    "type": "boolean"
+                },
+                "disable_download": {
+                    "type": "boolean"
+                },
+                "disable_upload": {
+                    "type": "boolean"
+                },
+                "drive_path": {
+                    "type": "string"
+                },
+                "enable_drive": {
                     "type": "boolean"
                 },
                 "paste": {

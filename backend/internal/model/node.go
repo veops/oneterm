@@ -28,8 +28,9 @@ type Node struct {
 	UpdatedAt   time.Time             `json:"updated_at" gorm:"column:updated_at"`
 	DeletedAt   soft_delete.DeletedAt `json:"-" gorm:"column:deleted_at"`
 
-	AssetCount int64 `json:"asset_count" gorm:"-"`
-	HasChild   bool  `json:"has_child" gorm:"-"`
+	AssetCount int64   `json:"asset_count" gorm:"-"`
+	HasChild   bool    `json:"has_child" gorm:"-"`
+	Children   []*Node `json:"children" gorm:"-"`
 }
 
 func (m *Node) TableName() string {

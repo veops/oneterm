@@ -75,7 +75,6 @@ func (s *NodeService) CheckCycle(ctx context.Context, data *model.Node, nodeId i
 func (s *NodeService) BuildQuery(ctx *gin.Context, currentUser interface{}, info bool) (*gorm.DB, error) {
 	db := dbpkg.DB.Model(model.DefaultNode)
 
-	// 改用通用过滤器
 	db = dbpkg.FilterEqual(ctx, db, "parent_id", "id")
 	db = dbpkg.FilterLike(ctx, db, "name")
 	db = dbpkg.FilterSearch(ctx, db, "name", "id")
@@ -369,4 +368,186 @@ func (s *NodeService) handleAssetIds(ctx context.Context, dbFind *gorm.DB, resId
 	db := dbFind.Where(d)
 
 	return db, nil
+}
+
+// GetNodesTree gets node tree with its children
+func (s *NodeService) GetNodesTree(ctx *gin.Context, dbQuery *gorm.DB, needAcl bool, resourceType string) ([]any, error) {
+	// Get info parameter
+	info := cast.ToBool(ctx.Query("info"))
+
+	// 1. First get all nodes that meet the conditions (using the same permission control)
+	currentUser, _ := acl.GetSessionFromCtx(ctx)
+
+	db := dbQuery
+	if needAcl && !acl.IsAdmin(currentUser) {
+		resIds, err := acl.GetRoleResourceIds(ctx, currentUser.GetRid(), resourceType)
+		if err != nil {
+			return nil, err
+		}
+
+		var err2 error
+		if db, err2 = repository.HandleNodeIds(ctx, db, resIds); err2 != nil {
+			return nil, err2
+		}
+	}
+
+	// Query filtered nodes (without pagination)
+	filteredNodes := make([]*model.Node, 0)
+	if err := db.Order("id DESC").Find(&filteredNodes).Error; err != nil {
+		return nil, err
+	}
+
+	// Extract node IDs from filtered nodes
+	nodeIds := make([]int, 0, len(filteredNodes))
+	for _, node := range filteredNodes {
+		nodeIds = append(nodeIds, node.Id)
+	}
+
+	// Get all children of these nodes recursively
+	allNodeIds := nodeIds
+	childIds, err := repository.HandleSelfChild(ctx, nodeIds...)
+	if err != nil {
+		logger.L().Error("failed to get child nodes", zap.Error(err))
+	} else {
+		allNodeIds = childIds
+	}
+
+	// Now get all nodes (filtered nodes + their children)
+	allNodes := make([]*model.Node, 0)
+	query := dbpkg.DB.Model(model.DefaultNode).Where("id IN ?", allNodeIds)
+
+	// If info=true, select only id, parent_id, name (same as in BuildQuery)
+	if info {
+		query = query.Select("id", "parent_id", "name")
+	}
+
+	if err := query.Find(&allNodes).Error; err != nil {
+		return nil, err
+	}
+
+	// Apply postHooks only if info=false
+	if !info {
+		if err := s.AttachAssetCount(ctx, allNodes); err != nil {
+			logger.L().Error("failed to attach asset count", zap.Error(err))
+		}
+
+		if err := s.AttachHasChild(ctx, allNodes); err != nil {
+			logger.L().Error("failed to attach has_child flag", zap.Error(err))
+		}
+
+		if err := s.handleNodePermissions(ctx, allNodes, resourceType); err != nil {
+			return nil, err
+		}
+	}
+
+	// Build tree structure
+	return s.buildNodeTree(allNodes, nodeIds), nil
+}
+
+// buildNodeTree builds a tree structure from nodes
+func (s *NodeService) buildNodeTree(nodes []*model.Node, rootIds []int) []any {
+	logger.L().Info("buildNodeTree", zap.Any("nodes", nodes))
+	// Node mapping
+	nodeMap := make(map[int]*model.Node)
+	for _, node := range nodes {
+		// Initialize Children for all nodes
+		node.Children = make([]*model.Node, 0)
+		nodeMap[node.Id] = node
+	}
+
+	// First pass: build parent-child relationships for all nodes
+	for _, node := range nodes {
+		if parent, exists := nodeMap[node.ParentId]; exists && node.ParentId != 0 {
+			// Add this node to its parent's children
+			parent.Children = append(parent.Children, node)
+		}
+	}
+
+	// Update has_child flag based on children array
+	for _, node := range nodes {
+		node.HasChild = len(node.Children) > 0
+	}
+
+	// Second pass: collect only specified root nodes
+	treeNodes := make([]any, 0)
+	rootNodesSet := make(map[int]bool)
+	for _, id := range rootIds {
+		rootNodesSet[id] = true
+	}
+
+	for _, node := range nodes {
+		// A node is a root if it's in the rootIds list
+		if rootNodesSet[node.Id] {
+			treeNodes = append(treeNodes, node)
+		}
+	}
+
+	return treeNodes
+}
+
+// handleNodePermissions handles node permissions
+func (s *NodeService) handleNodePermissions(ctx *gin.Context, nodes []*model.Node, resourceType string) error {
+	if info := cast.ToBool(ctx.Query("info")); info {
+		return nil
+	}
+
+	currentUser, _ := acl.GetSessionFromCtx(ctx)
+
+	if !lo.Contains(config.PermResource, resourceType) {
+		return nil
+	}
+
+	res, err := acl.GetRoleResources(ctx, currentUser.GetRid(), resourceType)
+	if err != nil {
+		return err
+	}
+
+	resId2perms := lo.SliceToMap(res, func(r *acl.Resource) (int, []string) {
+		return r.ResourceId, r.Permissions
+	})
+
+	// Process permission inheritance
+	resId2perms, err = handleSelfChildPerms(ctx, resId2perms)
+	if err != nil {
+		return err
+	}
+
+	// Set permissions
+	isAdmin := acl.IsAdmin(currentUser)
+	for _, node := range nodes {
+		if isAdmin {
+			node.SetPerms(acl.AllPermissions)
+		} else {
+			node.SetPerms(resId2perms[node.GetResourceId()])
+		}
+	}
+
+	return nil
+}
+
+// handleSelfChildPerms handles permission inheritance (from parent to child nodes)
+func handleSelfChildPerms(ctx context.Context, id2perms map[int][]string) (res map[int][]string, err error) {
+	nodes, err := repository.GetAllFromCacheDb(ctx, model.DefaultNode)
+	if err != nil {
+		return
+	}
+
+	res = make(map[int][]string)
+	id2rid := make(map[int]int)
+	g := make(map[int][]int)
+	for _, n := range nodes {
+		g[n.ParentId] = append(g[n.ParentId], n.Id)
+		id2rid[n.Id] = n.ResourceId
+		res[id2rid[n.Id]] = id2perms[id2rid[n.Id]]
+	}
+	var dfs func(int)
+	dfs = func(x int) {
+		for _, y := range g[x] {
+			res[id2rid[y]] = lo.Uniq(append(res[id2rid[y]], res[id2rid[x]]...))
+			dfs(y)
+		}
+	}
+	dfs(0)
+
+	return
 }

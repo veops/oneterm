@@ -78,11 +78,13 @@ func (c *Controller) UpdateNode(ctx *gin.Context) {
 //	@Param		name			query		string	false	"node name"
 //	@Param		no_self_child	query		int		false	"exclude itself and its child"
 //	@Param		self_parent		query		int		false	"include itself and its parent"
+//	@Param		recursive		query		bool	false	"return tree structure with children"
 //	@Success	200				{object}	HttpResponse{data=ListData{list=[]model.Node}}
 //	@Router		/node [get]
 func (c *Controller) GetNodes(ctx *gin.Context) {
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
 	info := cast.ToBool(ctx.Query("info"))
+	recursive := cast.ToBool(ctx.Query("recursive"))
 
 	db, err := nodeService.BuildQuery(ctx, currentUser, info)
 	if err != nil {
@@ -90,7 +92,22 @@ func (c *Controller) GetNodes(ctx *gin.Context) {
 		return
 	}
 
-	doGet(ctx, !info, db, config.RESOURCE_NODE, nodePostHooks...)
+	if recursive {
+		treeNodes, err := nodeService.GetNodesTree(ctx, db, !info, config.RESOURCE_NODE)
+		if err != nil {
+			ctx.AbortWithError(http.StatusInternalServerError, &errors.ApiError{Code: errors.ErrInternal, Data: map[string]any{"err": err}})
+			return
+		}
+
+		res := &ListData{
+			Count: int64(len(treeNodes)),
+			List:  treeNodes,
+		}
+
+		ctx.JSON(http.StatusOK, NewHttpResponseWithData(res))
+	} else {
+		doGet(ctx, !info, db, config.RESOURCE_NODE, nodePostHooks...)
+	}
 }
 
 func nodePreHookCheckCycle(ctx *gin.Context, data *model.Node) {

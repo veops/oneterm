@@ -86,6 +86,13 @@
         </a-radio-group>
       </a-form-model-item>
 
+      <a-form-model-item :label="$t('oneterm.terminalDisplay.remoteDesktopResolution')" prop="cursorStyle">
+        <ResolutionSetting
+          class="display-setting-input"
+          v-model="form.settings.resolution"
+        />
+      </a-form-model-item>
+
       <a-form-model-item :wrapper-col="{ span: 14, offset: 7 }">
         <a-button type="primary" @click="handleSubmit">
           {{ $t('save') }}
@@ -104,6 +111,8 @@ import { defaultPreferenceSetting } from './constants.js'
 import { getPreference, putPreference } from '@/modules/oneterm/api/preference.js'
 import { isFontAvailable } from '@/modules/oneterm/utils/index.js'
 
+import ResolutionSetting from './resolutionSetting/index.vue'
+
 const allFontFamily = [
   // Windows
   'Consolas', 'Courier New', 'Lucida Console', 'MS Gothic', 'NSimSun', 'SimSun-ExtB', 'Cascadia Mono', 'Cascadia Code',
@@ -117,6 +126,9 @@ const allFontFamily = [
 
 export default {
   name: 'DisplaySetting',
+  components: {
+    ResolutionSetting
+  },
   data() {
     return {
       form: _.omit(defaultPreferenceSetting, 'theme'),

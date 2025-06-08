@@ -4,5 +4,8 @@ export const defaultPreferenceSetting = {
   line_height: 1.1,
   letter_spacing: 0,
   cursor_style: 'block',
-  theme: ''
+  theme: '',
+  settings: {
+    resolution: 'auto'
+  }
 }

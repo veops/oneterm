@@ -50,9 +50,9 @@ export default {
       type: Boolean,
       default: false,
     },
-    forMyAsset: {
-      type: Boolean,
-      default: false
+    getRequestParams: {
+      type: Object,
+      default: () => {}
     }
   },
   data() {
@@ -92,7 +92,10 @@ export default {
     },
   },
   mounted() {
-    getAccountList({ page_index: 1, info: this.forMyAsset }).then((res) => {
+    getAccountList({
+      page_index: 1,
+      ...this.getRequestParams
+    }).then((res) => {
       this.accountList = res?.data?.list || []
     })
   },

@@ -1,36 +1,36 @@
 <template>
   <div class="oneterm-workstation oneterm-layout">
     <AssetList
-      :forMyAsset="true"
       :userStat="userStat"
-      :showAssetTable="tabActiveKey === '1'"
-      @openTerminal="openTerminal"
-      @openTerminalList="openTerminalList"
+      :selectedKeys="selectedKeys"
+      @updateSelectedKeys="updateSelectedKeys"
     >
-      <template #title>
-        <div class="asset-tree-title">
-          <div class="asset-tree-title-text">
-            {{ $t('oneterm.assetList.assetTree') }}
-          </div>
-
-          <a @click="openRecentSession">
-            {{ $t('oneterm.workStation.recentSession') }}
-          </a>
-        </div>
-      </template>
-
-      <template #two-tab>
+      <div
+        :class="[
+          'oneterm-workstation-two',
+          openFullScreen ? 'oneterm-workstation-two_full' : ''
+        ]"
+        slot="two"
+      >
         <a-tabs
+          id="workstation-drag-tab"
           v-model="tabActiveKey"
         >
-          <a-tab-pane key="1">
+          <a-tab-pane :key="WORKSTATION_TAB_TYPE.MY_ASSETS">
             <template #tab>
               <div>
                 <ops-icon type="veops-resource2" />
                 <strong>{{ $t('oneterm.workStation.myAsset') }}</strong>
               </div>
             </template>
-            <!-- tab1 在 AssetLIst 内部展示 -->
+
+            <AssetTable
+              v-if="loading"
+              :selectedKeys="selectedKeys"
+              :accountList="accountList"
+              @openTerminal="openTerminal"
+              @openTerminalList="openTerminalList"
+            />
           </a-tab-pane>
 
           <template v-if="terminalList.length" >
@@ -41,7 +41,7 @@
               <template #tab>
                 <div class="oneterm-workstation-tab-terminal">
                   <span
-                    v-if="!['displaySetting', 'themeSetting'].includes(item.id)"
+                    v-if="![WORKSTATION_TAB_TYPE.DISPLAY_SETTING, WORKSTATION_TAB_TYPE.THEME_SETTING, WORKSTATION_TAB_TYPE.BATCH_EXECUTION].includes(item.type)"
                     :class="['oneterm-workstation-tab-terminal-status', !item.socketStatus ? 'oneterm-workstation-tab-terminal-status_error' : '']"
                   ></span>
 
@@ -55,7 +55,7 @@
                     @click.stop="closeTerminal(item, index)"
                   />
                   <ops-icon
-                    v-if="['ssh', 'telnet', 'mysql', 'redis', 'postgresql', 'mongodb'].includes(item.protocolType)"
+                    v-if="item.type === WORKSTATION_TAB_TYPE.TERMINAL"
                     class="oneterm-workstation-tab-terminal-icon"
                     type="veops-copy"
                     @click.stop="copyTerminal(item)"
@@ -64,45 +64,78 @@
               </template>
 
               <DisplaySetting
-                v-if="item.id === 'displaySetting'"
+                v-if="item.type === WORKSTATION_TAB_TYPE.DISPLAY_SETTING"
                 class="oneterm-workstation-panel"
                 @ok="getPreference"
               />
 
               <ThemeSetting
-                v-else-if="item.id === 'themeSetting'"
+                v-else-if="item.type === WORKSTATION_TAB_TYPE.THEME_SETTING"
                 class="oneterm-workstation-panel"
                 @ok="getPreference"
               />
 
+              <BatchExecution
+                v-else-if="item.type === WORKSTATION_TAB_TYPE.BATCH_EXECUTION"
+                :preferenceSetting="preferenceSetting"
+                :batchExecutionData="item.batchExecutionData"
+                @getOfUserStat="getOfUserStat()"
+              />
+
               <TerminalPanel
-                v-else-if="['ssh', 'telnet', 'mysql', 'redis', 'postgresql', 'mongodb'].includes(item.protocolType)"
+                v-else-if="item.type === WORKSTATION_TAB_TYPE.TERMINAL"
+                class="oneterm-workstation-panel"
+                :ref="'workStationPanelRef' + item.id"
                 :assetId="item.assetId"
                 :accountId="item.accountId"
                 :protocol="item.protocol"
                 :isFullScreen="false"
-                :showOperationMenu="true"
                 :preferenceSetting="preferenceSetting"
-                class="oneterm-workstation-panel"
                 @close="handleTerminalError(item)"
-                @open="getOfUserStat(1000)"
+                @open="getOfUserStat()"
                 @openSystemSetting="openSystemSetting"
               />
 
               <GuacamolePanel
-                v-else
+                v-else-if="item.type === WORKSTATION_TAB_TYPE.GUACAMOLE"
+                class="oneterm-workstation-panel"
+                :ref="'workStationPanelRef' + item.id"
                 :assetId="item.assetId"
                 :accountId="item.accountId"
                 :protocol="item.protocol"
                 :isFullScreen="false"
-                class="oneterm-workstation-panel"
+                :preferenceSetting="preferenceSetting"
+                :controlConfig="controlConfig"
                 @close="handleTerminalError(item)"
-                @open="getOfUserStat(1000)"
+                @open="getOfUserStat()"
+                @updatePreferenceSetting="getPreference"
               />
             </a-tab-pane>
           </template>
+
+          <a-icon
+            slot="tabBarExtraContent"
+            :type="showOperationMenu ? 'menu-unfold' : 'menu-fold'"
+            class="operation-menu-icon"
+            @click="toggleOperationMenu"
+          />
         </a-tabs>
-      </template>
+
+        <OperationMenu
+          :style="{
+            width: showOperationMenu ? '40px' : '0px'
+          }"
+          :openFullScreen="openFullScreen"
+          :accountList="accountList"
+          :currentTabData="currentTabData"
+          :controlConfig="controlConfig"
+          @toggleFullScreen="toggleFullScreen"
+          @openRecentSession="openRecentSession"
+          @openBatchExecution="openBatchExecution"
+          @openSystemSetting="openSystemSetting"
+          @callComponentFn="callComponentFn"
+        />
+      </div>
     </AssetList>
 
     <RecentSession
@@ -113,38 +146,59 @@
 </template>
 
 <script>
+import _ from 'lodash'
 import { v4 as uuidv4 } from 'uuid'
 import { mapState } from 'vuex'
-import { getOfUserStat } from '../../api/stat'
+import Sortable from 'sortablejs'
+import { getOfUserStat } from '@/modules/oneterm/api/stat'
 import { getPreference } from '@/modules/oneterm/api/preference.js'
+import { getAccountList } from '@/modules/oneterm/api/account'
+import { getConfig } from '@/modules/oneterm/api/config'
 import { defaultPreferenceSetting } from '../systemSettings/terminalDisplay/constants.js'
+import { WORKSTATION_TAB_TYPE } from './constants.js'
+import FullScreenMixin from '@/modules/oneterm/mixins/fullScreenMixin'
 
 import RecentSession from './recentSession.vue'
-import AssetList from '../../views/assets/assets/assetList.vue'
+import AssetList from './asset/assetList.vue'
 import TerminalPanel from '@/modules/oneterm/views/connect/terminal/index.vue'
 import GuacamolePanel from '@/modules/oneterm/views/connect/guacamoleClient/index.vue'
 import DisplaySetting from '../systemSettings/terminalDisplay/displaySetting.vue'
 import ThemeSetting from '../systemSettings/terminalDisplay/themeSetting.vue'
+import AssetTable from './asset/assetTable.vue'
+import BatchExecution from './batchExecution/index.vue'
+import OperationMenu from './operationMenu/index.vue'
+
+const operationMenuExpandKey = 'ops_oneterm_work_station_menu_expand'
 
 export default {
   name: 'WorkStation',
+  mixins: [FullScreenMixin],
   components: {
     RecentSession,
     AssetList,
     TerminalPanel,
     GuacamolePanel,
     DisplaySetting,
-    ThemeSetting
+    ThemeSetting,
+    AssetTable,
+    BatchExecution,
+    OperationMenu
   },
   data() {
     return {
       userStat: {},
-      expandKeys: ['session', 'asset'],
       terminalList: [],
-      tabActiveKey: '1',
+      tabActiveKey: WORKSTATION_TAB_TYPE.MY_ASSETS,
       preferenceSetting: {
         ...defaultPreferenceSetting,
-      }
+      },
+      sortableInstance: null,
+      selectedKeys: [],
+      accountList: [],
+      loading: false,
+      WORKSTATION_TAB_TYPE,
+      showOperationMenu: localStorage.getItem(operationMenuExpandKey) ? localStorage.getItem(operationMenuExpandKey) === 'true' : true,
+      controlConfig: {},
     }
   },
   computed: {
@@ -159,27 +213,48 @@ export default {
       const isAdmin = permissions?.includes?.('oneterm_admin') || permissions?.includes?.('acl_admin')
       return isAdmin
     },
+    currentTabData() {
+      if (this.tabActiveKey === WORKSTATION_TAB_TYPE.MY_ASSETS) {
+        return {
+          id: WORKSTATION_TAB_TYPE.MY_ASSETS
+        }
+      }
+
+      const _find = this.terminalList.find((item) => item.id === this.tabActiveKey)
+      return _find
+    }
   },
   mounted() {
-    this.getOfUserStat()
-    this.getPreference()
+    Promise.all([
+      this.getAccountList(),
+      this.getOfUserStat(),
+      this.getPreference(),
+      this.getConfig()
+    ]).finally(() => {
+      this.$nextTick(() => {
+        this.initSortable()
+      })
+      this.loading = true
+    })
+  },
+  beforeDestroy() {
+    if (this.sortableInstance) {
+      this.sortableInstance.destroy()
+      this.sortableInstance = null
+    }
   },
   methods: {
-    async getOfUserStat(delayTime) {
-      if (delayTime) {
-        setTimeout(async () => {
-          const res = await getOfUserStat({
-            info: true
-          })
-          this.userStat = res?.data ?? {}
-        }, delayTime)
-      } else {
-        const res = await getOfUserStat({
-            info: true
-          })
-        this.userStat = res?.data ?? {}
-      }
+    async getAccountList() {
+      const res = await getAccountList({ page_index: 1, info: this.forMyAsset })
+      this.accountList = res?.data?.list || []
     },
+
+    getOfUserStat: _.debounce(async function() {
+      const res = await getOfUserStat({
+        info: true
+      })
+      this.userStat = res?.data ?? {}
+    }, 2000),
 
     async getPreference() {
       const res = await getPreference()
@@ -192,13 +267,26 @@ export default {
       this.preferenceSetting = preferenceSetting
     },
 
-    toggle(key) {
-      const _idx = this.expandKeys.findIndex((item) => item === key)
-      if (_idx > -1) {
-        this.expandKeys.splice(_idx, 1)
-      } else {
-        this.expandKeys.push(key)
+    async getConfig() {
+      const res = await getConfig({
+        info: true
+      })
+      this.controlConfig = res?.data || {}
+    },
+
+    initSortable() {
+      const dragTab = document.getElementById('workstation-drag-tab')?.querySelector?.('.ant-tabs-nav')?.firstChild
+      if (dragTab) {
+        this.sortableInstance = Sortable.create(dragTab, {
+          handle: '.ant-tabs-tab', // 标签选择器
+          draggable: '.ant-tabs-tab:not(:first-child)', // 可拖动的标签选择器
+          onEnd: this.handleSortEnd
+        })
       }
+    },
+
+    updateSelectedKeys(keys) {
+      this.selectedKeys = keys
     },
 
     openTerminal(data) {
@@ -207,7 +295,8 @@ export default {
         ...data,
         socketStatus: true,
         id,
-        name: data.assetName
+        name: data.assetName,
+        type: this.getConnectType(data.protocolType)
       })
 
       this.tabActiveKey = id
@@ -222,7 +311,8 @@ export default {
           name: data.assetName,
           accountId: id,
           socketStatus: true,
-          id: uuidv4()
+          id: uuidv4(),
+          type: this.getConnectType(data.protocolType)
         }
       })
       this.tabActiveKey = newList[0].id
@@ -231,10 +321,10 @@ export default {
 
     closeTerminal(item, index) {
       if (item.id === this.tabActiveKey) {
-        this.tabActiveKey = index === 0 ? '1' : this.terminalList[index - 1].id
+        this.tabActiveKey = index === 0 ? WORKSTATION_TAB_TYPE.MY_ASSETS : this.terminalList[index - 1].id
       }
       this.terminalList.splice(index, 1)
-      this.getOfUserStat(1000)
+      this.getOfUserStat()
     },
 
     copyTerminal(item) {
@@ -249,11 +339,19 @@ export default {
       this.tabActiveKey = id
     },
 
+    getConnectType(protocolType) {
+      if (['ssh', 'telnet', 'mysql', 'redis', 'postgresql', 'mongodb'].includes(protocolType)) {
+        return WORKSTATION_TAB_TYPE.TERMINAL
+      } else {
+        return WORKSTATION_TAB_TYPE.GUACAMOLE
+      }
+    },
+
     handleTerminalError(item) {
       const terminalIndex = this.terminalList.findIndex((terminal) => terminal.id === item.id)
       if (terminalIndex > -1) {
         this.terminalList[terminalIndex].socketStatus = false
-        this.getOfUserStat(1000)
+        this.getOfUserStat()
       }
     },
 
@@ -261,30 +359,67 @@ export default {
       this.$refs.recentSessionRef.open()
     },
 
-    openSystemSetting(id) {
-      const index = this.terminalList.findIndex((item) => item.id === id)
-      if (index >= 0) {
-        this.tabActiveKey = index
+    openSystemSetting(type) {
+      const findData = this.terminalList.find((item) => item.type === type)
+      if (findData) {
+        this.tabActiveKey = findData.id
       } else {
         let name = ''
-        switch (id) {
-          case 'displaySetting':
+        switch (type) {
+          case WORKSTATION_TAB_TYPE.DISPLAY_SETTING:
             name = 'oneterm.terminalDisplay.displaySetting'
             break
-          case 'themeSetting':
+          case WORKSTATION_TAB_TYPE.THEME_SETTING:
             name = 'oneterm.terminalDisplay.themeSetting'
             break
           default:
             break
         }
 
+        const id = uuidv4()
         this.terminalList.push({
           id,
+          type,
           name: this.$t(name)
         })
+
+        this.tabActiveKey = id
+      }
+    },
+
+    handleSortEnd(evt) {
+      const { oldIndex, newIndex } = evt
+      if (oldIndex === newIndex) {
+        return
       }
 
+      const terminalList = [...this.terminalList]
+      const movedItem = terminalList.splice(oldIndex - 1, 1)[0]
+      terminalList.splice(newIndex - 1, 0, movedItem)
+      this.terminalList = terminalList
+    },
+
+    openBatchExecution(data) {
+      const id = uuidv4()
+      this.terminalList.push({
+        id,
+        type: WORKSTATION_TAB_TYPE.BATCH_EXECUTION,
+        name: this.$t('oneterm.workStation.batchExecution'),
+        batchExecutionData: data
+      })
       this.tabActiveKey = id
+    },
+
+    callComponentFn(fnName) {
+      const component = this.$refs?.[`workStationPanelRef${this.tabActiveKey}`]?.[0]
+      if (component[fnName]) {
+        component[fnName]()
+      }
+    },
+
+    toggleOperationMenu() {
+      this.showOperationMenu = !this.showOperationMenu
+      localStorage.setItem(operationMenuExpandKey, this.showOperationMenu)
     }
   },
 }
@@ -295,32 +430,36 @@ export default {
   width: 100%;
   height: 100%;
 
-  .asset-tree-title {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    column-gap: 12px;
-    row-gap: 6px;
-
-    &-text {
-      padding-left: 12px;
-      border-left: solid 3px @primary-color;
-      font-size: 15px;
-      font-weight: 700;
-      color: #000000;
-      flex-shrink: 0;
-    }
-  }
-
-  /deep/ .oneterm-layout-container {
-    padding-top: 0px;
-  }
-
-  .oneterm-workstation-panel {
-    height: calc(100vh - 172px);
-    margin: 0px;
+  &-two {
+    width: 100%;
+    height: 100%;
     background-color: #FFFFFF;
+    border-radius: 15px;
+    display: flex;
+
+    /deep/ .ant-tabs {
+      flex-grow: 1;
+      padding: 0px 18px 18px;
+    }
+
+    .oneterm-workstation-panel {
+      height: calc(100vh - 172px);
+      margin: 0px;
+      background-color: #FFFFFF;
+    }
+
+    &_full {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 1000;
+
+      .oneterm-workstation-panel {
+        height: calc(100vh - 100px);
+      }
+    }
   }
 
   .oneterm-workstation-tab-terminal {
@@ -381,6 +520,10 @@ export default {
         opacity: 1;
       }
     }
+  }
+
+  .operation-menu-icon {
+    font-size: 18px;
   }
 }
 </style>

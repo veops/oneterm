@@ -12,6 +12,7 @@ import (
 	"github.com/veops/oneterm/internal/model"
 	"github.com/veops/oneterm/pkg/config"
 	dbpkg "github.com/veops/oneterm/pkg/db"
+	"github.com/veops/oneterm/pkg/utils"
 	"gorm.io/gorm"
 )
 
@@ -276,6 +277,30 @@ func HandleAssetIds(ctx context.Context, dbFind *gorm.DB, resIds []int) (db *gor
 	d := dbpkg.DB.Where("resource_id IN ?", resIds).Or("parent_id IN?", nodeIds)
 
 	db = dbFind.Where(d)
+
+	return
+}
+
+// GetAAG retrieves Asset, Account, and Gateway by their IDs with decrypted credentials
+func GetAAG(assetId int, accountId int) (asset *model.Asset, account *model.Account, gateway *model.Gateway, err error) {
+	asset, account, gateway = &model.Asset{}, &model.Account{}, &model.Gateway{}
+	if err = dbpkg.DB.Model(asset).Where("id = ?", assetId).First(asset).Error; err != nil {
+		return
+	}
+	if err = dbpkg.DB.Model(account).Where("id = ?", accountId).First(account).Error; err != nil {
+		return
+	}
+	account.Password = utils.DecryptAES(account.Password)
+	account.Pk = utils.DecryptAES(account.Pk)
+	account.Phrase = utils.DecryptAES(account.Phrase)
+	if asset.GatewayId != 0 {
+		if err = dbpkg.DB.Model(gateway).Where("id = ?", asset.GatewayId).First(gateway).Error; err != nil {
+			return
+		}
+		gateway.Password = utils.DecryptAES(gateway.Password)
+		gateway.Pk = utils.DecryptAES(gateway.Pk)
+		gateway.Phrase = utils.DecryptAES(gateway.Phrase)
+	}
 
 	return
 }

@@ -21,7 +21,7 @@ import (
 	"github.com/veops/oneterm/internal/acl"
 	"github.com/veops/oneterm/internal/guacd"
 	"github.com/veops/oneterm/internal/model"
-	"github.com/veops/oneterm/internal/service"
+	fileservice "github.com/veops/oneterm/internal/service/file"
 	gsession "github.com/veops/oneterm/internal/session"
 	myErrors "github.com/veops/oneterm/pkg/errors"
 	"github.com/veops/oneterm/pkg/logger"
@@ -51,7 +51,7 @@ const (
 func (c *Controller) GetFileHistory(ctx *gin.Context) {
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
 
-	db := service.DefaultFileService.BuildFileHistoryQuery(ctx)
+	db := fileservice.DefaultFileService.BuildFileHistoryQuery(ctx)
 
 	// Apply user permissions - non-admin users can only see their own history
 	if !acl.IsAdmin(currentUser) {
@@ -87,9 +87,9 @@ func (c *Controller) FileLS(ctx *gin.Context) {
 	}
 
 	// Use global file service
-	info, err := service.DefaultFileService.ReadDir(ctx, sess.Session.AssetId, sess.Session.AccountId, ctx.Query("dir"))
+	info, err := fileservice.DefaultFileService.ReadDir(ctx, sess.Session.AssetId, sess.Session.AccountId, ctx.Query("dir"))
 	if err != nil {
-		if service.IsPermissionError(err) {
+		if fileservice.IsPermissionError(err) {
 			ctx.AbortWithError(http.StatusForbidden, fmt.Errorf("permission denied"))
 		} else {
 			ctx.AbortWithError(http.StatusBadRequest, &myErrors.ApiError{Code: myErrors.ErrInvalidArgument, Data: map[string]any{"err": err}})
@@ -110,7 +110,7 @@ func (c *Controller) FileLS(ctx *gin.Context) {
 		List: lo.Map(info, func(f fs.FileInfo, _ int) any {
 			var target string
 			if f.Mode()&os.ModeSymlink != 0 {
-				cli, err := service.GetFileManager().GetFileClient(sess.Session.AssetId, sess.Session.AccountId)
+				cli, err := fileservice.GetFileManager().GetFileClient(sess.Session.AssetId, sess.Session.AccountId)
 				if err == nil {
 					linkPath := filepath.Join(ctx.Query("dir"), f.Name())
 					if linkTarget, err := cli.ReadLink(linkPath); err == nil {
@@ -118,7 +118,7 @@ func (c *Controller) FileLS(ctx *gin.Context) {
 					}
 				}
 			}
-			return &service.FileInfo{
+			return &fileservice.FileInfo{
 				Name:    f.Name(),
 				IsDir:   f.IsDir(),
 				Size:    f.Size(),
@@ -157,13 +157,13 @@ func (c *Controller) FileMkdir(ctx *gin.Context) {
 	}
 
 	// Use global file service
-	if err := service.DefaultFileService.MkdirAll(ctx, sess.Session.AssetId, sess.Session.AccountId, ctx.Query("dir")); err != nil {
+	if err := fileservice.DefaultFileService.MkdirAll(ctx, sess.Session.AssetId, sess.Session.AccountId, ctx.Query("dir")); err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, &myErrors.ApiError{Code: myErrors.ErrInvalidArgument, Data: map[string]any{"err": err}})
 		return
 	}
 
 	// Record file history using unified method
-	if err := service.DefaultFileService.RecordFileHistory(ctx, "mkdir", ctx.Query("dir"), "", sess.Session.AssetId, sess.Session.AccountId); err != nil {
+	if err := fileservice.DefaultFileService.RecordFileHistory(ctx, "mkdir", ctx.Query("dir"), "", sess.Session.AssetId, sess.Session.AccountId); err != nil {
 		logger.L().Error("Failed to record file history", zap.Error(err))
 	}
 
@@ -209,7 +209,7 @@ func (c *Controller) FileUpload(ctx *gin.Context) {
 		transferId = fmt.Sprintf("%d-%d-%d", sess.Session.AssetId, sess.Session.AccountId, time.Now().UnixNano())
 	}
 
-	service.CreateTransferProgress(transferId, "sftp")
+	fileservice.CreateTransferProgress(transferId, "sftp")
 
 	// Parse multipart form
 	if err := ctx.Request.ParseMultipartForm(MaxMemoryForParsing); err != nil {
@@ -243,7 +243,7 @@ func (c *Controller) FileUpload(ctx *gin.Context) {
 	}
 
 	// Update transfer progress with file size
-	service.UpdateTransferProgress(transferId, fileSize, 0, "")
+	fileservice.UpdateTransferProgress(transferId, fileSize, 0, "")
 
 	targetPath := filepath.Join(targetDir, filename)
 
@@ -290,10 +290,10 @@ func (c *Controller) FileUpload(ctx *gin.Context) {
 	}
 
 	// Phase 2: Transfer to target machine using SFTP (synchronous)
-	service.UpdateTransferProgress(transferId, fileSize, 0, "transferring")
+	fileservice.UpdateTransferProgress(transferId, fileSize, 0, "transferring")
 
-	if err := service.TransferToTarget(transferId, "", tempFilePath, targetPath, sess.Session.AssetId, sess.Session.AccountId); err != nil {
-		service.UpdateTransferProgress(transferId, 0, -1, "failed")
+	if err := fileservice.TransferToTarget(transferId, "", tempFilePath, targetPath, sess.Session.AssetId, sess.Session.AccountId); err != nil {
+		fileservice.UpdateTransferProgress(transferId, 0, -1, "failed")
 		os.Remove(tempFilePath)
 		ctx.JSON(http.StatusInternalServerError, HttpResponse{
 			Code:    http.StatusInternalServerError,
@@ -303,13 +303,13 @@ func (c *Controller) FileUpload(ctx *gin.Context) {
 	}
 
 	// Mark transfer as completed
-	service.UpdateTransferProgress(transferId, 0, -1, "completed")
+	fileservice.UpdateTransferProgress(transferId, 0, -1, "completed")
 
 	// Clean up temp file after successful transfer
 	os.Remove(tempFilePath)
 
 	// Record file history using unified method
-	if err := service.DefaultFileService.RecordFileHistory(ctx, "upload", targetDir, filename, sess.Session.AssetId, sess.Session.AccountId); err != nil {
+	if err := fileservice.DefaultFileService.RecordFileHistory(ctx, "upload", targetDir, filename, sess.Session.AssetId, sess.Session.AccountId); err != nil {
 		logger.L().Error("Failed to record file history", zap.Error(err))
 	}
 
@@ -329,7 +329,7 @@ func (c *Controller) FileUpload(ctx *gin.Context) {
 	// Clean up progress record after a short delay
 	go func() {
 		time.Sleep(30 * time.Second) // Keep for 30 seconds for any delayed queries
-		service.CleanupTransferProgress(transferId, 0)
+		fileservice.CleanupTransferProgress(transferId, 0)
 	}()
 }
 
@@ -378,9 +378,9 @@ func (c *Controller) FileDownload(ctx *gin.Context) {
 		return
 	}
 
-	reader, downloadFilename, fileSize, err := service.DefaultFileService.DownloadMultiple(ctx, sess.Session.AssetId, sess.Session.AccountId, ctx.Query("dir"), filenames)
+	reader, downloadFilename, fileSize, err := fileservice.DefaultFileService.DownloadMultiple(ctx, sess.Session.AssetId, sess.Session.AccountId, ctx.Query("dir"), filenames)
 	if err != nil {
-		if service.IsPermissionError(err) {
+		if fileservice.IsPermissionError(err) {
 			ctx.AbortWithError(http.StatusForbidden, &myErrors.ApiError{Code: myErrors.ErrNoPerm, Data: map[string]any{"err": err}})
 		} else {
 			ctx.AbortWithError(http.StatusInternalServerError, &myErrors.ApiError{Code: myErrors.ErrInvalidArgument, Data: map[string]any{"err": err}})
@@ -390,7 +390,7 @@ func (c *Controller) FileDownload(ctx *gin.Context) {
 	defer reader.Close()
 
 	// Record file operation history using unified method
-	if err := service.DefaultFileService.RecordFileHistory(ctx, "download", ctx.Query("dir"), strings.Join(filenames, ","), sess.Session.AssetId, sess.Session.AccountId); err != nil {
+	if err := fileservice.DefaultFileService.RecordFileHistory(ctx, "download", ctx.Query("dir"), strings.Join(filenames, ","), sess.Session.AssetId, sess.Session.AccountId); err != nil {
 		logger.L().Error("Failed to record file history", zap.Error(err))
 	}
 
@@ -448,7 +448,7 @@ func (c *Controller) RDPFileList(ctx *gin.Context) {
 	}
 
 	// Check if RDP drive is enabled
-	if !service.IsRDPDriveEnabled(tunnel) {
+	if !fileservice.IsRDPDriveEnabled(tunnel) {
 		ctx.JSON(http.StatusBadRequest, HttpResponse{
 			Code:    http.StatusBadRequest,
 			Message: "RDP drive is not enabled for this session",
@@ -457,7 +457,7 @@ func (c *Controller) RDPFileList(ctx *gin.Context) {
 	}
 
 	// Send file list request through Guacamole protocol
-	files, err := service.RequestRDPFileList(tunnel, path)
+	files, err := fileservice.RequestRDPFileList(tunnel, path)
 	if err != nil {
 		logger.L().Error("Failed to get RDP file list", zap.Error(err))
 		ctx.JSON(http.StatusInternalServerError, HttpResponse{
@@ -501,7 +501,7 @@ func (c *Controller) RDPFileUpload(ctx *gin.Context) {
 	}
 
 	// Create progress record IMMEDIATELY when request starts
-	service.CreateTransferProgress(transferId, "rdp")
+	fileservice.CreateTransferProgress(transferId, "rdp")
 
 	tunnel, err := c.validateRDPAccess(ctx, sessionId)
 	if err != nil {
@@ -519,7 +519,7 @@ func (c *Controller) RDPFileUpload(ctx *gin.Context) {
 		return
 	}
 
-	if !service.IsRDPDriveEnabled(tunnel) {
+	if !fileservice.IsRDPDriveEnabled(tunnel) {
 		logger.L().Error("RDP drive is not enabled for session", zap.String("sessionId", sessionId))
 		ctx.JSON(http.StatusBadRequest, HttpResponse{
 			Code:    http.StatusBadRequest,
@@ -528,7 +528,7 @@ func (c *Controller) RDPFileUpload(ctx *gin.Context) {
 		return
 	}
 
-	if !service.IsRDPUploadAllowed(tunnel) {
+	if !fileservice.IsRDPUploadAllowed(tunnel) {
 		logger.L().Error("RDP upload is disabled for session", zap.String("sessionId", sessionId))
 		ctx.JSON(http.StatusForbidden, HttpResponse{
 			Code:    http.StatusForbidden,
@@ -653,7 +653,7 @@ func (c *Controller) RDPFileUpload(ctx *gin.Context) {
 	fullPath := filepath.Join(targetPath, filename)
 
 	// Update progress record with file size
-	service.UpdateTransferProgress(transferId, fileSize, 0, "transferring")
+	fileservice.UpdateTransferProgress(transferId, fileSize, 0, "transferring")
 
 	// Open temp file for reading and upload synchronously
 	tempFile, err := os.Open(tempFilePath)
@@ -668,9 +668,9 @@ func (c *Controller) RDPFileUpload(ctx *gin.Context) {
 	defer tempFile.Close()
 
 	// Perform RDP upload synchronously
-	err = service.UploadRDPFileStreamWithID(tunnel, transferId, sessionId, fullPath, tempFile, fileSize)
+	err = fileservice.UploadRDPFileStreamWithID(tunnel, transferId, sessionId, fullPath, tempFile, fileSize)
 	if err != nil {
-		service.UpdateTransferProgress(transferId, 0, -1, "failed")
+		fileservice.UpdateTransferProgress(transferId, 0, -1, "failed")
 		os.Remove(tempFilePath)
 		ctx.JSON(http.StatusInternalServerError, HttpResponse{
 			Code:    http.StatusInternalServerError,
@@ -683,7 +683,7 @@ func (c *Controller) RDPFileUpload(ctx *gin.Context) {
 	os.Remove(tempFilePath)
 
 	// Record file history using session-based method
-	if err := service.DefaultFileService.RecordFileHistoryBySession(ctx, sessionId, "upload", fullPath); err != nil {
+	if err := fileservice.DefaultFileService.RecordFileHistoryBySession(ctx, sessionId, "upload", fullPath); err != nil {
 		logger.L().Error("Failed to record file history", zap.Error(err))
 	}
 
@@ -708,7 +708,7 @@ func (c *Controller) RDPFileUpload(ctx *gin.Context) {
 	// Clean up progress record after a short delay
 	go func() {
 		time.Sleep(30 * time.Second) // Keep for 30 seconds for any delayed queries
-		service.CleanupTransferProgress(transferId, 0)
+		fileservice.CleanupTransferProgress(transferId, 0)
 	}()
 }
 
@@ -742,7 +742,7 @@ func (c *Controller) RDPFileDownload(ctx *gin.Context) {
 		return
 	}
 
-	if !service.IsRDPDriveEnabled(tunnel) {
+	if !fileservice.IsRDPDriveEnabled(tunnel) {
 		ctx.JSON(http.StatusForbidden, HttpResponse{
 			Code:    http.StatusForbidden,
 			Message: "Drive redirection not enabled",
@@ -750,7 +750,7 @@ func (c *Controller) RDPFileDownload(ctx *gin.Context) {
 		return
 	}
 
-	if !service.IsRDPDownloadAllowed(tunnel) {
+	if !fileservice.IsRDPDownloadAllowed(tunnel) {
 		ctx.JSON(http.StatusForbidden, HttpResponse{
 			Code:    http.StatusForbidden,
 			Message: "File download not allowed",
@@ -803,7 +803,7 @@ func (c *Controller) RDPFileDownload(ctx *gin.Context) {
 	if len(filenames) == 1 {
 		// Single file download (memory-efficient streaming)
 		path := filepath.Join(dir, filenames[0])
-		reader, fileSize, err = service.DownloadRDPFile(tunnel, path)
+		reader, fileSize, err = fileservice.DownloadRDPFile(tunnel, path)
 		if err != nil {
 			ctx.JSON(http.StatusInternalServerError, HttpResponse{
 				Code:    http.StatusInternalServerError,
@@ -815,7 +815,7 @@ func (c *Controller) RDPFileDownload(ctx *gin.Context) {
 		downloadFilename = filenames[0]
 	} else {
 		// Multiple files download as ZIP
-		reader, downloadFilename, fileSize, err = service.DownloadRDPMultiple(tunnel, dir, filenames)
+		reader, downloadFilename, fileSize, err = fileservice.DownloadRDPMultiple(tunnel, dir, filenames)
 		if err != nil {
 			ctx.JSON(http.StatusInternalServerError, HttpResponse{
 				Code:    http.StatusInternalServerError,
@@ -827,7 +827,7 @@ func (c *Controller) RDPFileDownload(ctx *gin.Context) {
 	defer reader.Close()
 
 	// Record file operation history using session-based method
-	if err := service.DefaultFileService.RecordFileHistoryBySession(ctx, sessionId, "download", filepath.Join(dir, strings.Join(filenames, ","))); err != nil {
+	if err := fileservice.DefaultFileService.RecordFileHistoryBySession(ctx, sessionId, "download", filepath.Join(dir, strings.Join(filenames, ","))); err != nil {
 		logger.L().Error("Failed to record file history", zap.Error(err))
 	}
 
@@ -861,13 +861,13 @@ func (c *Controller) RDPFileDownload(ctx *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param session_id path string true "Session ID"
-// @Param request body service.RDPMkdirRequest true "Directory creation request"
+// @Param request body fileservice.RDPMkdirRequest true "Directory creation request"
 // @Success 200 {object} HttpResponse
 // @Router /rdp/sessions/{session_id}/files/mkdir [post]
 func (c *Controller) RDPFileMkdir(ctx *gin.Context) {
 	sessionId := ctx.Param("session_id")
 
-	var req service.RDPMkdirRequest
+	var req fileservice.RDPMkdirRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, HttpResponse{
 			Code:    http.StatusBadRequest,
@@ -893,7 +893,7 @@ func (c *Controller) RDPFileMkdir(ctx *gin.Context) {
 	}
 
 	// Check if upload is allowed (mkdir is considered an upload operation)
-	if !service.IsRDPUploadAllowed(tunnel) {
+	if !fileservice.IsRDPUploadAllowed(tunnel) {
 		ctx.JSON(http.StatusForbidden, HttpResponse{
 			Code:    http.StatusForbidden,
 			Message: "Directory creation is disabled for this session",
@@ -902,7 +902,7 @@ func (c *Controller) RDPFileMkdir(ctx *gin.Context) {
 	}
 
 	// Send mkdir request through Guacamole protocol
-	err := service.CreateRDPDirectory(tunnel, req.Path)
+	err := fileservice.CreateRDPDirectory(tunnel, req.Path)
 	if err != nil {
 		logger.L().Error("Failed to create directory in RDP session", zap.Error(err))
 		ctx.JSON(http.StatusInternalServerError, HttpResponse{
@@ -913,7 +913,7 @@ func (c *Controller) RDPFileMkdir(ctx *gin.Context) {
 	}
 
 	// Record file operation history using session-based method
-	if err := service.DefaultFileService.RecordFileHistoryBySession(ctx, sessionId, "mkdir", req.Path); err != nil {
+	if err := fileservice.DefaultFileService.RecordFileHistoryBySession(ctx, sessionId, "mkdir", req.Path); err != nil {
 		logger.L().Error("Failed to record file history", zap.Error(err))
 	}
 
@@ -967,7 +967,7 @@ func (c *Controller) SftpFileLS(ctx *gin.Context) {
 	}
 
 	// Check if session is active
-	if !service.DefaultFileService.IsSessionActive(sessionId) {
+	if !fileservice.DefaultFileService.IsSessionActive(sessionId) {
 		ctx.JSON(http.StatusNotFound, HttpResponse{
 			Code:    http.StatusNotFound,
 			Message: "Session not found or inactive",
@@ -995,14 +995,14 @@ func (c *Controller) SftpFileLS(ctx *gin.Context) {
 	}
 
 	// Use session-based file service
-	fileInfos, err := service.DefaultFileService.SessionLS(ctx, sessionId, dir)
+	fileInfos, err := fileservice.DefaultFileService.SessionLS(ctx, sessionId, dir)
 	if err != nil {
-		if errors.Is(err, service.ErrSessionNotFound) {
+		if errors.Is(err, fileservice.ErrSessionNotFound) {
 			ctx.JSON(http.StatusNotFound, HttpResponse{
 				Code:    http.StatusNotFound,
 				Message: "Session not found",
 			})
-		} else if service.IsPermissionError(err) {
+		} else if fileservice.IsPermissionError(err) {
 			ctx.JSON(http.StatusForbidden, HttpResponse{
 				Code:    http.StatusForbidden,
 				Message: "Permission denied",
@@ -1019,7 +1019,7 @@ func (c *Controller) SftpFileLS(ctx *gin.Context) {
 	// Filter hidden files unless show_hidden is true
 	showHidden := cast.ToBool(ctx.Query("show_hidden"))
 	if !showHidden {
-		var filtered []service.FileInfo
+		var filtered []fileservice.FileInfo
 		for _, f := range fileInfos {
 			if !strings.HasPrefix(f.Name, ".") {
 				filtered = append(filtered, f)
@@ -1030,7 +1030,7 @@ func (c *Controller) SftpFileLS(ctx *gin.Context) {
 
 	res := &ListData{
 		Count: int64(len(fileInfos)),
-		List:  lo.Map(fileInfos, func(f service.FileInfo, _ int) any { return f }),
+		List:  lo.Map(fileInfos, func(f fileservice.FileInfo, _ int) any { return f }),
 	}
 	ctx.JSON(http.StatusOK, NewHttpResponseWithData(res))
 }
@@ -1055,7 +1055,7 @@ func (c *Controller) SftpFileMkdir(ctx *gin.Context) {
 	}
 
 	// Check if session is active
-	if !service.DefaultFileService.IsSessionActive(sessionId) {
+	if !fileservice.DefaultFileService.IsSessionActive(sessionId) {
 		ctx.JSON(http.StatusNotFound, HttpResponse{
 			Code:    http.StatusNotFound,
 			Message: "Session not found or inactive",
@@ -1083,8 +1083,8 @@ func (c *Controller) SftpFileMkdir(ctx *gin.Context) {
 	}
 
 	// Use session-based file service
-	if err := service.DefaultFileService.SessionMkdir(ctx, sessionId, dir); err != nil {
-		if errors.Is(err, service.ErrSessionNotFound) {
+	if err := fileservice.DefaultFileService.SessionMkdir(ctx, sessionId, dir); err != nil {
+		if errors.Is(err, fileservice.ErrSessionNotFound) {
 			ctx.JSON(http.StatusNotFound, HttpResponse{
 				Code:    http.StatusNotFound,
 				Message: "Session not found",
@@ -1099,7 +1099,7 @@ func (c *Controller) SftpFileMkdir(ctx *gin.Context) {
 	}
 
 	// Record history using session-based method
-	if err := service.DefaultFileService.RecordFileHistoryBySession(ctx, sessionId, "mkdir", dir); err != nil {
+	if err := fileservice.DefaultFileService.RecordFileHistoryBySession(ctx, sessionId, "mkdir", dir); err != nil {
 		logger.L().Error("Failed to record file history", zap.Error(err))
 	}
 
@@ -1113,7 +1113,7 @@ func (c *Controller) TransferProgressById(ctx *gin.Context) {
 	transferId := ctx.Param("transfer_id")
 
 	// First check unified progress tracking
-	progress, exists := service.GetTransferProgressById(transferId)
+	progress, exists := fileservice.GetTransferProgressById(transferId)
 
 	if exists {
 		// Calculate transfer progress
@@ -1136,7 +1136,7 @@ func (c *Controller) TransferProgressById(ctx *gin.Context) {
 	}
 
 	// Fallback: check RDP guacd transfer manager
-	rdpProgress, err := service.GetRDPTransferProgressById(transferId)
+	rdpProgress, err := fileservice.GetRDPTransferProgressById(transferId)
 	if err == nil {
 		ctx.JSON(http.StatusOK, HttpResponse{
 			Code:    0,
@@ -1181,7 +1181,7 @@ func (c *Controller) RDPFileTransferPrepare(ctx *gin.Context) {
 	}
 
 	// Create unified progress tracking entry
-	service.CreateTransferProgress(transferId, "rdp")
+	fileservice.CreateTransferProgress(transferId, "rdp")
 
 	ctx.JSON(http.StatusOK, HttpResponse{
 		Code:    0,
@@ -1221,10 +1221,10 @@ func (c *Controller) SftpFileUpload(ctx *gin.Context) {
 		transferId = fmt.Sprintf("%s-%d", sessionId, time.Now().UnixNano())
 	}
 
-	service.CreateTransferProgress(transferId, "sftp")
+	fileservice.CreateTransferProgress(transferId, "sftp")
 
 	// Validate session
-	if !service.DefaultFileService.IsSessionActive(sessionId) {
+	if !fileservice.DefaultFileService.IsSessionActive(sessionId) {
 		ctx.JSON(http.StatusNotFound, HttpResponse{
 			Code:    http.StatusNotFound,
 			Message: "Session not found or inactive",
@@ -1280,7 +1280,7 @@ func (c *Controller) SftpFileUpload(ctx *gin.Context) {
 	}
 
 	// Update transfer progress with file size now that we have it
-	service.UpdateTransferProgress(transferId, fileSize, 0, "")
+	fileservice.UpdateTransferProgress(transferId, fileSize, 0, "")
 
 	// Phase 1: Save file to server temp directory
 	tempDir := filepath.Join(os.TempDir(), "oneterm-uploads", sessionId)
@@ -1327,11 +1327,11 @@ func (c *Controller) SftpFileUpload(ctx *gin.Context) {
 	targetPath := filepath.Join(targetDir, filename)
 
 	// Phase 2: Transfer to target machine using SFTP (synchronous)
-	service.UpdateTransferProgress(transferId, fileSize, 0, "transferring")
+	fileservice.UpdateTransferProgress(transferId, fileSize, 0, "transferring")
 
-	if err := service.TransferToTarget(transferId, sessionId, tempFilePath, targetPath, 0, 0); err != nil {
+	if err := fileservice.TransferToTarget(transferId, sessionId, tempFilePath, targetPath, 0, 0); err != nil {
 		// Mark transfer as failed and clean up
-		service.UpdateTransferProgress(transferId, 0, -1, "failed")
+		fileservice.UpdateTransferProgress(transferId, 0, -1, "failed")
 		os.Remove(tempFilePath)
 		ctx.JSON(http.StatusInternalServerError, HttpResponse{
 			Code:    http.StatusInternalServerError,
@@ -1341,13 +1341,13 @@ func (c *Controller) SftpFileUpload(ctx *gin.Context) {
 	}
 
 	// Mark transfer as completed (success)
-	service.UpdateTransferProgress(transferId, 0, -1, "completed")
+	fileservice.UpdateTransferProgress(transferId, 0, -1, "completed")
 
 	// Clean up temp file after successful transfer
 	os.Remove(tempFilePath)
 
 	// Record file history using session-based method
-	if err := service.DefaultFileService.RecordFileHistoryBySession(ctx, sessionId, "upload", filepath.Join(targetDir, filename)); err != nil {
+	if err := fileservice.DefaultFileService.RecordFileHistoryBySession(ctx, sessionId, "upload", filepath.Join(targetDir, filename)); err != nil {
 		logger.L().Error("Failed to record file history", zap.Error(err))
 	}
 
@@ -1367,7 +1367,7 @@ func (c *Controller) SftpFileUpload(ctx *gin.Context) {
 	// Clean up progress record after a short delay
 	go func() {
 		time.Sleep(30 * time.Second) // Keep for 30 seconds for any delayed queries
-		service.CleanupTransferProgress(transferId, 0)
+		fileservice.CleanupTransferProgress(transferId, 0)
 	}()
 }
 
@@ -1383,7 +1383,7 @@ func (c *Controller) SftpFileDownload(ctx *gin.Context) {
 	sessionId := ctx.Param("session_id")
 
 	// Check if session is active
-	if !service.DefaultFileService.IsSessionActive(sessionId) {
+	if !fileservice.DefaultFileService.IsSessionActive(sessionId) {
 		ctx.JSON(http.StatusNotFound, HttpResponse{
 			Code:    http.StatusNotFound,
 			Message: "Session not found or inactive",
@@ -1436,14 +1436,14 @@ func (c *Controller) SftpFileDownload(ctx *gin.Context) {
 		return
 	}
 
-	reader, downloadFilename, fileSize, err := service.DefaultFileService.SessionDownloadMultiple(ctx, sessionId, ctx.Query("dir"), filenames)
+	reader, downloadFilename, fileSize, err := fileservice.DefaultFileService.SessionDownloadMultiple(ctx, sessionId, ctx.Query("dir"), filenames)
 	if err != nil {
-		if errors.Is(err, service.ErrSessionNotFound) {
+		if errors.Is(err, fileservice.ErrSessionNotFound) {
 			ctx.JSON(http.StatusNotFound, HttpResponse{
 				Code:    http.StatusNotFound,
 				Message: "Session not found",
 			})
-		} else if service.IsPermissionError(err) {
+		} else if fileservice.IsPermissionError(err) {
 			ctx.JSON(http.StatusForbidden, HttpResponse{
 				Code:    http.StatusForbidden,
 				Message: "Permission denied",
@@ -1459,7 +1459,7 @@ func (c *Controller) SftpFileDownload(ctx *gin.Context) {
 	defer reader.Close()
 
 	// Record file operation history using session-based method
-	if err := service.DefaultFileService.RecordFileHistoryBySession(ctx, sessionId, "download", filepath.Join(ctx.Query("dir"), strings.Join(filenames, ","))); err != nil {
+	if err := fileservice.DefaultFileService.RecordFileHistoryBySession(ctx, sessionId, "download", filepath.Join(ctx.Query("dir"), strings.Join(filenames, ","))); err != nil {
 		logger.L().Error("Failed to record file history", zap.Error(err))
 	}
 

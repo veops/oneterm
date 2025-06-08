@@ -12,6 +12,7 @@ import (
 	"github.com/veops/oneterm/internal/api/router"
 	"github.com/veops/oneterm/internal/model"
 	"github.com/veops/oneterm/internal/service"
+	fileservice "github.com/veops/oneterm/internal/service/file"
 	"github.com/veops/oneterm/pkg/config"
 	"github.com/veops/oneterm/pkg/db"
 	"github.com/veops/oneterm/pkg/logger"
@@ -45,7 +46,7 @@ func initDB() {
 func initServices() {
 	service.InitAuthorizationService()
 
-	service.InitFileService()
+	fileservice.InitFileService()
 
 }
 

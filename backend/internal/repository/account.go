@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -12,6 +13,7 @@ import (
 	"github.com/veops/oneterm/internal/model"
 	"github.com/veops/oneterm/pkg/config"
 	dbpkg "github.com/veops/oneterm/pkg/db"
+	"golang.org/x/crypto/ssh"
 	"gorm.io/gorm"
 )
 
@@ -144,4 +146,28 @@ func HandleAccountIds(ctx context.Context, dbFind *gorm.DB, resIds []int) (db *g
 	db = dbFind.Where(d)
 
 	return
+}
+
+// GetAuth creates SSH authentication method from account credentials
+func GetAuth(account *model.Account) (ssh.AuthMethod, error) {
+	switch account.AccountType {
+	case model.AUTHMETHOD_PASSWORD:
+		return ssh.Password(account.Password), nil
+	case model.AUTHMETHOD_PUBLICKEY:
+		if account.Phrase == "" {
+			pk, err := ssh.ParsePrivateKey([]byte(account.Pk))
+			if err != nil {
+				return nil, err
+			}
+			return ssh.PublicKeys(pk), nil
+		} else {
+			pk, err := ssh.ParsePrivateKeyWithPassphrase([]byte(account.Pk), []byte(account.Phrase))
+			if err != nil {
+				return nil, err
+			}
+			return ssh.PublicKeys(pk), nil
+		}
+	default:
+		return nil, fmt.Errorf("invalid authmethod %d", account.AccountType)
+	}
 }

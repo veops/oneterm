@@ -22,7 +22,9 @@ import (
 	"github.com/veops/oneterm/internal/connector/protocols"
 	"github.com/veops/oneterm/internal/connector/protocols/db"
 	"github.com/veops/oneterm/internal/model"
+	"github.com/veops/oneterm/internal/repository"
 	"github.com/veops/oneterm/internal/service"
+	fileservice "github.com/veops/oneterm/internal/service/file"
 	gsession "github.com/veops/oneterm/internal/session"
 	myErrors "github.com/veops/oneterm/pkg/errors"
 	"github.com/veops/oneterm/pkg/logger"
@@ -163,7 +165,7 @@ func DoConnect(ctx *gin.Context, ws *websocket.Conn) (sess *gsession.Session, er
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
 
 	assetId, accountId := cast.ToInt(ctx.Param("asset_id")), cast.ToInt(ctx.Param("account_id"))
-	asset, account, gateway, err := service.GetAAG(assetId, accountId)
+	asset, account, gateway, err := repository.GetAAG(assetId, accountId)
 	if err != nil {
 		return
 	}
@@ -265,7 +267,7 @@ func DoConnect(ctx *gin.Context, ws *websocket.Conn) (sess *gsession.Session, er
 	// Only for SSH-based protocols that support SFTP
 	protocol := strings.Split(sess.Protocol, ":")[0]
 	if protocol == "ssh" {
-		if err := service.DefaultFileService.InitSessionFileClient(sess.SessionId, sess.AssetId, sess.AccountId); err != nil {
+		if err := fileservice.DefaultFileService.InitSessionFileClient(sess.SessionId, sess.AssetId, sess.AccountId); err != nil {
 			logger.L().Warn("Failed to initialize session file client",
 				zap.String("sessionId", sess.SessionId),
 				zap.Int("assetId", sess.AssetId),
@@ -296,7 +298,7 @@ func HandleTerm(sess *gsession.Session, ctx *gin.Context) (err error) {
 		// Clean up session-based file client (only for SSH-based protocols)
 		protocol := strings.Split(sess.Protocol, ":")[0]
 		if protocol == "ssh" {
-			service.DefaultFileService.CloseSessionFileClient(sess.SessionId)
+			fileservice.DefaultFileService.CloseSessionFileClient(sess.SessionId)
 			// Clear SSH client from session to ensure proper cleanup
 			sess.ClearSSHClient()
 		}

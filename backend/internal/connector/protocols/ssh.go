@@ -12,7 +12,7 @@ import (
 	gossh "golang.org/x/crypto/ssh"
 
 	"github.com/veops/oneterm/internal/model"
-	"github.com/veops/oneterm/internal/service"
+	"github.com/veops/oneterm/internal/repository"
 	gsession "github.com/veops/oneterm/internal/session"
 	"github.com/veops/oneterm/internal/tunneling"
 	"github.com/veops/oneterm/pkg/logger"
@@ -33,7 +33,7 @@ func ConnectSsh(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, ac
 		return
 	}
 
-	auth, err := service.GetAuth(account)
+	auth, err := repository.GetAuth(account)
 	if err != nil {
 		return
 	}

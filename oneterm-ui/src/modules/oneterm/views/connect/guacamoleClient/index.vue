@@ -1,7 +1,7 @@
 <template>
   <div
     :class="[
-      isFullScreen || openFullScreen ? 'oneterm-guacamole-full' : 'oneterm-guacamole-panel'
+      isFullScreen ? 'oneterm-guacamole-full' : 'oneterm-guacamole-panel'
     ]"
   >
     <div
@@ -9,24 +9,33 @@
       class="oneterm-guacamole-wrap"
     ></div>
 
-    <OperationMenu
-      v-if="showOperationMenu"
-      :openFullScreen="openFullScreen"
-      :showClipboardBtn="showClipboardBtn"
-      :showFullScreenBtn="!isFullScreen"
-      @toggleFullScreen="toggleFullScreen"
-      @handleClipboardOk="handleClipboardOk"
+    <ClipboardModal
+      ref="clipboardModalRef"
+      @ok="handleClipboardOk"
+    />
+
+    <ResolutionModal
+      ref="resolutionModalRef"
+      @ok="handleResolutionOk"
+    />
+
+    <FileManagementDrawer
+      ref="fileManagementDrawerRef"
+      connectType="rdp"
+      :sessionId="sessionId"
     />
   </div>
 </template>
 
 <script>
 import _ from 'lodash'
+import { v4 as uuidv4 } from 'uuid'
 import Guacamole from 'guacamole-common-js'
-import OperationMenu from './operationMenu.vue'
-import { getConfig } from '@/modules/oneterm/api/config'
+import { pageBeforeUnload } from '@/modules/oneterm/utils/index.js'
 
-import FullScreenMixin from '@/modules/oneterm/mixins/fullScreenMixin'
+import ClipboardModal from './clipboardModal.vue'
+import ResolutionModal from './resolutionModal.vue'
+import FileManagementDrawer from '../fileManagement/fileManagementDrawer.vue'
 
 const STATE_IDLE = 0
 const STATE_CONNECTING = 1
@@ -37,9 +46,10 @@ const STATE_DISCONNECTED = 5
 
 export default {
   name: 'GuacamoleClient',
-  mixins: [FullScreenMixin],
   components: {
-    OperationMenu
+    ClipboardModal,
+    ResolutionModal,
+    FileManagementDrawer
   },
   props: {
     assetId: {
@@ -61,35 +71,41 @@ export default {
     shareId: {
       type: String,
       default: ''
+    },
+    preferenceSetting: {
+      type: [Object, null],
+      default: null
+    },
+    controlConfig: {
+      type: Object,
+      default: () => {}
     }
   },
   data() {
     return {
       client: null,
-      session_id: null,
-      is_monitor: this.$route.query.is_monitor,
       messageKey: 'message',
       resizeObserver: null, // guacamoleClient container size observer
-      controlConfig: {}
+      sessionId: '',
     }
   },
   computed: {
-    showClipboardBtn() {
-      const protocol = this.protocol || this.$route?.params?.protocol || ''
-      return this?.controlConfig?.[`${protocol?.split?.(':')?.[0]}_config`]?.paste
-    },
-    showOperationMenu() {
-      const is_monitor = this.$route?.query?.is_monitor || false
-
-      return !is_monitor && (this.showClipboardBtn || !this.isFullScreen)
+    resolution() {
+      const resolution = this?.preferenceSetting?.settings?.resolution || 'auto'
+      return resolution === 'auto' ? 'auto' : resolution.split('x')
+    }
+  },
+  watch: {
+    resolution: {
+      handler() {
+        this.handleResolutionUpdate()
+      },
     }
   },
   async mounted() {
-    await this.getConfig()
     this.init()
-
     if (!this.$route?.query?.is_monitor) {
-      window.addEventListener('beforeunload', this.beforeUnload)
+      window.addEventListener('beforeunload', pageBeforeUnload)
     }
   },
   beforeDestroy() {
@@ -104,7 +120,7 @@ export default {
     }
 
     if (!this.$route?.query?.is_monitor) {
-      window.removeEventListener('beforeunload', this.beforeUnload)
+      window.removeEventListener('beforeunload', pageBeforeUnload)
     }
   },
   methods: {
@@ -121,10 +137,13 @@ export default {
       const protocol = document.location.protocol.startsWith('https') ? 'wss' : 'ws'
 
       let socketLink = ''
+      // audit page (online session, offline session)
       if (is_monitor) {
         socketLink = `${protocol}://${document.location.host}/api/oneterm/v1/connect/monitor/${session_id}`
+      // share page (temporary link)
       } else if (this.shareId) {
         socketLink = `${protocol}://${document.location.host}/api/oneterm/v1/share/connect/${this.shareId}`
+      // work station
       } else {
         socketLink = `${protocol}://${document.location.host}/api/oneterm/v1/connect/${asset_id}/${account_id}/${queryProtocol}`
       }
@@ -136,7 +155,7 @@ export default {
       client.onclipboard = this.handleClipboardReceived
 
       if (this?.controlConfig?.[`${queryProtocol?.split?.(':')?.[0]}_config`]?.copy) {
-        // 处理从虚拟机收到的剪贴板内容
+        // handle the clipboard content received from the remote desktop.
         client.onclipboard = this.handleClipboardReceived
       }
 
@@ -150,10 +169,21 @@ export default {
       // Add client to display div
       const element = client.getDisplay().getElement()
       displayEle.appendChild(element)
-      client.connect(`w=${displayEle.clientWidth}&h=${displayEle.clientHeight}&dpi=96`)
+
+      const { width, height } = this.getClientSize()
+      let queryString = `w=${width}&h=${height}&dpi=96`
+      // workstation page
+      if (!is_monitor && !this.shareId) {
+        const sessionId = uuidv4()
+        this.sessionId = sessionId
+        queryString += `&session_id=${sessionId}`
+      }
+
+      client.connect(queryString)
       const display = client.getDisplay()
-      display.onresize = function(width, height) {
-        display.scale(Math.min(displayEle.clientHeight / display.getHeight(), displayEle.clientWidth / display.getHeight()))
+      display.onresize = () => {
+        const { width, height } = this.getClientSize()
+        display.scale(Math.min(displayEle.clientWidth / width, displayEle.clientHeight / height))
       }
 
       const sink = new Guacamole.InputSink()
@@ -205,7 +235,7 @@ export default {
       if (this.$refs.onetermGuacamoleRef) {
         this.resizeObserver = new ResizeObserver(_.debounce((entries) => {
           if (entries?.length) {
-            this.onWindowResize()
+            this.handleDisplaySize()
           }
         }, 200))
         this.resizeObserver.observe(this.$refs.onetermGuacamoleRef)
@@ -248,16 +278,12 @@ export default {
           break
       }
     },
-    onWindowResize() {
-      const width = this.client.getDisplay().getWidth()
-      const height = this.client.getDisplay().getHeight()
+    handleDisplaySize() {
+      const { width, height } = this.getClientSize()
 
       const guacamoleWrap = this.$refs.onetermGuacamoleRef
-      const winWidth = guacamoleWrap.clientWidth
-      const winHeight = guacamoleWrap.clientHeight
-
-      const scaleW = winWidth / width
-      const scaleH = winHeight / height
+      const scaleW = guacamoleWrap.clientWidth / width
+      const scaleH = guacamoleWrap.clientHeight / height
 
       const scale = Math.min(scaleW, scaleH)
       if (!scale) {
@@ -265,6 +291,23 @@ export default {
       }
       this.client.getDisplay().scale(scale)
     },
+
+    handleResolutionUpdate() {
+      const { width, height } = this.getClientSize()
+      this.client.sendSize(width, height)
+    },
+
+    getClientSize() {
+      const guacamoleWrap = this.$refs.onetermGuacamoleRef
+      const width = this.resolution === 'auto' ? guacamoleWrap.clientWidth : this.resolution?.[0]
+      const height = this.resolution === 'auto' ? guacamoleWrap.clientHeight : this.resolution?.[1]
+
+      return {
+        width,
+        height
+      }
+    },
+
     onError(status) {
       console.log('onError', status)
       this.$message.destroy(this.messageKey)
@@ -319,20 +362,21 @@ export default {
       }
     },
 
-    beforeUnload(event) {
-      event.preventDefault()
-      event.returnValue = this.$t('oneterm.workStation.pageUnloadMessage')
+    handleResolutionOk() {
+      this.$emit('updatePreferenceSetting')
     },
 
-    async getConfig() {
-      try {
-        const res = await getConfig({
-          info: true
-        })
-        this.controlConfig = res?.data || {}
-      } catch (e) {
-        console.log('getConfig fail', e)
-      }
+    openClipboardModal() {
+      this.$refs.clipboardModalRef.open()
+    },
+
+    openResolutionModal() {
+      const resolution = this?.preferenceSetting?.settings?.resolution || 'auto'
+      this.$refs.resolutionModalRef.open(resolution)
+    },
+
+    openFileManagementDrawer() {
+      this.$refs.fileManagementDrawerRef.open()
     }
   }
 }

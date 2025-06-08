@@ -6,6 +6,48 @@
   "description": "",
   "glyphs": [
     {
+      "icon_id": "44501032",
+      "name": "onterm-symbolic_link",
+      "font_class": "onterm-symbolic_link",
+      "unicode": "ea23",
+      "unicode_decimal": 59939
+    },
+    {
+      "icon_id": "44497221",
+      "name": "oneterm-batch_execution",
+      "font_class": "oneterm-batch_execution",
+      "unicode": "ea20",
+      "unicode_decimal": 59936
+    },
+    {
+      "icon_id": "44497220",
+      "name": "oneterm-file_log-selected",
+      "font_class": "ops-oneterm-file_log-selected",
+      "unicode": "ea21",
+      "unicode_decimal": 59937
+    },
+    {
+      "icon_id": "44497219",
+      "name": "oneterm-file_log",
+      "font_class": "ops-oneterm-file_log",
+      "unicode": "ea22",
+      "unicode_decimal": 59938
+    },
+    {
+      "icon_id": "44455092",
+      "name": "file",
+      "font_class": "file",
+      "unicode": "ea1f",
+      "unicode_decimal": 59935
+    },
+    {
+      "icon_id": "44455100",
+      "name": "folder",
+      "font_class": "folder1",
+      "unicode": "ea1e",
+      "unicode_decimal": 59934
+    },
+    {
       "icon_id": "44315758",
       "name": "mongoDB (1)",
       "font_class": "a-mongoDB1",

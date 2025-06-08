@@ -97,6 +97,11 @@ const genOnetermRoutes = () => {
                   name: 'oneterm_log_operation',
                   meta: { title: 'oneterm.menu.operationLog', icon: 'ops-oneterm-operation', selectedIcon: 'ops-oneterm-operation-selected', appName: 'oneterm', permission: ['oneterm_admin', 'admin'] },
                   component: () => import('../views/log/operation')
+              }, {
+                  path: '/oneterm/log/file',
+                  name: 'oneterm_log_file',
+                  meta: { title: 'oneterm.menu.fileLog', appName: 'oneterm', icon: 'ops-oneterm-file_log', selectedIcon: 'ops-oneterm-file_log-selected', permission: ['oneterm_admin', 'admin'] },
+                  component: () => import('../views/log/file')
               }
             ]
           },

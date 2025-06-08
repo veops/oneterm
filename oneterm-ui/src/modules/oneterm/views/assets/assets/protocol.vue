@@ -101,22 +101,22 @@ export default {
           list: [
             {
               key: 'ssh',
-              label: 'ssh',
+              label: 'SSH',
               icon: 'a-oneterm-ssh2'
             },
             {
               key: 'rdp',
-              label: 'rdp',
+              label: 'RDP',
               icon: 'a-oneterm-ssh1'
             },
             {
               key: 'vnc',
-              label: 'vnc',
+              label: 'VNC',
               icon: 'oneterm-rdp'
             },
             {
               key: 'telnet',
-              label: 'telnet',
+              label: 'Telnet',
               icon: 'a-telnet1'
             },
           ]
@@ -126,22 +126,22 @@ export default {
           list: [
             {
               key: 'redis',
-              label: 'redis',
+              label: 'Redis',
               icon: 'oneterm-redis'
             },
             {
               key: 'mysql',
-              label: 'mysql',
+              label: 'MySQL',
               icon: 'oneterm-mysql'
             },
             {
               key: 'mongodb',
-              label: 'mongodb',
+              label: 'MongoDB',
               icon: 'a-mongoDB1'
             },
             {
               key: 'postgresql',
-              label: 'postgresql',
+              label: 'PostgreSQL',
               icon: 'a-postgreSQL1'
             }
           ]

@@ -47,6 +47,7 @@ const oneterm_en = {
     'logAuditing': 'Log Auditing',
     'loginLog': 'Login Log',
     'operationLog': 'Operation Log',
+    'fileLog': 'File Log',
     'publicKey': 'Public Key',
     'commandRecord': 'Command Record',
     'auditCentre': 'Audit Centre',
@@ -74,7 +75,10 @@ const oneterm_en = {
     loginTime: 'Login Time',
     fullScreen: 'Full Screen',
     exitFullScreen: 'Exit Full Screen',
-    pageUnloadMessage: 'Are you sure you want to leave the page?'
+    pageUnloadMessage: 'Are you sure you want to leave the page?',
+    batchExecution: 'Batch Execution',
+    chooseAssets: 'Choose Assets',
+    batchExecutionPlaceholder: 'Please input the command, press Enter to execute'
   },
   sessionTable: {
     target: 'Target',
@@ -165,6 +169,11 @@ const oneterm_en = {
     param: 'Param',
     before: 'Before',
     after: 'After',
+    fileName: 'File Name',
+    filePath: 'File Path',
+    account: 'Account',
+    download: 'Download',
+    upload: 'Upload'
   },
   guacamole: {
     play: 'click to play',
@@ -204,13 +213,42 @@ const oneterm_en = {
     fontSize: 'Font Size',
     lineHeight: 'Line Height',
     letterSpacing: 'Letter Spacing(px)',
-    cursorStyle: 'Cursor Style'
+    cursorStyle: 'Cursor Style',
+    remoteDesktopResolution: 'Remote Desktop Resolution',
+    resolution: 'Resolution',
+    auto: 'Auto',
+    custom: 'Custom',
+    width: 'Width',
+    height: 'Height'
   },
   quickCommand: {
     name: 'Quick Command',
     createCommand: 'Create Command',
     editCommand: 'Edit Command',
     use: 'Use'
+  },
+  fileManagement: {
+    name: 'File Management',
+    directoryInputPlaceholder: 'Please input the file directory',
+    backToPreviousLevel: 'Back To Previous Level',
+    showHiddenFiles: 'Show Hidden Files',
+    hideHiddenFiles: 'Hide Hidden Files',
+    path: 'Path',
+    size: 'Size',
+    lastModified: 'Last Modified',
+    permissions: 'Permissions',
+    uploadFile: 'Upload File',
+    batchDownloadFiles: 'Batch Download Files',
+    uploadFileTip1: 'click or drag {name} ',
+    uploadFileTip2: 'to upload',
+    uploadProgress: 'Upload Progress',
+    uploadTypeLabel: 'Select Upload Type',
+    file: 'File',
+    folder: 'Folder',
+    uploadFailed: 'Upload Failed',
+    uploadSuccess: 'Upload Success',
+    transferToServer: 'Transfer To Server',
+    transferToTargetMachine: 'Transfer To Target Machine'
   }
 }
 export default oneterm_en

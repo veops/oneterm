@@ -47,6 +47,7 @@ const oneterm_zh = {
     'logAuditing': '日志审计',
     'loginLog': '登录日志',
     'operationLog': '操作日志',
+    'fileLog': '文件日志',
     'publicKey': '我的公钥',
     'commandRecord': '命令记录',
     'auditCentre': '审计中心',
@@ -74,7 +75,10 @@ const oneterm_zh = {
     loginTime: '登录日期',
     fullScreen: '全屏',
     exitFullScreen: '退出全屏',
-    pageUnloadMessage: '你确定要离开这个页面吗？'
+    pageUnloadMessage: '你确定要离开这个页面吗？',
+    batchExecution: '批量执行',
+    chooseAssets: '选择资产',
+    batchExecutionPlaceholder: '请输入命令, 按 Enter 执行',
   },
   sessionTable: {
     target: '目标',
@@ -165,6 +169,11 @@ const oneterm_zh = {
     param: '属性',
     before: '操作前',
     after: '操作后',
+    fileName: '文件名称',
+    filePath: '文件路径',
+    account: '帐号',
+    download: '下载',
+    upload: '上传'
   },
   guacamole: {
     play: '点击播放',
@@ -204,7 +213,13 @@ const oneterm_zh = {
     fontSize: '字体大小',
     lineHeight: '行高',
     letterSpacing: '字间距(px)',
-    cursorStyle: '光标样式'
+    cursorStyle: '光标样式',
+    remoteDesktopResolution: '远程桌面分辨率',
+    resolution: '分辨率',
+    auto: '自适应',
+    custom: '自定义',
+    width: '宽',
+    height: '高'
   },
   quickCommand: {
     name: '快捷命令',
@@ -212,6 +227,29 @@ const oneterm_zh = {
     editCommand: '编辑命令',
     content: '内容',
     use: '使用'
+  },
+  fileManagement: {
+    name: '文件管理',
+    directoryInputPlaceholder: '请输入文件目录',
+    backToPreviousLevel: '返回上一级',
+    showHiddenFiles: '显示隐藏文件',
+    hideHiddenFiles: '不显示隐藏文件',
+    path: '路径',
+    size: '大小',
+    lastModified: '最后修改时间',
+    permissions: '权限',
+    uploadFile: '上传文件',
+    batchDownloadFiles: '批量下载文件',
+    uploadFileTip1: '点击或拖拽{name}',
+    uploadFileTip2: '至此上传',
+    uploadProgress: '上传进度',
+    uploadTypeLabel: '选择上传类型',
+    file: '文件',
+    folder: '文件夹',
+    uploadFailed: '上传失败',
+    uploadSuccess: '上传成功',
+    transferToServer: '传到服务端',
+    transferToTargetMachine: '传到目标机器'
   }
 }
 export default oneterm_zh

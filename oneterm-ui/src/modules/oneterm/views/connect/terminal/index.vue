@@ -2,45 +2,45 @@
   <div
     :class="[
       'oneterm-terminal-container',
-      isFullScreen || openFullScreen ? 'oneterm-terminal-full' : 'oneterm-terminal-panel'
+      isFullScreen ? 'oneterm-terminal-full' : 'oneterm-terminal-panel'
     ]"
     :style="{
       backgroundColor: terminalBackground
     }"
   >
-    <div
-      class="oneterm-terminal-wrap"
-      ref="onetermTerminalRef"
-    ></div>
+    <CommandDrawer
+      ref="commandDrawerRef"
+      @write="writeCommand"
+    />
 
-    <OperationMenu
-      v-if="showOperationMenu"
-      :openFullScreen="openFullScreen"
-      @toggleFullScreen="toggleFullScreen"
-      @writeCommand="writeCommand"
-      @openSystemSetting="openSystemSetting"
+    <FileManagementDrawer
+      ref="fileManagementDrawerRef"
+      connectType="ssh"
+      :sessionId="connectData.sessionId"
     />
   </div>
 </template>
 
 <script>
 import _ from 'lodash'
+import { v4 as uuidv4 } from 'uuid'
 import 'xterm/css/xterm.css'
 import { Terminal } from 'xterm'
 import { FitAddon } from 'xterm-addon-fit'
 import XtermTheme from 'xterm-theme'
 import { defaultPreferenceSetting } from '@/modules/oneterm/views/systemSettings/terminalDisplay/constants.js'
-import FullScreenMixin from '@/modules/oneterm/mixins/fullScreenMixin'
+import { pageBeforeUnload } from '@/modules/oneterm/utils/index.js'
 
-import OperationMenu from './operationMenu.vue'
+import CommandDrawer from '@/modules/oneterm/views/systemSettings/quickCommand/commandDrawer.vue'
+import FileManagementDrawer from '../fileManagement/fileManagementDrawer.vue'
 
 export const initMessageStorageKey = 'init_oneterm_terminal_msg'
 
 export default {
   name: 'Terminal',
-  mixins: [FullScreenMixin],
   components: {
-    OperationMenu
+    CommandDrawer,
+    FileManagementDrawer
   },
   props: {
     assetId: {
@@ -63,10 +63,6 @@ export default {
       type: String,
       default: ''
     },
-    showOperationMenu: {
-      type: Boolean,
-      default: false
-    },
     preferenceSetting: {
       type: [Object, null],
       default: null
@@ -79,8 +75,26 @@ export default {
       interval: null,
       initMessage: [],
       terminalBackground: '#000000',
+      sessionId: '',
 
       resizeObserver: null, // terminal container size observer
+    }
+  },
+  computed: {
+    connectData() {
+      /**
+       * fullscreen page (route query)
+       * workstation page (props)
+       */
+      const { asset_id, account_id, protocol, is_monitor, session_id } = this.$route.query
+
+      return {
+        assetId: this.assetId || asset_id,
+        accountId: this.accountId || account_id,
+        protocol: this.protocol || protocol,
+        isMonitor: is_monitor,
+        sessionId: this.sessionId || session_id
+      }
     }
   },
   async mounted() {
@@ -104,7 +118,7 @@ export default {
     this.initWebsocket()
 
     if (!is_monitor) {
-      window.addEventListener('beforeunload', this.beforeUnload)
+      window.addEventListener('beforeunload', pageBeforeUnload)
     }
   },
   beforeDestroy() {
@@ -132,7 +146,7 @@ export default {
     }
 
     if (!this.$route?.query?.is_monitor) {
-      window.removeEventListener('beforeunload', this.beforeUnload)
+      window.removeEventListener('beforeunload', pageBeforeUnload)
     }
   },
   watch: {
@@ -140,7 +154,7 @@ export default {
       deep: true,
       handler(preferenceSetting) {
         if (preferenceSetting) {
-          this.updateTerm(preferenceSetting)
+          this.updateTermDisplay(preferenceSetting)
         }
       },
     }
@@ -194,7 +208,7 @@ export default {
       this.term.focus()
     },
 
-    updateTerm(preferenceSetting) {
+    updateTermDisplay(preferenceSetting) {
       if (!this.term) {
         return
       }
@@ -217,24 +231,28 @@ export default {
     },
 
     initWebsocket() {
-      const { session_id, is_monitor } = this.$route.query
-      let { asset_id, account_id, protocol: queryProtocol } = this.$route.query
-
-      if (!this.isFullScreen) {
-        asset_id = this.assetId
-        account_id = this.accountId
-        queryProtocol = this.protocol
-      }
+      const {
+        assetId,
+        accountId,
+        isMonitor,
+        sessionId,
+        protocol: queryProtocol
+      } = this.connectData
 
       const protocol = document.location.protocol.startsWith('https') ? 'wss' : 'ws'
 
       let socketLink = ''
-      if (is_monitor) {
-        socketLink = `${protocol}://${document.location.host}/api/oneterm/v1/connect/monitor/${session_id}?w=${this.term.cols}&h=${this.term.rows}`
+      // audit page (online session, offline session)
+      if (isMonitor) {
+        socketLink = `${protocol}://${document.location.host}/api/oneterm/v1/connect/monitor/${sessionId}?w=${this.term.cols}&h=${this.term.rows}`
+      // share page (temporary link)
       } else if (this.shareId) {
         socketLink = `${protocol}://${document.location.host}/api/oneterm/v1/share/connect/${this.shareId}?w=${this.term.cols}&h=${this.term.rows}`
+      // work station
       } else {
-        socketLink = `${protocol}://${document.location.host}/api/oneterm/v1/connect/${asset_id}/${account_id}/${queryProtocol}?w=${this.term.cols}&h=${this.term.rows}`
+        const sessionId = uuidv4()
+        this.sessionId = sessionId
+        socketLink = `${protocol}://${document.location.host}/api/oneterm/v1/connect/${assetId}/${accountId}/${queryProtocol}?w=${this.term.cols}&h=${this.term.rows}&session_id=${sessionId}`
       }
 
       if (!socketLink) {
@@ -246,7 +264,7 @@ export default {
         ['Sec-WebSocket-Protocol']
       )
 
-      this.websocket.onopen = this.websocketOpen()
+      this.websocket.onopen = this.websocketOpen
       this.websocket.onmessage = this.getMessage
       this.websocket.onclose = this.closeWebSocket
       this.websocket.onerror = this.errorWebSocket
@@ -258,7 +276,7 @@ export default {
       if (this.$refs.onetermTerminalRef) {
         this.resizeObserver = new ResizeObserver(_.debounce((entries) => {
           if (entries?.length) {
-            this.resize()
+            this.handleResize()
           }
         }, 200))
         this.resizeObserver.observe(this.$refs.onetermTerminalRef)
@@ -292,7 +310,7 @@ export default {
       }
     },
 
-    resize() {
+    handleResize() {
       if (this.fitAddon) {
         this.fitAddon.fit()
       }
@@ -302,17 +320,12 @@ export default {
       this.websocket.send(`1${content}`)
     },
 
-    openSystemSetting(type) {
-      if (this.openFullScreen) {
-        this.toggleFullScreen()
-      }
-
-      this.$emit('openSystemSetting', type)
+    openCommandDrawer() {
+      this.$refs.commandDrawerRef.open()
     },
 
-    beforeUnload(event) {
-      event.preventDefault()
-      event.returnValue = this.$t('oneterm.workStation.pageUnloadMessage')
+    openFileManagementDrawer() {
+      this.$refs.fileManagementDrawerRef.open()
     }
   },
 }
@@ -338,27 +351,12 @@ export default {
 .oneterm-terminal-wrap {
   width: 100%;
   height: 100%;
-}
 
-.oneterm-terminal-menu {
-  position: absolute;
-  bottom: 20px;
-  right: 30px;
-  z-index: 1001;
+  /deep/ .xterm-viewport {
+    overflow-y: auto;
 
-  &-btn {
-    background-color: #FFFFFF;
-    width: 32px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 2px;
-    cursor: pointer;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-
-    &:hover {
-      color: @text-color_5;
+    &::-webkit-scrollbar-thumb {
+      background-color: @text-color_4;
     }
   }
 }

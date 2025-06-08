@@ -1,3 +1,5 @@
+import i18n from '@/lang'
+
 export const getAllParentNodesLabel = (node, label) => {
     if (node.parentNode) {
         return getAllParentNodesLabel(node.parentNode, `${node.parentNode.label}-${label}`)
@@ -58,4 +60,9 @@ export function isFontAvailable(fontName) {
   context.font = '72px ' + fontName + ', monospace'
   const newSize = context.measureText(text).width
   return newSize !== baselineSize
+}
+
+export function pageBeforeUnload(event) {
+  event.preventDefault()
+  event.returnValue = i18n.t('oneterm.workStation.pageUnloadMessage')
 }

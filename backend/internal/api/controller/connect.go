@@ -9,9 +9,10 @@ import (
 // Connect handles WebSocket connections for terminal sessions
 // @Tags		connect
 // @Success	200	{object}	HttpResponse
-// @Param		w	query	int	false	"width"
-// @Param		h	query	int	false	"height"
-// @Param		dpi	query	int	false	"dpi"
+// @Param		w			query	int		false	"width"
+// @Param		h			query	int		false	"height"
+// @Param		dpi			query	int		false	"dpi"
+// @Param		session_id	query	string	false	"session_id"
 // @Success	200	{object}	HttpResponse{}
 // @Router		/connect/:asset_id/:account_id/:protocol [get]
 func (c *Controller) Connect(ctx *gin.Context) {

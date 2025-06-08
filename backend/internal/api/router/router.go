@@ -12,7 +12,7 @@ import (
 
 func SetupRouter(r *gin.Engine) {
 	r.SetTrustedProxies([]string{"0.0.0.0/0", "::/0"})
-	r.MaxMultipartMemory = 128 << 20
+	r.MaxMultipartMemory = 32 << 20 // 32MB, match with controller constant
 	r.Use(gin.Recovery(), middleware.LoggerMiddleware())
 
 	docs.SwaggerInfo.Title = "ONETERM API"
@@ -101,10 +101,23 @@ func SetupRouter(r *gin.Engine) {
 		file := v1.Group("file")
 		{
 			file.GET("/history", c.GetFileHistory)
+
+			// Legacy asset-based file operations (for backward compatibility)
 			file.GET("/ls/:asset_id/:account_id", c.FileLS)
 			file.POST("/mkdir/:asset_id/:account_id", c.FileMkdir)
 			file.POST("/upload/:asset_id/:account_id", c.FileUpload)
 			file.GET("/download/:asset_id/:account_id", c.FileDownload)
+
+			sftpFile := file.Group("/session/:session_id")
+			{
+				sftpFile.GET("/ls", c.SftpFileLS)
+				sftpFile.POST("/mkdir", c.SftpFileMkdir)
+				sftpFile.POST("/upload", c.SftpFileUpload)
+				sftpFile.GET("/download", c.SftpFileDownload)
+			}
+
+			// File transfer progress tracking
+			file.GET("/transfer/progress/id/:transfer_id", c.TransferProgressById)
 		}
 
 		config := v1.Group("config")

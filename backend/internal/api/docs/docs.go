@@ -188,160 +188,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/rdp/sessions/{session_id}/files": {
-            "get": {
-                "description": "Get file list for RDP session drive",
-                "tags": [
-                    "RDP File"
-                ],
-                "summary": "List RDP session files",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Session ID",
-                        "name": "session_id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Directory path",
-                        "name": "path",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/controller.HttpResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/rdp/sessions/{session_id}/files/download": {
-            "get": {
-                "description": "Download file from RDP session drive",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/octet-stream"
-                ],
-                "tags": [
-                    "RDP File"
-                ],
-                "summary": "Download file from RDP session",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Session ID",
-                        "name": "session_id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "File path",
-                        "name": "path",
-                        "in": "query",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "file"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/rdp/sessions/{session_id}/files/mkdir": {
-            "post": {
-                "description": "Create directory in RDP session drive",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "RDP File"
-                ],
-                "summary": "Create directory in RDP session",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Session ID",
-                        "name": "session_id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Directory creation request",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/controller.RDPMkdirRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/controller.HttpResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/rdp/sessions/{session_id}/files/upload": {
-            "post": {
-                "description": "Upload file to RDP session drive",
-                "consumes": [
-                    "multipart/form-data"
-                ],
-                "tags": [
-                    "RDP File"
-                ],
-                "summary": "Upload file to RDP session",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Session ID",
-                        "name": "session_id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "file",
-                        "description": "File to upload",
-                        "name": "file",
-                        "in": "formData",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Target directory path",
-                        "name": "path",
-                        "in": "formData"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/controller.HttpResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/asset": {
             "get": {
                 "tags": [
@@ -906,6 +752,12 @@ const docTemplate = `{
                         "description": "dpi",
                         "name": "dpi",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "session_id",
+                        "name": "session_id",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1181,8 +1033,173 @@ const docTemplate = `{
                 }
             }
         },
+        "/file/session/:session_id/download": {
+            "get": {
+                "tags": [
+                    "file"
+                ],
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "session_id",
+                        "name": "session_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "dir",
+                        "name": "dir",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "names (comma-separated for multiple files)",
+                        "name": "names",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controller.HttpResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/file/session/:session_id/ls": {
+            "get": {
+                "tags": [
+                    "file"
+                ],
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "session_id",
+                        "name": "session_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "dir",
+                        "name": "dir",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "show hidden files (default: false)",
+                        "name": "show_hidden",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controller.HttpResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/file/session/:session_id/mkdir": {
+            "post": {
+                "tags": [
+                    "file"
+                ],
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "session_id",
+                        "name": "session_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "dir",
+                        "name": "dir",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controller.HttpResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/file/session/:session_id/upload": {
+            "post": {
+                "description": "Uploads file via server temp storage then transfers to target using optimized SFTP with performance enhancements. HTTP response only after file reaches target machine.",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "tags": [
+                    "file"
+                ],
+                "summary": "High-performance file upload using optimized SFTP",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "session_id",
+                        "name": "session_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "target directory path (default: /tmp)",
+                        "name": "dir",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Custom transfer ID for progress tracking (frontend generated)",
+                        "name": "transfer_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "file",
+                        "description": "file to upload",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controller.HttpResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/file/transfer/progress/id/:transfer_id": {
+            "get": {
+                "tags": [
+                    "file"
+                ],
+                "responses": {}
+            }
+        },
         "/file/upload/:asset_id/:account_id": {
             "post": {
+                "consumes": [
+                    "multipart/form-data"
+                ],
                 "tags": [
                     "file"
                 ],
@@ -1203,9 +1220,21 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "path",
-                        "name": "path",
-                        "in": "query",
+                        "description": "target directory path (default: /tmp)",
+                        "name": "dir",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Custom transfer ID for progress tracking (frontend generated)",
+                        "name": "transfer_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "file",
+                        "description": "file to upload",
+                        "name": "file",
+                        "in": "formData",
                         "required": true
                     }
                 ],
@@ -2090,6 +2119,217 @@ const docTemplate = `{
                 }
             }
         },
+        "/rdp/sessions/{session_id}/files": {
+            "get": {
+                "description": "Get file list for RDP session drive",
+                "tags": [
+                    "RDP File"
+                ],
+                "summary": "List RDP session files",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Session ID",
+                        "name": "session_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Directory path",
+                        "name": "path",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controller.HttpResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/rdp/sessions/{session_id}/files/download": {
+            "get": {
+                "description": "Download files from RDP session drive (supports multiple files via names parameter)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/octet-stream"
+                ],
+                "tags": [
+                    "RDP File"
+                ],
+                "summary": "Download files from RDP session",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Session ID",
+                        "name": "session_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Directory path",
+                        "name": "dir",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "File names (comma-separated for multiple files)",
+                        "name": "names",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "file"
+                        }
+                    }
+                }
+            }
+        },
+        "/rdp/sessions/{session_id}/files/mkdir": {
+            "post": {
+                "description": "Create directory in RDP session drive",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "RDP File"
+                ],
+                "summary": "Create directory in RDP session",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Session ID",
+                        "name": "session_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Directory creation request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/service.RDPMkdirRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controller.HttpResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/rdp/sessions/{session_id}/files/prepare": {
+            "post": {
+                "description": "Create transfer record before RDP upload starts for progress tracking",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "RDP File"
+                ],
+                "summary": "Create transfer record for RDP upload",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Session ID",
+                        "name": "session_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Custom transfer ID",
+                        "name": "transfer_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filename",
+                        "name": "filename",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controller.HttpResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/rdp/sessions/{session_id}/files/upload": {
+            "post": {
+                "description": "Upload file to RDP session drive",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "tags": [
+                    "RDP File"
+                ],
+                "summary": "Upload file to RDP session",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Session ID",
+                        "name": "session_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Custom transfer ID for progress tracking (frontend generated)",
+                        "name": "transfer_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Target directory path",
+                        "name": "path",
+                        "in": "query"
+                    },
+                    {
+                        "type": "file",
+                        "description": "File to upload",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controller.HttpResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/session": {
             "get": {
                 "tags": [
@@ -2880,17 +3120,6 @@ const docTemplate = `{
                 "list": {
                     "type": "array",
                     "items": {}
-                }
-            }
-        },
-        "controller.RDPMkdirRequest": {
-            "type": "object",
-            "required": [
-                "path"
-            ],
-            "properties": {
-                "path": {
-                    "type": "string"
                 }
             }
         },
@@ -3735,6 +3964,17 @@ const docTemplate = `{
                 },
                 "paste": {
                     "type": "boolean"
+                }
+            }
+        },
+        "service.RDPMkdirRequest": {
+            "type": "object",
+            "required": [
+                "path"
+            ],
+            "properties": {
+                "path": {
+                    "type": "string"
                 }
             }
         }

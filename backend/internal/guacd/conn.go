@@ -5,13 +5,11 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/samber/lo"
 	"github.com/spf13/cast"
-	"go.uber.org/zap"
 
 	"github.com/veops/oneterm/internal/model"
 	"github.com/veops/oneterm/internal/tunneling"
@@ -33,6 +31,7 @@ const (
 	DRIVE_CREATE_PATH      = "create-drive-path"
 	DRIVE_DISABLE_UPLOAD   = "disable-upload"
 	DRIVE_DISABLE_DOWNLOAD = "disable-download"
+	DRIVE_NAME             = "drive-name"
 )
 
 type Configuration struct {
@@ -87,6 +86,7 @@ func NewTunnel(connectionId, sessionId string, w, h, dpi int, protocol string, a
 				func() map[string]string {
 					return map[string]string{
 						"version":               VERSION,
+						"client-name":           "OneTerm",
 						"recording-path":        RECORDING_PATH,
 						"create-recording-path": CREATE_RECORDING,
 						"ignore-cert":           IGNORE_CERT,
@@ -100,12 +100,19 @@ func NewTunnel(connectionId, sessionId string, w, h, dpi int, protocol string, a
 						"password":              account.Password,
 						"disable-copy":          cast.ToString(lo.Ternary(strings.Contains(protocol, "rdp"), !cfg.RdpConfig.Copy, !cfg.VncConfig.Copy)),
 						"disable-paste":         cast.ToString(lo.Ternary(strings.Contains(protocol, "rdp"), !cfg.RdpConfig.Paste, !cfg.VncConfig.Paste)),
+						"resize-method":         "display-update",
 						// Set file transfer related parameters from config
-						DRIVE_ENABLE:           cast.ToString(lo.Ternary(strings.Contains(protocol, "rdp"), cfg.RdpConfig.EnableDrive, false)),
-						DRIVE_PATH:             cast.ToString(lo.Ternary(strings.Contains(protocol, "rdp"), cfg.RdpConfig.DrivePath, "")),
-						DRIVE_CREATE_PATH:      cast.ToString(lo.Ternary(strings.Contains(protocol, "rdp"), cfg.RdpConfig.CreateDrivePath, false)),
-						DRIVE_DISABLE_UPLOAD:   cast.ToString(lo.Ternary(strings.Contains(protocol, "rdp"), cfg.RdpConfig.DisableUpload, false)),
-						DRIVE_DISABLE_DOWNLOAD: cast.ToString(lo.Ternary(strings.Contains(protocol, "rdp"), cfg.RdpConfig.DisableDownload, false)),
+						// DRIVE_ENABLE:           cast.ToString(lo.Ternary(strings.Contains(protocol, "rdp"), cfg.RdpConfig.EnableDrive, false)),
+						// DRIVE_PATH:             cast.ToString(lo.Ternary(strings.Contains(protocol, "rdp"), cfg.RdpConfig.DrivePath, "")),
+						// DRIVE_CREATE_PATH:      cast.ToString(lo.Ternary(strings.Contains(protocol, "rdp"), cfg.RdpConfig.CreateDrivePath, false)),
+						// DRIVE_DISABLE_UPLOAD:   cast.ToString(lo.Ternary(strings.Contains(protocol, "rdp"), cfg.RdpConfig.DisableUpload, false)),
+						// DRIVE_DISABLE_DOWNLOAD: cast.ToString(lo.Ternary(strings.Contains(protocol, "rdp"), cfg.RdpConfig.DisableDownload, false)),
+						DRIVE_ENABLE:           "true",
+						DRIVE_PATH:             fmt.Sprintf("/rdp/asset_%d", asset.Id),
+						DRIVE_CREATE_PATH:      "true",
+						DRIVE_DISABLE_UPLOAD:   "false",
+						DRIVE_DISABLE_DOWNLOAD: "false",
+						DRIVE_NAME:             "Drive",
 					}
 				}, func() map[string]string {
 					return map[string]string{
@@ -128,21 +135,6 @@ func NewTunnel(connectionId, sessionId string, w, h, dpi int, protocol string, a
 		}
 		t.Config.Parameters["hostname"] = "localhost"
 		t.Config.Parameters["port"] = cast.ToString(t.gw.LocalPort)
-	}
-
-	// If RDP protocol and file transfer is enabled
-	if strings.Contains(protocol, "rdp") && t.Config.Parameters[DRIVE_ENABLE] == "true" {
-		// Get drive path
-		t.drivePath = t.Config.Parameters[DRIVE_PATH]
-
-		// Create drive path if needed
-		if t.Config.Parameters[DRIVE_CREATE_PATH] == "true" && t.drivePath != "" {
-			if err := os.MkdirAll(t.drivePath, 0755); err != nil {
-				logger.L().Error("Failed to create RDP drive path", zap.Error(err))
-				// Don't terminate the connection, just disable file transfer
-				t.drivePath = ""
-			}
-		}
 	}
 
 	err = t.handshake()
@@ -284,7 +276,7 @@ func (t *Tunnel) HandleFileUpload(filename string, size int64) (string, error) {
 		return "", fmt.Errorf("file upload is disabled")
 	}
 
-	transfer, err := t.transferManager.CreateUpload(filename, t.drivePath)
+	transfer, err := t.transferManager.CreateUpload(t.SessionId, filename, t.drivePath)
 	if err != nil {
 		return "", err
 	}
@@ -298,7 +290,7 @@ func (t *Tunnel) HandleFileDownload(filename string) (string, int64, error) {
 		return "", 0, fmt.Errorf("file download is disabled")
 	}
 
-	transfer, err := t.transferManager.CreateDownload(filename, t.drivePath)
+	transfer, err := t.transferManager.CreateDownload(t.SessionId, filename, t.drivePath)
 	if err != nil {
 		return "", 0, err
 	}

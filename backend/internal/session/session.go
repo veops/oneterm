@@ -12,6 +12,7 @@ import (
 	"github.com/gliderlabs/ssh"
 	"github.com/gorilla/websocket"
 	"go.uber.org/zap"
+	gossh "golang.org/x/crypto/ssh"
 	"golang.org/x/sync/errgroup"
 	"gorm.io/gorm/clause"
 
@@ -125,6 +126,10 @@ type Session struct {
 	ShareEnd     time.Time       `json:"-" gorm:"-"`
 	Once         sync.Once       `json:"-" gorm:"-"`
 	Prompt       string          `json:"-" gorm:"-"`
+
+	// SSH connection reuse for file transfers
+	SSHClient *gossh.Client `json:"-" gorm:"-"`
+	sshMutex  sync.RWMutex  `json:"-" gorm:"-"`
 }
 
 func (m *Session) HasMonitors() (has bool) {
@@ -165,4 +170,37 @@ func UpsertSession(data *Session) (err error) {
 		}).
 		Create(data).
 		Error
+}
+
+// SetSSHClient stores SSH client for connection reuse
+func (s *Session) SetSSHClient(client *gossh.Client) {
+	s.sshMutex.Lock()
+	defer s.sshMutex.Unlock()
+	s.SSHClient = client
+	logger.L().Debug("SSH client stored for session", zap.String("sessionId", s.SessionId))
+}
+
+// GetSSHClient gets stored SSH client for connection reuse
+func (s *Session) GetSSHClient() *gossh.Client {
+	s.sshMutex.RLock()
+	defer s.sshMutex.RUnlock()
+	return s.SSHClient
+}
+
+// ClearSSHClient clears stored SSH client
+func (s *Session) ClearSSHClient() {
+	s.sshMutex.Lock()
+	defer s.sshMutex.Unlock()
+	if s.SSHClient != nil {
+		s.SSHClient.Close()
+		s.SSHClient = nil
+		logger.L().Debug("SSH client cleared for session", zap.String("sessionId", s.SessionId))
+	}
+}
+
+// HasSSHClient checks if session has an active SSH client
+func (s *Session) HasSSHClient() bool {
+	s.sshMutex.RLock()
+	defer s.sshMutex.RUnlock()
+	return s.SSHClient != nil
 }

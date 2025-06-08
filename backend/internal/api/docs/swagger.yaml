@@ -15,13 +15,6 @@ definitions:
         items: {}
         type: array
     type: object
-  controller.RDPMkdirRequest:
-    properties:
-      path:
-        type: string
-    required:
-    - path
-    type: object
   model.AccessAuth:
     properties:
       allow:
@@ -580,6 +573,13 @@ definitions:
       paste:
         type: boolean
     type: object
+  service.RDPMkdirRequest:
+    properties:
+      path:
+        type: string
+    required:
+    - path
+    type: object
 info:
   contact: {}
 paths:
@@ -689,108 +689,6 @@ paths:
             $ref: '#/definitions/controller.HttpResponse'
       tags:
       - account
-  /api/v1/rdp/sessions/{session_id}/files:
-    get:
-      description: Get file list for RDP session drive
-      parameters:
-      - description: Session ID
-        in: path
-        name: session_id
-        required: true
-        type: string
-      - description: Directory path
-        in: query
-        name: path
-        type: string
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/controller.HttpResponse'
-      summary: List RDP session files
-      tags:
-      - RDP File
-  /api/v1/rdp/sessions/{session_id}/files/download:
-    get:
-      consumes:
-      - application/json
-      description: Download file from RDP session drive
-      parameters:
-      - description: Session ID
-        in: path
-        name: session_id
-        required: true
-        type: string
-      - description: File path
-        in: query
-        name: path
-        required: true
-        type: string
-      produces:
-      - application/octet-stream
-      responses:
-        "200":
-          description: OK
-          schema:
-            type: file
-      summary: Download file from RDP session
-      tags:
-      - RDP File
-  /api/v1/rdp/sessions/{session_id}/files/mkdir:
-    post:
-      consumes:
-      - application/json
-      description: Create directory in RDP session drive
-      parameters:
-      - description: Session ID
-        in: path
-        name: session_id
-        required: true
-        type: string
-      - description: Directory creation request
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/controller.RDPMkdirRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/controller.HttpResponse'
-      summary: Create directory in RDP session
-      tags:
-      - RDP File
-  /api/v1/rdp/sessions/{session_id}/files/upload:
-    post:
-      consumes:
-      - multipart/form-data
-      description: Upload file to RDP session drive
-      parameters:
-      - description: Session ID
-        in: path
-        name: session_id
-        required: true
-        type: string
-      - description: File to upload
-        in: formData
-        name: file
-        required: true
-        type: file
-      - description: Target directory path
-        in: formData
-        name: path
-        type: string
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/controller.HttpResponse'
-      summary: Upload file to RDP session
-      tags:
-      - RDP File
   /asset:
     get:
       parameters:
@@ -1134,6 +1032,10 @@ paths:
         in: query
         name: dpi
         type: integer
+      - description: session_id
+        in: query
+        name: session_id
+        type: string
       responses:
         "200":
           description: OK
@@ -1307,8 +1209,118 @@ paths:
             $ref: '#/definitions/controller.HttpResponse'
       tags:
       - file
+  /file/session/:session_id/download:
+    get:
+      parameters:
+      - description: session_id
+        in: path
+        name: session_id
+        required: true
+        type: string
+      - description: dir
+        in: query
+        name: dir
+        required: true
+        type: string
+      - description: names (comma-separated for multiple files)
+        in: query
+        name: names
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - file
+  /file/session/:session_id/ls:
+    get:
+      parameters:
+      - description: session_id
+        in: path
+        name: session_id
+        required: true
+        type: string
+      - description: dir
+        in: query
+        name: dir
+        required: true
+        type: string
+      - description: 'show hidden files (default: false)'
+        in: query
+        name: show_hidden
+        type: boolean
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - file
+  /file/session/:session_id/mkdir:
+    post:
+      parameters:
+      - description: session_id
+        in: path
+        name: session_id
+        required: true
+        type: string
+      - description: dir
+        in: query
+        name: dir
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - file
+  /file/session/:session_id/upload:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Uploads file via server temp storage then transfers to target using
+        optimized SFTP with performance enhancements. HTTP response only after file
+        reaches target machine.
+      parameters:
+      - description: session_id
+        in: path
+        name: session_id
+        required: true
+        type: string
+      - description: 'target directory path (default: /tmp)'
+        in: query
+        name: dir
+        type: string
+      - description: Custom transfer ID for progress tracking (frontend generated)
+        in: query
+        name: transfer_id
+        type: string
+      - description: file to upload
+        in: formData
+        name: file
+        required: true
+        type: file
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      summary: High-performance file upload using optimized SFTP
+      tags:
+      - file
+  /file/transfer/progress/id/:transfer_id:
+    get:
+      responses: {}
+      tags:
+      - file
   /file/upload/:asset_id/:account_id:
     post:
+      consumes:
+      - multipart/form-data
       parameters:
       - description: asset_id
         in: path
@@ -1320,11 +1332,19 @@ paths:
         name: account_id
         required: true
         type: integer
-      - description: path
+      - description: 'target directory path (default: /tmp)'
         in: query
-        name: path
-        required: true
+        name: dir
         type: string
+      - description: Custom transfer ID for progress tracking (frontend generated)
+        in: query
+        name: transfer_id
+        type: string
+      - description: file to upload
+        in: formData
+        name: file
+        required: true
+        type: file
       responses:
         "200":
           description: OK
@@ -1861,6 +1881,147 @@ paths:
             $ref: '#/definitions/controller.HttpResponse'
       tags:
       - QuickCommand
+  /rdp/sessions/{session_id}/files:
+    get:
+      description: Get file list for RDP session drive
+      parameters:
+      - description: Session ID
+        in: path
+        name: session_id
+        required: true
+        type: string
+      - description: Directory path
+        in: query
+        name: path
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      summary: List RDP session files
+      tags:
+      - RDP File
+  /rdp/sessions/{session_id}/files/download:
+    get:
+      consumes:
+      - application/json
+      description: Download files from RDP session drive (supports multiple files
+        via names parameter)
+      parameters:
+      - description: Session ID
+        in: path
+        name: session_id
+        required: true
+        type: string
+      - description: Directory path
+        in: query
+        name: dir
+        required: true
+        type: string
+      - description: File names (comma-separated for multiple files)
+        in: query
+        name: names
+        required: true
+        type: string
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+      summary: Download files from RDP session
+      tags:
+      - RDP File
+  /rdp/sessions/{session_id}/files/mkdir:
+    post:
+      consumes:
+      - application/json
+      description: Create directory in RDP session drive
+      parameters:
+      - description: Session ID
+        in: path
+        name: session_id
+        required: true
+        type: string
+      - description: Directory creation request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/service.RDPMkdirRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      summary: Create directory in RDP session
+      tags:
+      - RDP File
+  /rdp/sessions/{session_id}/files/prepare:
+    post:
+      consumes:
+      - application/json
+      description: Create transfer record before RDP upload starts for progress tracking
+      parameters:
+      - description: Session ID
+        in: path
+        name: session_id
+        required: true
+        type: string
+      - description: Custom transfer ID
+        in: query
+        name: transfer_id
+        type: string
+      - description: Filename
+        in: query
+        name: filename
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      summary: Create transfer record for RDP upload
+      tags:
+      - RDP File
+  /rdp/sessions/{session_id}/files/upload:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Upload file to RDP session drive
+      parameters:
+      - description: Session ID
+        in: path
+        name: session_id
+        required: true
+        type: string
+      - description: Custom transfer ID for progress tracking (frontend generated)
+        in: query
+        name: transfer_id
+        type: string
+      - description: Target directory path
+        in: query
+        name: path
+        type: string
+      - description: File to upload
+        in: formData
+        name: file
+        required: true
+        type: file
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      summary: Upload file to RDP session
+      tags:
+      - RDP File
   /session:
     get:
       parameters:

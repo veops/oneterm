@@ -49,6 +49,10 @@ func ConnectSsh(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, ac
 		return
 	}
 
+	// CRITICAL: Store SSH client in session for file transfer reuse
+	sess.SetSSHClient(sshCli)
+	logger.L().Info("SSH client stored in session for reuse", zap.String("sessionId", sess.SessionId))
+
 	sshSess, err := sshCli.NewSession()
 	if err != nil {
 		logger.L().Error("ssh session create failed", zap.Error(err))

@@ -26,7 +26,7 @@ func Error2RespMiddleware() gin.HandlerFunc {
 		// Skip middleware for session replay and file download endpoints
 		urlPath := ctx.Request.URL.String()
 		if strings.Contains(urlPath, "session/replay") ||
-			strings.Contains(urlPath, "/file/download/") {
+			strings.Contains(urlPath, "/download") {
 			ctx.Next()
 			return
 		}

@@ -168,11 +168,16 @@ func DoConnect(ctx *gin.Context, ws *websocket.Conn) (sess *gsession.Session, er
 		return
 	}
 
+	sessionId := ctx.Query("session_id")
+	if sessionId == "" {
+		sessionId = uuid.New().String()
+	}
+
 	sess = gsession.NewSession(ctx)
 	sess.Ws = ws
 	sess.Session = &model.Session{
 		SessionType: ctx.GetInt("sessionType"),
-		SessionId:   uuid.New().String(),
+		SessionId:   sessionId,
 		Uid:         currentUser.GetUid(),
 		UserName:    currentUser.GetUserName(),
 		AssetId:     assetId,
@@ -256,6 +261,30 @@ func DoConnect(ctx *gin.Context, ws *websocket.Conn) (sess *gsession.Session, er
 	gsession.GetOnlineSession().Store(sess.SessionId, sess)
 	gsession.UpsertSession(sess)
 
+	// Initialize session-based file client for high-performance file operations
+	// Only for SSH-based protocols that support SFTP
+	protocol := strings.Split(sess.Protocol, ":")[0]
+	if protocol == "ssh" {
+		if err := service.DefaultFileService.InitSessionFileClient(sess.SessionId, sess.AssetId, sess.AccountId); err != nil {
+			logger.L().Warn("Failed to initialize session file client",
+				zap.String("sessionId", sess.SessionId),
+				zap.Int("assetId", sess.AssetId),
+				zap.Int("accountId", sess.AccountId),
+				zap.Error(err))
+			// Don't fail the session creation for file service initialization failure
+		} else {
+			logger.L().Info("Session file client initialized successfully",
+				zap.String("sessionId", sess.SessionId),
+				zap.Int("assetId", sess.AssetId),
+				zap.Int("accountId", sess.AccountId))
+		}
+	} else if protocol == "rdp" || protocol == "vnc" {
+		logger.L().Debug("Skipping session file client initialization for Guacamole protocol",
+			zap.String("protocol", protocol),
+			zap.String("sessionId", sess.SessionId))
+		// RDP and VNC use Guacamole protocol for file transfer, not SSH/SFTP
+	}
+
 	return
 }
 
@@ -263,12 +292,20 @@ func DoConnect(ctx *gin.Context, ws *websocket.Conn) (sess *gsession.Session, er
 func HandleTerm(sess *gsession.Session, ctx *gin.Context) (err error) {
 	defer func() {
 		logger.L().Debug("defer HandleTerm", zap.String("sessionId", sess.SessionId))
+
+		// Clean up session-based file client (only for SSH-based protocols)
+		protocol := strings.Split(sess.Protocol, ":")[0]
+		if protocol == "ssh" {
+			service.DefaultFileService.CloseSessionFileClient(sess.SessionId)
+			// Clear SSH client from session to ensure proper cleanup
+			sess.ClearSSHClient()
+		}
+
 		sess.SshParser.Close(sess.Prompt)
 		sess.Status = model.SESSIONSTATUS_OFFLINE
 		sess.ClosedAt = lo.ToPtr(time.Now())
 		if err = gsession.UpsertSession(sess); err != nil {
-			logger.L().Error("offline session failed", zap.String("sessionId", sess.SessionId), zap.Error(err))
-			return
+			logger.L().Error("upsert session failed", zap.Error(err))
 		}
 	}()
 	chs := sess.Chans

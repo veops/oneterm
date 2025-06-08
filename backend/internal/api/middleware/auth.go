@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -24,7 +25,11 @@ func AuthMiddleware() gin.HandlerFunc {
 		)
 
 		m := make(map[string]any)
-		ctx.ShouldBindBodyWithJSON(&m)
+		contentType := ctx.GetHeader("Content-Type")
+		if !strings.Contains(contentType, "multipart/form-data") {
+			ctx.ShouldBindBodyWithJSON(&m)
+		}
+
 		if ctx.Request.Method == "GET" {
 			if _, ok := ctx.GetQuery("_key"); ok {
 				m["_key"] = ctx.Query("_key")

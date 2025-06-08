@@ -15,14 +15,25 @@ const (
 	INSTRUCTION_FILE_ERROR    = "file-error"
 )
 
-// RDP file transfer related parameters
+// Object instruction constants for filesystem operations
 const (
-	RDP_ENABLE_DRIVE      = "enable-drive"
-	RDP_DRIVE_PATH        = "drive-path"
-	RDP_DRIVE_NAME        = "drive-name"
-	RDP_DISABLE_DOWNLOAD  = "disable-download"
-	RDP_DISABLE_UPLOAD    = "disable-upload"
-	RDP_CREATE_DRIVE_PATH = "create-drive-path"
+	INSTRUCTION_FILESYSTEM = "filesystem"
+	INSTRUCTION_GET        = "get"
+	INSTRUCTION_PUT        = "put"
+	INSTRUCTION_BODY       = "body"
+	INSTRUCTION_UNDEFINE   = "undefine"
+)
+
+// Stream instruction constants
+const (
+	INSTRUCTION_BLOB = "blob"
+	INSTRUCTION_END  = "end"
+)
+
+// Filesystem mimetypes
+const (
+	MIMETYPE_STREAM_INDEX = "application/vnd.glyptodon.guacamole.stream-index+json"
+	MIMETYPE_TEXT_PLAIN   = "text/plain"
 )
 
 // HandleFileInstruction processes file transfer related instructions

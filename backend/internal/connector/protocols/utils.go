@@ -16,6 +16,7 @@ import (
 
 	myi18n "github.com/veops/oneterm/internal/i18n"
 	"github.com/veops/oneterm/internal/model"
+	"github.com/veops/oneterm/internal/service"
 	gsession "github.com/veops/oneterm/internal/session"
 	myErrors "github.com/veops/oneterm/pkg/errors"
 	"github.com/veops/oneterm/pkg/logger"
@@ -224,6 +225,10 @@ func IsActive(message []byte) bool {
 func OfflineSession(ctx *gin.Context, sessionId string, closer string) {
 	logger.L().Debug("offline", zap.String("session_id", sessionId), zap.String("closer", closer))
 	defer gsession.GetOnlineSession().Delete(sessionId)
+
+	// Clean up session-based file client
+	service.DefaultFileService.CloseSessionFileClient(sessionId)
+
 	session := gsession.GetOnlineSessionById(sessionId)
 	if session == nil {
 		return

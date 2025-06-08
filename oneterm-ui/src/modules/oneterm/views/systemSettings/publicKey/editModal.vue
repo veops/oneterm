@@ -5,7 +5,11 @@
         <a-input v-model="form.name" :placeholder="`${$t(`placeholder1`)}`" />
       </a-form-model-item>
       <a-form-model-item prop="pk" :label="$t(`oneterm.publicKey`)">
-        <a-textarea v-model="form.pk" :placeholder="`${$t(`placeholder1`)}`" />
+        <a-textarea
+          v-model="form.pk"
+          :placeholder="`${$t(`placeholder1`)}`"
+          :autoSize="{ minRows: 5, maxRows: 8 }"
+        />
       </a-form-model-item>
       <!-- <a-form-model-item prop="mac" :label="$t(`oneterm.macAddress`)">
         <a-input v-model="form.mac" :placeholder="`${$t(`placeholder1`)}`" />

@@ -49,11 +49,11 @@ server {
         proxy_send_timeout 7200s;
     }
 
-    # File upload configuration for all upload endpoints
+        # File upload configuration for all upload endpoints
     # Matches: /api/oneterm/v1/rdp/sessions/:session_id/files/upload
     #          /api/oneterm/v1/file/session/:session_id/upload  
     #          /api/oneterm/v1/file/upload/:asset_id/:account_id
-    location ~ ^/api/oneterm/v1/(rdp/sessions/.+/files/upload|file/(session/.+/upload|upload/.+/.+))$ {
+    location ~ ^/api/oneterm/v1/(rdp/sessions/.+/files/upload|file/(session/.+/upload|upload/.+/.+)) {
         proxy_pass http://${ONETERM_API_HOST};
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -76,7 +76,7 @@ server {
         client_body_timeout 1800s;             # Body timeout: 30 minutes
     }
 
-    location ^~ /api/oneterm {
+    location /api/oneterm {
         proxy_pass http://${ONETERM_API_HOST};
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -90,7 +90,7 @@ server {
     }
 
 
-    location ^~ /api/{
+    location /api/v1/acl { 
         proxy_pass http://${ACL_API_HOST};
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;

@@ -199,7 +199,7 @@ export default {
       })
       const nodeList = nodeRes?.data?.list ?? []
       nodeList.map((item) => {
-        item.isLeaf = !item.has_child
+        item.isLeaf = false
         item.isConnect = false
         item.checkable = false
         item.key = `node-${item.id}`

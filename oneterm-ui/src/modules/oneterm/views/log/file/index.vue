@@ -119,11 +119,11 @@ export default {
       totalResult: 0,
       actionTypeMap: {
         3: {
-          text: 'download',
+          text: 'oneterm.log.upload',
           color: 'blue'
         },
         4: {
-          text: 'upload',
+          text: 'oneterm.log.download',
           color: 'green'
         }
       }
@@ -179,7 +179,9 @@ export default {
         .then((res) => {
           const tableData = res?.data?.list || []
           tableData.forEach((row) => {
-            row.createdTime = moment(row.created_at).format('YYYY-MM-DD HH:mm:ss')
+            const createMoment = moment(row.created_at)
+            row.createTimeStamp = createMoment.valueOf()
+            row.createdTime = createMoment.format('YYYY-MM-DD HH:mm:ss')
             const actionType = this.actionTypeMap?.[row.action]
             if (actionType) {
               row.actionText = actionType.text
@@ -216,11 +218,12 @@ export default {
       const data = this.$refs.opsTable
         .getVxetableRef()
         .getCheckboxRecords()
+        .sort((a, b) => b.createTimeStamp - a.createTimeStamp)
         .map((item) => {
           return {
             ...item,
             created_at: item.createdTime,
-            action: this.actionTypeMap?.[item.action]?.text || item.action
+            action: this.$t(this.actionTypeMap?.[item.action]?.text || item.action)
           }
         })
 

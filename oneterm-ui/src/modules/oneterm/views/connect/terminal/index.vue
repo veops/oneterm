@@ -8,6 +8,11 @@
       backgroundColor: terminalBackground
     }"
   >
+    <div
+      class="oneterm-terminal-wrap"
+      ref="onetermTerminalRef"
+    ></div>
+
     <CommandDrawer
       ref="commandDrawerRef"
       @write="writeCommand"

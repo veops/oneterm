@@ -12,7 +12,7 @@
       <div class="file-management-title-name">
         {{ $t('oneterm.fileManagement.name') }}
       </div>
-      <a-space>
+      <div class="file-management-title-right">
         <a-tooltip
           v-if="selectedRows.length"
           :title="$t('oneterm.fileManagement.batchDownloadFiles')"
@@ -28,7 +28,7 @@
           :connectType="connectType"
           @updateFileList="getFileList()"
         />
-      </a-space>
+      </div>
     </div>
     <a-spin :spinning="loading">
       <a-space class="file-management-header">
@@ -331,6 +331,12 @@ export default {
   &-title {
     display: flex;
     justify-content: space-between;
+
+    &-right {
+      display: flex;
+      column-gap: 8px;
+      align-items: center;
+    }
   }
 
   &-header {

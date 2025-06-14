@@ -143,3 +143,20 @@ func (s *SessionService) GetSessionReplayFilename(ctx context.Context, sessionId
 
 	return filename, nil
 }
+
+// GetSessionReplay gets session replay file reader
+func (s *SessionService) GetSessionReplay(ctx context.Context, sessionId string) (io.ReadCloser, error) {
+	// First try to get from storage service
+	if DefaultStorageService != nil {
+		reader, err := DefaultStorageService.GetSessionReplay(ctx, sessionId)
+		if err == nil {
+			return reader, nil
+		}
+		logger.L().Warn("Failed to get replay from storage service, falling back to local file",
+			zap.String("session_id", sessionId),
+			zap.Error(err))
+	}
+
+	// Fallback to direct file access with date hierarchy search
+	return gsession.GetReplay(sessionId)
+}

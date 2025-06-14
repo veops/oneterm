@@ -2208,13 +2208,11 @@
                         "required": true
                     },
                     {
-                        "description": "Directory creation request",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/service.RDPMkdirRequest"
-                        }
+                        "type": "string",
+                        "description": "Directory path",
+                        "name": "path",
+                        "in": "query",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -3085,6 +3083,310 @@
                     }
                 }
             }
+        },
+        "/storage/configs": {
+            "get": {
+                "tags": [
+                    "storage"
+                ],
+                "summary": "List all storage configurations",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "page_index",
+                        "name": "page_index",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "page_size",
+                        "name": "page_size",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "search",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "storage type filter",
+                        "name": "type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "enabled filter (true/false)",
+                        "name": "enabled",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "primary filter (true/false)",
+                        "name": "primary",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/controller.HttpResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/definitions/controller.ListData"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "list": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "$ref": "#/definitions/model.StorageConfig"
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "storage"
+                ],
+                "summary": "Create a new storage configuration",
+                "parameters": [
+                    {
+                        "description": "Storage configuration",
+                        "name": "config",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.StorageConfig"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controller.HttpResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/storage/configs/{id}": {
+            "get": {
+                "tags": [
+                    "storage"
+                ],
+                "summary": "Get storage configuration by ID",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Storage ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/controller.HttpResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.StorageConfig"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            "put": {
+                "tags": [
+                    "storage"
+                ],
+                "summary": "Update an existing storage configuration",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Storage ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Storage configuration",
+                        "name": "config",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.StorageConfig"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controller.HttpResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "storage"
+                ],
+                "summary": "Delete a storage configuration",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Storage ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controller.HttpResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/storage/configs/{id}/set-primary": {
+            "put": {
+                "tags": [
+                    "storage"
+                ],
+                "summary": "Set a storage provider as primary",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Storage ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controller.HttpResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/storage/configs/{id}/toggle": {
+            "put": {
+                "tags": [
+                    "storage"
+                ],
+                "summary": "Enable or disable a storage provider",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Storage ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controller.HttpResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/storage/health": {
+            "get": {
+                "tags": [
+                    "storage"
+                ],
+                "summary": "Get health status of all storage providers",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/controller.HttpResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "additionalProperties": true
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/storage/test-connection": {
+            "post": {
+                "tags": [
+                    "storage"
+                ],
+                "summary": "Test storage connection",
+                "parameters": [
+                    {
+                        "description": "Storage configuration to test",
+                        "name": "config",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.StorageConfig"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controller.HttpResponse"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -3895,6 +4197,71 @@
                 }
             }
         },
+        "model.StorageConfig": {
+            "type": "object",
+            "properties": {
+                "config": {
+                    "$ref": "#/definitions/model.StorageConfigMap"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "creator_id": {
+                    "description": "Standard fields",
+                    "type": "integer"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "is_primary": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "priority": {
+                    "type": "integer"
+                },
+                "type": {
+                    "$ref": "#/definitions/model.StorageType"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "updater_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "model.StorageConfigMap": {
+            "type": "object",
+            "additionalProperties": {
+                "type": "string"
+            }
+        },
+        "model.StorageType": {
+            "type": "string",
+            "enum": [
+                "local",
+                "s3",
+                "minio",
+                "oss",
+                "cos"
+            ],
+            "x-enum-varnames": [
+                "StorageTypeLocal",
+                "StorageTypeS3",
+                "StorageTypeMinio",
+                "StorageTypeOSS",
+                "StorageTypeCOS"
+            ]
+        },
         "model.UserPreference": {
             "type": "object",
             "properties": {
@@ -3953,17 +4320,6 @@
                 },
                 "paste": {
                     "type": "boolean"
-                }
-            }
-        },
-        "service.RDPMkdirRequest": {
-            "type": "object",
-            "required": [
-                "path"
-            ],
-            "properties": {
-                "path": {
-                    "type": "string"
                 }
             }
         }

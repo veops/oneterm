@@ -351,7 +351,7 @@ type IFileService interface {
 
 // FileService implements IFileService
 type FileService struct {
-	repo IFileRepository
+	repo repository.IFileRepository
 }
 
 // RDP File related structures
@@ -553,12 +553,6 @@ func (pw *FileProgressWriter) Write(p []byte) (int, error) {
 	}
 
 	return n, err
-}
-
-// Repository interface
-type IFileRepository interface {
-	AddFileHistory(ctx context.Context, history *model.FileHistory) error
-	BuildFileHistoryQuery(ctx *gin.Context) *gorm.DB
 }
 
 // SessionFileTransfer methods

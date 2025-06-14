@@ -532,6 +532,52 @@ definitions:
       uid:
         type: integer
     type: object
+  model.StorageConfig:
+    properties:
+      config:
+        $ref: '#/definitions/model.StorageConfigMap'
+      created_at:
+        type: string
+      creator_id:
+        description: Standard fields
+        type: integer
+      description:
+        type: string
+      enabled:
+        type: boolean
+      id:
+        type: integer
+      is_primary:
+        type: boolean
+      name:
+        type: string
+      priority:
+        type: integer
+      type:
+        $ref: '#/definitions/model.StorageType'
+      updated_at:
+        type: string
+      updater_id:
+        type: integer
+    type: object
+  model.StorageConfigMap:
+    additionalProperties:
+      type: string
+    type: object
+  model.StorageType:
+    enum:
+    - local
+    - s3
+    - minio
+    - oss
+    - cos
+    type: string
+    x-enum-varnames:
+    - StorageTypeLocal
+    - StorageTypeS3
+    - StorageTypeMinio
+    - StorageTypeOSS
+    - StorageTypeCOS
   model.UserPreference:
     properties:
       created_at:
@@ -572,13 +618,6 @@ definitions:
         type: boolean
       paste:
         type: boolean
-    type: object
-  service.RDPMkdirRequest:
-    properties:
-      path:
-        type: string
-    required:
-    - path
     type: object
 info:
   contact: {}
@@ -1945,12 +1984,11 @@ paths:
         name: session_id
         required: true
         type: string
-      - description: Directory creation request
-        in: body
-        name: request
+      - description: Directory path
+        in: query
+        name: path
         required: true
-        schema:
-          $ref: '#/definitions/service.RDPMkdirRequest'
+        type: string
       produces:
       - application/json
       responses:
@@ -2456,4 +2494,189 @@ paths:
               type: object
       tags:
       - stat
+  /storage/configs:
+    get:
+      parameters:
+      - description: page_index
+        in: query
+        name: page_index
+        type: integer
+      - description: page_size
+        in: query
+        name: page_size
+        type: integer
+      - description: search
+        in: query
+        name: search
+        type: string
+      - description: storage type filter
+        in: query
+        name: type
+        type: string
+      - description: enabled filter (true/false)
+        in: query
+        name: enabled
+        type: string
+      - description: primary filter (true/false)
+        in: query
+        name: primary
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/controller.HttpResponse'
+            - properties:
+                data:
+                  allOf:
+                  - $ref: '#/definitions/controller.ListData'
+                  - properties:
+                      list:
+                        items:
+                          $ref: '#/definitions/model.StorageConfig'
+                        type: array
+                    type: object
+              type: object
+      summary: List all storage configurations
+      tags:
+      - storage
+    post:
+      parameters:
+      - description: Storage configuration
+        in: body
+        name: config
+        required: true
+        schema:
+          $ref: '#/definitions/model.StorageConfig'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      summary: Create a new storage configuration
+      tags:
+      - storage
+  /storage/configs/{id}:
+    delete:
+      parameters:
+      - description: Storage ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      summary: Delete a storage configuration
+      tags:
+      - storage
+    get:
+      parameters:
+      - description: Storage ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/controller.HttpResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.StorageConfig'
+              type: object
+      summary: Get storage configuration by ID
+      tags:
+      - storage
+    put:
+      parameters:
+      - description: Storage ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Storage configuration
+        in: body
+        name: config
+        required: true
+        schema:
+          $ref: '#/definitions/model.StorageConfig'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      summary: Update an existing storage configuration
+      tags:
+      - storage
+  /storage/configs/{id}/set-primary:
+    put:
+      parameters:
+      - description: Storage ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      summary: Set a storage provider as primary
+      tags:
+      - storage
+  /storage/configs/{id}/toggle:
+    put:
+      parameters:
+      - description: Storage ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      summary: Enable or disable a storage provider
+      tags:
+      - storage
+  /storage/health:
+    get:
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/controller.HttpResponse'
+            - properties:
+                data:
+                  additionalProperties: true
+                  type: object
+              type: object
+      summary: Get health status of all storage providers
+      tags:
+      - storage
+  /storage/test-connection:
+    post:
+      parameters:
+      - description: Storage configuration to test
+        in: body
+        name: config
+        required: true
+        schema:
+          $ref: '#/definitions/model.StorageConfig'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      summary: Test storage connection
+      tags:
+      - storage
 swagger: "2.0"

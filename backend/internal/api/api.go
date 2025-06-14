@@ -31,6 +31,7 @@ func initDB() {
 		model.DefaultConfig, model.DefaultFileHistory, model.DefaultGateway, model.DefaultHistory,
 		model.DefaultNode, model.DefaultPublicKey, model.DefaultSession, model.DefaultSessionCmd,
 		model.DefaultShare, model.DefaultQuickCommand, model.DefaultUserPreference,
+		model.DefaultStorageConfig, model.DefaultStorageMetrics,
 	); err != nil {
 		logger.L().Fatal("Failed to init database", zap.Error(err))
 	}
@@ -40,20 +41,37 @@ func initDB() {
 	}
 
 	acl.MigrateNode()
-
 }
 
 func initServices() {
 	service.InitAuthorizationService()
-
 	fileservice.InitFileService()
+}
 
+func initStorage() error {
+	service.InitStorageService()
+
+	if service.DefaultStorageService == nil {
+		logger.L().Error("Storage service initialization failed")
+		return nil
+	}
+
+	logger.L().Info("Storage system initialization completed successfully")
+
+	// Initialize storage cleaner service
+	service.InitStorageCleanerService()
+
+	return nil
 }
 
 func RunApi() error {
 	initDB()
-
 	initServices()
+
+	// Initialize storage
+	if err := initStorage(); err != nil {
+		logger.L().Fatal("Failed to init storage", zap.Error(err))
+	}
 
 	r := gin.New()
 

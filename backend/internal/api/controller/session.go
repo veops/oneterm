@@ -1,15 +1,17 @@
 package controller
 
 import (
+	"fmt"
+	"io"
 	"net/http"
-	"path/filepath"
 
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 
 	"github.com/veops/oneterm/internal/model"
 	"github.com/veops/oneterm/internal/service"
-	"github.com/veops/oneterm/pkg/config"
 	"github.com/veops/oneterm/pkg/errors"
+	"github.com/veops/oneterm/pkg/logger"
 )
 
 var (
@@ -146,11 +148,22 @@ func (c *Controller) CreateSessionReplay(ctx *gin.Context) {
 func (c *Controller) GetSessionReplay(ctx *gin.Context) {
 	sessionId := ctx.Param("session_id")
 
-	filename, err := sessionService.GetSessionReplayFilename(ctx, sessionId)
+	// Try to get replay from storage service or local file system
+	replayReader, err := sessionService.GetSessionReplay(ctx, sessionId)
 	if err != nil {
-		ctx.AbortWithError(http.StatusInternalServerError, &errors.ApiError{Code: errors.ErrInternal, Data: map[string]any{"err": err}})
+		ctx.AbortWithError(http.StatusNotFound, &errors.ApiError{Code: errors.ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
+	defer replayReader.Close()
 
-	ctx.FileAttachment(filepath.Join(config.Cfg.Session.ReplayDir, filename), filename)
+	// Stream the file content
+	filename := fmt.Sprintf("%s.cast", sessionId)
+	ctx.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
+	ctx.Header("Content-Type", "application/octet-stream")
+
+	_, err = io.Copy(ctx.Writer, replayReader)
+	if err != nil {
+		logger.L().Error("Failed to stream replay file", zap.String("session_id", sessionId), zap.Error(err))
+		return
+	}
 }

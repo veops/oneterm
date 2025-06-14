@@ -20,6 +20,7 @@ import (
 
 	"github.com/veops/oneterm/internal/acl"
 	"github.com/veops/oneterm/internal/model"
+	"github.com/veops/oneterm/internal/repository"
 	gsession "github.com/veops/oneterm/internal/session"
 	dbpkg "github.com/veops/oneterm/pkg/db"
 	"github.com/veops/oneterm/pkg/logger"
@@ -30,9 +31,8 @@ var DefaultFileService IFileService
 
 // InitFileService initializes the global file service
 func InitFileService() {
-	DefaultFileService = NewFileService(&FileRepository{
-		db: dbpkg.DB,
-	})
+	repo := repository.NewFileRepository(dbpkg.DB)
+	DefaultFileService = NewFileService(repo)
 }
 
 func init() {
@@ -68,7 +68,7 @@ func init() {
 }
 
 // NewFileService creates a new file service instance
-func NewFileService(repo IFileRepository) IFileService {
+func NewFileService(repo repository.IFileRepository) IFileService {
 	return &FileService{
 		repo: repo,
 	}
@@ -650,17 +650,4 @@ func (s *FileService) GetRDPDrivePath(assetId int) (string, error) {
 	}
 
 	return fullDrivePath, nil
-}
-
-// Simple FileRepository implementation
-type FileRepository struct {
-	db *gorm.DB
-}
-
-func (r *FileRepository) AddFileHistory(ctx context.Context, history *model.FileHistory) error {
-	return r.db.Create(history).Error
-}
-
-func (r *FileRepository) BuildFileHistoryQuery(ctx *gin.Context) *gorm.DB {
-	return r.db.Model(&model.FileHistory{})
 }

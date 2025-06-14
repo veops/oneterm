@@ -16,4 +16,6 @@ var (
 	DefaultShare          = &Share{}
 	DefaultQuickCommand   = &QuickCommand{}
 	DefaultUserPreference = &UserPreference{}
+	DefaultStorageConfig  = &StorageConfig{}
+	DefaultStorageMetrics = &StorageMetrics{}
 )

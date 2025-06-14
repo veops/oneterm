@@ -173,5 +173,19 @@ func SetupRouter(r *gin.Engine) {
 			rdpGroup.GET("/sessions/:session_id/files/download", c.RDPFileDownload)
 			rdpGroup.POST("/sessions/:session_id/files/mkdir", c.RDPFileMkdir)
 		}
+
+		// Storage management routes
+		storage := v1.Group("/storage")
+		{
+			storage.GET("/configs", c.ListStorageConfigs)
+			storage.GET("/configs/:id", c.GetStorageConfig)
+			storage.POST("/configs", c.CreateStorageConfig)
+			storage.PUT("/configs/:id", c.UpdateStorageConfig)
+			storage.DELETE("/configs/:id", c.DeleteStorageConfig)
+			storage.POST("/test-connection", c.TestStorageConnection)
+			storage.GET("/health", c.GetStorageHealth)
+			storage.PUT("/configs/:id/set-primary", c.SetPrimaryStorage)
+			storage.PUT("/configs/:id/toggle", c.ToggleStorageProvider)
+		}
 	}
 }

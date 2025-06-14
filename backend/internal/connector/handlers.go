@@ -303,6 +303,13 @@ func HandleTerm(sess *gsession.Session, ctx *gin.Context) (err error) {
 			sess.ClearSSHClient()
 		}
 
+		// Close SSH recorder to save recording file
+		if sess.SshRecoder != nil {
+			if closeErr := sess.SshRecoder.Close(); closeErr != nil {
+				logger.L().Error("Failed to close SSH recorder", zap.String("sessionId", sess.SessionId), zap.Error(closeErr))
+			}
+		}
+
 		sess.SshParser.Close(sess.Prompt)
 		sess.Status = model.SESSIONSTATUS_OFFLINE
 		sess.ClosedAt = lo.ToPtr(time.Now())

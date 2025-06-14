@@ -861,14 +861,14 @@ func (c *Controller) RDPFileDownload(ctx *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param session_id path string true "Session ID"
-// @Param request body fileservice.RDPMkdirRequest true "Directory creation request"
+// @Param path query string true "Directory path"
 // @Success 200 {object} HttpResponse
 // @Router /rdp/sessions/{session_id}/files/mkdir [post]
 func (c *Controller) RDPFileMkdir(ctx *gin.Context) {
 	sessionId := ctx.Param("session_id")
 
-	var req fileservice.RDPMkdirRequest
-	if err := ctx.ShouldBindJSON(&req); err != nil {
+	path := ctx.Query("path")
+	if path == "" {
 		ctx.JSON(http.StatusBadRequest, HttpResponse{
 			Code:    http.StatusBadRequest,
 			Message: "Invalid request parameters",
@@ -902,7 +902,7 @@ func (c *Controller) RDPFileMkdir(ctx *gin.Context) {
 	}
 
 	// Send mkdir request through Guacamole protocol
-	err := fileservice.CreateRDPDirectory(tunnel, req.Path)
+	err := fileservice.CreateRDPDirectory(tunnel, path)
 	if err != nil {
 		logger.L().Error("Failed to create directory in RDP session", zap.Error(err))
 		ctx.JSON(http.StatusInternalServerError, HttpResponse{
@@ -913,7 +913,7 @@ func (c *Controller) RDPFileMkdir(ctx *gin.Context) {
 	}
 
 	// Record file operation history using session-based method
-	if err := fileservice.DefaultFileService.RecordFileHistoryBySession(ctx, sessionId, "mkdir", req.Path); err != nil {
+	if err := fileservice.DefaultFileService.RecordFileHistoryBySession(ctx, sessionId, "mkdir", path); err != nil {
 		logger.L().Error("Failed to record file history", zap.Error(err))
 	}
 
@@ -922,7 +922,7 @@ func (c *Controller) RDPFileMkdir(ctx *gin.Context) {
 		Message: "ok",
 		Data: gin.H{
 			"message": "Directory created successfully",
-			"path":    req.Path,
+			"path":    path,
 		},
 	})
 }

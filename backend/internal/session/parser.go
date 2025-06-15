@@ -84,48 +84,28 @@ func (p *Parser) AddInput(bs []byte) (cmd string, forbidden bool) {
 		p.lastRes = ""
 	}
 
-	// Track command input, directly use curCmd field
-	if len(bs) > 0 {
-		if bytes.Equal(bs, []byte("\r")) {
-			// Command ends, keep curCmd unchanged
-		} else if len(bs) == 1 && (bs[0] == '\b' || bs[0] == 127) { // Backspace key
-			if len(p.curCmd) > 0 {
-				p.curCmd = p.curCmd[:len(p.curCmd)-1]
-			}
-		} else {
-			// Check if all characters are printable and record input
-			input := string(bs)
-			allPrintable := true
-			for _, ch := range input {
-				if ch < 32 || ch > 126 {
-					allPrintable = false
-					break
-				}
-			}
-			if allPrintable {
-				p.curCmd += input
-			}
-		}
-	}
-
 	p.Input = append(p.Input, bs...)
 	if !bytes.HasSuffix(p.Input, []byte("\r")) {
 		return
 	}
 
 	p.isPrompt = true
-	// Save current command
-	currentCmd := strings.TrimSpace(p.curCmd)
+
+	// Extract command from output
+	currentOutput := p.getOutputLocked()
+	cmdFromOutput := strings.TrimPrefix(currentOutput, p.prompt)
+	cmdFromOutput = strings.TrimSpace(cmdFromOutput)
+
 	// Reset command buffer
 	p.curCmd = ""
 	p.resetLocked()
 
 	filter := ""
-	if filter, forbidden = p.IsForbidden(currentCmd); forbidden {
+	if filter, forbidden = p.IsForbidden(cmdFromOutput); forbidden {
 		cmd = filter
 		return
 	}
-	p.lastCmd = currentCmd
+	p.lastCmd = cmdFromOutput
 	return
 }
 
@@ -235,7 +215,15 @@ func (p *Parser) GetOutput() string {
 }
 
 func (p *Parser) getOutputLocked() string {
-	p.OutputStream.Feed(p.Output)
+	var cleanOutput []byte
+
+	if !strings.HasPrefix(p.Protocol, "ssh") {
+		cleanOutput = p.removeAutoCompletionFromRawOutput(p.Output)
+	} else {
+		cleanOutput = p.Output
+	}
+
+	p.OutputStream.Feed(cleanOutput)
 
 	res := p.OutputStream.Listener.Display()
 	res = lo.DropRightWhile(res, func(item string) bool { return item == "" })
@@ -264,6 +252,69 @@ func (p *Parser) getOutputLocked() string {
 	}
 	p.curRes = res[ln-1]
 	return p.curRes
+}
+
+// removeAutoCompletionFromRawOutput removes auto-completion hints from raw output
+// Performance optimized: early return if no markers found, minimal allocations
+func (p *Parser) removeAutoCompletionFromRawOutput(rawOutput []byte) []byte {
+	// Quick check: if no ANSI escape sequences, return immediately
+	if !bytes.Contains(rawOutput, []byte("\x1b[")) {
+		return rawOutput
+	}
+
+	// Auto-completion ANSI color markers (most common first for performance)
+	autoCompletionMarkers := [][]byte{
+		[]byte("\x1b[0;90;49m"), // Dark gray background (Redis common)
+		[]byte("\x1b[90m"),      // Dark gray text
+		[]byte("\x1b[2m"),       // Dim text
+		[]byte("\x1b[37m"),      // Light gray
+	}
+
+	result := rawOutput
+
+	// Process all auto-completion markers until none found
+	for {
+		found := false
+		for _, marker := range autoCompletionMarkers {
+			if idx := bytes.Index(result, marker); idx != -1 {
+				found = true
+
+				// Find end marker after the auto-completion start
+				remaining := result[idx:]
+				endMarkers := [][]byte{
+					[]byte("\x1b[0m"), // Standard reset
+					[]byte("\x1b[m"),  // Simplified reset
+					[]byte("\r"),      // Carriage return
+					[]byte("\n"),      // Line feed
+				}
+
+				endIdx := len(remaining) // Default to end
+				for _, endMarker := range endMarkers {
+					if pos := bytes.Index(remaining, endMarker); pos != -1 {
+						endIdx = pos + len(endMarker)
+						break
+					}
+				}
+
+				// Build cleaned output: keep content before marker + content after end marker
+				newResult := make([]byte, 0, len(result))
+				newResult = append(newResult, result[:idx]...)
+
+				if idx+endIdx < len(result) {
+					newResult = append(newResult, result[idx+endIdx:]...)
+				}
+
+				result = newResult
+				break // Restart search as indices changed
+			}
+		}
+
+		if !found {
+			break // No more markers found
+		}
+	}
+
+	return result
 }
 
 func (p *Parser) State(b []byte) bool {

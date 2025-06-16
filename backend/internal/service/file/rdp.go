@@ -2,7 +2,6 @@ package file
 
 import (
 	"archive/zip"
-	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -12,8 +11,11 @@ import (
 	"strings"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/veops/oneterm/internal/guacd"
 	gsession "github.com/veops/oneterm/internal/session"
+	"github.com/veops/oneterm/pkg/logger"
 )
 
 // RDP file operation functions
@@ -211,25 +213,31 @@ func DownloadRDPMultiple(tunnel *guacd.Tunnel, dir string, filenames []string) (
 
 // CreateRDPZip creates a ZIP archive of multiple RDP files
 func CreateRDPZip(tunnel *guacd.Tunnel, dir string, filenames []string) (io.ReadCloser, string, int64, error) {
-	var buf bytes.Buffer
-	zipWriter := zip.NewWriter(&buf)
-
-	for _, filename := range filenames {
-		fullPath := filepath.Join(dir, filename)
-		err := AddToRDPZip(tunnel, zipWriter, fullPath, filename)
-		if err != nil {
-			zipWriter.Close()
-			return nil, "", 0, fmt.Errorf("failed to add %s to zip: %w", filename, err)
-		}
-	}
-
-	if err := zipWriter.Close(); err != nil {
-		return nil, "", 0, fmt.Errorf("failed to close zip: %w", err)
-	}
-
 	downloadFilename := fmt.Sprintf("rdp_files_%s.zip", time.Now().Format("20060102_150405"))
-	reader := io.NopCloser(bytes.NewReader(buf.Bytes()))
-	return reader, downloadFilename, int64(buf.Len()), nil
+
+	// Use pipe for true streaming without memory buffering
+	pipeReader, pipeWriter := io.Pipe()
+
+	// Create ZIP in a separate goroutine
+	go func() {
+		defer pipeWriter.Close()
+
+		zipWriter := zip.NewWriter(pipeWriter)
+		defer zipWriter.Close()
+
+		for _, filename := range filenames {
+			fullPath := filepath.Join(dir, filename)
+			err := AddToRDPZip(tunnel, zipWriter, fullPath, filename)
+			if err != nil {
+				logger.L().Error("Failed to add file to RDP ZIP", zap.String("path", fullPath), zap.Error(err))
+				pipeWriter.CloseWithError(fmt.Errorf("failed to add %s to zip: %w", filename, err))
+				return
+			}
+		}
+	}()
+
+	// Return pipe reader for streaming, size unknown (-1)
+	return pipeReader, downloadFilename, -1, nil
 }
 
 // AddToRDPZip adds a file or directory to the ZIP archive
@@ -301,8 +309,9 @@ func AddToRDPZip(tunnel *guacd.Tunnel, zipWriter *zip.Writer, fullPath, zipPath 
 			return fmt.Errorf("failed to create zip entry: %w", err)
 		}
 
-		// Stream file content to zip (memory-efficient)
-		if _, err := io.Copy(writer, file); err != nil {
+		// Stream file content to zip with small buffer to reduce memory usage
+		buffer := make([]byte, 64*1024) // 64KB buffer for low memory usage
+		if _, err := io.CopyBuffer(writer, file, buffer); err != nil {
 			return fmt.Errorf("failed to write file to zip: %w", err)
 		}
 	}

@@ -28,7 +28,7 @@ import (
 )
 
 const (
-	MaxMemoryForParsing              = 32 << 20    // 32MB for multipart parsing
+	MaxMemoryForParsing              = 1 << 20     // 1MB for multipart parsing
 	MaxFileSize                      = 10240 << 20 // 10GB max file size
 	MaxFileSizeForInMemoryProcessing = 64 << 20    // 64MB for in-memory processing
 )
@@ -1197,8 +1197,6 @@ func (c *Controller) RDPFileTransferPrepare(ctx *gin.Context) {
 // SftpFileUpload godoc
 //
 //	@Tags		file
-//	@Summary	High-performance file upload using optimized SFTP
-//	@Description Uploads file via server temp storage then transfers to target using optimized SFTP with performance enhancements. HTTP response only after file reaches target machine.
 //	@Param		session_id		path		string	true	"session_id"
 //	@Param		dir				query		string	false	"target directory path (default: /tmp)"
 //	@Param		transfer_id		query		string	false	"Custom transfer ID for progress tracking (frontend generated)"
@@ -1249,29 +1247,116 @@ func (c *Controller) SftpFileUpload(ctx *gin.Context) {
 		return
 	}
 
-	// Parse multipart form with memory limit, have many time for big file
-	if err := ctx.Request.ParseMultipartForm(MaxMemoryForParsing); err != nil {
+	// Use streaming multipart parsing like RDP to minimize memory usage
+	contentType := ctx.GetHeader("Content-Type")
+	if !strings.HasPrefix(contentType, "multipart/form-data") {
 		ctx.JSON(http.StatusBadRequest, HttpResponse{
 			Code:    http.StatusBadRequest,
-			Message: fmt.Sprintf("Failed to parse multipart form: %v", err),
+			Message: "Invalid content type, expected multipart/form-data",
 		})
 		return
 	}
 
-	file, fileHeader, err := ctx.Request.FormFile("file")
+	// Get boundary from content type
+	_, params, err := mime.ParseMediaType(contentType)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, HttpResponse{
 			Code:    http.StatusBadRequest,
-			Message: fmt.Sprintf("Failed to get uploaded file: %v", err),
+			Message: fmt.Sprintf("Invalid content type: %v", err),
 		})
 		return
 	}
-	defer file.Close()
+	boundary := params["boundary"]
+	if boundary == "" {
+		ctx.JSON(http.StatusBadRequest, HttpResponse{
+			Code:    http.StatusBadRequest,
+			Message: "Missing boundary in content type",
+		})
+		return
+	}
 
-	filename := fileHeader.Filename
-	fileSize := fileHeader.Size
+	// Create multipart reader for streaming (memory-efficient like RDP)
+	reader := multipart.NewReader(ctx.Request.Body, boundary)
+
+	var filename string
+	var fileSize int64
+
+	// Find the file part and save to temporary file (avoid memory overhead)
+	var tempFilePath string
+	for {
+		part, err := reader.NextPart()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, HttpResponse{
+				Code:    http.StatusBadRequest,
+				Message: fmt.Sprintf("Error reading multipart: %v", err),
+			})
+			return
+		}
+
+		formName := part.FormName()
+		if formName == "file" {
+			filename = part.FileName()
+			if filename == "" {
+				part.Close()
+				continue
+			}
+
+			// Create temporary file to store upload data (streaming, no memory overhead)
+			tempDir := filepath.Join(os.TempDir(), "oneterm-uploads", sessionId)
+			if err := os.MkdirAll(tempDir, 0755); err != nil {
+				part.Close()
+				ctx.JSON(http.StatusInternalServerError, HttpResponse{
+					Code:    http.StatusInternalServerError,
+					Message: fmt.Sprintf("Failed to create temp directory: %v", err),
+				})
+				return
+			}
+
+			tempFile, err := os.CreateTemp(tempDir, fmt.Sprintf("sftp_upload_%s_*", sessionId))
+			if err != nil {
+				part.Close()
+				ctx.JSON(http.StatusInternalServerError, HttpResponse{
+					Code:    http.StatusInternalServerError,
+					Message: fmt.Sprintf("Failed to create temp file: %v", err),
+				})
+				return
+			}
+			tempFilePath = tempFile.Name()
+
+			// Stream file data directly to temp file (memory-efficient)
+			written, err := io.Copy(tempFile, part)
+			tempFile.Close()
+			part.Close()
+
+			if err != nil {
+				os.Remove(tempFilePath)
+				ctx.JSON(http.StatusInternalServerError, HttpResponse{
+					Code:    http.StatusInternalServerError,
+					Message: fmt.Sprintf("Failed to save file data: %v", err),
+				})
+				return
+			}
+
+			fileSize = written
+			break // Found and saved the file
+		} else {
+			part.Close()
+		}
+	}
+
+	if filename == "" || tempFilePath == "" {
+		ctx.JSON(http.StatusBadRequest, HttpResponse{
+			Code:    http.StatusBadRequest,
+			Message: "No file found in upload",
+		})
+		return
+	}
 
 	if fileSize > MaxFileSize {
+		os.Remove(tempFilePath)
 		ctx.JSON(http.StatusBadRequest, HttpResponse{
 			Code:    http.StatusBadRequest,
 			Message: fmt.Sprintf("File size %d bytes exceeds limit of %d bytes", fileSize, MaxFileSize),
@@ -1281,48 +1366,6 @@ func (c *Controller) SftpFileUpload(ctx *gin.Context) {
 
 	// Update transfer progress with file size now that we have it
 	fileservice.UpdateTransferProgress(transferId, fileSize, 0, "")
-
-	// Phase 1: Save file to server temp directory
-	tempDir := filepath.Join(os.TempDir(), "oneterm-uploads", sessionId)
-	if err := os.MkdirAll(tempDir, 0755); err != nil {
-		ctx.JSON(http.StatusInternalServerError, HttpResponse{
-			Code:    http.StatusInternalServerError,
-			Message: fmt.Sprintf("Failed to create temp directory: %v", err),
-		})
-		return
-	}
-
-	tempFilePath := filepath.Join(tempDir, filename)
-	tempFile, err := os.Create(tempFilePath)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, HttpResponse{
-			Code:    http.StatusInternalServerError,
-			Message: fmt.Sprintf("Failed to create temp file: %v", err),
-		})
-		return
-	}
-
-	// Copy uploaded file to temp location
-	written, err := io.Copy(tempFile, file)
-	tempFile.Close()
-
-	if err != nil {
-		os.Remove(tempFilePath)
-		ctx.JSON(http.StatusInternalServerError, HttpResponse{
-			Code:    http.StatusInternalServerError,
-			Message: fmt.Sprintf("Failed to save file: %v", err),
-		})
-		return
-	}
-
-	if written != fileSize {
-		os.Remove(tempFilePath)
-		ctx.JSON(http.StatusBadRequest, HttpResponse{
-			Code:    http.StatusBadRequest,
-			Message: fmt.Sprintf("File size mismatch: expected %d, got %d", fileSize, written),
-		})
-		return
-	}
 
 	targetPath := filepath.Join(targetDir, filename)
 

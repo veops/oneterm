@@ -1,14 +1,11 @@
 package file
 
 import (
-	"archive/zip"
-	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/pkg/sftp"
@@ -318,112 +315,9 @@ func SftpDownloadMultiple(ctx context.Context, assetId, accountId int, dir strin
 		return file, filenames[0], info.Size(), nil
 	}
 
-	// Multiple files - create ZIP
-	return createSftpZipArchive(cli, dir, filenames)
-}
-
-// createSftpZipArchive creates a ZIP archive of multiple SFTP files
-func createSftpZipArchive(cli *sftp.Client, baseDir string, filenames []string) (io.ReadCloser, string, int64, error) {
-	// Create a buffer to write the ZIP archive
-	var buffer bytes.Buffer
-	zipWriter := zip.NewWriter(&buffer)
-
-	for _, filename := range filenames {
-		fullPath := filepath.Join(baseDir, filename)
-		if err := addSftpFileToZip(cli, zipWriter, baseDir, filename, fullPath); err != nil {
-			zipWriter.Close()
-			return nil, "", 0, fmt.Errorf("failed to add %s to ZIP: %w", filename, err)
-		}
-	}
-
-	if err := zipWriter.Close(); err != nil {
-		return nil, "", 0, fmt.Errorf("failed to close ZIP writer: %w", err)
-	}
-
-	// Generate ZIP filename
-	var zipFilename string
-	if len(filenames) == 1 {
-		zipFilename = strings.TrimSuffix(filenames[0], filepath.Ext(filenames[0])) + ".zip"
-	} else {
-		zipFilename = fmt.Sprintf("sftp_files_%d_items.zip", len(filenames))
-	}
-
-	reader := bytes.NewReader(buffer.Bytes())
-	return io.NopCloser(reader), zipFilename, int64(buffer.Len()), nil
-}
-
-// addSftpFileToZip adds a file or directory to the ZIP archive
-func addSftpFileToZip(cli *sftp.Client, zipWriter *zip.Writer, baseDir, relativePath, fullPath string) error {
-	// Get file info
-	info, err := cli.Stat(fullPath)
-	if err != nil {
-		return fmt.Errorf("failed to stat %s: %w", fullPath, err)
-	}
-
-	if info.IsDir() {
-		// Handle directory
-		return addSftpDirToZip(cli, zipWriter, baseDir, relativePath, fullPath)
-	}
-
-	// Handle regular file
-	return addSftpRegularFileToZip(cli, zipWriter, fullPath, relativePath)
-}
-
-// addSftpRegularFileToZip adds a regular file to ZIP
-func addSftpRegularFileToZip(cli *sftp.Client, zipWriter *zip.Writer, fullPath, relativePath string) error {
-	// Open remote file
-	file, err := cli.Open(fullPath)
-	if err != nil {
-		return fmt.Errorf("failed to open file %s: %w", fullPath, err)
-	}
-	defer file.Close()
-
-	// Create ZIP entry
-	header := &zip.FileHeader{
-		Name:   relativePath,
-		Method: zip.Deflate,
-	}
-
-	writer, err := zipWriter.CreateHeader(header)
-	if err != nil {
-		return fmt.Errorf("failed to create ZIP entry: %w", err)
-	}
-
-	// Copy file content to ZIP
-	_, err = io.Copy(writer, file)
-	return err
-}
-
-// addSftpDirToZip adds a directory to ZIP recursively
-func addSftpDirToZip(cli *sftp.Client, zipWriter *zip.Writer, baseDir, relativePath, fullPath string) error {
-	// Read directory contents
-	entries, err := cli.ReadDir(fullPath)
-	if err != nil {
-		return fmt.Errorf("failed to read directory %s: %w", fullPath, err)
-	}
-
-	// Add directory entry to ZIP
-	if relativePath != "" && relativePath != "." {
-		header := &zip.FileHeader{
-			Name: relativePath + "/",
-		}
-		_, err = zipWriter.CreateHeader(header)
-		if err != nil {
-			return fmt.Errorf("failed to create directory entry: %w", err)
-		}
-	}
-
-	// Add directory contents recursively
-	for _, entry := range entries {
-		entryRelPath := filepath.Join(relativePath, entry.Name())
-		entryFullPath := filepath.Join(fullPath, entry.Name())
-
-		if err := addSftpFileToZip(cli, zipWriter, baseDir, entryRelPath, entryFullPath); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	// Multiple files - use the common ZIP creation logic from FileService
+	fileService := &FileService{}
+	return fileService.createZipArchive(cli, dir, filenames)
 }
 
 // =============================================================================

@@ -540,8 +540,9 @@ func (pw *FileProgressWriter) Write(p []byte) (int, error) {
 		pw.updateBytes += int64(n)
 		pw.updateTicker++
 
-		// Update progress every 64KB or every 100 writes to reduce overhead
-		if pw.updateBytes >= 65536 || pw.updateTicker%100 == 0 {
+		// Update progress every 256KB or every 500 writes to reduce memory overhead
+		// Larger intervals reduce GC pressure and memory fragmentation
+		if pw.updateBytes >= 262144 || pw.updateTicker%500 == 0 {
 			UpdateTransferProgress(pw.transferId, 0, pw.written, "transferring")
 			pw.updateBytes = 0
 			pw.lastUpdate = time.Now()

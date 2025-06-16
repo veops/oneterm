@@ -249,8 +249,9 @@ func (s *FileService) addFileToZip(cli *sftp.Client, zipWriter *zip.Writer, full
 		return err
 	}
 
-	// Copy file content
-	_, err = io.Copy(zipFile, file)
+	// Copy file content with small buffer to reduce memory usage
+	buffer := make([]byte, 64*1024) // 64KB buffer for low memory usage
+	_, err = io.CopyBuffer(zipFile, file, buffer)
 	return err
 }
 

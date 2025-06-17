@@ -3,6 +3,7 @@
     width="700px"
     :visible="visible"
     :zIndex="1003"
+    :maskClosable="false"
     @close="handleClose"
   >
     <div

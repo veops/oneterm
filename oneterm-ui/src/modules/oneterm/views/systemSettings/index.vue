@@ -24,25 +24,24 @@
 </template>
 
 <script>
-import { mixinPermissions } from '@/utils/mixin'
-
 import CommandIntercept from './commandIntercept/index.vue'
 import TerminalControl from './terminalControl/index.vue'
 import PublicKey from './publicKey/index.vue'
 import QuickCommand from './quickCommand/index.vue'
 import TerminalDisplay from './terminalDisplay/index.vue'
+import StorageConfig from './storageConfig/index.vue'
 
 const systemSettingTabStorageKey = 'ops_oneterm_system_setting_tab_key'
 
 export default {
   name: 'SystemSettings',
-  mixins: [mixinPermissions],
   components: {
     CommandIntercept,
     TerminalControl,
     PublicKey,
     QuickCommand,
-    TerminalDisplay
+    TerminalDisplay,
+    StorageConfig
   },
   data() {
     return {
@@ -81,6 +80,12 @@ export default {
           icon: 'a-command_interception1',
           key: 'commandIntercept',
           component: 'CommandIntercept',
+        },
+        {
+          label: 'oneterm.systemSettings.storageConfig',
+          icon: 'itsm-default_line',
+          key: 'storageConfig',
+          component: 'StorageConfig'
         }
       ]
 

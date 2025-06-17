@@ -167,7 +167,7 @@ export default {
 
       const form = {}
       Object.keys(this.form).map((key) => {
-        form[key] = data?.[key] ?? this.form[key]
+        form[key] = data?.[key] || this.form[key]
       })
       this.form = form
     },

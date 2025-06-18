@@ -177,6 +177,10 @@ const oneterm_zh = {
   },
   guacamole: {
     play: '点击播放',
+    speed1: '1倍速',
+    speed2: '1.25倍速',
+    speed3: '1.5倍速',
+    speed4: '2倍速',
     idle: '正在初始化中...',
     connecting: '正在努力连接中...',
     waiting: '正在等待服务器响应...',

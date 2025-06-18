@@ -177,6 +177,10 @@ const oneterm_en = {
   },
   guacamole: {
     play: 'click to play',
+    speed1: '1x speed',
+    speed2: '1.25x speed',
+    speed3: '1.5x speed',
+    speed4: '2x speed',
     idle: 'Initializing...',
     connecting: 'Connecting...',
     waiting: 'Waiting...',

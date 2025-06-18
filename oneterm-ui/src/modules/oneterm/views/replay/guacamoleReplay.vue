@@ -30,7 +30,7 @@
       <a-col>
         <a-select
           size="small"
-          :style="{ width: '90px' }"
+          :style="{ width: '110px' }"
           :value="speed"
           @change="
             (value) => {
@@ -44,16 +44,16 @@
           "
         >
           <a-select-option :value="1">
-            1倍速
+            {{ $t('oneterm.guacamole.speed1') }}
           </a-select-option>
           <a-select-option :value="1.25">
-            1.25倍速
+            {{ $t('oneterm.guacamole.speed2') }}
           </a-select-option>
           <a-select-option :value="1.5">
-            1.5倍速
+            {{ $t('oneterm.guacamole.speed3') }}
           </a-select-option>
           <a-select-option :value="2">
-            2倍速
+            {{ $t('oneterm.guacamole.speed4') }}
           </a-select-option>
         </a-select>
       </a-col>

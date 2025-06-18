@@ -1,6 +1,6 @@
 services:
   oneterm-api:
-    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-api:v25.6.1
+    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-api:v25.6.2
     container_name: oneterm-api
     environment:
       ONETERM_RDP_DRIVE_PATH: /rdp
@@ -95,7 +95,7 @@ services:
           - redis
 
   oneterm-ui:
-    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-ui:v25.6.1
+    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-ui:v25.6.2
     container_name: oneterm-ui
     depends_on:
       oneterm-api:
@@ -121,7 +121,7 @@ services:
       - "8666:80"
 
   acl-api:
-    image: registry.cn-hangzhou.aliyuncs.com/veops/acl-api:2.0
+    image: registry.cn-hangzhou.aliyuncs.com/veops/acl-api:2.1
     container_name: oneterm-acl-api
     depends_on:
       mysql:
@@ -131,6 +131,7 @@ services:
     environment:
       TZ: Asia/Shanghai
       WAIT_HOSTS: mysql:3306, redis:6379
+      SYSTEM_DEFAULT_LANGUAGE: en-US  # en-US, zh-CN
     volumes:
       - ./.env:/data/apps/acl/.env
     restart: always

@@ -14,6 +14,7 @@ import (
 	"github.com/veops/oneterm/internal/model"
 	"github.com/veops/oneterm/internal/repository"
 	"github.com/veops/oneterm/pkg/config"
+	dbpkg "github.com/veops/oneterm/pkg/db"
 	"github.com/veops/oneterm/pkg/logger"
 	"github.com/veops/oneterm/pkg/storage"
 	"github.com/veops/oneterm/pkg/storage/providers"
@@ -32,6 +33,9 @@ type StorageService interface {
 	UpdateStorageConfig(ctx context.Context, config *model.StorageConfig) error
 	DeleteStorageConfig(ctx context.Context, name string) error
 
+	// Clear all primary flags for ensuring single primary constraint
+	ClearAllPrimaryFlags(ctx context.Context) error
+
 	// File Operations combining storage backend and database metadata
 	UploadFile(ctx context.Context, key string, reader io.Reader, size int64, metadata *model.FileMetadata) error
 	DownloadFile(ctx context.Context, key string) (io.ReadCloser, *model.FileMetadata, error)
@@ -47,11 +51,13 @@ type StorageService interface {
 	SaveRDPFile(ctx context.Context, assetId int, remotePath string, reader io.Reader, size int64) error
 	GetRDPFile(ctx context.Context, assetId int, remotePath string) (io.ReadCloser, error)
 	DeleteRDPFile(ctx context.Context, assetId int, remotePath string) error
+	ListRDPFiles(ctx context.Context, assetId int, directory string, limit, offset int) ([]*model.FileMetadata, int64, error)
 
 	// Provider management
 	GetPrimaryProvider() (storage.Provider, error)
 	HealthCheck(ctx context.Context) map[string]error
 	CreateProvider(config *model.StorageConfig) (storage.Provider, error)
+	RefreshProviders(ctx context.Context) error
 
 	// New method for building queries
 	BuildQuery(ctx *gin.Context) *gorm.DB
@@ -59,6 +65,11 @@ type StorageService interface {
 	// GetAvailableProvider returns an available storage provider with fallback logic
 	// Priority: Primary storage first, then by priority (lower number = higher priority)
 	GetAvailableProvider(ctx context.Context) (storage.Provider, error)
+
+	// Storage Metrics Operations
+	GetStorageMetrics(ctx context.Context) (map[string]*model.StorageMetrics, error)
+	RefreshStorageMetrics(ctx context.Context) error
+	CalculateStorageMetrics(ctx context.Context, storageName string) (*model.StorageMetrics, error)
 }
 
 // storageService implements StorageService
@@ -103,17 +114,42 @@ func (s *storageService) CreateStorageConfig(ctx context.Context, config *model.
 		return fmt.Errorf("failed to create storage config: %w", err)
 	}
 
-	// Initialize storage provider
-	provider, err := s.CreateProvider(config)
-	if err != nil {
-		logger.L().Warn("Failed to initialize storage provider",
-			zap.String("name", config.Name),
-			zap.Error(err))
-	} else {
+	// Only initialize storage provider if it's enabled
+	if config.Enabled {
+		provider, err := s.CreateProvider(config)
+		if err != nil {
+			logger.L().Warn("Failed to initialize storage provider",
+				zap.String("name", config.Name),
+				zap.Error(err))
+			return nil // Don't fail the creation, just warn
+		}
+
+		// Perform health check before adding to providers map
+		if err := provider.HealthCheck(ctx); err != nil {
+			logger.L().Warn("Storage provider failed health check",
+				zap.String("name", config.Name),
+				zap.String("type", string(config.Type)),
+				zap.Error(err))
+			// Still add to providers map even if health check fails,
+			// so it appears in health status for monitoring
+		}
+
 		s.providers[config.Name] = provider
 		if config.IsPrimary {
 			s.primary = config.Name
+			logger.L().Info("Set new storage as primary provider",
+				zap.String("name", config.Name),
+				zap.String("type", string(config.Type)))
 		}
+
+		logger.L().Info("Storage provider initialized successfully",
+			zap.String("name", config.Name),
+			zap.String("type", string(config.Type)),
+			zap.Bool("is_primary", config.IsPrimary))
+	} else {
+		logger.L().Info("Storage configuration created but not initialized (disabled)",
+			zap.String("name", config.Name),
+			zap.String("type", string(config.Type)))
 	}
 
 	return nil
@@ -124,7 +160,15 @@ func (s *storageService) UpdateStorageConfig(ctx context.Context, config *model.
 		return err
 	}
 
-	return s.storageRepo.UpdateStorageConfig(ctx, config)
+	if err := s.storageRepo.UpdateStorageConfig(ctx, config); err != nil {
+		return err
+	}
+
+	if err := s.RefreshProviders(ctx); err != nil {
+		logger.L().Warn("Failed to refresh providers after config update", zap.Error(err))
+	}
+
+	return nil
 }
 
 func (s *storageService) DeleteStorageConfig(ctx context.Context, name string) error {
@@ -296,9 +340,42 @@ func (s *storageService) GetPrimaryProvider() (storage.Provider, error) {
 func (s *storageService) HealthCheck(ctx context.Context) map[string]error {
 	results := make(map[string]error)
 
-	for name, provider := range s.providers {
-		err := provider.HealthCheck(ctx)
-		results[name] = err
+	// Get all storage configurations from database
+	configs, err := s.GetStorageConfigs(ctx)
+	if err != nil {
+		logger.L().Error("Failed to get storage configs for health check", zap.Error(err))
+		return results
+	}
+
+	// Check each configuration
+	for _, config := range configs {
+		if !config.Enabled {
+			// For disabled configs, add a special error indicating they are disabled
+			results[config.Name] = fmt.Errorf("storage provider is disabled")
+			continue
+		}
+
+		// For enabled configs, check if provider exists and perform health check
+		if provider, exists := s.providers[config.Name]; exists {
+			err := provider.HealthCheck(ctx)
+			if err != nil {
+				// Add more context to the error message
+				logger.L().Warn("Storage provider health check failed",
+					zap.String("name", config.Name),
+					zap.String("type", string(config.Type)),
+					zap.Error(err))
+				results[config.Name] = fmt.Errorf("health check failed: %v", err)
+			} else {
+				results[config.Name] = nil
+			}
+		} else {
+			// Provider should exist but doesn't - this indicates an initialization problem
+			logger.L().Warn("Storage provider not found in memory",
+				zap.String("name", config.Name),
+				zap.String("type", string(config.Type)),
+				zap.Bool("enabled", config.Enabled))
+			results[config.Name] = fmt.Errorf("storage provider not initialized, possible configuration error or initialization failure")
+		}
 	}
 
 	return results
@@ -353,15 +430,56 @@ func (s *storageService) CreateProvider(config *model.StorageConfig) (storage.Pr
 		localConfig.RetentionConfig = retentionConfig
 
 		return providers.NewLocal(localConfig)
+
 	case model.StorageTypeMinio:
 		minioConfig, err := providers.ParseMinioConfigFromMap(config.Config)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse Minio config: %w", err)
 		}
 		return providers.NewMinio(minioConfig)
+
 	case model.StorageTypeS3:
-		// TODO: implement S3 provider with path strategy support
-		return nil, fmt.Errorf("S3 provider not implemented yet")
+		s3Config, err := providers.ParseS3ConfigFromMap(config.Config)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse S3 config: %w", err)
+		}
+		return providers.NewS3(s3Config)
+
+	case model.StorageTypeAzure:
+		azureConfig, err := providers.ParseAzureConfigFromMap(config.Config)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse Azure config: %w", err)
+		}
+		return providers.NewAzure(azureConfig)
+
+	case model.StorageTypeCOS:
+		cosConfig, err := providers.ParseCOSConfigFromMap(config.Config)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse COS config: %w", err)
+		}
+		return providers.NewCOS(cosConfig)
+
+	case model.StorageTypeOSS:
+		ossConfig, err := providers.ParseOSSConfigFromMap(config.Config)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse OSS config: %w", err)
+		}
+		return providers.NewOSS(ossConfig)
+
+	case model.StorageTypeOBS:
+		obsConfig, err := providers.ParseOBSConfigFromMap(config.Config)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse OBS config: %w", err)
+		}
+		return providers.NewOBS(obsConfig)
+
+	case model.StorageTypeOOS:
+		oosConfig, err := providers.ParseOOSConfigFromMap(config.Config)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse OOS config: %w", err)
+		}
+		return providers.NewOOS(oosConfig)
+
 	default:
 		return nil, fmt.Errorf("unsupported storage type: %s", config.Type)
 	}
@@ -605,6 +723,26 @@ func init() {
 			}
 		}
 	}()
+
+	// Start background storage metrics calculation
+	// go func() {
+	// 	// Update storage metrics every 30 minutes to avoid high resource consumption
+	// 	ticker := time.NewTicker(30 * time.Minute)
+	// 	defer ticker.Stop()
+
+	// 	// Initial update after 5 minutes
+	// 	time.Sleep(5 * time.Minute)
+	// 	if DefaultStorageService != nil {
+	// 		performMetricsUpdate()
+	// 	}
+
+	// 	for {
+	// 		<-ticker.C
+	// 		if DefaultStorageService != nil {
+	// 			performMetricsUpdate()
+	// 		}
+	// 	}
+	// }()
 }
 
 // performHealthMonitoring performs periodic health checks on all storage providers
@@ -647,4 +785,205 @@ func performHealthMonitoring() {
 			zap.Int("healthy_providers", healthyCount),
 			zap.Int("total_providers", totalCount))
 	}
+}
+
+// performMetricsUpdate performs periodic storage metrics calculation
+func performMetricsUpdate() {
+	ctx := context.Background()
+	storageImpl, ok := DefaultStorageService.(*storageService)
+	if !ok {
+		return
+	}
+
+	// Refresh metrics for all storage configurations
+	if err := storageImpl.RefreshStorageMetrics(ctx); err != nil {
+		logger.L().Warn("Failed to refresh storage metrics during background update", zap.Error(err))
+		return
+	}
+
+	// Log completion
+	configs, err := storageImpl.GetStorageConfigs(ctx)
+	if err == nil && len(configs) > 0 {
+		enabledCount := 0
+		for _, config := range configs {
+			if config.Enabled {
+				enabledCount++
+			}
+		}
+		logger.L().Info("Storage metrics update completed",
+			zap.Int("enabled_storages", enabledCount),
+			zap.Int("total_storages", len(configs)))
+	}
+}
+
+func (s *storageService) RefreshProviders(ctx context.Context) error {
+	s.providers = make(map[string]storage.Provider)
+	s.primary = ""
+
+	configs, err := s.GetStorageConfigs(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to load storage configurations: %w", err)
+	}
+
+	successCount := initializeStorageProviders(ctx, s, configs)
+
+	if provider, err := s.GetPrimaryProvider(); err == nil {
+		storage.InitializeAdapter(provider)
+		logger.L().Info("Session replay adapter re-initialized with new primary provider",
+			zap.String("provider_type", provider.Type()))
+	} else {
+		logger.L().Warn("Failed to re-initialize session replay adapter", zap.Error(err))
+	}
+
+	logger.L().Info("Storage providers refreshed",
+		zap.Int("total_configs", len(configs)),
+		zap.Int("successful_providers", successCount))
+
+	return nil
+}
+
+func (s *storageService) ClearAllPrimaryFlags(ctx context.Context) error {
+	if err := s.storageRepo.ClearAllPrimaryFlags(ctx); err != nil {
+		return fmt.Errorf("failed to clear primary flags in database: %w", err)
+	}
+
+	s.primary = ""
+
+	if err := s.RefreshProviders(ctx); err != nil {
+		logger.L().Warn("Failed to refresh providers after clearing primary flags", zap.Error(err))
+		return err
+	}
+
+	return nil
+}
+
+func (s *storageService) ListRDPFiles(ctx context.Context, assetId int, directory string, limit, offset int) ([]*model.FileMetadata, int64, error) {
+	prefix := fmt.Sprintf("rdp_files/%d/%s", assetId, directory)
+	return s.storageRepo.ListFileMetadata(ctx, prefix, limit, offset)
+}
+
+func (s *storageService) GetStorageMetrics(ctx context.Context) (map[string]*model.StorageMetrics, error) {
+	metricsList, err := s.storageRepo.GetStorageMetrics(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get storage metrics: %w", err)
+	}
+
+	metricsMap := make(map[string]*model.StorageMetrics)
+	for _, metric := range metricsList {
+		metricsMap[metric.StorageName] = metric
+	}
+
+	return metricsMap, nil
+}
+
+func (s *storageService) RefreshStorageMetrics(ctx context.Context) error {
+	// Get all storage configurations
+	configs, err := s.GetStorageConfigs(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get storage configs: %w", err)
+	}
+
+	// Calculate metrics for each storage
+	for _, config := range configs {
+		if !config.Enabled {
+			continue
+		}
+
+		metric, err := s.CalculateStorageMetrics(ctx, config.Name)
+		if err != nil {
+			logger.L().Warn("Failed to calculate storage metrics",
+				zap.String("storage", config.Name),
+				zap.Error(err))
+			continue
+		}
+
+		// Upsert metrics
+		if err := s.storageRepo.UpsertStorageMetrics(ctx, metric); err != nil {
+			logger.L().Warn("Failed to save storage metrics",
+				zap.String("storage", config.Name),
+				zap.Error(err))
+		}
+	}
+
+	return nil
+}
+
+func (s *storageService) CalculateStorageMetrics(ctx context.Context, storageName string) (*model.StorageMetrics, error) {
+	metric := &model.StorageMetrics{
+		StorageName: storageName,
+		LastUpdated: time.Now(),
+		IsHealthy:   true,
+	}
+
+	// Check if provider exists and is healthy
+	if provider, exists := s.providers[storageName]; exists {
+		if err := provider.HealthCheck(ctx); err != nil {
+			metric.IsHealthy = false
+			metric.ErrorMessage = err.Error()
+		}
+	} else {
+		metric.IsHealthy = false
+		metric.ErrorMessage = "Provider not initialized"
+	}
+
+	// Calculate file counts and sizes efficiently using database aggregation
+	// Use storage_name field from file_metadata table
+	if err := s.calculateFileStats(ctx, storageName, metric); err != nil {
+		logger.L().Warn("Failed to calculate file stats",
+			zap.String("storage", storageName),
+			zap.Error(err))
+		// Don't fail completely, just log the warning
+	}
+
+	return metric, nil
+}
+
+// Helper method to calculate file statistics efficiently
+func (s *storageService) calculateFileStats(ctx context.Context, storageName string, metric *model.StorageMetrics) error {
+
+	// Calculate total file count and size
+	type Result struct {
+		Count int64 `json:"count"`
+		Size  int64 `json:"size"`
+	}
+
+	var totalResult Result
+	err := dbpkg.DB.Model(&model.FileMetadata{}).
+		Select("COUNT(*) as count, COALESCE(SUM(file_size), 0) as size").
+		Where("storage_name = ?", storageName).
+		Scan(&totalResult).Error
+	if err != nil {
+		return fmt.Errorf("failed to calculate total stats: %w", err)
+	}
+
+	metric.FileCount = totalResult.Count
+	metric.TotalSize = totalResult.Size
+
+	// Calculate replay-specific stats
+	var replayResult Result
+	err = dbpkg.DB.Model(&model.FileMetadata{}).
+		Select("COUNT(*) as count, COALESCE(SUM(file_size), 0) as size").
+		Where("storage_name = ? AND category = ?", storageName, "replay").
+		Scan(&replayResult).Error
+	if err != nil {
+		logger.L().Warn("Failed to calculate replay stats", zap.Error(err))
+	} else {
+		metric.ReplayCount = replayResult.Count
+		metric.ReplaySize = replayResult.Size
+	}
+
+	// Calculate RDP file stats
+	var rdpResult Result
+	err = dbpkg.DB.Model(&model.FileMetadata{}).
+		Select("COUNT(*) as count, COALESCE(SUM(file_size), 0) as size").
+		Where("storage_name = ? AND category = ?", storageName, "rdp_file").
+		Scan(&rdpResult).Error
+	if err != nil {
+		logger.L().Warn("Failed to calculate RDP file stats", zap.Error(err))
+	} else {
+		metric.RdpFileCount = rdpResult.Count
+		metric.RdpFileSize = rdpResult.Size
+	}
+
+	return nil
 }

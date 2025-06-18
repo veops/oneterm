@@ -2,6 +2,7 @@ package controller
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -135,6 +136,14 @@ func (c *Controller) UpdateStorageConfig(ctx *gin.Context) {
 			}
 		}
 	})
+
+	// Always refresh providers after update to handle name changes
+	if !ctx.IsAborted() {
+		if err := storageService.RefreshProviders(ctx); err != nil {
+			ctx.AbortWithError(http.StatusInternalServerError, &myErrors.ApiError{Code: myErrors.ErrInternal, Data: map[string]any{"err": err}})
+			return
+		}
+	}
 }
 
 // DeleteStorageConfig godoc
@@ -177,8 +186,19 @@ func (c *Controller) TestStorageConnection(ctx *gin.Context) {
 	}
 
 	config := &model.StorageConfig{}
-	if err := ctx.ShouldBindJSON(config); err != nil {
-		ctx.AbortWithError(http.StatusBadRequest, &myErrors.ApiError{Code: myErrors.ErrInvalidArgument, Data: map[string]any{"err": err}})
+	if err := ctx.ShouldBindBodyWithJSON(config); err != nil {
+		// Provide more detailed error information for JSON parsing issues
+		errorMsg := fmt.Sprintf("failed to parse request body: %v", err)
+		if err.Error() == "EOF" {
+			errorMsg = "request body is empty, please provide storage configuration JSON"
+		}
+		ctx.AbortWithError(http.StatusBadRequest, &myErrors.ApiError{Code: myErrors.ErrInvalidArgument, Data: map[string]any{"err": errorMsg}})
+		return
+	}
+
+	// Validate required fields
+	if config.Type == "" {
+		ctx.AbortWithError(http.StatusBadRequest, &myErrors.ApiError{Code: myErrors.ErrInvalidArgument, Data: map[string]any{"err": "storage type is required"}})
 		return
 	}
 
@@ -216,9 +236,16 @@ func (c *Controller) GetStorageHealth(ctx *gin.Context) {
 	// Convert error map to a more API-friendly format
 	healthStatus := make(map[string]map[string]interface{})
 	for name, err := range healthResults {
+		var errorMsg interface{}
+		if err != nil {
+			errorMsg = err.Error() // Convert error to string for proper JSON serialization
+		} else {
+			errorMsg = nil
+		}
+
 		healthStatus[name] = map[string]interface{}{
 			"healthy": err == nil,
-			"error":   err,
+			"error":   errorMsg,
 		}
 	}
 
@@ -253,11 +280,23 @@ func (c *Controller) SetPrimaryStorage(ctx *gin.Context) {
 		return
 	}
 
+	// First, clear all existing primary flags
+	if err := storageService.ClearAllPrimaryFlags(ctx); err != nil {
+		ctx.AbortWithError(http.StatusInternalServerError, &myErrors.ApiError{Code: myErrors.ErrInternal, Data: map[string]any{"err": err}})
+		return
+	}
+
 	// Update to set as primary
 	config.IsPrimary = true
 	config.UpdaterId = currentUser.GetUid()
 
 	if err := storageService.UpdateStorageConfig(ctx, config); err != nil {
+		ctx.AbortWithError(http.StatusInternalServerError, &myErrors.ApiError{Code: myErrors.ErrInternal, Data: map[string]any{"err": err}})
+		return
+	}
+
+	// Refresh providers after setting new primary to ensure session replay adapter uses the new primary provider
+	if err := storageService.RefreshProviders(ctx); err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, &myErrors.ApiError{Code: myErrors.ErrInternal, Data: map[string]any{"err": err}})
 		return
 	}
@@ -302,7 +341,56 @@ func (c *Controller) ToggleStorageProvider(ctx *gin.Context) {
 		return
 	}
 
+	// Refresh providers after toggle to ensure correct provider state
+	if err := storageService.RefreshProviders(ctx); err != nil {
+		ctx.AbortWithError(http.StatusInternalServerError, &myErrors.ApiError{Code: myErrors.ErrInternal, Data: map[string]any{"err": err}})
+		return
+	}
+
 	ctx.JSON(http.StatusOK, HttpResponse{Data: map[string]bool{"enabled": config.Enabled}})
+}
+
+// GetStorageMetrics godoc
+//
+//	@Tags		storage
+//	@Summary	Get storage usage metrics
+//	@Success	200	{object}	HttpResponse{data=map[string]any}
+//	@Router		/storage/metrics [get]
+func (c *Controller) GetStorageMetrics(ctx *gin.Context) {
+	currentUser, _ := acl.GetSessionFromCtx(ctx)
+	if !acl.IsAdmin(currentUser) {
+		ctx.AbortWithError(http.StatusForbidden, &myErrors.ApiError{Code: myErrors.ErrNoPerm, Data: map[string]any{"perm": acl.READ}})
+		return
+	}
+
+	metrics, err := storageService.GetStorageMetrics(ctx)
+	if err != nil {
+		ctx.AbortWithError(http.StatusInternalServerError, &myErrors.ApiError{Code: myErrors.ErrInternal, Data: map[string]any{"err": err}})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, HttpResponse{Data: metrics})
+}
+
+// RefreshStorageMetrics godoc
+//
+//	@Tags		storage
+//	@Summary	Refresh storage usage metrics
+//	@Success	200	{object}	HttpResponse{}
+//	@Router		/storage/metrics/refresh [post]
+func (c *Controller) RefreshStorageMetrics(ctx *gin.Context) {
+	currentUser, _ := acl.GetSessionFromCtx(ctx)
+	if !acl.IsAdmin(currentUser) {
+		ctx.AbortWithError(http.StatusForbidden, &myErrors.ApiError{Code: myErrors.ErrNoPerm, Data: map[string]any{"perm": acl.WRITE}})
+		return
+	}
+
+	if err := storageService.RefreshStorageMetrics(ctx); err != nil {
+		ctx.AbortWithError(http.StatusInternalServerError, &myErrors.ApiError{Code: myErrors.ErrInternal, Data: map[string]any{"err": err}})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, defaultHttpResponse)
 }
 
 // validateStorageConfig validates storage configuration

@@ -17,6 +17,9 @@ const (
 	StorageTypeMinio StorageType = "minio"
 	StorageTypeOSS   StorageType = "oss"
 	StorageTypeCOS   StorageType = "cos"
+	StorageTypeAzure StorageType = "azure"
+	StorageTypeOBS   StorageType = "obs"
+	StorageTypeOOS   StorageType = "oos"
 )
 
 // StorageConfigMap represents the configuration parameters for a storage backend
@@ -53,7 +56,7 @@ type StorageConfig struct {
 	UpdaterId int                   `json:"updater_id" gorm:"column:updater_id"`
 	CreatedAt time.Time             `json:"created_at" gorm:"column:created_at"`
 	UpdatedAt time.Time             `json:"updated_at" gorm:"column:updated_at"`
-	DeletedAt soft_delete.DeletedAt `json:"-" gorm:"column:deleted_at;uniqueIndex:deleted_at"`
+	DeletedAt soft_delete.DeletedAt `json:"-" gorm:"column:deleted_at"`
 }
 
 func (m *StorageConfig) TableName() string {
@@ -108,7 +111,7 @@ type StorageMetrics struct {
 
 	CreatedAt time.Time             `json:"created_at" gorm:"column:created_at"`
 	UpdatedAt time.Time             `json:"updated_at" gorm:"column:updated_at"`
-	DeletedAt soft_delete.DeletedAt `json:"-" gorm:"column:deleted_at;uniqueIndex:deleted_at"`
+	DeletedAt soft_delete.DeletedAt `json:"-" gorm:"column:deleted_at"`
 }
 
 func (m *StorageMetrics) TableName() string {
@@ -135,7 +138,7 @@ type FileMetadata struct {
 	UpdaterId int                   `json:"updater_id" gorm:"column:updater_id"`
 	CreatedAt time.Time             `json:"created_at" gorm:"column:created_at"`
 	UpdatedAt time.Time             `json:"updated_at" gorm:"column:updated_at"`
-	DeletedAt soft_delete.DeletedAt `json:"-" gorm:"column:deleted_at;uniqueIndex:deleted_at"`
+	DeletedAt soft_delete.DeletedAt `json:"-" gorm:"column:deleted_at"`
 }
 
 func (m *FileMetadata) TableName() string {

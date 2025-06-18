@@ -31,6 +31,9 @@ type StorageRepository interface {
 	// DeleteStorageConfig deletes storage configuration
 	DeleteStorageConfig(ctx context.Context, name string) error
 
+	// ClearAllPrimaryFlags clears all primary flags in database
+	ClearAllPrimaryFlags(ctx context.Context) error
+
 	// GetFileMetadata retrieves file metadata
 	GetFileMetadata(ctx context.Context, key string) (*model.FileMetadata, error)
 
@@ -45,6 +48,13 @@ type StorageRepository interface {
 
 	// ListFileMetadata lists file metadata with pagination
 	ListFileMetadata(ctx context.Context, prefix string, limit, offset int) ([]*model.FileMetadata, int64, error)
+
+	// Storage Metrics Operations
+	GetStorageMetrics(ctx context.Context) ([]*model.StorageMetrics, error)
+	GetStorageMetricsByName(ctx context.Context, storageName string) (*model.StorageMetrics, error)
+	CreateStorageMetrics(ctx context.Context, metrics *model.StorageMetrics) error
+	UpdateStorageMetrics(ctx context.Context, metrics *model.StorageMetrics) error
+	UpsertStorageMetrics(ctx context.Context, metrics *model.StorageMetrics) error
 }
 
 // storageRepository implements StorageRepository
@@ -118,6 +128,11 @@ func (r *storageRepository) DeleteStorageConfig(ctx context.Context, name string
 	return dbpkg.DB.Where("name = ?", name).Delete(&model.StorageConfig{}).Error
 }
 
+// ClearAllPrimaryFlags clears all primary flags in database
+func (r *storageRepository) ClearAllPrimaryFlags(ctx context.Context) error {
+	return dbpkg.DB.Model(&model.StorageConfig{}).Where("is_primary = ?", true).Update("is_primary", false).Error
+}
+
 // GetFileMetadata retrieves file metadata
 func (r *storageRepository) GetFileMetadata(ctx context.Context, key string) (*model.FileMetadata, error) {
 	var metadata model.FileMetadata
@@ -162,4 +177,36 @@ func (r *storageRepository) ListFileMetadata(ctx context.Context, prefix string,
 	// Get records with pagination
 	err = query.Limit(limit).Offset(offset).Find(&metadata).Error
 	return metadata, total, err
+}
+
+// GetStorageMetrics retrieves storage metrics
+func (r *storageRepository) GetStorageMetrics(ctx context.Context) ([]*model.StorageMetrics, error) {
+	var metrics []*model.StorageMetrics
+	err := dbpkg.DB.Find(&metrics).Error
+	return metrics, err
+}
+
+// GetStorageMetricsByName retrieves storage metrics by name
+func (r *storageRepository) GetStorageMetricsByName(ctx context.Context, storageName string) (*model.StorageMetrics, error) {
+	var metric model.StorageMetrics
+	err := dbpkg.DB.Where("storage_name = ?", storageName).First(&metric).Error
+	if err != nil {
+		return nil, err
+	}
+	return &metric, nil
+}
+
+// CreateStorageMetrics creates new storage metrics
+func (r *storageRepository) CreateStorageMetrics(ctx context.Context, metrics *model.StorageMetrics) error {
+	return dbpkg.DB.Create(metrics).Error
+}
+
+// UpdateStorageMetrics updates storage metrics
+func (r *storageRepository) UpdateStorageMetrics(ctx context.Context, metrics *model.StorageMetrics) error {
+	return dbpkg.DB.Save(metrics).Error
+}
+
+// UpsertStorageMetrics upserts storage metrics
+func (r *storageRepository) UpsertStorageMetrics(ctx context.Context, metrics *model.StorageMetrics) error {
+	return dbpkg.DB.Save(metrics).Error
 }

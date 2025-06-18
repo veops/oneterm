@@ -184,6 +184,8 @@ func SetupRouter(r *gin.Engine) {
 			storage.DELETE("/configs/:id", c.DeleteStorageConfig)
 			storage.POST("/test-connection", c.TestStorageConnection)
 			storage.GET("/health", c.GetStorageHealth)
+			// storage.GET("/metrics", c.GetStorageMetrics)
+			// storage.POST("/metrics/refresh", c.RefreshStorageMetrics)
 			storage.PUT("/configs/:id/set-primary", c.SetPrimaryStorage)
 			storage.PUT("/configs/:id/toggle", c.ToggleStorageProvider)
 		}

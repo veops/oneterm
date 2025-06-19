@@ -131,7 +131,7 @@ services:
     environment:
       TZ: Asia/Shanghai
       WAIT_HOSTS: mysql:3306, redis:6379
-      SYSTEM_DEFAULT_LANGUAGE: en-US  # en-US, zh-CN
+      SYSTEM_DEFAULT_LANGUAGE:  # en-US, zh-CN
     volumes:
       - ./.env:/data/apps/acl/.env
     restart: always

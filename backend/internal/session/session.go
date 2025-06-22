@@ -26,7 +26,8 @@ var (
 	onlineSession = &sync.Map{}
 )
 
-func init() {
+// InitSessionCleanup initializes session cleanup after database is ready
+func InitSessionCleanup() {
 	// After system restart, set all online sessions to offline
 	sessions := make([]*Session, 0)
 	if err := dbpkg.DB.
@@ -34,7 +35,8 @@ func init() {
 		Where("status = ?", model.SESSIONSTATUS_ONLINE).
 		Find(&sessions).
 		Error; err != nil {
-		logger.L().Fatal("get sessions failed", zap.Error(err))
+		logger.L().Error("get sessions failed", zap.Error(err))
+		return
 	}
 	now := time.Now()
 	for _, s := range sessions {

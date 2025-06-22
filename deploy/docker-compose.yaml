@@ -1,6 +1,6 @@
 services:
   oneterm-api:
-    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-api:v25.6.2
+    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-api:v25.6.2.fix
     container_name: oneterm-api
     environment:
       ONETERM_RDP_DRIVE_PATH: /rdp

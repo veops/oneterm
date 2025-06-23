@@ -44,9 +44,7 @@
 </template>
 
 <script>
-/* eslint-disable */
-import { addResource, searchResourceType } from '@/modules/acl/api/resource'
-import { addResourceGroup } from '@/modules/acl/api/resource'
+import { addResource, searchResourceType, addResourceGroup } from '@/modules/acl/api/resource'
 
 export default {
   name: 'ResourceForm',

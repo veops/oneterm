@@ -1,4 +1,3 @@
-/* eslint-disable */
 import { UserLayout, BasicLayout, RouteView } from '@/layouts'
 import appConfig from '@/config/app'
 import { getAppAclRouter } from './utils'
@@ -7,7 +6,7 @@ import store from '../store'
 export const generatorDynamicRouter = async () => {
   const packages = []
   const { apps = undefined } = store.getters.userInfo
-  for (let appName of appConfig.buildModules) {
+  for (const appName of appConfig.buildModules) {
     if (!apps || !apps.length || apps.includes(appName)) {
       const module = await import(`@/modules/${appName}/index.js`)
       const r = await module.default.route()
@@ -28,19 +27,6 @@ export const generatorDynamicRouter = async () => {
   let routes = packages
   routes = routes.concat([
     { path: '*', redirect: '/404', hidden: true },
-    {
-      hidden: true,
-      path: '/noticecenter',
-      name: 'notice_center',
-      component: BasicLayout,
-      children: [{
-        hidden: true,
-        path: '/noticecenter',
-        name: 'notice_center',
-        meta: { title: '消息中心' },
-        component: () => import(/* webpackChunkName: "setting" */ '@/views/noticeCenter/index')
-      }]
-    },
     {
       path: '/setting',
       component: BasicLayout,
@@ -91,11 +77,11 @@ export const generatorDynamicRouter = async () => {
           component: () => import(/* webpackChunkName: "setting" */ '@/views/setting/auth/index')
         },
       ]
-    },])
+    }, ])
   return routes
 }
 
-// 基础模块路由，根据当前 app config 配置添加
+// basic route (module based), added according to app config configuration
 const constantModuleRouteMap = []
 if (appConfig.buildModules.includes('oneterm')) {
   constantModuleRouteMap.push({
@@ -103,12 +89,12 @@ if (appConfig.buildModules.includes('oneterm')) {
     name: 'oneterm_share',
     hidden: true,
     component: () => import('@/modules/oneterm/views/share'),
-    meta: { title: '分享', keepAlive: false }
+    meta: { title: 'oneterm.menu.share', keepAlive: false }
   })
 }
 
 /**
- * 基础路由
+ * basic route
  */
 export const constantRouterMap = [
   {

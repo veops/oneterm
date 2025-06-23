@@ -16,7 +16,7 @@ export default {
     },
   },
   methods: {
-    // 穿梭框双击实现
+    // Double-click to move from left to right
     leftToRight(leftList, dataSource, targetKeys, sourceImportantKey, targetImportantKey) {
       for (let i = 0; i < leftList.length; i++) {
         leftList[i].ondblclick = e => {
@@ -28,6 +28,7 @@ export default {
         }
       }
     },
+    // Double-click to move from right to left
     rightToLeft(rightList, dataSource, targetKeys, sourceImportantKey, targetImportantKey) {
       for (let i = 0; i < rightList.length; i++) {
         rightList[i].ondblclick = e => {
@@ -42,7 +43,10 @@ export default {
         }
       }
     },
-    // 必须传入importantKey，用来做键名比对，传错或不传会造成错误
+    /**
+     * You must pass importantKey for key comparison.
+     * Passing the wrong key or not passing it will cause errors.
+     */
     dbClick(sourceSelectedKeys, targetSelectedKeys, sourceImportantKey, targetImportantKey) {
       window.setTimeout(() => {
         const element = document.getElementsByClassName('ant-transfer-list-content')

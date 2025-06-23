@@ -151,7 +151,7 @@ export default {
       const tunnel = new Guacamole.WebSocketTunnel(socketLink)
       const client = new Guacamole.Client(tunnel)
 
-      // 处理从虚拟机收到的剪贴板内容
+      // clipboard contents received by remote desktop
       client.onclipboard = this.handleClipboardReceived
 
       if (this?.controlConfig?.[`${queryProtocol?.split?.(':')?.[0]}_config`]?.copy) {
@@ -260,8 +260,6 @@ export default {
           this.$message.destroy(this.messageKey)
           this.$message.success({ content: this.$t('oneterm.guacamole.connected'), duration: 3, key: this.messageKey })
           this.$emit('open')
-          // 向后台发送请求，更新会话的状态
-          //   sessionApi.connect(sessionId)
           break
         case STATE_DISCONNECTING:
           break

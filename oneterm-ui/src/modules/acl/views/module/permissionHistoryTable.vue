@@ -211,7 +211,6 @@ export default {
     },
   },
   methods: {
-    // 获取数据
     async getTable(queryParams) {
       try {
         this.loading = true

@@ -7,12 +7,12 @@ import enUS from 'vxe-table/lib/locale/lang/en-US'
 
 Vue.use(VueI18n)
 const i18n = new VueI18n({
-    locale: 'zh', // 初始化中文
-    messages: {
-        'zh': { ...zh, ...zhCN },
-        'en': { ...en, ...enUS },
-    },
-    silentTranslationWarn: true
+  locale: 'zh',
+  messages: {
+    'zh': { ...zh, ...zhCN },
+    'en': { ...en, ...enUS },
+  },
+  silentTranslationWarn: true
 })
 
 export default i18n

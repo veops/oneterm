@@ -63,8 +63,6 @@ import RouteView from './RouteView'
 import MultiTab from '@/components/MultiTab'
 import SideMenu from '@/components/Menu/SideMenu'
 import GlobalHeader from '@/components/GlobalHeader'
-import GlobalFooter from '@/components/GlobalFooter'
-import SettingDrawer from '@/components/SettingDrawer'
 
 export default {
   name: 'BasicLayout',
@@ -74,8 +72,6 @@ export default {
     MultiTab,
     SideMenu,
     GlobalHeader,
-    GlobalFooter,
-    SettingDrawer,
   },
   data() {
     return {
@@ -86,7 +82,7 @@ export default {
   },
   computed: {
     ...mapState({
-      // 动态主路由
+      // dynamic main route
       mainMenu: (state) => state.routes.appRoutes,
     }),
     contentPaddingLeft() {

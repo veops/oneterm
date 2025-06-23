@@ -17,7 +17,9 @@
 
 <script>
 import _ from 'lodash'
-// 该组件使用方法与vxe-table一致，但调用它的方法时，需先调用getVxetableRef()获取到vxe-table实体
+/**
+ * This component is used in the same way as vxe-table, but when calling its methods, you need to call `getVxetableRef()` to get the vxe-table component first.
+ */
 export default {
   name: 'OpsTable',
   data() {
@@ -34,7 +36,7 @@ export default {
         return this.$listeners
       }
       return Object.assign(this.$listeners, {
-        // 在这里覆盖原有的change事件
+        // overriding vxe-table change events
         // 'checkbox-change': this.selectChangeEvent,
         'checkbox-range-change': this.checkboxRangeChange,
         'checkbox-range-start': this.checkboxRangeStart,

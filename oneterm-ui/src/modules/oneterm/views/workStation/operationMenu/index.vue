@@ -113,7 +113,6 @@
 </template>
 
 <script>
-import { mixinPermissions } from '@/utils/mixin'
 import { WORKSTATION_TAB_TYPE } from '@/modules/oneterm/views/workStation/constants.js'
 import { OPERATION_MENU_TYPE } from './constants.js'
 
@@ -121,7 +120,6 @@ import ChooseAssetsModal from '../batchExecution/chooseAssetsModal.vue'
 
 export default {
   name: 'OperationMenu',
-  mixins: [mixinPermissions],
   components: {
     ChooseAssetsModal
   },
@@ -160,23 +158,16 @@ export default {
       const controlDisplayList = [
         OPERATION_MENU_TYPE.FULL_SCREEN,
         OPERATION_MENU_TYPE.RECENT_SESSION,
-        OPERATION_MENU_TYPE.BATCH_EXECUTION
+        OPERATION_MENU_TYPE.BATCH_EXECUTION,
+        OPERATION_MENU_TYPE.DISPLAY_SETTING,
+        OPERATION_MENU_TYPE.THEME_SETTING
       ]
 
-      const showTerminalSetting = this.hasDetailPermission('oneterm', 'System_Config', ['terminal_show'])
-      if (showTerminalSetting) {
-        controlDisplayList.push(
-          OPERATION_MENU_TYPE.DISPLAY_SETTING,
-          OPERATION_MENU_TYPE.THEME_SETTING
-        )
-
-        if (this.isGuacamole) {
-          controlDisplayList.push(OPERATION_MENU_TYPE.RESOLUTION)
-        }
+      if (this.isGuacamole) {
+        controlDisplayList.push(OPERATION_MENU_TYPE.RESOLUTION)
       }
 
-      const showQuickCommand = this.hasDetailPermission('oneterm', 'System_Config', ['quick_command'])
-      if (this.isTerminal && showQuickCommand) {
+      if (this.isTerminal) {
         controlDisplayList.push(OPERATION_MENU_TYPE.QUICK_COMMAND)
       }
 

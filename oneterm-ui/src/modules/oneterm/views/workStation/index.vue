@@ -278,8 +278,8 @@ export default {
       const dragTab = document.getElementById('workstation-drag-tab')?.querySelector?.('.ant-tabs-nav')?.firstChild
       if (dragTab) {
         this.sortableInstance = Sortable.create(dragTab, {
-          handle: '.ant-tabs-tab', // 标签选择器
-          draggable: '.ant-tabs-tab:not(:first-child)', // 可拖动的标签选择器
+          handle: '.ant-tabs-tab', // css selector
+          draggable: '.ant-tabs-tab:not(:first-child)', // draggable css selector
           onEnd: this.handleSortEnd
         })
       }

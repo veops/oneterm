@@ -1,9 +1,9 @@
 const appConfig = {
-    buildModules: ['oneterm', 'acl'], // 需要编译的模块
-    redirectTo: '/oneterm', // 首页的重定向路径
-    buildAclToModules: true, // 是否在各个应用下 内联权限管理
-    showDocs: false,
-    useEncryption: false,
+  buildModules: ['oneterm', 'acl'], // Modules to be compiled
+  redirectTo: '/oneterm', // Redirect path for the home page
+  buildAclToModules: true, // Inline permission management in each app
+  showDocs: false,
+  useEncryption: false,
 }
 
 export default appConfig

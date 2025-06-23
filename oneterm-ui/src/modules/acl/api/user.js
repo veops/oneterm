@@ -1,4 +1,3 @@
-/* eslint-disable */
 import { axios } from '@/utils/request'
 
 const urlPrefix = '/v1/acl'
@@ -13,8 +12,7 @@ export function currentUser() {
 export function getOnDutyUser() {
   return axios({
     url: urlPrefix + '/users/employee',
-    method: 'GET',
-    // data: { 'originUrl': 'http://hr.dfc.sh/api/all_users?work_status=在职' }
+    method: 'GET'
   })
 }
 

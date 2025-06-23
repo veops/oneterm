@@ -3,6 +3,9 @@ package guacd
 import (
 	"fmt"
 	"strconv"
+
+	"github.com/veops/oneterm/pkg/logger"
+	"go.uber.org/zap"
 )
 
 // File transfer instruction constants
@@ -78,7 +81,7 @@ func (t *Tunnel) HandleFileInstruction(instruction *Instruction) (*Instruction, 
 		go func() {
 			if err := t.SendDownloadData(transferId); err != nil {
 				// Log error, but we can't send error instruction here as it would interfere with protocol
-				fmt.Printf("Download failed: %s\n", err.Error())
+				logger.L().Error("Download failed", zap.Error(err))
 			}
 		}()
 

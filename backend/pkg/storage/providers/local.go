@@ -51,8 +51,6 @@ func NewLocal(config LocalConfig) (storage.Provider, error) {
 
 // Upload uploads a file to local storage
 func (p *Local) Upload(ctx context.Context, key string, reader io.Reader, size int64) error {
-	fmt.Println("Local provider Upload called:", key)
-
 	// For backward compatibility, if key doesn't include timestamp info,
 	// we'll use current time for path generation
 	filePath := p.getFilePath(key)

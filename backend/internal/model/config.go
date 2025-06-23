@@ -46,3 +46,23 @@ type Config struct {
 func (m *Config) TableName() string {
 	return "config"
 }
+
+// ScheduleConfig defines configuration for scheduled tasks
+type ScheduleConfig struct {
+	ConnectableCheckInterval time.Duration `json:"connectable_check_interval" yaml:"connectable_check_interval" default:"30m"`
+	ConfigUpdateInterval     time.Duration `json:"config_update_interval" yaml:"config_update_interval" default:"5m"`
+	BatchSize                int           `json:"batch_size" yaml:"batch_size" default:"50"`
+	ConcurrentWorkers        int           `json:"concurrent_workers" yaml:"concurrent_workers" default:"10"`
+	ConnectTimeout           time.Duration `json:"connect_timeout" yaml:"connect_timeout" default:"3s"`
+}
+
+// GetDefaultScheduleConfig returns default schedule configuration
+func GetDefaultScheduleConfig() *ScheduleConfig {
+	return &ScheduleConfig{
+		ConnectableCheckInterval: 30 * time.Minute, // Check connectivity every 30 minutes
+		ConfigUpdateInterval:     5 * time.Minute,  // Update config every 5 minutes (reduced from 1 minute)
+		BatchSize:                50,               // Process 50 assets per batch
+		ConcurrentWorkers:        10,               // Use 10 concurrent workers
+		ConnectTimeout:           3 * time.Second,  // 3 second timeout for connectivity tests
+	}
+}

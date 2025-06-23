@@ -13,6 +13,7 @@ import (
 	"github.com/veops/oneterm/internal/model"
 	"github.com/veops/oneterm/internal/service"
 	fileservice "github.com/veops/oneterm/internal/service/file"
+	gsession "github.com/veops/oneterm/internal/session"
 	"github.com/veops/oneterm/pkg/config"
 	"github.com/veops/oneterm/pkg/db"
 	"github.com/veops/oneterm/pkg/logger"
@@ -41,6 +42,8 @@ func initDB() {
 	}
 
 	acl.MigrateNode()
+
+	gsession.InitSessionCleanup()
 }
 
 func initServices() {

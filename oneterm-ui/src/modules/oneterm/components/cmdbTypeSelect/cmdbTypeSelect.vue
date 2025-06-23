@@ -30,8 +30,8 @@
       (node) => {
         return {
           id: node.id || -1,
-          label: node.alias || node.name || '其他',
-          title: node.alias || node.name || '其他',
+          label: node.alias || node.name || $t('other'),
+          title: node.alias || node.name || $t('other'),
         }
       }
     "

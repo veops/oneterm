@@ -108,6 +108,11 @@ export default {
     visual: '虚拟',
     default: '默认',
     tip: '提示',
+    requestError: '出现错误，请稍后再试',
+    requestServiceError: '服务端未知错误, 请联系管理员！',
+    requestWait: '修改已提交，请等待审核（{time}s）',
+    requestContact: '如需联动cmdb使用，请联系维易官方bd@veops.cn',
+    documentCenter: '文档中心',
     exception: {
         backToHome: '返回首页',
         desc1: '抱歉，你无权访问该页面',

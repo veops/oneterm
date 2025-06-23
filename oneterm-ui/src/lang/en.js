@@ -108,6 +108,11 @@ export default {
     visual: 'Visual',
     default: 'default',
     tip: 'Tip',
+    requestError: 'An error occurred, please try again later',
+    requestServiceError: 'Unknown error on the server, please contact the administrator',
+    requestWait: 'The modification has been submitted, please wait for review ({time} seconds)',
+    requestContact: 'For use with cmdb, please contact VE official bd@veops.cn',
+    documentCenter: 'Document Center',
     exception: {
         backToHome: 'Back to home page',
         desc1: 'Sorry, you are not authorized to access this page',

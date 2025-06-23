@@ -116,28 +116,28 @@ const genOnetermRoutes = () => {
               name: 'oneterm_terminal',
               hidden: true,
               component: () => import('../views/connect/terminal/index.vue'),
-              meta: { title: '终端', keepAlive: false }
+              meta: { title: 'oneterm.menu.terminal', keepAlive: false }
           },
           {
               path: '/oneterm/guacamole/:asset_id/:account_id/:protocol',
               name: 'oneterm_guacamole',
               hidden: true,
               component: () => import('../views/connect/guacamoleClient/index.vue'),
-              meta: { title: '终端', keepAlive: false }
+              meta: { title: 'oneterm.menu.terminal', keepAlive: false }
           },
           {
               path: '/oneterm/replay/:session_id',
               name: 'oneterm_replay',
               hidden: true,
               component: () => import('../views/replay'),
-              meta: { title: '回放', keepAlive: false }
+              meta: { title: 'oneterm.menu.replay', keepAlive: false }
           },
           {
               path: '/oneterm/replay/guacamole/:session_id',
               name: 'oneterm_replay_guacamole',
               hidden: true,
               component: () => import('../views/replay/guacamoleReplay.vue'),
-              meta: { title: '回放', keepAlive: false }
+              meta: { title: 'oneterm.menu.replay', keepAlive: false }
           },
         ]
     }

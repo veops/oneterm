@@ -142,7 +142,7 @@ export default {
     },
     handlePlayPause() {
       if (this.percent === this.max) {
-        // 重播
+        // replay
         this.percent = 0
         this.recording.seek(0, () => {
           this.recording.play()
@@ -155,7 +155,7 @@ export default {
       } else {
         this.recording.pause()
         this.stopSpeedUp()
-        this.$message.info('暂停')
+        this.$message.info(this.$t('oneterm.guacamole.pause'))
       }
     },
     startSpeedUp() {

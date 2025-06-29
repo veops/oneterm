@@ -119,7 +119,7 @@ export const MIN_IO_CONFIG_FORM = [
     label: 'oneterm.storageConfig.secretAccessKey',
     extra: '',
     required: true,
-    component: 'PasswordField',
+    component: 'a-input-password',
     componentProps: {}
   },
   {
@@ -162,7 +162,7 @@ export const S3_CONFIG_FORM = [
     label: 'oneterm.storageConfig.secretAccessKey',
     extra: '',
     required: true,
-    component: 'PasswordField',
+    component: 'a-input-password',
     componentProps: {}
   },
   {
@@ -212,7 +212,7 @@ export const OSS_CONFIG_FORM = [
     label: 'oneterm.storageConfig.accessKeySecret',
     extra: '',
     required: true,
-    component: 'PasswordField',
+    component: 'a-input-password',
     componentProps: {}
   },
   {
@@ -248,7 +248,7 @@ export const COS_CONFIG_FORM = [
     label: 'oneterm.storageConfig.secretKey',
     extra: '',
     required: true,
-    component: 'PasswordField',
+    component: 'a-input-password',
     componentProps: {}
   },
   {
@@ -284,7 +284,7 @@ export const AZURE_CONFIG_FORM = [
     label: 'oneterm.storageConfig.accountKey',
     extra: '',
     required: true,
-    component: 'PasswordField',
+    component: 'a-input-password',
     componentProps: {}
   },
   {
@@ -327,7 +327,7 @@ export const OBS_CONFIG_FORM = [
     label: 'oneterm.storageConfig.secretAccessKey',
     extra: '',
     required: true,
-    component: 'PasswordField',
+    component: 'a-input-password',
     componentProps: {}
   },
   {
@@ -363,7 +363,7 @@ export const OOS_CONFIG_FORM = [
     label: 'oneterm.storageConfig.secretAccessKey',
     extra: '',
     required: true,
-    component: 'PasswordField',
+    component: 'a-input-password',
     componentProps: {}
   },
   {

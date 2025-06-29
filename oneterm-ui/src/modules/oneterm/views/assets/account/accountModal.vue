@@ -28,7 +28,7 @@
         :label-col="{ span: 7 }"
         :wrapper-col="{ span: 14 }"
       >
-        <a-input v-if="form.account_type === 1" v-model="form.password" :placeholder="`${$t(`placeholder1`)}`" />
+        <a-input-password v-if="form.account_type === 1" v-model="form.password" :placeholder="`${$t(`placeholder1`)}`" />
         <a-textarea v-else v-model="form.pk" :placeholder="`${$t(`placeholder1`)}`" />
       </a-form-model-item>
       <a-form-model-item
@@ -38,7 +38,7 @@
         :wrapper-col="{ span: 14 }"
         v-if="form.account_type === 2"
       >
-        <a-input v-model="form.phrase" :placeholder="`${$t(`placeholder1`)}`" />
+        <a-input-password v-model="form.phrase" :placeholder="`${$t(`placeholder1`)}`" />
       </a-form-model-item>
     </a-form-model>
   </a-modal>

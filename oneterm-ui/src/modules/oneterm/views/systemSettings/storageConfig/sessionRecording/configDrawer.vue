@@ -113,13 +113,8 @@ import {
   testConnection
 } from '@/modules/oneterm/api/storage.js'
 
-import PasswordField from './passwordField.vue'
-
 export default {
   name: 'ConfigDrawer',
-  components: {
-    PasswordField
-  },
   data() {
     return {
       visible: false,

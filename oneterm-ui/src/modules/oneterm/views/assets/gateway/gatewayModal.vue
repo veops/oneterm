@@ -25,8 +25,8 @@
           <a-tooltip v-if="form.account_type === 2" :title="$t('oneterm.assetList.gatewayAccountTip')">
             <a><a-icon type="question-circle"/></a>
           </a-tooltip>
-          {{ $t(`oneterm.account`) }}</template
-          >
+          {{ $t(`oneterm.account`) }}
+        </template>
         <a-input v-model="form.account" :placeholder="`${$t(`placeholder1`)}`" />
       </a-form-model-item>
       <a-form-model-item prop="password" :label-col="{ span: 7 }" :wrapper-col="{ span: 14 }">
@@ -38,9 +38,9 @@
           >
             <a><a-icon type="question-circle"/></a>
           </a-tooltip>
-          {{ form.account_type === 1 ? $t('oneterm.password') : $t('oneterm.secretkey') }}</template
-          >
-        <a-input v-if="form.account_type === 1" v-model="form.password" :placeholder="`${$t(`placeholder1`)}`" />
+          {{ form.account_type === 1 ? $t('oneterm.password') : $t('oneterm.secretkey') }}
+        </template>
+        <a-input-password v-if="form.account_type === 1" v-model="form.password" :placeholder="`${$t(`placeholder1`)}`" />
         <a-textarea v-else v-model="form.pk" :placeholder="`${$t(`placeholder1`)}`" />
       </a-form-model-item>
       <a-form-model-item
@@ -53,9 +53,9 @@
           <a-tooltip :title="$t('oneterm.assetList.gatewayPhraseTip')">
             <a><a-icon type="question-circle"/></a>
           </a-tooltip>
-          {{ $t('oneterm.phrase') }}</template
-          >
-        <a-input v-model="form.phrase" :placeholder="`${$t(`placeholder1`)}`" />
+          {{ $t('oneterm.phrase') }}
+        </template>
+        <a-input-password v-model="form.phrase" :placeholder="`${$t(`placeholder1`)}`" />
       </a-form-model-item>
     </a-form-model>
   </a-modal>

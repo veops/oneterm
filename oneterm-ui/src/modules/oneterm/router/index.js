@@ -109,7 +109,7 @@ const genOnetermRoutes = () => {
               path: '/oneterm/settings',
               name: 'onterm_settings',
               component: () => import('../views/systemSettings'),
-              meta: { title: 'oneterm.menu.systemSettings', appName: 'oneterm', icon: 'veops-setting2', selectedIcon: 'veops-setting2', keepAlive: false, permission: ['oneterm_admin', 'admin'] }
+              meta: { title: 'oneterm.menu.systemSettings', appName: 'oneterm', icon: 'veops-setting2', selectedIcon: 'veops-setting2', keepAlive: false }
           },
           {
               path: '/oneterm/terminal',

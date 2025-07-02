@@ -291,11 +291,14 @@ export default {
 
     openTerminal(data) {
       const id = uuidv4()
+      const accountName = this.getAccountName(data.accountId)
+      const name = accountName ? `${accountName}@${data.assetName}` : data.assetName
+
       this.terminalList.push({
         ...data,
         socketStatus: true,
         id,
-        name: data.assetName,
+        name,
         type: this.getConnectType(data.protocolType)
       })
 
@@ -304,11 +307,14 @@ export default {
 
     openTerminalList(data) {
       const newList = data.accountList.map((id) => {
+        const accountName = this.getAccountName(id)
+        const name = accountName ? `${accountName}@${data.assetName}` : data.assetName
+
         return {
           protocolType: data.protocolType,
           protocol: data.protocol,
           assetId: data.assetId,
-          name: data.assetName,
+          name,
           accountId: id,
           socketStatus: true,
           id: uuidv4(),
@@ -331,7 +337,6 @@ export default {
       const id = uuidv4()
       this.terminalList.push({
         ...item,
-        name: item.assetName,
         socketStatus: true,
         id
       })
@@ -420,6 +425,14 @@ export default {
     toggleOperationMenu() {
       this.showOperationMenu = !this.showOperationMenu
       localStorage.setItem(operationMenuExpandKey, this.showOperationMenu)
+    },
+
+    getAccountName(id) {
+      if (!id) {
+        return ''
+      }
+
+      return this.accountList.find((account) => account.id === id)?.name || ''
     }
   },
 }

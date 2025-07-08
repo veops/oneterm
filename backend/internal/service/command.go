@@ -55,6 +55,17 @@ func (s *CommandService) BuildQuery(ctx *gin.Context) (*gorm.DB, error) {
 		db = db.Where("id IN ?", lo.Map(strings.Split(q, ","), func(s string, _ int) int { return cast.ToInt(s) }))
 	}
 
+	// Apply category filter
+	if category := ctx.Query("category"); category != "" {
+		db = db.Where("category = ?", category)
+	}
+
+	// Apply risk level filter
+	if riskLevelStr := ctx.Query("risk_level"); riskLevelStr != "" {
+		riskLevel := cast.ToInt(riskLevelStr)
+		db = db.Where("risk_level = ?", riskLevel)
+	}
+
 	return db, nil
 }
 

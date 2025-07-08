@@ -82,13 +82,15 @@ func (c *Controller) UpdateCommand(ctx *gin.Context) {
 // GetCommands godoc
 //
 //	@Tags		command
-//	@Param		page_index	query		int		true	"command id"
-//	@Param		page_size	query		int		true	"command id"
+//	@Param		page_index	query		int		true	"page index"
+//	@Param		page_size	query		int		true	"page size"
 //	@Param		search		query		string	false	"name or cmd"
 //	@Param		id			query		int		false	"command id"
 //	@Param		ids			query		string	false	"command ids"
 //	@Param		name		query		string	false	"command name"
 //	@Param		enable		query		int		false	"command enable"
+//	@Param		category	query		string	false	"command category"
+//	@Param		risk_level	query		int		false	"command risk level"
 //	@Param		info		query		bool	false	"is info mode"
 //	@Param		search		query		string	false	"name or cmd"
 //	@Success	200			{object}	HttpResponse{data=ListData{list=[]model.Command}}

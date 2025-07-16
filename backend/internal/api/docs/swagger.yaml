@@ -1,4 +1,69 @@
 definitions:
+  controller.AssetPermissionBatchResult:
+    properties:
+      results:
+        additionalProperties:
+          $ref: '#/definitions/controller.AssetPermissionResult'
+        type: object
+    type: object
+  controller.AssetPermissionMultiAccountResult:
+    properties:
+      results:
+        additionalProperties:
+          $ref: '#/definitions/controller.AssetPermissionBatchResult'
+        description: accountId -> batch results
+        type: object
+    type: object
+  controller.AssetPermissionResult:
+    properties:
+      allowed:
+        type: boolean
+      reason:
+        type: string
+      restrictions:
+        additionalProperties: true
+        type: object
+      rule_id:
+        type: integer
+      rule_name:
+        type: string
+    type: object
+  controller.CheckPermissionRequest:
+    properties:
+      account_id:
+        minimum: 0
+        type: integer
+      action:
+        $ref: '#/definitions/model.AuthAction'
+      asset_id:
+        minimum: 0
+        type: integer
+      node_id:
+        minimum: 0
+        type: integer
+    required:
+    - action
+    type: object
+  controller.CheckTimeAccessRequest:
+    properties:
+      template_id:
+        type: integer
+      timezone:
+        type: string
+    required:
+    - template_id
+    type: object
+  controller.CheckTimeAccessResponse:
+    properties:
+      allowed:
+        type: boolean
+      checked_at:
+        type: string
+      template_id:
+        type: integer
+      timezone:
+        type: string
+    type: object
   controller.HttpResponse:
     properties:
       code:
@@ -30,6 +95,52 @@ definitions:
           $ref: '#/definitions/model.Range'
         type: array
       start:
+        type: string
+    type: object
+  model.AccessControl:
+    properties:
+      cmd_ids:
+        description: Command control
+        items:
+          type: integer
+        type: array
+      custom_time_ranges:
+        description: Direct definition
+        items:
+          $ref: '#/definitions/model.TimeRange'
+        type: array
+      ip_whitelist:
+        items:
+          type: string
+        type: array
+      max_sessions:
+        type: integer
+      session_timeout:
+        type: integer
+      template_ids:
+        items:
+          type: integer
+        type: array
+      time_template:
+        allOf:
+        - $ref: '#/definitions/model.TimeTemplateReference'
+        description: Time control options
+      timezone:
+        type: string
+    type: object
+  model.AccessTimeControl:
+    properties:
+      comment:
+        description: Description of the time restriction
+        type: string
+      enabled:
+        type: boolean
+      time_ranges:
+        items:
+          $ref: '#/definitions/model.TimeRange'
+        type: array
+      timezone:
+        description: e.g., "Asia/Shanghai"
         type: string
     type: object
   model.Account:
@@ -65,12 +176,32 @@ definitions:
       updater_id:
         type: integer
     type: object
+  model.AccountAuthorization:
+    properties:
+      permissions:
+        allOf:
+        - $ref: '#/definitions/model.AuthPermissions'
+        description: V2 permissions (connect, file_upload, etc.)
+      rids:
+        description: Role IDs for ACL system
+        items:
+          type: integer
+        type: array
+    type: object
   model.Asset:
     properties:
       access_auth:
-        $ref: '#/definitions/model.AccessAuth'
+        allOf:
+        - $ref: '#/definitions/model.AccessAuth'
+        description: 'Deprecated: Use V2 fields below'
+      access_time_control:
+        allOf:
+        - $ref: '#/definitions/model.AccessTimeControl'
+        description: V2 Access Control (replaces AccessAuth)
+      asset_command_control:
+        $ref: '#/definitions/model.AssetCommandControl'
       authorization:
-        $ref: '#/definitions/model.Map-int-model_Slice-int'
+        $ref: '#/definitions/model.AuthorizationMap'
       comment:
         type: string
       connectable:
@@ -106,6 +237,71 @@ definitions:
       updater_id:
         type: integer
     type: object
+  model.AssetCommandControl:
+    properties:
+      cmd_ids:
+        description: Command IDs to control
+        items:
+          type: integer
+        type: array
+      comment:
+        description: Description of the command restriction
+        type: string
+      enabled:
+        type: boolean
+      template_ids:
+        description: Command template IDs
+        items:
+          type: integer
+        type: array
+    type: object
+  model.AuthAction:
+    enum:
+    - connect
+    - file_upload
+    - file_download
+    - copy
+    - paste
+    - share
+    type: string
+    x-enum-varnames:
+    - ActionConnect
+    - ActionFileUpload
+    - ActionFileDownload
+    - ActionCopy
+    - ActionPaste
+    - ActionShare
+  model.AuthPermissions:
+    properties:
+      connect:
+        type: boolean
+      copy:
+        type: boolean
+      file_download:
+        type: boolean
+      file_upload:
+        type: boolean
+      paste:
+        type: boolean
+      share:
+        type: boolean
+    type: object
+  model.AuthResult:
+    properties:
+      allowed:
+        type: boolean
+      permissions:
+        $ref: '#/definitions/model.AuthPermissions'
+      reason:
+        type: string
+      restrictions:
+        additionalProperties: true
+        type: object
+      rule_id:
+        type: integer
+      rule_name:
+        type: string
+    type: object
   model.Authorization:
     properties:
       account_id:
@@ -131,18 +327,80 @@ definitions:
       updater_id:
         type: integer
     type: object
+  model.AuthorizationMap:
+    additionalProperties:
+      $ref: '#/definitions/model.AccountAuthorization'
+    type: object
+  model.AuthorizationV2:
+    properties:
+      access_control:
+        allOf:
+        - $ref: '#/definitions/model.AccessControl'
+        description: Access control with time template support
+      account_selector:
+        $ref: '#/definitions/model.TargetSelector'
+      asset_selector:
+        $ref: '#/definitions/model.TargetSelector'
+      created_at:
+        type: string
+      creator_id:
+        type: integer
+      description:
+        type: string
+      enabled:
+        type: boolean
+      id:
+        type: integer
+      name:
+        type: string
+      node_selector:
+        allOf:
+        - $ref: '#/definitions/model.TargetSelector'
+        description: Target selectors
+      permissions:
+        allOf:
+        - $ref: '#/definitions/model.AuthPermissions'
+        description: Permissions configuration
+      resource_id:
+        description: Standard fields
+        type: integer
+      rids:
+        description: Role IDs for ACL integration
+        items:
+          type: integer
+        type: array
+      updated_at:
+        type: string
+      updater_id:
+        type: integer
+      valid_from:
+        allOf:
+        - $ref: '#/definitions/model.CustomTime'
+        description: Rule validity period
+      valid_to:
+        $ref: '#/definitions/model.CustomTime'
+    type: object
   model.Command:
     properties:
+      category:
+        allOf:
+        - $ref: '#/definitions/model.CommandCategory'
+        description: Enhanced fields for better management
       cmd:
         type: string
       created_at:
         type: string
       creator_id:
         type: integer
+      description:
+        type: string
       enable:
         type: boolean
       id:
         type: integer
+      is_global:
+        description: Global predefined command
+        type: boolean
       is_re:
         type: boolean
       name:
@@ -151,6 +409,83 @@ definitions:
         items:
           type: string
         type: array
+      resource_id:
+        type: integer
+      risk_level:
+        $ref: '#/definitions/model.CommandRiskLevel'
+      tags:
+        items:
+          type: string
+        type: array
+      updated_at:
+        type: string
+      updater_id:
+        type: integer
+    type: object
+  model.CommandCategory:
+    enum:
+    - security
+    - system
+    - database
+    - network
+    - file
+    - developer
+    - custom
+    type: string
+    x-enum-comments:
+      CategoryCustom: Custom commands
+      CategoryDatabase: Database operations
+      CategoryDeveloper: Development related
+      CategoryFile: File operations
+      CategoryNetwork: Network operations
+      CategorySecurity: Security related
+      CategorySystem: System operations
+    x-enum-varnames:
+    - CategorySecurity
+    - CategorySystem
+    - CategoryDatabase
+    - CategoryNetwork
+    - CategoryFile
+    - CategoryDeveloper
+    - CategoryCustom
+  model.CommandRiskLevel:
+    enum:
+    - 0
+    - 1
+    - 2
+    - 3
+    type: integer
+    x-enum-comments:
+      RiskLevelCritical: Critical danger
+      RiskLevelDanger: Dangerous commands
+      RiskLevelSafe: Safe commands
+      RiskLevelWarning: Warning level
+    x-enum-varnames:
+    - RiskLevelSafe
+    - RiskLevelWarning
+    - RiskLevelDanger
+    - RiskLevelCritical
+  model.CommandTemplate:
+    properties:
+      category:
+        $ref: '#/definitions/model.CommandCategory'
+      cmd_ids:
+        items:
+          type: integer
+        type: array
+      created_at:
+        type: string
+      creator_id:
+        type: integer
+      description:
+        type: string
+      id:
+        type: integer
+      is_builtin:
+        description: Built-in template
+        type: boolean
+      name:
+        type: string
       resource_id:
         type: integer
       updated_at:
@@ -164,20 +499,38 @@ definitions:
         type: string
       creator_id:
         type: integer
+      default_permissions:
+        allOf:
+        - $ref: '#/definitions/model.DefaultPermissions'
+        description: Default permissions for authorization creation
       id:
         type: integer
-      rdp_config:
-        $ref: '#/definitions/model.RdpConfig'
-      ssh_config:
-        $ref: '#/definitions/model.SshConfig'
       timeout:
         type: integer
       updated_at:
         type: string
       updater_id:
         type: integer
-      vnc_config:
-        $ref: '#/definitions/model.VncConfig'
+    type: object
+  model.CustomTime:
+    properties:
+      time.Time:
+        type: string
+    type: object
+  model.DefaultPermissions:
+    properties:
+      connect:
+        type: boolean
+      copy:
+        type: boolean
+      file_download:
+        type: boolean
+      file_upload:
+        type: boolean
+      paste:
+        type: boolean
+      share:
+        type: boolean
     type: object
   model.Gateway:
     properties:
@@ -347,23 +700,18 @@ definitions:
       week:
         type: integer
     type: object
-  model.RdpConfig:
-    properties:
-      copy:
-        type: boolean
-      create_drive_path:
-        type: boolean
-      disable_download:
-        type: boolean
-      disable_upload:
-        type: boolean
-      drive_path:
-        type: string
-      enable_drive:
-        type: boolean
-      paste:
-        type: boolean
-    type: object
+  model.SelectorType:
+    enum:
+    - all
+    - ids
+    - regex
+    - tags
+    type: string
+    x-enum-varnames:
+    - SelectorTypeAll
+    - SelectorTypeIds
+    - SelectorTypeRegex
+    - SelectorTypeTags
   model.Session:
     properties:
       account_id:
@@ -457,13 +805,6 @@ definitions:
         type: integer
       uuid:
         type: string
-    type: object
-  model.SshConfig:
-    properties:
-      copy:
-        type: boolean
-      paste:
-        type: boolean
     type: object
   model.StatAccount:
     properties:
@@ -571,6 +912,9 @@ definitions:
     - minio
     - oss
     - cos
+    - azure
+    - obs
+    - oos
     type: string
     x-enum-varnames:
     - StorageTypeLocal
@@ -578,6 +922,84 @@ definitions:
     - StorageTypeMinio
     - StorageTypeOSS
     - StorageTypeCOS
+    - StorageTypeAzure
+    - StorageTypeOBS
+    - StorageTypeOOS
+  model.TargetSelector:
+    properties:
+      exclude_ids:
+        items:
+          type: integer
+        type: array
+      type:
+        $ref: '#/definitions/model.SelectorType'
+      values:
+        items:
+          type: string
+        type: array
+    type: object
+  model.TimeRange:
+    properties:
+      end_time:
+        type: string
+      start_time:
+        type: string
+      weekdays:
+        items:
+          type: integer
+        type: array
+    type: object
+  model.TimeTemplate:
+    properties:
+      category:
+        description: work, maintenance, emergency, etc.
+        type: string
+      created_at:
+        type: string
+      creator_id:
+        type: integer
+      description:
+        type: string
+      id:
+        type: integer
+      is_active:
+        type: boolean
+      is_builtin:
+        description: Status and metadata
+        type: boolean
+      name:
+        type: string
+      resource_id:
+        description: Standard fields
+        type: integer
+      time_ranges:
+        description: Time configuration
+        items:
+          $ref: '#/definitions/model.TimeRange'
+        type: array
+      timezone:
+        type: string
+      updated_at:
+        type: string
+      updater_id:
+        type: integer
+      usage_count:
+        description: Usage statistics
+        type: integer
+    type: object
+  model.TimeTemplateReference:
+    properties:
+      custom_ranges:
+        description: Additional custom time ranges
+        items:
+          $ref: '#/definitions/model.TimeRange'
+        type: array
+      template_id:
+        type: integer
+      template_name:
+        description: For display
+        type: string
+    type: object
   model.UserPreference:
     properties:
       created_at:
@@ -611,13 +1033,6 @@ definitions:
       user_id:
         description: User ID with unique index
         type: integer
-    type: object
-  model.VncConfig:
-    properties:
-      copy:
-        type: boolean
-      paste:
-        type: boolean
     type: object
 info:
   contact: {}
@@ -838,6 +1253,30 @@ paths:
             $ref: '#/definitions/controller.HttpResponse'
       tags:
       - asset
+  /asset/:id/permissions:
+    get:
+      parameters:
+      - description: asset id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: account ids (comma separated, e.g. 123,456,789)
+        in: query
+        name: account_ids
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/controller.HttpResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/controller.AssetPermissionMultiAccountResult'
+              type: object
+      tags:
+      - asset
   /authorization:
     get:
       parameters:
@@ -912,15 +1351,169 @@ paths:
             $ref: '#/definitions/controller.HttpResponse'
       tags:
       - authorization
+  /authorization_v2:
+    get:
+      parameters:
+      - description: page index
+        in: query
+        name: page_index
+        type: integer
+      - description: page size
+        in: query
+        name: page_size
+        type: integer
+      - description: filter by enabled status
+        in: query
+        name: enabled
+        type: boolean
+      - description: search by name or description
+        in: query
+        name: search
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/controller.HttpResponse'
+            - properties:
+                data:
+                  allOf:
+                  - $ref: '#/definitions/controller.ListData'
+                  - properties:
+                      list:
+                        items:
+                          $ref: '#/definitions/model.AuthorizationV2'
+                        type: array
+                    type: object
+              type: object
+      tags:
+      - authorization_v2
+    post:
+      parameters:
+      - description: authorization rule
+        in: body
+        name: authorization
+        required: true
+        schema:
+          $ref: '#/definitions/model.AuthorizationV2'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - authorization_v2
+  /authorization_v2/:id:
+    delete:
+      parameters:
+      - description: authorization id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - authorization_v2
+    get:
+      parameters:
+      - description: authorization id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/controller.HttpResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.AuthorizationV2'
+              type: object
+      tags:
+      - authorization_v2
+    put:
+      parameters:
+      - description: authorization id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: authorization rule
+        in: body
+        name: authorization
+        required: true
+        schema:
+          $ref: '#/definitions/model.AuthorizationV2'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - authorization_v2
+  /authorization_v2/:id/clone:
+    post:
+      parameters:
+      - description: source authorization id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: clone request
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/controller.HttpResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.AuthorizationV2'
+              type: object
+      tags:
+      - authorization_v2
+  /authorization_v2/check:
+    post:
+      parameters:
+      - description: permission check request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/controller.CheckPermissionRequest'
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/controller.HttpResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.AuthResult'
+              type: object
+      tags:
+      - authorization_v2
   /command:
     get:
       parameters:
-      - description: command id
+      - description: page index
         in: query
         name: page_index
         required: true
         type: integer
-      - description: command id
+      - description: page size
         in: query
         name: page_size
         required: true
@@ -944,6 +1537,14 @@ paths:
       - description: command enable
         in: query
         name: enable
+        type: integer
+      - description: command category
+        in: query
+        name: category
+        type: string
+      - description: command risk level
+        in: query
+        name: risk_level
         type: integer
       - description: is info mode
         in: query
@@ -1022,6 +1623,131 @@ paths:
             $ref: '#/definitions/controller.HttpResponse'
       tags:
       - command
+  /command_template:
+    get:
+      parameters:
+      - description: page index
+        in: query
+        name: page_index
+        type: integer
+      - description: page size
+        in: query
+        name: page_size
+        type: integer
+      - description: template category
+        in: query
+        name: category
+        type: string
+      - description: filter by builtin status
+        in: query
+        name: builtin
+        type: boolean
+      - description: info mode
+        in: query
+        name: info
+        type: boolean
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/controller.HttpResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.CommandTemplate'
+                  type: array
+              type: object
+      tags:
+      - command_template
+    post:
+      parameters:
+      - description: command template
+        in: body
+        name: template
+        required: true
+        schema:
+          $ref: '#/definitions/model.CommandTemplate'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - command_template
+  /command_template/:id:
+    delete:
+      parameters:
+      - description: template id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - command_template
+    put:
+      parameters:
+      - description: template id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: command template
+        in: body
+        name: template
+        required: true
+        schema:
+          $ref: '#/definitions/model.CommandTemplate'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - command_template
+  /command_template/:id/commands:
+    get:
+      parameters:
+      - description: template id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/controller.HttpResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.Command'
+                  type: array
+              type: object
+      tags:
+      - command_template
+  /command_template/builtin:
+    get:
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/controller.HttpResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.CommandTemplate'
+                  type: array
+              type: object
+      tags:
+      - command_template
   /config:
     get:
       parameters:
@@ -1321,9 +2047,6 @@ paths:
     post:
       consumes:
       - multipart/form-data
-      description: Uploads file via server temp storage then transfers to target using
-        optimized SFTP with performance enhancements. HTTP response only after file
-        reaches target machine.
       parameters:
       - description: session_id
         in: path
@@ -1348,7 +2071,6 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/controller.HttpResponse'
-      summary: High-performance file upload using optimized SFTP
       tags:
       - file
   /file/transfer/progress/id/:transfer_id:
@@ -2662,6 +3384,32 @@ paths:
       summary: Get health status of all storage providers
       tags:
       - storage
+  /storage/metrics:
+    get:
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/controller.HttpResponse'
+            - properties:
+                data:
+                  additionalProperties: true
+                  type: object
+              type: object
+      summary: Get storage usage metrics
+      tags:
+      - storage
+  /storage/metrics/refresh:
+    post:
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      summary: Refresh storage usage metrics
+      tags:
+      - storage
   /storage/test-connection:
     post:
       parameters:
@@ -2679,4 +3427,137 @@ paths:
       summary: Test storage connection
       tags:
       - storage
+  /time_template:
+    get:
+      parameters:
+      - description: page index
+        in: query
+        name: page_index
+        type: integer
+      - description: page size
+        in: query
+        name: page_size
+        type: integer
+      - description: template category
+        in: query
+        name: category
+        type: string
+      - description: filter by active status
+        in: query
+        name: active
+        type: boolean
+      - description: info mode
+        in: query
+        name: info
+        type: boolean
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/controller.HttpResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.TimeTemplate'
+                  type: array
+              type: object
+      tags:
+      - time_template
+    post:
+      parameters:
+      - description: time template
+        in: body
+        name: template
+        required: true
+        schema:
+          $ref: '#/definitions/model.TimeTemplate'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - time_template
+  /time_template/:id:
+    delete:
+      parameters:
+      - description: template id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - time_template
+    put:
+      parameters:
+      - description: template id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: time template
+        in: body
+        name: template
+        required: true
+        schema:
+          $ref: '#/definitions/model.TimeTemplate'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - time_template
+  /time_template/builtin:
+    get:
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/controller.HttpResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.TimeTemplate'
+                  type: array
+              type: object
+      tags:
+      - time_template
+  /time_template/check:
+    post:
+      parameters:
+      - description: time access check request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/controller.CheckTimeAccessRequest'
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/controller.HttpResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/controller.CheckTimeAccessResponse'
+              type: object
+      tags:
+      - time_template
+  /time_template/init:
+    post:
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.HttpResponse'
+      tags:
+      - time_template
 swagger: "2.0"

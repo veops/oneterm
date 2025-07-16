@@ -21,6 +21,7 @@ import (
 	"github.com/veops/oneterm/internal/acl"
 	"github.com/veops/oneterm/internal/guacd"
 	"github.com/veops/oneterm/internal/model"
+	"github.com/veops/oneterm/internal/service"
 	fileservice "github.com/veops/oneterm/internal/service/file"
 	gsession "github.com/veops/oneterm/internal/session"
 	myErrors "github.com/veops/oneterm/pkg/errors"
@@ -78,10 +79,11 @@ func (c *Controller) FileLS(ctx *gin.Context) {
 		},
 	}
 
-	if ok, err := hasAuthorization(ctx, sess); err != nil {
+	// Check connect permission first
+	if result, err := service.DefaultAuthService.HasAuthorizationV2(ctx, sess, model.ActionConnect); err != nil {
 		ctx.AbortWithError(http.StatusBadRequest, &myErrors.ApiError{Code: myErrors.ErrInvalidArgument, Data: map[string]any{"err": err}})
 		return
-	} else if !ok {
+	} else if !result.IsAllowed(model.ActionConnect) {
 		ctx.AbortWithError(http.StatusForbidden, &myErrors.ApiError{Code: myErrors.ErrNoPerm, Data: map[string]any{}})
 		return
 	}
@@ -148,11 +150,12 @@ func (c *Controller) FileMkdir(ctx *gin.Context) {
 		},
 	}
 
-	if ok, err := hasAuthorization(ctx, sess); err != nil {
+	// Check file upload permission (mkdir is considered an upload operation)
+	if result, err := service.DefaultAuthService.HasAuthorizationV2(ctx, sess, model.ActionFileUpload); err != nil {
 		ctx.AbortWithError(http.StatusBadRequest, &myErrors.ApiError{Code: myErrors.ErrInvalidArgument, Data: map[string]any{"err": err}})
 		return
-	} else if !ok {
-		ctx.AbortWithError(http.StatusForbidden, &myErrors.ApiError{Code: myErrors.ErrNoPerm, Data: map[string]any{}})
+	} else if !result.IsAllowed(model.ActionFileUpload) {
+		ctx.AbortWithError(http.StatusForbidden, &myErrors.ApiError{Code: myErrors.ErrNoPerm, Data: map[string]any{"message": "No file upload permission"}})
 		return
 	}
 
@@ -189,11 +192,12 @@ func (c *Controller) FileUpload(ctx *gin.Context) {
 		},
 	}
 
-	if ok, err := hasAuthorization(ctx, sess); err != nil {
+	// Check file upload permission using V2 system
+	if result, err := service.DefaultAuthService.HasAuthorizationV2(ctx, sess, model.ActionFileUpload); err != nil {
 		ctx.AbortWithError(http.StatusBadRequest, &myErrors.ApiError{Code: myErrors.ErrInvalidArgument, Data: map[string]any{"err": err}})
 		return
-	} else if !ok {
-		ctx.AbortWithError(http.StatusForbidden, &myErrors.ApiError{Code: myErrors.ErrNoPerm, Data: map[string]any{}})
+	} else if !result.IsAllowed(model.ActionFileUpload) {
+		ctx.AbortWithError(http.StatusForbidden, &myErrors.ApiError{Code: myErrors.ErrNoPerm, Data: map[string]any{"message": "No file upload permission"}})
 		return
 	}
 
@@ -350,11 +354,12 @@ func (c *Controller) FileDownload(ctx *gin.Context) {
 		},
 	}
 
-	if ok, err := hasAuthorization(ctx, sess); err != nil {
+	// Check file download permission using V2 system
+	if result, err := service.DefaultAuthService.HasAuthorizationV2(ctx, sess, model.ActionFileDownload); err != nil {
 		ctx.AbortWithError(http.StatusBadRequest, &myErrors.ApiError{Code: myErrors.ErrInvalidArgument, Data: map[string]any{"err": err}})
 		return
-	} else if !ok {
-		ctx.AbortWithError(http.StatusForbidden, &myErrors.ApiError{Code: myErrors.ErrNoPerm, Data: map[string]any{}})
+	} else if !result.IsAllowed(model.ActionFileDownload) {
+		ctx.AbortWithError(http.StatusForbidden, &myErrors.ApiError{Code: myErrors.ErrNoPerm, Data: map[string]any{"message": "No file download permission"}})
 		return
 	}
 
@@ -431,7 +436,7 @@ func (c *Controller) RDPFileList(ctx *gin.Context) {
 	sessionId := ctx.Param("session_id")
 	path := ctx.DefaultQuery("path", "/")
 
-	tunnel, err := c.validateRDPAccess(ctx, sessionId)
+	tunnel, authResult, err := c.validateRDPAccess(ctx, sessionId)
 	if err != nil {
 		if strings.Contains(err.Error(), "permission") {
 			ctx.JSON(http.StatusForbidden, HttpResponse{
@@ -446,6 +451,9 @@ func (c *Controller) RDPFileList(ctx *gin.Context) {
 		}
 		return
 	}
+
+	// Connect permission already validated in validateRDPAccess
+	_ = authResult // Use the already validated result
 
 	// Check if RDP drive is enabled
 	if !fileservice.IsRDPDriveEnabled(tunnel) {
@@ -503,7 +511,7 @@ func (c *Controller) RDPFileUpload(ctx *gin.Context) {
 	// Create progress record IMMEDIATELY when request starts
 	fileservice.CreateTransferProgress(transferId, "rdp")
 
-	tunnel, err := c.validateRDPAccess(ctx, sessionId)
+	tunnel, authResult, err := c.validateRDPAccess(ctx, sessionId)
 	if err != nil {
 		if strings.Contains(err.Error(), "permission") {
 			ctx.JSON(http.StatusForbidden, HttpResponse{
@@ -516,6 +524,15 @@ func (c *Controller) RDPFileUpload(ctx *gin.Context) {
 				Message: err.Error(),
 			})
 		}
+		return
+	}
+
+	// Check specific file upload permission using already validated result
+	if !authResult.IsAllowed(model.ActionFileUpload) {
+		ctx.JSON(http.StatusForbidden, HttpResponse{
+			Code:    http.StatusForbidden,
+			Message: "No file upload permission",
+		})
 		return
 	}
 
@@ -726,7 +743,7 @@ func (c *Controller) RDPFileUpload(ctx *gin.Context) {
 func (c *Controller) RDPFileDownload(ctx *gin.Context) {
 	sessionId := ctx.Param("session_id")
 
-	tunnel, validationErr := c.validateRDPAccess(ctx, sessionId)
+	tunnel, authResult, validationErr := c.validateRDPAccess(ctx, sessionId)
 	if validationErr != nil {
 		if strings.Contains(validationErr.Error(), "permission") {
 			ctx.JSON(http.StatusForbidden, HttpResponse{
@@ -739,6 +756,15 @@ func (c *Controller) RDPFileDownload(ctx *gin.Context) {
 				Message: validationErr.Error(),
 			})
 		}
+		return
+	}
+
+	// Check specific file download permission using already validated result
+	if !authResult.IsAllowed(model.ActionFileDownload) {
+		ctx.JSON(http.StatusForbidden, HttpResponse{
+			Code:    http.StatusForbidden,
+			Message: "No file download permission",
+		})
 		return
 	}
 
@@ -876,7 +902,7 @@ func (c *Controller) RDPFileMkdir(ctx *gin.Context) {
 		return
 	}
 
-	tunnel, validateErr := c.validateRDPAccess(ctx, sessionId)
+	tunnel, authResult, validateErr := c.validateRDPAccess(ctx, sessionId)
 	if validateErr != nil {
 		if strings.Contains(validateErr.Error(), "permission") {
 			ctx.JSON(http.StatusForbidden, HttpResponse{
@@ -889,6 +915,15 @@ func (c *Controller) RDPFileMkdir(ctx *gin.Context) {
 				Message: validateErr.Error(),
 			})
 		}
+		return
+	}
+
+	// Check specific file upload permission using already validated result (mkdir is considered an upload operation)
+	if !authResult.IsAllowed(model.ActionFileUpload) {
+		ctx.JSON(http.StatusForbidden, HttpResponse{
+			Code:    http.StatusForbidden,
+			Message: "No file upload permission",
+		})
 		return
 	}
 
@@ -927,23 +962,37 @@ func (c *Controller) RDPFileMkdir(ctx *gin.Context) {
 	})
 }
 
-func (c *Controller) validateRDPAccess(ctx *gin.Context, sessionId string) (*guacd.Tunnel, error) {
+func (c *Controller) validateRDPAccess(ctx *gin.Context, sessionId string) (*guacd.Tunnel, *model.BatchAuthResult, error) {
 	currentUser, err := acl.GetSessionFromCtx(ctx)
 	if err != nil || currentUser == nil {
-		return nil, fmt.Errorf("no permission to access this session")
+		return nil, nil, fmt.Errorf("no permission to access this session")
 	}
 
 	onlineSession := gsession.GetOnlineSessionById(sessionId)
 	if onlineSession == nil {
-		return nil, fmt.Errorf("session not found or not active")
+		return nil, nil, fmt.Errorf("session not found or not active")
 	}
 
 	tunnel := onlineSession.GuacdTunnel
 	if tunnel == nil {
-		return nil, fmt.Errorf("session not found or not active")
+		return nil, nil, fmt.Errorf("session not found or not active")
 	}
 
-	return tunnel, nil
+	// V2 authorization check for RDP file operations
+	// Check connect permission and file permissions using batch check
+	result, err := service.DefaultAuthService.HasAuthorizationV2(ctx, onlineSession,
+		model.ActionConnect, model.ActionFileUpload, model.ActionFileDownload)
+	if err != nil {
+		return nil, nil, fmt.Errorf("authorization check failed: %w", err)
+	}
+
+	// Must have connect permission to access the session
+	if !result.IsAllowed(model.ActionConnect) {
+		return nil, nil, fmt.Errorf("no permission to access this session")
+	}
+
+	// Return tunnel and permission result for efficient reuse
+	return tunnel, result, nil
 }
 
 // =============================================================================
@@ -985,11 +1034,11 @@ func (c *Controller) SftpFileLS(ctx *gin.Context) {
 		return
 	}
 
-	// Check authorization using the same logic as legacy API
-	if ok, err := hasAuthorization(ctx, onlineSession); err != nil {
+	// Check connect permission for SFTP file listing
+	if result, err := service.DefaultAuthService.HasAuthorizationV2(ctx, onlineSession, model.ActionConnect); err != nil {
 		ctx.AbortWithError(http.StatusBadRequest, &myErrors.ApiError{Code: myErrors.ErrInvalidArgument, Data: map[string]any{"err": err}})
 		return
-	} else if !ok {
+	} else if !result.IsAllowed(model.ActionConnect) {
 		ctx.AbortWithError(http.StatusForbidden, &myErrors.ApiError{Code: myErrors.ErrNoPerm, Data: map[string]any{}})
 		return
 	}
@@ -1073,12 +1122,12 @@ func (c *Controller) SftpFileMkdir(ctx *gin.Context) {
 		return
 	}
 
-	// Check authorization using the same logic as legacy API
-	if ok, err := hasAuthorization(ctx, onlineSession); err != nil {
+	// Check file upload permission for SFTP mkdir
+	if result, err := service.DefaultAuthService.HasAuthorizationV2(ctx, onlineSession, model.ActionFileUpload); err != nil {
 		ctx.AbortWithError(http.StatusBadRequest, &myErrors.ApiError{Code: myErrors.ErrInvalidArgument, Data: map[string]any{"err": err}})
 		return
-	} else if !ok {
-		ctx.AbortWithError(http.StatusForbidden, &myErrors.ApiError{Code: myErrors.ErrNoPerm, Data: map[string]any{}})
+	} else if !result.IsAllowed(model.ActionFileUpload) {
+		ctx.AbortWithError(http.StatusForbidden, &myErrors.ApiError{Code: myErrors.ErrNoPerm, Data: map[string]any{"message": "No file upload permission"}})
 		return
 	}
 
@@ -1239,11 +1288,12 @@ func (c *Controller) SftpFileUpload(ctx *gin.Context) {
 		return
 	}
 
-	if ok, err := hasAuthorization(ctx, onlineSession); err != nil {
+	// Check file upload permission for SFTP upload
+	if result, err := service.DefaultAuthService.HasAuthorizationV2(ctx, onlineSession, model.ActionFileUpload); err != nil {
 		ctx.AbortWithError(http.StatusBadRequest, &myErrors.ApiError{Code: myErrors.ErrInvalidArgument, Data: map[string]any{"err": err}})
 		return
-	} else if !ok {
-		ctx.AbortWithError(http.StatusForbidden, &myErrors.ApiError{Code: myErrors.ErrNoPerm, Data: map[string]any{}})
+	} else if !result.IsAllowed(model.ActionFileUpload) {
+		ctx.AbortWithError(http.StatusForbidden, &myErrors.ApiError{Code: myErrors.ErrNoPerm, Data: map[string]any{"message": "No file upload permission"}})
 		return
 	}
 
@@ -1444,12 +1494,12 @@ func (c *Controller) SftpFileDownload(ctx *gin.Context) {
 		return
 	}
 
-	// Check authorization using the same logic as legacy API
-	if ok, err := hasAuthorization(ctx, onlineSession); err != nil {
+	// Check file download permission for SFTP download
+	if result, err := service.DefaultAuthService.HasAuthorizationV2(ctx, onlineSession, model.ActionFileDownload); err != nil {
 		ctx.AbortWithError(http.StatusBadRequest, &myErrors.ApiError{Code: myErrors.ErrInvalidArgument, Data: map[string]any{"err": err}})
 		return
-	} else if !ok {
-		ctx.AbortWithError(http.StatusForbidden, &myErrors.ApiError{Code: myErrors.ErrNoPerm, Data: map[string]any{}})
+	} else if !result.IsAllowed(model.ActionFileDownload) {
+		ctx.AbortWithError(http.StatusForbidden, &myErrors.ApiError{Code: myErrors.ErrNoPerm, Data: map[string]any{"message": "No file download permission"}})
 		return
 	}
 

@@ -242,4 +242,370 @@ var (
 		One:   "\x1b[31;47m Welcome: {{.User}}",
 		Other: "\x1b[31;47m Welcome: {{.User}}",
 	}
+
+	// Predefined dangerous commands
+	CmdDeleteRootDir = &i18n.Message{
+		ID:    "CmdDeleteRootDir",
+		One:   "Delete root directory",
+		Other: "Delete root directory",
+	}
+	CmdDeleteRootDirDesc = &i18n.Message{
+		ID:    "CmdDeleteRootDirDesc",
+		One:   "Prohibit deletion of root directory, this will destroy the entire system",
+		Other: "Prohibit deletion of root directory, this will destroy the entire system",
+	}
+	CmdDeleteSystemDirs = &i18n.Message{
+		ID:    "CmdDeleteSystemDirs",
+		One:   "Delete system directories",
+		Other: "Delete system directories",
+	}
+	CmdDeleteSystemDirsDesc = &i18n.Message{
+		ID:    "CmdDeleteSystemDirsDesc",
+		One:   "Prohibit deletion of critical system directories",
+		Other: "Prohibit deletion of critical system directories",
+	}
+	CmdDiskDestruction = &i18n.Message{
+		ID:    "CmdDiskDestruction",
+		One:   "Disk destruction operations",
+		Other: "Disk destruction operations",
+	}
+	CmdDiskDestructionDesc = &i18n.Message{
+		ID:    "CmdDiskDestructionDesc",
+		One:   "Prohibit writing random data to disk devices, will destroy data",
+		Other: "Prohibit writing random data to disk devices, will destroy data",
+	}
+	CmdFormatDisk = &i18n.Message{
+		ID:    "CmdFormatDisk",
+		One:   "Format disk",
+		Other: "Format disk",
+	}
+	CmdFormatDiskDesc = &i18n.Message{
+		ID:    "CmdFormatDiskDesc",
+		One:   "Prohibit formatting disk partitions",
+		Other: "Prohibit formatting disk partitions",
+	}
+	CmdForkBomb = &i18n.Message{
+		ID:    "CmdForkBomb",
+		One:   "Fork bomb",
+		Other: "Fork bomb",
+	}
+	CmdForkBombDesc = &i18n.Message{
+		ID:    "CmdForkBombDesc",
+		One:   "Prohibit fork bomb attacks",
+		Other: "Prohibit fork bomb attacks",
+	}
+	CmdSystemReboot = &i18n.Message{
+		ID:    "CmdSystemReboot",
+		One:   "System reboot shutdown",
+		Other: "System reboot shutdown",
+	}
+	CmdSystemRebootDesc = &i18n.Message{
+		ID:    "CmdSystemRebootDesc",
+		One:   "Restrict system reboot and shutdown operations",
+		Other: "Restrict system reboot and shutdown operations",
+	}
+	CmdModifySystemFiles = &i18n.Message{
+		ID:    "CmdModifySystemFiles",
+		One:   "Modify critical system files",
+		Other: "Modify critical system files",
+	}
+	CmdModifySystemFilesDesc = &i18n.Message{
+		ID:    "CmdModifySystemFilesDesc",
+		One:   "Restrict direct modification of system configuration files",
+		Other: "Restrict direct modification of system configuration files",
+	}
+	CmdDropDatabase = &i18n.Message{
+		ID:    "CmdDropDatabase",
+		One:   "Drop database",
+		Other: "Drop database",
+	}
+	CmdDropDatabaseDesc = &i18n.Message{
+		ID:    "CmdDropDatabaseDesc",
+		One:   "Restrict dropping entire databases",
+		Other: "Restrict dropping entire databases",
+	}
+	CmdTruncateTable = &i18n.Message{
+		ID:    "CmdTruncateTable",
+		One:   "Truncate table data",
+		Other: "Truncate table data",
+	}
+	CmdTruncateTableDesc = &i18n.Message{
+		ID:    "CmdTruncateTableDesc",
+		One:   "Restrict clearing all table data",
+		Other: "Restrict clearing all table data",
+	}
+	CmdModifyPermissions = &i18n.Message{
+		ID:    "CmdModifyPermissions",
+		One:   "Modify user permissions",
+		Other: "Modify user permissions",
+	}
+	CmdModifyPermissionsDesc = &i18n.Message{
+		ID:    "CmdModifyPermissionsDesc",
+		One:   "Restrict modifying root directory permissions",
+		Other: "Restrict modifying root directory permissions",
+	}
+	CmdDropTable = &i18n.Message{
+		ID:    "CmdDropTable",
+		One:   "Drop table",
+		Other: "Drop table",
+	}
+	CmdDropTableDesc = &i18n.Message{
+		ID:    "CmdDropTableDesc",
+		One:   "Warning: Dropping database table",
+		Other: "Warning: Dropping database table",
+	}
+	CmdServiceControl = &i18n.Message{
+		ID:    "CmdServiceControl",
+		One:   "Service control commands",
+		Other: "Service control commands",
+	}
+	CmdServiceControlDesc = &i18n.Message{
+		ID:    "CmdServiceControlDesc",
+		One:   "Warning: Operating on system services",
+		Other: "Warning: Operating on system services",
+	}
+	CmdNetworkConfig = &i18n.Message{
+		ID:    "CmdNetworkConfig",
+		One:   "Network configuration modification",
+		Other: "Network configuration modification",
+	}
+	CmdNetworkConfigDesc = &i18n.Message{
+		ID:    "CmdNetworkConfigDesc",
+		One:   "Warning: Modifying network configuration",
+		Other: "Warning: Modifying network configuration",
+	}
+	CmdUserManagement = &i18n.Message{
+		ID:    "CmdUserManagement",
+		One:   "User management",
+		Other: "User management",
+	}
+	CmdUserManagementDesc = &i18n.Message{
+		ID:    "CmdUserManagementDesc",
+		One:   "Warning: Performing user management operations",
+		Other: "Warning: Performing user management operations",
+	}
+	CmdKernelModule = &i18n.Message{
+		ID:    "CmdKernelModule",
+		One:   "Kernel module operations",
+		Other: "Kernel module operations",
+	}
+	CmdKernelModuleDesc = &i18n.Message{
+		ID:    "CmdKernelModuleDesc",
+		One:   "Warning: Operating on kernel modules",
+		Other: "Warning: Operating on kernel modules",
+	}
+
+	// Predefined command templates
+	TmplBasicSecurity = &i18n.Message{
+		ID:    "TmplBasicSecurity",
+		One:   "Basic Security Protection",
+		Other: "Basic Security Protection",
+	}
+	TmplBasicSecurityDesc = &i18n.Message{
+		ID:    "TmplBasicSecurityDesc",
+		One:   "Basic security command restrictions for all production environments",
+		Other: "Basic security command restrictions for all production environments",
+	}
+	TmplDatabaseProtection = &i18n.Message{
+		ID:    "TmplDatabaseProtection",
+		One:   "Production Database Protection",
+		Other: "Production Database Protection",
+	}
+	TmplDatabaseProtectionDesc = &i18n.Message{
+		ID:    "TmplDatabaseProtectionDesc",
+		One:   "Security policies to protect production databases",
+		Other: "Security policies to protect production databases",
+	}
+	TmplServiceRestrictions = &i18n.Message{
+		ID:    "TmplServiceRestrictions",
+		One:   "System Service Control Restrictions",
+		Other: "System Service Control Restrictions",
+	}
+	TmplServiceRestrictionsDesc = &i18n.Message{
+		ID:    "TmplServiceRestrictionsDesc",
+		One:   "Restrictions on critical system service operations",
+		Other: "Restrictions on critical system service operations",
+	}
+	TmplNetworkSecurity = &i18n.Message{
+		ID:    "TmplNetworkSecurity",
+		One:   "Network Security Control",
+		Other: "Network Security Control",
+	}
+	TmplNetworkSecurityDesc = &i18n.Message{
+		ID:    "TmplNetworkSecurityDesc",
+		One:   "Security controls for network configuration and user permissions",
+		Other: "Security controls for network configuration and user permissions",
+	}
+	TmplDevEnvironment = &i18n.Message{
+		ID:    "TmplDevEnvironment",
+		One:   "Development Environment Basic Restrictions",
+		Other: "Development Environment Basic Restrictions",
+	}
+	TmplDevEnvironmentDesc = &i18n.Message{
+		ID:    "TmplDevEnvironmentDesc",
+		One:   "Minimal security restrictions for development environments",
+		Other: "Minimal security restrictions for development environments",
+	}
+
+	// Command tags
+	TagDangerous = &i18n.Message{
+		ID:    "TagDangerous",
+		One:   "dangerous",
+		Other: "dangerous",
+	}
+	TagDelete = &i18n.Message{
+		ID:    "TagDelete",
+		One:   "delete",
+		Other: "delete",
+	}
+	TagSystem = &i18n.Message{
+		ID:    "TagSystem",
+		One:   "system",
+		Other: "system",
+	}
+	TagSystemDirs = &i18n.Message{
+		ID:    "TagSystemDirs",
+		One:   "system-dirs",
+		Other: "system-dirs",
+	}
+	TagDisk = &i18n.Message{
+		ID:    "TagDisk",
+		One:   "disk",
+		Other: "disk",
+	}
+	TagDestruction = &i18n.Message{
+		ID:    "TagDestruction",
+		One:   "destruction",
+		Other: "destruction",
+	}
+	TagFormat = &i18n.Message{
+		ID:    "TagFormat",
+		One:   "format",
+		Other: "format",
+	}
+	TagAttack = &i18n.Message{
+		ID:    "TagAttack",
+		One:   "attack",
+		Other: "attack",
+	}
+	TagResourceExhaustion = &i18n.Message{
+		ID:    "TagResourceExhaustion",
+		One:   "resource-exhaustion",
+		Other: "resource-exhaustion",
+	}
+	TagReboot = &i18n.Message{
+		ID:    "TagReboot",
+		One:   "reboot",
+		Other: "reboot",
+	}
+	TagShutdown = &i18n.Message{
+		ID:    "TagShutdown",
+		One:   "shutdown",
+		Other: "shutdown",
+	}
+	TagEdit = &i18n.Message{
+		ID:    "TagEdit",
+		One:   "edit",
+		Other: "edit",
+	}
+	TagSystemFiles = &i18n.Message{
+		ID:    "TagSystemFiles",
+		One:   "system-files",
+		Other: "system-files",
+	}
+	TagConfig = &i18n.Message{
+		ID:    "TagConfig",
+		One:   "config",
+		Other: "config",
+	}
+	TagDatabase = &i18n.Message{
+		ID:    "TagDatabase",
+		One:   "database",
+		Other: "database",
+	}
+	TagDrop = &i18n.Message{
+		ID:    "TagDrop",
+		One:   "drop",
+		Other: "drop",
+	}
+	TagClear = &i18n.Message{
+		ID:    "TagClear",
+		One:   "clear",
+		Other: "clear",
+	}
+	TagTruncate = &i18n.Message{
+		ID:    "TagTruncate",
+		One:   "truncate",
+		Other: "truncate",
+	}
+	TagPermissions = &i18n.Message{
+		ID:    "TagPermissions",
+		One:   "permissions",
+		Other: "permissions",
+	}
+	TagChmod = &i18n.Message{
+		ID:    "TagChmod",
+		One:   "chmod",
+		Other: "chmod",
+	}
+	TagSecurity = &i18n.Message{
+		ID:    "TagSecurity",
+		One:   "security",
+		Other: "security",
+	}
+	TagTable = &i18n.Message{
+		ID:    "TagTable",
+		One:   "table",
+		Other: "table",
+	}
+	TagService = &i18n.Message{
+		ID:    "TagService",
+		One:   "service",
+		Other: "service",
+	}
+	TagSystemctl = &i18n.Message{
+		ID:    "TagSystemctl",
+		One:   "systemctl",
+		Other: "systemctl",
+	}
+	TagControl = &i18n.Message{
+		ID:    "TagControl",
+		One:   "control",
+		Other: "control",
+	}
+	TagNetwork = &i18n.Message{
+		ID:    "TagNetwork",
+		One:   "network",
+		Other: "network",
+	}
+	TagFirewall = &i18n.Message{
+		ID:    "TagFirewall",
+		One:   "firewall",
+		Other: "firewall",
+	}
+	TagRouting = &i18n.Message{
+		ID:    "TagRouting",
+		One:   "routing",
+		Other: "routing",
+	}
+	TagUser = &i18n.Message{
+		ID:    "TagUser",
+		One:   "user",
+		Other: "user",
+	}
+	TagManagement = &i18n.Message{
+		ID:    "TagManagement",
+		One:   "management",
+		Other: "management",
+	}
+	TagKernel = &i18n.Message{
+		ID:    "TagKernel",
+		One:   "kernel",
+		Other: "kernel",
+	}
+	TagModule = &i18n.Message{
+		ID:    "TagModule",
+		One:   "module",
+		Other: "module",
+	}
 )

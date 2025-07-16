@@ -11,30 +11,22 @@ var (
 	GlobalConfig atomic.Pointer[Config]
 )
 
-type SshConfig struct {
-	Copy  bool `json:"copy" gorm:"column:copy"`
-	Paste bool `json:"paste" gorm:"column:paste"`
-}
-type RdpConfig struct {
-	Copy            bool   `json:"copy" gorm:"column:copy"`
-	Paste           bool   `json:"paste" gorm:"column:paste"`
-	EnableDrive     bool   `json:"enable_drive" gorm:"column:enable_drive"`
-	DrivePath       string `json:"drive_path" gorm:"column:drive_path"`
-	CreateDrivePath bool   `json:"create_drive_path" gorm:"column:create_drive_path"`
-	DisableUpload   bool   `json:"disable_upload" gorm:"column:disable_upload"`
-	DisableDownload bool   `json:"disable_download" gorm:"column:disable_download"`
-}
-type VncConfig struct {
-	Copy  bool `json:"copy" gorm:"column:copy"`
-	Paste bool `json:"paste" gorm:"column:paste"`
+// DefaultPermissions defines default permissions for authorization
+type DefaultPermissions struct {
+	Connect      bool `json:"connect" gorm:"column:connect"`
+	FileUpload   bool `json:"file_upload" gorm:"column:file_upload"`
+	FileDownload bool `json:"file_download" gorm:"column:file_download"`
+	Copy         bool `json:"copy" gorm:"column:copy"`
+	Paste        bool `json:"paste" gorm:"column:paste"`
+	Share        bool `json:"share" gorm:"column:share"`
 }
 
 type Config struct {
-	Id        int       `json:"id" gorm:"column:id;primarykey;autoIncrement"`
-	Timeout   int       `json:"timeout" gorm:"column:timeout"`
-	SshConfig SshConfig `json:"ssh_config" gorm:"embedded;embeddedPrefix:ssh_;column:ssh_config"`
-	RdpConfig RdpConfig `json:"rdp_config" gorm:"embedded;embeddedPrefix:rdp_;column:rdp_config"`
-	VncConfig VncConfig `json:"vnc_config" gorm:"embedded;embeddedPrefix:vnc_;column:vnc_config"`
+	Id      int `json:"id" gorm:"column:id;primarykey;autoIncrement"`
+	Timeout int `json:"timeout" gorm:"column:timeout"`
+
+	// Default permissions for authorization creation
+	DefaultPermissions DefaultPermissions `json:"default_permissions" gorm:"embedded;embeddedPrefix:default_"`
 
 	CreatorId int                   `json:"creator_id" gorm:"column:creator_id"`
 	UpdaterId int                   `json:"updater_id" gorm:"column:updater_id"`
@@ -45,6 +37,23 @@ type Config struct {
 
 func (m *Config) TableName() string {
 	return "config"
+}
+
+// GetDefaultPermissions returns the default permissions configuration
+func (c *Config) GetDefaultPermissions() DefaultPermissions {
+	return c.DefaultPermissions
+}
+
+// GetDefaultPermissionsAsAuthPermissions converts to AuthPermissions format
+func (c *Config) GetDefaultPermissionsAsAuthPermissions() AuthPermissions {
+	return AuthPermissions{
+		Connect:      c.DefaultPermissions.Connect,
+		FileUpload:   c.DefaultPermissions.FileUpload,
+		FileDownload: c.DefaultPermissions.FileDownload,
+		Copy:         c.DefaultPermissions.Copy,
+		Paste:        c.DefaultPermissions.Paste,
+		Share:        c.DefaultPermissions.Share,
+	}
 }
 
 // ScheduleConfig defines configuration for scheduled tasks
@@ -64,5 +73,20 @@ func GetDefaultScheduleConfig() *ScheduleConfig {
 		BatchSize:                50,               // Process 50 assets per batch
 		ConcurrentWorkers:        10,               // Use 10 concurrent workers
 		ConnectTimeout:           3 * time.Second,  // 3 second timeout for connectivity tests
+	}
+}
+
+// GetDefaultConfig returns a default configuration with reasonable defaults
+func GetDefaultConfig() *Config {
+	return &Config{
+		Timeout: 1800, // 30 minutes
+		DefaultPermissions: DefaultPermissions{
+			Connect:      true,
+			FileUpload:   true,
+			FileDownload: true,
+			Copy:         true,
+			Paste:        true,
+			Share:        false, // Share is disabled by default for security
+		},
 	}
 }

@@ -63,6 +63,178 @@ func MigrateNode() {
 	}
 }
 
+func MigrateCommand() {
+	ctx := context.Background()
+
+	rts, err := GetResourceTypes(ctx)
+	if err != nil {
+		logger.L().Fatal("get resource type failed", zap.Error(err))
+	}
+
+	// Ensure command resource type exists
+	if !lo.ContainsBy(rts, func(rt *ResourceType) bool { return rt.Name == "command" }) {
+		if err = AddResourceTypes(ctx, &ResourceType{Name: "command", Perms: AllPermissions}); err != nil {
+			logger.L().Fatal("add command resource type failed", zap.Error(err))
+		}
+	}
+
+	// Ensure command_template resource type exists
+	if !lo.ContainsBy(rts, func(rt *ResourceType) bool { return rt.Name == "command_template" }) {
+		if err = AddResourceTypes(ctx, &ResourceType{Name: "command_template", Perms: AllPermissions}); err != nil {
+			logger.L().Fatal("add command_template resource type failed", zap.Error(err))
+		}
+	}
+
+	// Migrate Commands
+	commands := make([]*model.Command, 0)
+	if err = dbpkg.DB.Model(&commands).Where("resource_id = 0").Or("resource_id IS NULL").Find(&commands).Error; err != nil {
+		logger.L().Fatal("get commands failed", zap.Error(err))
+	}
+
+	// Get existing command resources to avoid duplicates
+	existingCommandResources, err := GetCommandResources(ctx)
+	if err != nil {
+		logger.L().Fatal("get existing command resources failed", zap.Error(err))
+	}
+	commandNameToResourceId := lo.SliceToMap(existingCommandResources, func(r *Resource) (string, int) {
+		return r.Name, r.ResourceId
+	})
+
+	eg := errgroup.Group{}
+	for _, c := range commands {
+		cmd := c
+		eg.Go(func() error {
+			var resourceId int
+
+			// Check if resource already exists
+			if existingResourceId, exists := commandNameToResourceId[cmd.Name]; exists {
+				resourceId = existingResourceId
+				logger.L().Info("Using existing resource for command",
+					zap.String("command", cmd.Name),
+					zap.Int("resource_id", resourceId))
+			} else {
+				// Create new resource
+				r, err := AddResource(ctx, cmd.CreatorId, "command", cmd.Name)
+				if err != nil {
+					return err
+				}
+				resourceId = r.ResourceId
+				logger.L().Info("Created new resource for command",
+					zap.String("command", cmd.Name),
+					zap.Int("resource_id", resourceId))
+			}
+
+			// Update command with resource_id
+			if err := dbpkg.DB.Model(&cmd).Where("id=?", cmd.Id).Update("resource_id", resourceId).Error; err != nil {
+				return err
+			}
+			return nil
+		})
+	}
+
+	// Migrate CommandTemplates
+	templates := make([]*model.CommandTemplate, 0)
+	if err = dbpkg.DB.Model(&templates).Where("resource_id = 0").Or("resource_id IS NULL").Find(&templates).Error; err != nil {
+		logger.L().Fatal("get command templates failed", zap.Error(err))
+	}
+
+	// Get existing command_template resources to avoid duplicates
+	existingTemplateResources, err := GetCommandTemplateResources(ctx)
+	if err != nil {
+		logger.L().Fatal("get existing command template resources failed", zap.Error(err))
+	}
+	templateNameToResourceId := lo.SliceToMap(existingTemplateResources, func(r *Resource) (string, int) {
+		return r.Name, r.ResourceId
+	})
+
+	for _, t := range templates {
+		tmpl := t
+		eg.Go(func() error {
+			var resourceId int
+
+			// Check if resource already exists
+			if existingResourceId, exists := templateNameToResourceId[tmpl.Name]; exists {
+				resourceId = existingResourceId
+				logger.L().Info("Using existing resource for command template",
+					zap.String("template", tmpl.Name),
+					zap.Int("resource_id", resourceId))
+			} else {
+				// Create new resource
+				r, err := AddResource(ctx, tmpl.CreatorId, "command_template", tmpl.Name)
+				if err != nil {
+					return err
+				}
+				resourceId = r.ResourceId
+				logger.L().Info("Created new resource for command template",
+					zap.String("template", tmpl.Name),
+					zap.Int("resource_id", resourceId))
+			}
+
+			// Update template with resource_id
+			if err := dbpkg.DB.Model(&tmpl).Where("id=?", tmpl.Id).Update("resource_id", resourceId).Error; err != nil {
+				return err
+			}
+			return nil
+		})
+	}
+
+	if err = eg.Wait(); err != nil {
+		logger.L().Fatal("migrate command and template resources failed", zap.Error(err))
+	}
+}
+
+// GetCommandResources retrieves all command resources from ACL system
+func GetCommandResources(ctx context.Context) ([]*Resource, error) {
+	token, err := remote.GetAclToken(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	data := &ResourceResult{}
+	url := fmt.Sprintf("%s/acl/resources", config.Cfg.Auth.Acl.Url)
+	resp, err := remote.RC.R().
+		SetHeader("App-Access-Token", token).
+		SetQueryParams(map[string]string{
+			"app_id":           config.Cfg.Auth.Acl.AppId,
+			"resource_type_id": "command",
+			"page_size":        "1000", // Get all resources
+		}).
+		SetResult(data).
+		Get(url)
+
+	if err = remote.HandleErr(err, resp, func(dt map[string]any) bool { return true }); err != nil {
+		return nil, err
+	}
+
+	return data.Resources, nil
+}
+
+// GetCommandTemplateResources retrieves all command template resources from ACL system
+func GetCommandTemplateResources(ctx context.Context) ([]*Resource, error) {
+	token, err := remote.GetAclToken(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	data := &ResourceResult{}
+	url := fmt.Sprintf("%s/acl/resources", config.Cfg.Auth.Acl.Url)
+	resp, err := remote.RC.R().
+		SetHeader("App-Access-Token", token).
+		SetQueryParams(map[string]string{
+			"app_id":           config.Cfg.Auth.Acl.AppId,
+			"resource_type_id": "command_template",
+			"page_size":        "1000", // Get all resources
+		}).
+		SetResult(data).
+		Get(url)
+
+	if err = remote.HandleErr(err, resp, func(dt map[string]any) bool { return true }); err != nil {
+		return nil, err
+	}
+
+	return data.Resources, nil
+}
+
 func GetResourceTypes(ctx context.Context) (rt []*ResourceType, err error) {
 	token, err := remote.GetAclToken(ctx)
 	if err != nil {

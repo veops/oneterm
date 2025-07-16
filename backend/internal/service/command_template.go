@@ -7,6 +7,7 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/gin-gonic/gin"
 	"github.com/veops/oneterm/internal/model"
 	"github.com/veops/oneterm/internal/repository"
 	dbpkg "github.com/veops/oneterm/pkg/db"
@@ -26,8 +27,25 @@ func NewCommandTemplateService() *CommandTemplateService {
 }
 
 // BuildQuery builds the base query for command templates
-func (s *CommandTemplateService) BuildQuery(ctx context.Context) (*gorm.DB, error) {
+func (s *CommandTemplateService) BuildQuery(ctx *gin.Context) (*gorm.DB, error) {
 	db := dbpkg.DB.Model(model.DefaultCommandTemplate)
+
+	// Apply search filter
+	if search := ctx.Query("search"); search != "" {
+		db = db.Where("name LIKE ? OR description LIKE ?", "%"+search+"%", "%"+search+"%")
+	}
+
+	// Apply category filter
+	if category := ctx.Query("category"); category != "" {
+		db = db.Where("category = ?", category)
+	}
+
+	// Apply builtin filter
+	if builtinStr := ctx.Query("builtin"); builtinStr != "" {
+		builtin := builtinStr == "true"
+		db = db.Where("is_builtin = ?", builtin)
+	}
+
 	return db, nil
 }
 

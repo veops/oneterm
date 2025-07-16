@@ -63,10 +63,14 @@ func (c *Controller) GetConfig(ctx *gin.Context) {
 
 	cfg, err := configService.GetConfig(ctx)
 	if err != nil {
-		if !errors.Is(err, gorm.ErrRecordNotFound) {
-			ctx.AbortWithError(http.StatusInternalServerError, &myErrors.ApiError{Code: myErrors.ErrInternal, Data: map[string]any{"err": err}})
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// Return default configuration if no config exists
+			defaultCfg := model.GetDefaultConfig()
+			ctx.JSON(http.StatusOK, NewHttpResponseWithData(defaultCfg))
 			return
 		}
+		ctx.AbortWithError(http.StatusInternalServerError, &myErrors.ApiError{Code: myErrors.ErrInternal, Data: map[string]any{"err": err}})
+		return
 	}
 
 	ctx.JSON(http.StatusOK, NewHttpResponseWithData(cfg))

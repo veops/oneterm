@@ -153,3 +153,290 @@ other = "Bad Request: Invalid SSH public key"
 [MsgWrongPvk]
 one = "Bad Request: Invalid SSH private key"
 other = "Bad Request: Invalid SSH private key"
+
+# Predefined dangerous commands
+[CmdDeleteRootDir]
+one = "Delete root directory"
+other = "Delete root directory"
+
+[CmdDeleteRootDirDesc]
+one = "Prohibit deletion of root directory, this will destroy the entire system"
+other = "Prohibit deletion of root directory, this will destroy the entire system"
+
+[CmdDeleteSystemDirs]
+one = "Delete system directories"
+other = "Delete system directories"
+
+[CmdDeleteSystemDirsDesc]
+one = "Prohibit deletion of critical system directories"
+other = "Prohibit deletion of critical system directories"
+
+[CmdDiskDestruction]
+one = "Disk destruction operations"
+other = "Disk destruction operations"
+
+[CmdDiskDestructionDesc]
+one = "Prohibit writing random data to disk devices, will destroy data"
+other = "Prohibit writing random data to disk devices, will destroy data"
+
+[CmdFormatDisk]
+one = "Format disk"
+other = "Format disk"
+
+[CmdFormatDiskDesc]
+one = "Prohibit formatting disk partitions"
+other = "Prohibit formatting disk partitions"
+
+[CmdForkBomb]
+one = "Fork bomb"
+other = "Fork bomb"
+
+[CmdForkBombDesc]
+one = "Prohibit fork bomb attacks"
+other = "Prohibit fork bomb attacks"
+
+[CmdSystemReboot]
+one = "System reboot shutdown"
+other = "System reboot shutdown"
+
+[CmdSystemRebootDesc]
+one = "Restrict system reboot and shutdown operations"
+other = "Restrict system reboot and shutdown operations"
+
+[CmdModifySystemFiles]
+one = "Modify critical system files"
+other = "Modify critical system files"
+
+[CmdModifySystemFilesDesc]
+one = "Restrict direct modification of system configuration files"
+other = "Restrict direct modification of system configuration files"
+
+[CmdDropDatabase]
+one = "Drop database"
+other = "Drop database"
+
+[CmdDropDatabaseDesc]
+one = "Restrict dropping entire databases"
+other = "Restrict dropping entire databases"
+
+[CmdTruncateTable]
+one = "Truncate table data"
+other = "Truncate table data"
+
+[CmdTruncateTableDesc]
+one = "Restrict clearing all table data"
+other = "Restrict clearing all table data"
+
+[CmdModifyPermissions]
+one = "Modify user permissions"
+other = "Modify user permissions"
+
+[CmdModifyPermissionsDesc]
+one = "Restrict modifying root directory permissions"
+other = "Restrict modifying root directory permissions"
+
+[CmdDropTable]
+one = "Drop table"
+other = "Drop table"
+
+[CmdDropTableDesc]
+one = "Warning: Dropping database table"
+other = "Warning: Dropping database table"
+
+[CmdServiceControl]
+one = "Service control commands"
+other = "Service control commands"
+
+[CmdServiceControlDesc]
+one = "Warning: Operating on system services"
+other = "Warning: Operating on system services"
+
+[CmdNetworkConfig]
+one = "Network configuration modification"
+other = "Network configuration modification"
+
+[CmdNetworkConfigDesc]
+one = "Warning: Modifying network configuration"
+other = "Warning: Modifying network configuration"
+
+[CmdUserManagement]
+one = "User management"
+other = "User management"
+
+[CmdUserManagementDesc]
+one = "Warning: Performing user management operations"
+other = "Warning: Performing user management operations"
+
+[CmdKernelModule]
+one = "Kernel module operations"
+other = "Kernel module operations"
+
+# Predefined command templates
+[TmplBasicSecurity]
+one = "Basic Security Protection"
+other = "Basic Security Protection"
+
+[TmplBasicSecurityDesc]
+one = "Basic security command restrictions for all production environments"
+other = "Basic security command restrictions for all production environments"
+
+[TmplDatabaseProtection]
+one = "Production Database Protection"
+other = "Production Database Protection"
+
+[TmplDatabaseProtectionDesc]
+one = "Security policies to protect production databases"
+other = "Security policies to protect production databases"
+
+[TmplServiceRestrictions]
+one = "System Service Control Restrictions"
+other = "System Service Control Restrictions"
+
+[TmplServiceRestrictionsDesc]
+one = "Restrictions on critical system service operations"
+other = "Restrictions on critical system service operations"
+
+[TmplNetworkSecurity]
+one = "Network Security Control"
+other = "Network Security Control"
+
+[TmplNetworkSecurityDesc]
+one = "Security controls for network configuration and user permissions"
+other = "Security controls for network configuration and user permissions"
+
+[TmplDevEnvironment]
+one = "Development Environment Basic Restrictions"
+other = "Development Environment Basic Restrictions"
+
+[TmplDevEnvironmentDesc]
+one = "Minimal security restrictions for development environments"
+other = "Minimal security restrictions for development environments"
+
+# Tags
+[TagDangerous]
+one = "dangerous"
+other = "dangerous"
+
+[TagDelete]
+one = "delete"
+other = "delete"
+
+[TagSystem]
+one = "system"
+other = "system"
+
+[TagSystemDirs]
+one = "system-dirs"
+other = "system-dirs"
+
+[TagDisk]
+one = "disk"
+other = "disk"
+
+[TagDestruction]
+one = "destruction"
+other = "destruction"
+
+[TagFormat]
+one = "format"
+other = "format"
+
+[TagAttack]
+one = "attack"
+other = "attack"
+
+[TagResourceExhaustion]
+one = "resource-exhaustion"
+other = "resource-exhaustion"
+
+[TagReboot]
+one = "reboot"
+other = "reboot"
+
+[TagShutdown]
+one = "shutdown"
+other = "shutdown"
+
+[TagEdit]
+one = "edit"
+other = "edit"
+
+[TagSystemFiles]
+one = "system-files"
+other = "system-files"
+
+[TagConfig]
+one = "config"
+other = "config"
+
+[TagDatabase]
+one = "database"
+other = "database"
+
+[TagDrop]
+one = "drop"
+other = "drop"
+
+[TagClear]
+one = "clear"
+other = "clear"
+
+[TagTruncate]
+one = "truncate"
+other = "truncate"
+
+[TagPermissions]
+one = "permissions"
+other = "permissions"
+
+[TagChmod]
+one = "chmod"
+other = "chmod"
+
+[TagSecurity]
+one = "security"
+other = "security"
+
+[TagTable]
+one = "table"
+other = "table"
+
+[TagService]
+one = "service"
+other = "service"
+
+[TagSystemctl]
+one = "systemctl"
+other = "systemctl"
+
+[TagControl]
+one = "control"
+other = "control"
+
+[TagNetwork]
+one = "network"
+other = "network"
+
+[TagFirewall]
+one = "firewall"
+other = "firewall"
+
+[TagRouting]
+one = "routing"
+other = "routing"
+
+[TagUser]
+one = "user"
+other = "user"
+
+[TagManagement]
+one = "management"
+other = "management"
+
+[TagKernel]
+one = "kernel"
+other = "kernel"
+
+[TagModule]
+one = "module"
+other = "module"

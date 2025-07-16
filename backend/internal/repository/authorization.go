@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 
-	"github.com/samber/lo"
 	"gorm.io/gorm"
 
 	"github.com/veops/oneterm/internal/model"
@@ -50,7 +49,6 @@ func (r *AuthorizationRepository) UpsertAuthorization(ctx context.Context, auth 
 	return r.db.Save(auth).Error
 }
 
-// GetAuthorizationById 根据ID获取授权
 func (r *AuthorizationRepository) GetAuthorizationById(ctx context.Context, id int) (*model.Authorization, error) {
 	auth := &model.Authorization{}
 	err := r.db.Model(auth).Where("id = ?", id).First(auth).Error
@@ -60,7 +58,6 @@ func (r *AuthorizationRepository) GetAuthorizationById(ctx context.Context, id i
 	return auth, nil
 }
 
-// GetAuthorizationByFields 根据字段获取授权
 func (r *AuthorizationRepository) GetAuthorizationByFields(ctx context.Context, nodeId, assetId, accountId int) (*model.Authorization, error) {
 	auth := &model.Authorization{}
 	err := r.db.Model(auth).
@@ -104,8 +101,21 @@ func (r *AuthorizationRepository) GetAuthorizations(ctx context.Context, nodeId,
 
 func (r *AuthorizationRepository) GetAuthsByAsset(ctx context.Context, asset *model.Asset) ([]*model.Authorization, error) {
 	var data []*model.Authorization
+
+	// Extract account IDs from the new Authorization structure
+	accountIds := make([]int, 0, len(asset.Authorization))
+	for accountId := range asset.Authorization {
+		if accountId != 0 {
+			accountIds = append(accountIds, accountId)
+		}
+	}
+
+	if len(accountIds) == 0 {
+		return data, nil
+	}
+
 	err := r.db.Model(&model.Authorization{}).
-		Where("asset_id=? AND account_id IN ? AND node_id=0", asset.Id, lo.Without(lo.Keys(asset.Authorization), 0)).
+		Where("asset_id=? AND account_id IN ? AND node_id=0", asset.Id, accountIds).
 		Find(&data).Error
 	return data, err
 }

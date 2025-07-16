@@ -30,7 +30,28 @@ func ConnectGuacd(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, 
 
 	w, h, dpi := cast.ToInt(ctx.Query("w")), cast.ToInt(ctx.Query("h")), cast.ToInt(ctx.Query("dpi"))
 
-	t, err := guacd.NewTunnel("", sess.SessionId, w, h, dpi, sess.Protocol, asset, account, gateway)
+	// Get permissions for guacd connection using batch check
+	permissions := &guacd.PermissionInfo{}
+
+	// Check all relevant permissions in one batch call
+	batchResult, err := service.DefaultAuthService.HasAuthorizationV2(ctx, sess,
+		model.ActionCopy,
+		model.ActionPaste,
+		model.ActionFileUpload,
+		model.ActionFileDownload)
+
+	if err != nil {
+		logger.L().Warn("Failed to check permissions, using default settings", zap.Error(err))
+		// Continue with default (denied) permissions if check fails
+	} else {
+		// Extract individual permissions from batch result
+		permissions.AllowCopy = batchResult.IsAllowed(model.ActionCopy)
+		permissions.AllowPaste = batchResult.IsAllowed(model.ActionPaste)
+		permissions.AllowFileUpload = batchResult.IsAllowed(model.ActionFileUpload)
+		permissions.AllowFileDownload = batchResult.IsAllowed(model.ActionFileDownload)
+	}
+
+	t, err := guacd.NewTunnel("", sess.SessionId, w, h, dpi, sess.Protocol, asset, account, gateway, permissions)
 	if err != nil {
 		logger.L().Error("guacd tunnel failed", zap.Error(err))
 		return
@@ -135,7 +156,8 @@ func MonitGuacd(ctx *gin.Context, sess *gsession.Session, chs *gsession.SessionC
 		chs.ErrChan <- err
 	}()
 
-	t, err := guacd.NewTunnel(sess.ConnectionId, "", w, h, dpi, ":", nil, nil, nil)
+	// For monitoring, no permissions needed since it's read-only
+	t, err := guacd.NewTunnel(sess.ConnectionId, "", w, h, dpi, ":", nil, nil, nil, nil)
 	if err != nil {
 		logger.L().Error("guacd tunnel failed", zap.Error(err))
 		return

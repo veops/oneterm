@@ -67,20 +67,20 @@ func (m *AuthorizationIds) TableName() string {
 }
 
 type AssetInfo struct {
-	Id            int           `json:"id" gorm:"column:id;primarykey;autoIncrement"`
-	Name          string        `json:"name" gorm:"column:name"`
-	Comment       string        `json:"comment" gorm:"column:comment"`
-	ParentId      int           `json:"parent_id" gorm:"column:parent_id"`
-	Ip            string        `json:"ip" gorm:"column:ip"`
-	Protocols     Slice[string] `json:"protocols" gorm:"column:protocols"`
-	Connectable   bool          `json:"connectable" gorm:"column:connectable"`
-	NodeChain     string        `json:"node_chain" gorm:"-"`
-	*AccessAuth   `json:"access_auth" gorm:"column:access_auth"`
+	Id            int                  `json:"id" gorm:"column:id;primarykey;autoIncrement"`
+	Name          string               `json:"name" gorm:"column:name"`
+	Comment       string               `json:"comment" gorm:"column:comment"`
+	ParentId      int                  `json:"parent_id" gorm:"column:parent_id"`
+	Ip            string               `json:"ip" gorm:"column:ip"`
+	Protocols     Slice[string]        `json:"protocols" gorm:"column:protocols"`
+	Connectable   bool                 `json:"connectable" gorm:"column:connectable"`
+	NodeChain     string               `json:"node_chain" gorm:"-"`
 	Authorization Map[int, Slice[int]] `json:"-" gorm:"column:authorization"`
 	GatewayId     int                  `json:"-" gorm:"column:gateway_id"`
 	Gateway       *GatewayInfo         `json:"gateway,omitempty" gorm:"-"`
 	Accounts      []*AccountInfo       `json:"accounts" gorm:"-"`
 	Commands      []*CmdInfo           `json:"commands" gorm:"-"`
+	*AccessAuth   `json:"access_auth" gorm:"column:access_auth"`
 }
 
 func (m *AssetInfo) GetId() int {

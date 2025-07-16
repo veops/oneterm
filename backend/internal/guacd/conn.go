@@ -34,6 +34,14 @@ const (
 	DRIVE_NAME             = "drive-name"
 )
 
+// PermissionInfo contains permission information for guacd connection
+type PermissionInfo struct {
+	AllowCopy         bool
+	AllowPaste        bool
+	AllowFileUpload   bool
+	AllowFileDownload bool
+}
+
 type Configuration struct {
 	Protocol   string
 	Parameters map[string]string
@@ -57,7 +65,7 @@ type Tunnel struct {
 	drivePath       string
 }
 
-func NewTunnel(connectionId, sessionId string, w, h, dpi int, protocol string, asset *model.Asset, account *model.Account, gateway *model.Gateway) (t *Tunnel, err error) {
+func NewTunnel(connectionId, sessionId string, w, h, dpi int, protocol string, asset *model.Asset, account *model.Account, gateway *model.Gateway, permissions *PermissionInfo) (t *Tunnel, err error) {
 	var hostPort string
 	if strings.Contains(config.Cfg.Guacd.Host, ":") {
 		// IPv6 address
@@ -70,9 +78,34 @@ func NewTunnel(connectionId, sessionId string, w, h, dpi int, protocol string, a
 	if err != nil {
 		return
 	}
-	ss := strings.Split(protocol, ":")
-	protocol, port := ss[0], ss[1]
-	cfg := model.GlobalConfig.Load()
+	// Find the port for the protocol from asset.Protocols
+	var port string
+	protocolLower := strings.ToLower(protocol)
+	for _, p := range asset.Protocols {
+		if strings.HasPrefix(strings.ToLower(p), protocolLower) {
+			parts := strings.Split(p, ":")
+			if len(parts) >= 2 {
+				port = parts[1]
+				break
+			}
+		}
+	}
+
+	// Fallback to default ports if not found in asset.Protocols
+	if port == "" {
+		switch protocolLower {
+		case "rdp":
+			port = "3389"
+		case "vnc":
+			port = "5900"
+		default:
+			port = "22" // SSH default
+		}
+	}
+
+	// Determine if file transfer should be enabled
+	enableFileTransfer := permissions != nil && (permissions.AllowFileUpload || permissions.AllowFileDownload)
+
 	t = &Tunnel{
 		conn:            conn,
 		reader:          bufio.NewReader(conn),
@@ -84,7 +117,7 @@ func NewTunnel(connectionId, sessionId string, w, h, dpi int, protocol string, a
 			Parameters: lo.TernaryF(
 				connectionId == "",
 				func() map[string]string {
-					return map[string]string{
+					params := map[string]string{
 						"version":               VERSION,
 						"client-name":           "OneTerm",
 						"recording-path":        RECORDING_PATH,
@@ -98,22 +131,36 @@ func NewTunnel(connectionId, sessionId string, w, h, dpi int, protocol string, a
 						"port":                  port,
 						"username":              account.Account,
 						"password":              account.Password,
-						"disable-copy":          cast.ToString(lo.Ternary(strings.Contains(protocol, "rdp"), !cfg.RdpConfig.Copy, !cfg.VncConfig.Copy)),
-						"disable-paste":         cast.ToString(lo.Ternary(strings.Contains(protocol, "rdp"), !cfg.RdpConfig.Paste, !cfg.VncConfig.Paste)),
 						"resize-method":         "display-update",
-						// Set file transfer related parameters from config
-						// DRIVE_ENABLE:           cast.ToString(lo.Ternary(strings.Contains(protocol, "rdp"), cfg.RdpConfig.EnableDrive, false)),
-						// DRIVE_PATH:             cast.ToString(lo.Ternary(strings.Contains(protocol, "rdp"), cfg.RdpConfig.DrivePath, "")),
-						// DRIVE_CREATE_PATH:      cast.ToString(lo.Ternary(strings.Contains(protocol, "rdp"), cfg.RdpConfig.CreateDrivePath, false)),
-						// DRIVE_DISABLE_UPLOAD:   cast.ToString(lo.Ternary(strings.Contains(protocol, "rdp"), cfg.RdpConfig.DisableUpload, false)),
-						// DRIVE_DISABLE_DOWNLOAD: cast.ToString(lo.Ternary(strings.Contains(protocol, "rdp"), cfg.RdpConfig.DisableDownload, false)),
-						DRIVE_ENABLE:           "true",
-						DRIVE_PATH:             fmt.Sprintf("/rdp/asset_%d", asset.Id),
-						DRIVE_CREATE_PATH:      "true",
-						DRIVE_DISABLE_UPLOAD:   "false",
-						DRIVE_DISABLE_DOWNLOAD: "false",
-						DRIVE_NAME:             "Drive",
 					}
+
+					// Set permission-based parameters
+					if permissions != nil {
+						// Copy/Paste permissions
+						params["disable-copy"] = cast.ToString(!permissions.AllowCopy)
+						params["disable-paste"] = cast.ToString(!permissions.AllowPaste)
+
+						// File transfer permissions
+						params[DRIVE_ENABLE] = cast.ToString(enableFileTransfer)
+						params[DRIVE_DISABLE_UPLOAD] = cast.ToString(!permissions.AllowFileUpload)
+						params[DRIVE_DISABLE_DOWNLOAD] = cast.ToString(!permissions.AllowFileDownload)
+					} else {
+						// Default to deny all permissions if no permissions provided
+						params["disable-copy"] = "true"
+						params["disable-paste"] = "true"
+						params[DRIVE_ENABLE] = "false"
+						params[DRIVE_DISABLE_UPLOAD] = "true"
+						params[DRIVE_DISABLE_DOWNLOAD] = "true"
+					}
+
+					// Only set file transfer parameters if enabled
+					if enableFileTransfer {
+						params[DRIVE_PATH] = fmt.Sprintf("/rdp/asset_%d", asset.Id)
+						params[DRIVE_CREATE_PATH] = "true"
+						params[DRIVE_NAME] = "Drive"
+					}
+
+					return params
 				}, func() map[string]string {
 					return map[string]string{
 						"width":     cast.ToString(w),

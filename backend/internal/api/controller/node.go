@@ -8,7 +8,6 @@ import (
 	"github.com/samber/lo"
 	"github.com/spf13/cast"
 
-	"github.com/veops/oneterm/internal/acl"
 	"github.com/veops/oneterm/internal/model"
 	"github.com/veops/oneterm/internal/repository"
 	"github.com/veops/oneterm/internal/service"
@@ -82,14 +81,19 @@ func (c *Controller) UpdateNode(ctx *gin.Context) {
 //	@Success	200				{object}	HttpResponse{data=ListData{list=[]model.Node}}
 //	@Router		/node [get]
 func (c *Controller) GetNodes(ctx *gin.Context) {
-	currentUser, _ := acl.GetSessionFromCtx(ctx)
 	info := cast.ToBool(ctx.Query("info"))
 	recursive := cast.ToBool(ctx.Query("recursive"))
 
-	db, err := nodeService.BuildQuery(ctx, currentUser, info)
+	// Build query with integrated V2 authorization filter
+	db, err := nodeService.BuildQueryWithAuthorization(ctx)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, &errors.ApiError{Code: errors.ErrInternal, Data: map[string]any{"err": err}})
 		return
+	}
+
+	// Apply info mode settings
+	if info {
+		db = db.Select("id", "parent_id", "name")
 	}
 
 	if recursive {

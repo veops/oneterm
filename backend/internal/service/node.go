@@ -125,6 +125,82 @@ func (s *NodeService) BuildQuery(ctx *gin.Context, currentUser interface{}, info
 	return db, nil
 }
 
+// BuildQueryWithAuthorization builds query with integrated V2 authorization filter
+func (s *NodeService) BuildQueryWithAuthorization(ctx *gin.Context) (*gorm.DB, error) {
+	// Start with base query filters (without authorization)
+	db := dbpkg.DB.Model(model.DefaultNode)
+
+	db = dbpkg.FilterEqual(ctx, db, "parent_id", "id")
+	db = dbpkg.FilterLike(ctx, db, "name")
+	db = dbpkg.FilterSearch(ctx, db, "name", "id")
+
+	// Handle IDs filter
+	if q, ok := ctx.GetQuery("ids"); ok {
+		db = db.Where("id IN ?", lo.Map(strings.Split(q, ","), func(s string, _ int) int { return cast.ToInt(s) }))
+	}
+
+	// Handle no_self_child filter
+	if id, ok := ctx.GetQuery("no_self_child"); ok {
+		ids, err := s.handleNoSelfChild(ctx, cast.ToInt(id))
+		if err != nil {
+			return nil, err
+		}
+		db = db.Where("id IN ?", ids)
+	}
+
+	// Handle self_parent filter
+	if id, ok := ctx.GetQuery("self_parent"); ok {
+		ids, err := repository.HandleSelfParent(ctx, cast.ToInt(id))
+		if err != nil {
+			return nil, err
+		}
+		db = db.Where("id IN ?", ids)
+	}
+
+	currentUser, _ := acl.GetSessionFromCtx(ctx)
+
+	// Administrators have access to all nodes
+	if acl.IsAdmin(currentUser) {
+		return db, nil
+	}
+
+	// Apply V2 authorization filter: get authorized asset IDs using V2 system
+	authV2Service := NewAuthorizationV2Service()
+	_, assetIds, _, err := authV2Service.GetAuthorizationScopeByACL(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Use the same logic as GetNodeIdsByAuthorization but more efficiently
+	if len(assetIds) == 0 {
+		// No access to any assets = no access to any nodes
+		db = db.Where("1 = 0")
+	} else {
+		// Get parent node IDs from authorized assets (same logic as before)
+		var parentIds []int
+		err = dbpkg.DB.Model(model.DefaultAsset).
+			Where("id IN ?", assetIds).
+			Distinct("parent_id").
+			Pluck("parent_id", &parentIds).Error
+		if err != nil {
+			return nil, err
+		}
+
+		if len(parentIds) == 0 {
+			db = db.Where("1 = 0")
+		} else {
+			// Include self and parent hierarchy for proper tree navigation
+			allNodeIds, err := repository.HandleSelfParent(ctx, parentIds...)
+			if err != nil {
+				return nil, err
+			}
+			db = db.Where("id IN ?", allNodeIds)
+		}
+	}
+
+	return db, nil
+}
+
 // AttachAssetCount attaches asset count to nodes
 func (s *NodeService) AttachAssetCount(ctx *gin.Context, data []*model.Node) error {
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
@@ -136,7 +212,9 @@ func (s *NodeService) AttachAssetCount(ctx *gin.Context, data []*model.Node) err
 	if !acl.IsAdmin(currentUser) {
 		info := cast.ToBool(ctx.Query("info"))
 		if info {
-			_, assetIds, _, err := NewAssetService().GetAssetIdsByAuthorization(ctx)
+			// Use V2 authorization system for asset filtering
+			authV2Service := NewAuthorizationV2Service()
+			_, assetIds, _, err := authV2Service.GetAuthorizationScopeByACL(ctx)
 			if err != nil {
 				return err
 			}
@@ -215,7 +293,9 @@ func (s *NodeService) AttachHasChild(ctx *gin.Context, data []*model.Node) error
 		}
 
 		if info {
-			_, assetIds, _, err := NewAssetService().GetAssetIdsByAuthorization(ctx)
+			// Use V2 authorization system for asset filtering
+			authV2Service := NewAuthorizationV2Service()
+			_, assetIds, _, err := authV2Service.GetAuthorizationScopeByACL(ctx)
 			if err != nil {
 				return err
 			}
@@ -311,7 +391,9 @@ func (s *NodeService) CheckDependencies(ctx context.Context, id int) (string, er
 
 // GetNodeIdsByAuthorization gets node IDs that the user is authorized to access
 func (s *NodeService) GetNodeIdsByAuthorization(ctx *gin.Context) ([]int, error) {
-	_, assetIds, _, err := NewAssetService().GetAssetIdsByAuthorization(ctx)
+	// Use V2 authorization system for asset filtering
+	authV2Service := NewAuthorizationV2Service()
+	_, assetIds, _, err := authV2Service.GetAuthorizationScopeByACL(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -425,19 +507,18 @@ func (s *NodeService) GetNodesTree(ctx *gin.Context, dbQuery *gorm.DB, needAcl b
 		return nil, err
 	}
 
-	// Apply postHooks only if info=false
-	if !info {
-		if err := s.AttachAssetCount(ctx, allNodes); err != nil {
-			logger.L().Error("failed to attach asset count", zap.Error(err))
-		}
+	// Apply postHooks - now always apply permission handling regardless of info mode
+	if err := s.AttachAssetCount(ctx, allNodes); err != nil {
+		logger.L().Error("failed to attach asset count", zap.Error(err))
+	}
 
-		if err := s.AttachHasChild(ctx, allNodes); err != nil {
-			logger.L().Error("failed to attach has_child flag", zap.Error(err))
-		}
+	if err := s.AttachHasChild(ctx, allNodes); err != nil {
+		logger.L().Error("failed to attach has_child flag", zap.Error(err))
+	}
 
-		if err := s.handleNodePermissions(ctx, allNodes, resourceType); err != nil {
-			return nil, err
-		}
+	// Always handle permissions, regardless of info mode
+	if err := s.handleNodePermissions(ctx, allNodes, resourceType); err != nil {
+		return nil, err
 	}
 
 	// Build tree structure
@@ -487,10 +568,6 @@ func (s *NodeService) buildNodeTree(nodes []*model.Node, rootIds []int) []any {
 
 // handleNodePermissions handles node permissions
 func (s *NodeService) handleNodePermissions(ctx *gin.Context, nodes []*model.Node, resourceType string) error {
-	if info := cast.ToBool(ctx.Query("info")); info {
-		return nil
-	}
-
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
 
 	if !lo.Contains(config.PermResource, resourceType) {

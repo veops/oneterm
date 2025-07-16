@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
 
@@ -207,41 +206,61 @@ func DoConnect(ctx *gin.Context, ws *websocket.Conn) (sess *gsession.Session, er
 		sess.SshParser = gsession.NewParser(sess.SessionId, w, h)
 		sess.SshParser.Protocol = sess.Protocol
 
-		sessionService := service.NewSessionService()
-		cmds, err := sessionService.GetSshParserCommands(ctx, []int(asset.AccessAuth.CmdIds))
+		// Use V2 command analyzer instead of legacy method
+		commandAnalyzer := service.NewCommandAnalyzer()
+		cmds, err := commandAnalyzer.AnalyzeSessionCommands(ctx, sess)
 		if err != nil {
-			return sess, err
+			logger.L().Error("Failed to analyze session commands", zap.String("sessionId", sess.SessionId), zap.Error(err))
+			// Continue with empty command list (no command restrictions)
+			cmds = []*model.Command{}
 		}
 		sess.SshParser.Cmds = cmds
 
-		for _, c := range sess.SshParser.Cmds {
-			if c.IsRe {
-				c.Re, _ = regexp.Compile(c.Cmd)
-			}
-		}
 		if sess.SshRecoder, err = gsession.NewAsciinema(sess.SessionId, w, h); err != nil {
 			return sess, err
 		}
 	}
-	if sess.SessionType == model.SESSIONTYPE_WEB {
+	switch sess.SessionType {
+	case model.SESSIONTYPE_WEB:
 		sess.ClientIp = ctx.ClientIP()
-	} else if sess.SessionType == model.SESSIONTYPE_CLIENT {
+	case model.SESSIONTYPE_CLIENT:
 		sess.ClientIp = ctx.RemoteIP()
 	}
 
-	if !protocols.CheckTime(asset.AccessAuth) {
-		err = &myErrors.ApiError{Code: myErrors.ErrAccessTime}
-		return
+	// V2 authorization check - determine required permissions based on protocol
+	protocol := strings.Split(sess.Protocol, ":")[0]
+	var requiredActions []model.AuthAction
+
+	// All protocols need connect permission
+	requiredActions = append(requiredActions, model.ActionConnect)
+
+	// SSH protocol needs file permissions since it will initialize SFTP client
+	if protocol == "ssh" {
+		requiredActions = append(requiredActions, model.ActionFileUpload, model.ActionFileDownload)
 	}
-	if ok, err := service.DefaultAuthService.HasAuthorization(ctx, sess); err != nil {
+
+	// RDP/VNC are handled separately in ConnectGuacd with their own batch permission check
+	// but we still check connect permission here for consistency
+
+	result, err := service.DefaultAuthService.HasAuthorizationV2(ctx, sess, requiredActions...)
+	if err != nil {
 		err = &myErrors.ApiError{Code: myErrors.ErrInvalidArgument, Data: map[string]any{"err": err}}
 		return sess, err
-	} else if !ok {
+	}
+
+	// Check connect permission (required for all protocols)
+	if !result.IsAllowed(model.ActionConnect) {
 		err = &myErrors.ApiError{Code: myErrors.ErrUnauthorized, Data: map[string]any{"perm": "connect"}}
 		return sess, err
 	}
 
-	switch strings.Split(sess.Protocol, ":")[0] {
+	// For SSH, check if user has any file permissions before initializing SFTP
+	hasFilePermissions := false
+	if protocol == "ssh" {
+		hasFilePermissions = result.IsAllowed(model.ActionFileUpload) || result.IsAllowed(model.ActionFileDownload)
+	}
+
+	switch protocol {
 	case "ssh":
 		go protocols.ConnectSsh(ctx, sess, asset, account, gateway)
 	case "redis", "mysql", "mongodb", "postgresql":
@@ -263,24 +282,30 @@ func DoConnect(ctx *gin.Context, ws *websocket.Conn) (sess *gsession.Session, er
 	gsession.GetOnlineSession().Store(sess.SessionId, sess)
 	gsession.UpsertSession(sess)
 
-	// Initialize session-based file client for high-performance file operations
-	// Only for SSH-based protocols that support SFTP
-	protocol := strings.Split(sess.Protocol, ":")[0]
-	if protocol == "ssh" {
-		if err := fileservice.DefaultFileService.InitSessionFileClient(sess.SessionId, sess.AssetId, sess.AccountId); err != nil {
-			logger.L().Warn("Failed to initialize session file client",
-				zap.String("sessionId", sess.SessionId),
-				zap.Int("assetId", sess.AssetId),
-				zap.Int("accountId", sess.AccountId),
-				zap.Error(err))
-			// Don't fail the session creation for file service initialization failure
+	// Initialize session-based file client only for SSH and only if user has file permissions
+	switch protocol {
+	case "ssh":
+		if hasFilePermissions {
+			if err := fileservice.DefaultFileService.InitSessionFileClient(sess.SessionId, sess.AssetId, sess.AccountId); err != nil {
+				logger.L().Warn("Failed to initialize session file client",
+					zap.String("sessionId", sess.SessionId),
+					zap.Int("assetId", sess.AssetId),
+					zap.Int("accountId", sess.AccountId),
+					zap.Error(err))
+				// Don't fail the session creation for file service initialization failure
+			} else {
+				logger.L().Info("Session file client initialized successfully",
+					zap.String("sessionId", sess.SessionId),
+					zap.Int("assetId", sess.AssetId),
+					zap.Int("accountId", sess.AccountId))
+			}
 		} else {
-			logger.L().Info("Session file client initialized successfully",
+			logger.L().Info("Skipping SFTP client initialization - no file permissions",
 				zap.String("sessionId", sess.SessionId),
 				zap.Int("assetId", sess.AssetId),
 				zap.Int("accountId", sess.AccountId))
 		}
-	} else if protocol == "rdp" || protocol == "vnc" {
+	case "rdp", "vnc":
 		logger.L().Debug("Skipping session file client initialization for Guacamole protocol",
 			zap.String("protocol", protocol),
 			zap.String("sessionId", sess.SessionId))

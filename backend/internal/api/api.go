@@ -28,11 +28,12 @@ func initDB() {
 	cfg := db.ConfigFromGlobal()
 
 	if err := db.Init(cfg, true,
-		model.DefaultAccount, model.DefaultAsset, model.DefaultAuthorization, model.DefaultCommand,
-		model.DefaultConfig, model.DefaultFileHistory, model.DefaultGateway, model.DefaultHistory,
-		model.DefaultNode, model.DefaultPublicKey, model.DefaultSession, model.DefaultSessionCmd,
-		model.DefaultShare, model.DefaultQuickCommand, model.DefaultUserPreference,
-		model.DefaultStorageConfig, model.DefaultStorageMetrics,
+		model.DefaultAccount, model.DefaultAsset, model.DefaultAuthorization, model.DefaultAuthorizationV2,
+		model.DefaultCommand, model.DefaultCommandTemplate, model.DefaultConfig, model.DefaultFileHistory,
+		model.DefaultGateway, model.DefaultHistory, model.DefaultNode, model.DefaultPublicKey,
+		model.DefaultSession, model.DefaultSessionCmd, model.DefaultShare, model.DefaultQuickCommand,
+		model.DefaultUserPreference, model.DefaultStorageConfig, model.DefaultStorageMetrics,
+		model.DefaultTimeTemplate, model.DefaultMigrationRecord,
 	); err != nil {
 		logger.L().Fatal("Failed to init database", zap.Error(err))
 	}
@@ -42,6 +43,7 @@ func initDB() {
 	}
 
 	acl.MigrateNode()
+	acl.MigrateCommand()
 
 	gsession.InitSessionCleanup()
 }
@@ -49,6 +51,17 @@ func initDB() {
 func initServices() {
 	service.InitAuthorizationService()
 	fileservice.InitFileService()
+
+	// Initialize predefined dangerous commands and templates
+	if err := service.InitBuiltinCommands(); err != nil {
+		logger.L().Error("Failed to initialize builtin commands", zap.Error(err))
+	}
+
+	// Initialize built-in time templates
+	timeTemplateService := service.NewTimeTemplateService()
+	if err := timeTemplateService.InitializeBuiltInTemplates(ctx); err != nil {
+		logger.L().Error("Failed to initialize built-in time templates", zap.Error(err))
+	}
 }
 
 func initStorage() error {

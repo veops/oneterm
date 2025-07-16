@@ -435,10 +435,6 @@ func hasPerm[T model.Model](ctx context.Context, md T, resourceTypeName, action 
 }
 
 func handlePermissions[T any](ctx *gin.Context, data []T, resourceTypeName string) (err error) {
-	if info := cast.ToBool(ctx.Query("info")); info {
-		return
-	}
-
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
 
 	if !lo.Contains(config.PermResource, resourceTypeName) {

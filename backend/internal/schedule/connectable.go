@@ -83,7 +83,8 @@ func getAssetsToCheck(ids ...int) ([]*model.Asset, error) {
 			time.Now().Add(-checkInterval).Add(-time.Second*30), false)
 	}
 
-	if err := db.Find(&assets).Error; err != nil {
+	// Only select fields needed for connectivity check, exclude authorization to avoid V1/V2 compatibility issues
+	if err := db.Select("id", "name", "ip", "protocols", "gateway_id", "connectable", "updated_at").Find(&assets).Error; err != nil {
 		logger.L().Error("Failed to get assets for connectivity check", zap.Error(err))
 		return nil, err
 	}

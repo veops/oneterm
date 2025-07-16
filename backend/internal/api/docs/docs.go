@@ -367,6 +367,48 @@ const docTemplate = `{
                 }
             }
         },
+        "/asset/:id/permissions": {
+            "get": {
+                "tags": [
+                    "asset"
+                ],
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "asset id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "account ids (comma separated, e.g. 123,456,789)",
+                        "name": "account_ids",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/controller.HttpResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/controller.AssetPermissionMultiAccountResult"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/authorization": {
             "get": {
                 "tags": [
@@ -491,6 +533,270 @@ const docTemplate = `{
                 }
             }
         },
+        "/authorization_v2": {
+            "get": {
+                "tags": [
+                    "authorization_v2"
+                ],
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "page index",
+                        "name": "page_index",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "page size",
+                        "name": "page_size",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "filter by enabled status",
+                        "name": "enabled",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "search by name or description",
+                        "name": "search",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/controller.HttpResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/definitions/controller.ListData"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "list": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "$ref": "#/definitions/model.AuthorizationV2"
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "authorization_v2"
+                ],
+                "parameters": [
+                    {
+                        "description": "authorization rule",
+                        "name": "authorization",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.AuthorizationV2"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controller.HttpResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/authorization_v2/:id": {
+            "get": {
+                "tags": [
+                    "authorization_v2"
+                ],
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "authorization id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/controller.HttpResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.AuthorizationV2"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            "put": {
+                "tags": [
+                    "authorization_v2"
+                ],
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "authorization id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "authorization rule",
+                        "name": "authorization",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.AuthorizationV2"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controller.HttpResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "authorization_v2"
+                ],
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "authorization id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controller.HttpResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/authorization_v2/:id/clone": {
+            "post": {
+                "tags": [
+                    "authorization_v2"
+                ],
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "source authorization id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "clone request",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/controller.HttpResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.AuthorizationV2"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/authorization_v2/check": {
+            "post": {
+                "tags": [
+                    "authorization_v2"
+                ],
+                "parameters": [
+                    {
+                        "description": "permission check request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controller.CheckPermissionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/controller.HttpResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.AuthResult"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/command": {
             "get": {
                 "tags": [
@@ -499,14 +805,14 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "command id",
+                        "description": "page index",
                         "name": "page_index",
                         "in": "query",
                         "required": true
                     },
                     {
                         "type": "integer",
-                        "description": "command id",
+                        "description": "page size",
                         "name": "page_size",
                         "in": "query",
                         "required": true
@@ -539,6 +845,18 @@ const docTemplate = `{
                         "type": "integer",
                         "description": "command enable",
                         "name": "enable",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "command category",
+                        "name": "category",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "command risk level",
+                        "name": "risk_level",
                         "in": "query"
                     },
                     {
@@ -665,6 +983,216 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/controller.HttpResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/command_template": {
+            "get": {
+                "tags": [
+                    "command_template"
+                ],
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "page index",
+                        "name": "page_index",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "page size",
+                        "name": "page_size",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "template category",
+                        "name": "category",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "filter by builtin status",
+                        "name": "builtin",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "info mode",
+                        "name": "info",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/controller.HttpResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/model.CommandTemplate"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "command_template"
+                ],
+                "parameters": [
+                    {
+                        "description": "command template",
+                        "name": "template",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.CommandTemplate"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controller.HttpResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/command_template/:id": {
+            "put": {
+                "tags": [
+                    "command_template"
+                ],
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "template id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "command template",
+                        "name": "template",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.CommandTemplate"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controller.HttpResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "command_template"
+                ],
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "template id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controller.HttpResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/command_template/:id/commands": {
+            "get": {
+                "tags": [
+                    "command_template"
+                ],
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "template id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/controller.HttpResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/model.Command"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/command_template/builtin": {
+            "get": {
+                "tags": [
+                    "command_template"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/controller.HttpResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/model.CommandTemplate"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -1141,14 +1669,12 @@ const docTemplate = `{
         },
         "/file/session/:session_id/upload": {
             "post": {
-                "description": "Uploads file via server temp storage then transfers to target using optimized SFTP with performance enhancements. HTTP response only after file reaches target machine.",
                 "consumes": [
                     "multipart/form-data"
                 ],
                 "tags": [
                     "file"
                 ],
-                "summary": "High-performance file upload using optimized SFTP",
                 "parameters": [
                     {
                         "type": "string",
@@ -3372,6 +3898,51 @@ const docTemplate = `{
                 }
             }
         },
+        "/storage/metrics": {
+            "get": {
+                "tags": [
+                    "storage"
+                ],
+                "summary": "Get storage usage metrics",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/controller.HttpResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "additionalProperties": true
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/storage/metrics/refresh": {
+            "post": {
+                "tags": [
+                    "storage"
+                ],
+                "summary": "Refresh storage usage metrics",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controller.HttpResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/storage/test-connection": {
             "post": {
                 "tags": [
@@ -3398,9 +3969,331 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/time_template": {
+            "get": {
+                "tags": [
+                    "time_template"
+                ],
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "page index",
+                        "name": "page_index",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "page size",
+                        "name": "page_size",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "template category",
+                        "name": "category",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "filter by active status",
+                        "name": "active",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "info mode",
+                        "name": "info",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/controller.HttpResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/model.TimeTemplate"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "time_template"
+                ],
+                "parameters": [
+                    {
+                        "description": "time template",
+                        "name": "template",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.TimeTemplate"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controller.HttpResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/time_template/:id": {
+            "put": {
+                "tags": [
+                    "time_template"
+                ],
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "template id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "time template",
+                        "name": "template",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.TimeTemplate"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controller.HttpResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "time_template"
+                ],
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "template id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controller.HttpResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/time_template/builtin": {
+            "get": {
+                "tags": [
+                    "time_template"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/controller.HttpResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/model.TimeTemplate"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/time_template/check": {
+            "post": {
+                "tags": [
+                    "time_template"
+                ],
+                "parameters": [
+                    {
+                        "description": "time access check request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controller.CheckTimeAccessRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/controller.HttpResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/controller.CheckTimeAccessResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/time_template/init": {
+            "post": {
+                "tags": [
+                    "time_template"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controller.HttpResponse"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
+        "controller.AssetPermissionBatchResult": {
+            "type": "object",
+            "properties": {
+                "results": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/controller.AssetPermissionResult"
+                    }
+                }
+            }
+        },
+        "controller.AssetPermissionMultiAccountResult": {
+            "type": "object",
+            "properties": {
+                "results": {
+                    "description": "accountId -\u003e batch results",
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/controller.AssetPermissionBatchResult"
+                    }
+                }
+            }
+        },
+        "controller.AssetPermissionResult": {
+            "type": "object",
+            "properties": {
+                "allowed": {
+                    "type": "boolean"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "restrictions": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "rule_id": {
+                    "type": "integer"
+                },
+                "rule_name": {
+                    "type": "string"
+                }
+            }
+        },
+        "controller.CheckPermissionRequest": {
+            "type": "object",
+            "required": [
+                "action"
+            ],
+            "properties": {
+                "account_id": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "action": {
+                    "$ref": "#/definitions/model.AuthAction"
+                },
+                "asset_id": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "node_id": {
+                    "type": "integer",
+                    "minimum": 0
+                }
+            }
+        },
+        "controller.CheckTimeAccessRequest": {
+            "type": "object",
+            "required": [
+                "template_id"
+            ],
+            "properties": {
+                "template_id": {
+                    "type": "integer"
+                },
+                "timezone": {
+                    "type": "string"
+                }
+            }
+        },
+        "controller.CheckTimeAccessResponse": {
+            "type": "object",
+            "properties": {
+                "allowed": {
+                    "type": "boolean"
+                },
+                "checked_at": {
+                    "type": "string"
+                },
+                "template_id": {
+                    "type": "integer"
+                },
+                "timezone": {
+                    "type": "string"
+                }
+            }
+        },
         "controller.HttpResponse": {
             "type": "object",
             "properties": {
@@ -3447,6 +4340,76 @@ const docTemplate = `{
                     }
                 },
                 "start": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.AccessControl": {
+            "type": "object",
+            "properties": {
+                "cmd_ids": {
+                    "description": "Command control",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "custom_time_ranges": {
+                    "description": "Direct definition",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.TimeRange"
+                    }
+                },
+                "ip_whitelist": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "max_sessions": {
+                    "type": "integer"
+                },
+                "session_timeout": {
+                    "type": "integer"
+                },
+                "template_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "time_template": {
+                    "description": "Time control options",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.TimeTemplateReference"
+                        }
+                    ]
+                },
+                "timezone": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.AccessTimeControl": {
+            "type": "object",
+            "properties": {
+                "comment": {
+                    "description": "Description of the time restriction",
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "time_ranges": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.TimeRange"
+                    }
+                },
+                "timezone": {
+                    "description": "e.g., \"Asia/Shanghai\"",
                     "type": "string"
                 }
             }
@@ -3501,14 +4464,50 @@ const docTemplate = `{
                 }
             }
         },
+        "model.AccountAuthorization": {
+            "type": "object",
+            "properties": {
+                "permissions": {
+                    "description": "V2 permissions (connect, file_upload, etc.)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.AuthPermissions"
+                        }
+                    ]
+                },
+                "rids": {
+                    "description": "Role IDs for ACL system",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
         "model.Asset": {
             "type": "object",
             "properties": {
                 "access_auth": {
-                    "$ref": "#/definitions/model.AccessAuth"
+                    "description": "Deprecated: Use V2 fields below",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.AccessAuth"
+                        }
+                    ]
+                },
+                "access_time_control": {
+                    "description": "V2 Access Control (replaces AccessAuth)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.AccessTimeControl"
+                        }
+                    ]
+                },
+                "asset_command_control": {
+                    "$ref": "#/definitions/model.AssetCommandControl"
                 },
                 "authorization": {
-                    "$ref": "#/definitions/model.Map-int-model_Slice-int"
+                    "$ref": "#/definitions/model.AuthorizationMap"
                 },
                 "comment": {
                     "type": "string"
@@ -3563,6 +4562,98 @@ const docTemplate = `{
                 }
             }
         },
+        "model.AssetCommandControl": {
+            "type": "object",
+            "properties": {
+                "cmd_ids": {
+                    "description": "Command IDs to control",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "comment": {
+                    "description": "Description of the command restriction",
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "template_ids": {
+                    "description": "Command template IDs",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
+        "model.AuthAction": {
+            "type": "string",
+            "enum": [
+                "connect",
+                "file_upload",
+                "file_download",
+                "copy",
+                "paste",
+                "share"
+            ],
+            "x-enum-varnames": [
+                "ActionConnect",
+                "ActionFileUpload",
+                "ActionFileDownload",
+                "ActionCopy",
+                "ActionPaste",
+                "ActionShare"
+            ]
+        },
+        "model.AuthPermissions": {
+            "type": "object",
+            "properties": {
+                "connect": {
+                    "type": "boolean"
+                },
+                "copy": {
+                    "type": "boolean"
+                },
+                "file_download": {
+                    "type": "boolean"
+                },
+                "file_upload": {
+                    "type": "boolean"
+                },
+                "paste": {
+                    "type": "boolean"
+                },
+                "share": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "model.AuthResult": {
+            "type": "object",
+            "properties": {
+                "allowed": {
+                    "type": "boolean"
+                },
+                "permissions": {
+                    "$ref": "#/definitions/model.AuthPermissions"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "restrictions": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "rule_id": {
+                    "type": "integer"
+                },
+                "rule_name": {
+                    "type": "string"
+                }
+            }
+        },
         "model.Authorization": {
             "type": "object",
             "properties": {
@@ -3601,9 +4692,104 @@ const docTemplate = `{
                 }
             }
         },
+        "model.AuthorizationMap": {
+            "type": "object",
+            "additionalProperties": {
+                "$ref": "#/definitions/model.AccountAuthorization"
+            }
+        },
+        "model.AuthorizationV2": {
+            "type": "object",
+            "properties": {
+                "access_control": {
+                    "description": "Access control with time template support",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.AccessControl"
+                        }
+                    ]
+                },
+                "account_selector": {
+                    "$ref": "#/definitions/model.TargetSelector"
+                },
+                "asset_selector": {
+                    "$ref": "#/definitions/model.TargetSelector"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "creator_id": {
+                    "type": "integer"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "node_selector": {
+                    "description": "Target selectors",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.TargetSelector"
+                        }
+                    ]
+                },
+                "permissions": {
+                    "description": "Permissions configuration",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.AuthPermissions"
+                        }
+                    ]
+                },
+                "resource_id": {
+                    "description": "Standard fields",
+                    "type": "integer"
+                },
+                "rids": {
+                    "description": "Role IDs for ACL integration",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "updater_id": {
+                    "type": "integer"
+                },
+                "valid_from": {
+                    "description": "Rule validity period",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.CustomTime"
+                        }
+                    ]
+                },
+                "valid_to": {
+                    "$ref": "#/definitions/model.CustomTime"
+                }
+            }
+        },
         "model.Command": {
             "type": "object",
             "properties": {
+                "category": {
+                    "description": "Enhanced fields for better management",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.CommandCategory"
+                        }
+                    ]
+                },
                 "cmd": {
                     "type": "string"
                 },
@@ -3613,11 +4799,18 @@ const docTemplate = `{
                 "creator_id": {
                     "type": "integer"
                 },
+                "description": {
+                    "type": "string"
+                },
                 "enable": {
                     "type": "boolean"
                 },
                 "id": {
                     "type": "integer"
+                },
+                "is_global": {
+                    "description": "Global predefined command",
+                    "type": "boolean"
                 },
                 "is_re": {
                     "type": "boolean"
@@ -3630,6 +4823,108 @@ const docTemplate = `{
                     "items": {
                         "type": "string"
                     }
+                },
+                "resource_id": {
+                    "type": "integer"
+                },
+                "risk_level": {
+                    "$ref": "#/definitions/model.CommandRiskLevel"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "updater_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "model.CommandCategory": {
+            "type": "string",
+            "enum": [
+                "security",
+                "system",
+                "database",
+                "network",
+                "file",
+                "developer",
+                "custom"
+            ],
+            "x-enum-comments": {
+                "CategoryCustom": "Custom commands",
+                "CategoryDatabase": "Database operations",
+                "CategoryDeveloper": "Development related",
+                "CategoryFile": "File operations",
+                "CategoryNetwork": "Network operations",
+                "CategorySecurity": "Security related",
+                "CategorySystem": "System operations"
+            },
+            "x-enum-varnames": [
+                "CategorySecurity",
+                "CategorySystem",
+                "CategoryDatabase",
+                "CategoryNetwork",
+                "CategoryFile",
+                "CategoryDeveloper",
+                "CategoryCustom"
+            ]
+        },
+        "model.CommandRiskLevel": {
+            "type": "integer",
+            "enum": [
+                0,
+                1,
+                2,
+                3
+            ],
+            "x-enum-comments": {
+                "RiskLevelCritical": "Critical danger",
+                "RiskLevelDanger": "Dangerous commands",
+                "RiskLevelSafe": "Safe commands",
+                "RiskLevelWarning": "Warning level"
+            },
+            "x-enum-varnames": [
+                "RiskLevelSafe",
+                "RiskLevelWarning",
+                "RiskLevelDanger",
+                "RiskLevelCritical"
+            ]
+        },
+        "model.CommandTemplate": {
+            "type": "object",
+            "properties": {
+                "category": {
+                    "$ref": "#/definitions/model.CommandCategory"
+                },
+                "cmd_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "creator_id": {
+                    "type": "integer"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "is_builtin": {
+                    "description": "Built-in template",
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
                 },
                 "resource_id": {
                     "type": "integer"
@@ -3651,14 +4946,16 @@ const docTemplate = `{
                 "creator_id": {
                     "type": "integer"
                 },
+                "default_permissions": {
+                    "description": "Default permissions for authorization creation",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.DefaultPermissions"
+                        }
+                    ]
+                },
                 "id": {
                     "type": "integer"
-                },
-                "rdp_config": {
-                    "$ref": "#/definitions/model.RdpConfig"
-                },
-                "ssh_config": {
-                    "$ref": "#/definitions/model.SshConfig"
                 },
                 "timeout": {
                     "type": "integer"
@@ -3668,9 +4965,37 @@ const docTemplate = `{
                 },
                 "updater_id": {
                     "type": "integer"
+                }
+            }
+        },
+        "model.CustomTime": {
+            "type": "object",
+            "properties": {
+                "time.Time": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.DefaultPermissions": {
+            "type": "object",
+            "properties": {
+                "connect": {
+                    "type": "boolean"
                 },
-                "vnc_config": {
-                    "$ref": "#/definitions/model.VncConfig"
+                "copy": {
+                    "type": "boolean"
+                },
+                "file_download": {
+                    "type": "boolean"
+                },
+                "file_upload": {
+                    "type": "boolean"
+                },
+                "paste": {
+                    "type": "boolean"
+                },
+                "share": {
+                    "type": "boolean"
                 }
             }
         },
@@ -3925,31 +5250,20 @@ const docTemplate = `{
                 }
             }
         },
-        "model.RdpConfig": {
-            "type": "object",
-            "properties": {
-                "copy": {
-                    "type": "boolean"
-                },
-                "create_drive_path": {
-                    "type": "boolean"
-                },
-                "disable_download": {
-                    "type": "boolean"
-                },
-                "disable_upload": {
-                    "type": "boolean"
-                },
-                "drive_path": {
-                    "type": "string"
-                },
-                "enable_drive": {
-                    "type": "boolean"
-                },
-                "paste": {
-                    "type": "boolean"
-                }
-            }
+        "model.SelectorType": {
+            "type": "string",
+            "enum": [
+                "all",
+                "ids",
+                "regex",
+                "tags"
+            ],
+            "x-enum-varnames": [
+                "SelectorTypeAll",
+                "SelectorTypeIds",
+                "SelectorTypeRegex",
+                "SelectorTypeTags"
+            ]
         },
         "model.Session": {
             "type": "object",
@@ -4091,17 +5405,6 @@ const docTemplate = `{
                 },
                 "uuid": {
                     "type": "string"
-                }
-            }
-        },
-        "model.SshConfig": {
-            "type": "object",
-            "properties": {
-                "copy": {
-                    "type": "boolean"
-                },
-                "paste": {
-                    "type": "boolean"
                 }
             }
         },
@@ -4263,15 +5566,132 @@ const docTemplate = `{
                 "s3",
                 "minio",
                 "oss",
-                "cos"
+                "cos",
+                "azure",
+                "obs",
+                "oos"
             ],
             "x-enum-varnames": [
                 "StorageTypeLocal",
                 "StorageTypeS3",
                 "StorageTypeMinio",
                 "StorageTypeOSS",
-                "StorageTypeCOS"
+                "StorageTypeCOS",
+                "StorageTypeAzure",
+                "StorageTypeOBS",
+                "StorageTypeOOS"
             ]
+        },
+        "model.TargetSelector": {
+            "type": "object",
+            "properties": {
+                "exclude_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "type": {
+                    "$ref": "#/definitions/model.SelectorType"
+                },
+                "values": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "model.TimeRange": {
+            "type": "object",
+            "properties": {
+                "end_time": {
+                    "type": "string"
+                },
+                "start_time": {
+                    "type": "string"
+                },
+                "weekdays": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
+        "model.TimeTemplate": {
+            "type": "object",
+            "properties": {
+                "category": {
+                    "description": "work, maintenance, emergency, etc.",
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "creator_id": {
+                    "type": "integer"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "is_builtin": {
+                    "description": "Status and metadata",
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "resource_id": {
+                    "description": "Standard fields",
+                    "type": "integer"
+                },
+                "time_ranges": {
+                    "description": "Time configuration",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.TimeRange"
+                    }
+                },
+                "timezone": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "updater_id": {
+                    "type": "integer"
+                },
+                "usage_count": {
+                    "description": "Usage statistics",
+                    "type": "integer"
+                }
+            }
+        },
+        "model.TimeTemplateReference": {
+            "type": "object",
+            "properties": {
+                "custom_ranges": {
+                    "description": "Additional custom time ranges",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.TimeRange"
+                    }
+                },
+                "template_id": {
+                    "type": "integer"
+                },
+                "template_name": {
+                    "description": "For display",
+                    "type": "string"
+                }
+            }
         },
         "model.UserPreference": {
             "type": "object",
@@ -4320,17 +5740,6 @@ const docTemplate = `{
                 "user_id": {
                     "description": "User ID with unique index",
                     "type": "integer"
-                }
-            }
-        },
-        "model.VncConfig": {
-            "type": "object",
-            "properties": {
-                "copy": {
-                    "type": "boolean"
-                },
-                "paste": {
-                    "type": "boolean"
                 }
             }
         }

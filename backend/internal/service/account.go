@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/gin-gonic/gin"
+	"github.com/veops/oneterm/internal/acl"
 	"github.com/veops/oneterm/internal/model"
 	"github.com/veops/oneterm/internal/repository"
 	"github.com/veops/oneterm/pkg/utils"
@@ -77,4 +78,28 @@ func (s *AccountService) FilterByAssetIds(db *gorm.DB, assetIds []int) *gorm.DB 
 // GetAccountIdsByAuthorization gets account IDs by authorization
 func (s *AccountService) GetAccountIdsByAuthorization(ctx context.Context, assetIds []int, authorizationIds []int) ([]int, error) {
 	return s.repo.GetAccountIdsByAuthorization(ctx, assetIds, authorizationIds)
+}
+
+// BuildQueryWithAuthorization builds query with integrated V2 authorization filter
+func (s *AccountService) BuildQueryWithAuthorization(ctx *gin.Context) (*gorm.DB, error) {
+	// Start with base query
+	db := s.repo.BuildQuery(ctx)
+
+	currentUser, _ := acl.GetSessionFromCtx(ctx)
+
+	// Administrators have access to all accounts
+	if acl.IsAdmin(currentUser) {
+		return db, nil
+	}
+
+	// Apply V2 authorization filter: get authorized asset IDs using V2 system
+	authV2Service := NewAuthorizationV2Service()
+	_, assetIds, _, err := authV2Service.GetAuthorizationScopeByACL(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Use the same filtering logic as before, but with V2 authorized assets
+	// This maintains the original logic: find accounts that can access the authorized assets
+	return s.FilterByAssetIds(db, assetIds), nil
 }

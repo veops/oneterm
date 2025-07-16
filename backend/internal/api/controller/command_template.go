@@ -54,6 +54,7 @@ func (c *Controller) UpdateCommandTemplate(ctx *gin.Context) {
 //	@Tags		command_template
 //	@Param		page_index	query		int		false	"page index"
 //	@Param		page_size	query		int		false	"page size"
+//	@Param		search		query		string	false	"search by name or description"
 //	@Param		category	query		string	false	"template category"
 //	@Param		builtin		query		bool	false	"filter by builtin status"
 //	@Param		info		query		bool	false	"info mode"
@@ -62,21 +63,11 @@ func (c *Controller) UpdateCommandTemplate(ctx *gin.Context) {
 func (c *Controller) GetCommandTemplates(ctx *gin.Context) {
 	info := cast.ToBool(ctx.Query("info"))
 
-	// Build base query using service layer
+	// Build base query using service layer with all filters
 	db, err := commandTemplateService.BuildQuery(ctx)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, &pkgErrors.ApiError{Code: pkgErrors.ErrInternal, Data: map[string]any{"err": err}})
 		return
-	}
-
-	// Apply filters
-	if category := ctx.Query("category"); category != "" {
-		db = db.Where("category = ?", category)
-	}
-
-	if builtinStr := ctx.Query("builtin"); builtinStr != "" {
-		builtin := cast.ToBool(builtinStr)
-		db = db.Where("is_builtin = ?", builtin)
 	}
 
 	doGet(ctx, !info, db, config.RESOURCE_AUTHORIZATION, commandTemplatePostHooks...)

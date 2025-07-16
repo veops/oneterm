@@ -153,3 +153,222 @@ other = "请求错误: 非法SSH公钥"
 [MsgWrongPvk]
 hash = "sha1-fd11d7d098d05415f5ed082abdf31223cb2aeda9"
 other = "请求错误: 非法SSH私钥"
+
+# 预定义危险命令
+[CmdDeleteRootDir]
+other = "删除根目录"
+
+[CmdDeleteRootDirDesc]
+other = "禁止删除根目录，这会摧毁整个系统"
+
+[CmdDeleteSystemDirs]
+other = "删除系统目录"
+
+[CmdDeleteSystemDirsDesc]
+other = "禁止删除系统关键目录"
+
+[CmdDiskDestruction]
+other = "磁盘破坏操作"
+
+[CmdDiskDestructionDesc]
+other = "禁止向磁盘设备写入随机数据，会破坏数据"
+
+[CmdFormatDisk]
+other = "格式化磁盘"
+
+[CmdFormatDiskDesc]
+other = "禁止格式化磁盘分区"
+
+[CmdForkBomb]
+other = "fork炸弹"
+
+[CmdForkBombDesc]
+other = "禁止fork炸弹攻击"
+
+[CmdSystemReboot]
+other = "系统重启关机"
+
+[CmdSystemRebootDesc]
+other = "限制系统重启和关机操作"
+
+[CmdModifySystemFiles]
+other = "修改关键系统文件"
+
+[CmdModifySystemFilesDesc]
+other = "限制直接修改系统配置文件"
+
+[CmdDropDatabase]
+other = "删除数据库"
+
+[CmdDropDatabaseDesc]
+other = "限制删除整个数据库的操作"
+
+[CmdTruncateTable]
+other = "清空表数据"
+
+[CmdTruncateTableDesc]
+other = "限制清空表数据的操作"
+
+[CmdModifyPermissions]
+other = "修改用户权限"
+
+[CmdModifyPermissionsDesc]
+other = "限制修改根目录权限"
+
+[CmdDropTable]
+other = "删除表"
+
+[CmdDropTableDesc]
+other = "警告：正在删除数据库表"
+
+[CmdServiceControl]
+other = "服务控制命令"
+
+[CmdServiceControlDesc]
+other = "警告：正在操作系统服务"
+
+[CmdNetworkConfig]
+other = "网络配置修改"
+
+[CmdNetworkConfigDesc]
+other = "警告：正在修改网络配置"
+
+[CmdUserManagement]
+other = "用户管理"
+
+[CmdUserManagementDesc]
+other = "警告：正在进行用户管理操作"
+
+[CmdKernelModule]
+other = "内核模块操作"
+
+[CmdKernelModuleDesc]
+other = "警告：正在操作内核模块"
+
+# 预定义命令模板
+[TmplBasicSecurity]
+other = "基础安全防护"
+
+[TmplBasicSecurityDesc]
+other = "适用于所有生产环境的基础安全命令限制"
+
+[TmplDatabaseProtection]
+other = "生产环境数据库保护"
+
+[TmplDatabaseProtectionDesc]
+other = "保护生产环境数据库的安全策略"
+
+[TmplServiceRestrictions]
+other = "系统服务控制限制"
+
+[TmplServiceRestrictionsDesc]
+other = "限制对关键系统服务的操作"
+
+[TmplNetworkSecurity]
+other = "网络安全控制"
+
+[TmplNetworkSecurityDesc]
+other = "网络配置和用户权限相关的安全控制"
+
+[TmplDevEnvironment]
+other = "开发环境基础限制"
+
+[TmplDevEnvironmentDesc]
+other = "适用于开发环境的最小安全限制"
+
+# 标签
+[TagDangerous]
+other = "危险"
+
+[TagDelete]
+other = "删除"
+
+[TagSystem]
+other = "系统"
+
+[TagSystemDirs]
+other = "系统目录"
+
+[TagDisk]
+other = "磁盘"
+
+[TagDestruction]
+other = "破坏"
+
+[TagFormat]
+other = "格式化"
+
+[TagAttack]
+other = "攻击"
+
+[TagResourceExhaustion]
+other = "资源耗尽"
+
+[TagReboot]
+other = "重启"
+
+[TagShutdown]
+other = "关机"
+
+[TagEdit]
+other = "编辑"
+
+[TagSystemFiles]
+other = "系统文件"
+
+[TagConfig]
+other = "配置"
+
+[TagDatabase]
+other = "数据库"
+
+[TagDrop]
+other = "删除"
+
+[TagClear]
+other = "清空"
+
+[TagTruncate]
+other = "truncate"
+
+[TagPermissions]
+other = "权限"
+
+[TagChmod]
+other = "chmod"
+
+[TagSecurity]
+other = "安全"
+
+[TagTable]
+other = "表"
+
+[TagService]
+other = "服务"
+
+[TagSystemctl]
+other = "systemctl"
+
+[TagControl]
+other = "控制"
+
+[TagNetwork]
+other = "网络"
+
+[TagFirewall]
+other = "防火墙"
+
+[TagRouting]
+other = "路由"
+
+[TagUser]
+other = "用户"
+
+[TagManagement]
+other = "管理"
+
+[TagKernel]
+other = "内核"
+
+[TagModule]
+other = "模块"

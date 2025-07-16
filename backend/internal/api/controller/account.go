@@ -7,7 +7,6 @@ import (
 	"github.com/samber/lo"
 	"github.com/spf13/cast"
 
-	"github.com/veops/oneterm/internal/acl"
 	"github.com/veops/oneterm/internal/model"
 	"github.com/veops/oneterm/internal/service"
 	"github.com/veops/oneterm/pkg/config"
@@ -103,27 +102,18 @@ func (c *Controller) UpdateAccount(ctx *gin.Context) {
 //	@Success	200			{object}	HttpResponse{data=ListData{list=[]model.Account}}
 //	@Router		/account [get]
 func (c *Controller) GetAccounts(ctx *gin.Context) {
-	currentUser, _ := acl.GetSessionFromCtx(ctx)
 	info := cast.ToBool(ctx.Query("info"))
 
-	// Build base query using service layer
-	db := accountService.BuildQuery(ctx)
+	// Build query with integrated V2 authorization filter
+	db, err := accountService.BuildQueryWithAuthorization(ctx)
+	if err != nil {
+		ctx.AbortWithError(http.StatusInternalServerError, &myErrors.ApiError{Code: myErrors.ErrInternal, Data: map[string]any{"err": err}})
+		return
+	}
 
-	// Apply select fields for info mode
+	// Apply info mode settings
 	if info {
 		db = db.Select("id", "name", "account")
-
-		// Apply authorization filter if needed
-		if !acl.IsAdmin(currentUser) {
-			assetIds, err := GetAssetIdsByAuthorization(ctx)
-			if err != nil {
-				ctx.AbortWithError(http.StatusInternalServerError, &myErrors.ApiError{Code: myErrors.ErrInternal, Data: map[string]any{"err": err}})
-				return
-			}
-
-			// Filter accounts by asset IDs
-			db = accountService.FilterByAssetIds(db, assetIds)
-		}
 	}
 
 	doGet(ctx, !info, db, config.RESOURCE_ACCOUNT, accountPostHooks...)

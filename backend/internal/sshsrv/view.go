@@ -243,7 +243,10 @@ func (m *view) refresh() {
 		}
 		if !acl.IsAdmin(m.currentUser) {
 			var assetIds, accountIds []int
-			if _, assetIds, _, err = service.NewAssetService().GetAssetIdsByAuthorization(m.Ctx); err != nil {
+
+			// Use V2 authorization system for asset filtering
+			authV2Service := service.NewAuthorizationV2Service()
+			if _, assetIds, _, err = authV2Service.GetAuthorizationScopeByACL(m.Ctx); err != nil {
 				return
 			}
 			assets = lo.Filter(assets, func(a *model.Asset, _ int) bool { return lo.Contains(assetIds, a.Id) })
@@ -258,11 +261,17 @@ func (m *view) refresh() {
 
 		m.combines = make(map[string][3]int)
 		for _, asset := range assets {
-			for accountId := range asset.Authorization {
+			for accountId, authData := range asset.Authorization {
 				account, ok := accountMap[accountId]
 				if !ok {
 					continue
 				}
+
+				// Check if this account has connect permission
+				if authData.Permissions == nil || !authData.Permissions.Connect {
+					continue
+				}
+
 				for _, p := range asset.Protocols {
 					ss := strings.Split(p, ":")
 					if len(ss) != 2 {

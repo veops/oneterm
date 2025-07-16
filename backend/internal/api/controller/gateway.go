@@ -111,7 +111,9 @@ func (c *Controller) GetGateways(ctx *gin.Context) {
 
 	// Apply authorization filter if needed
 	if info && !acl.IsAdmin(currentUser) {
-		assetIds, err := GetAssetIdsByAuthorization(ctx)
+		// Use V2 authorization system for asset filtering
+		authV2Service := service.NewAuthorizationV2Service()
+		_, assetIds, _, err := authV2Service.GetAuthorizationScopeByACL(ctx)
 		if err != nil {
 			ctx.AbortWithError(http.StatusInternalServerError, &errors.ApiError{Code: errors.ErrInternal, Data: map[string]any{"err": err}})
 			return

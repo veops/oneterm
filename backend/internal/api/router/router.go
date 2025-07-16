@@ -38,6 +38,7 @@ func SetupRouter(r *gin.Engine) {
 			asset.DELETE("/:id", c.DeleteAsset)
 			asset.PUT("/:id", c.UpdateAsset)
 			asset.GET("", c.GetAssets)
+			asset.GET("/:id/permissions", c.GetAssetPermissions)
 		}
 
 		node := v1.Group("node")
@@ -147,8 +148,19 @@ func SetupRouter(r *gin.Engine) {
 		authorization := v1.Group("/authorization")
 		{
 			authorization.POST("", c.UpsertAuthorization)
-			authorization.DELETE("/:id", c.DeleteAccount)
+			authorization.DELETE("/:id", c.DeleteAuthorization)
 			authorization.GET("", c.GetAuthorizations)
+		}
+
+		authorizationV2 := v1.Group("/authorization_v2")
+		{
+			authorizationV2.POST("", c.CreateAuthorizationV2)
+			authorizationV2.GET("", c.GetAuthorizationsV2)
+			authorizationV2.GET("/:id", c.GetAuthorizationV2)
+			authorizationV2.PUT("/:id", c.UpdateAuthorizationV2)
+			authorizationV2.DELETE("/:id", c.DeleteAuthorizationV2)
+			authorizationV2.POST("/:id/clone", c.CloneAuthorizationV2)
+			authorizationV2.POST("/check", c.CheckPermissionV2)
 		}
 
 		quickCommand := v1.Group("/quick_command")
@@ -188,6 +200,29 @@ func SetupRouter(r *gin.Engine) {
 			// storage.POST("/metrics/refresh", c.RefreshStorageMetrics)
 			storage.PUT("/configs/:id/set-primary", c.SetPrimaryStorage)
 			storage.PUT("/configs/:id/toggle", c.ToggleStorageProvider)
+		}
+
+		// Time template management routes
+		timeTemplate := v1.Group("/time_template")
+		{
+			timeTemplate.POST("", c.CreateTimeTemplate)
+			timeTemplate.DELETE("/:id", c.DeleteTimeTemplate)
+			timeTemplate.PUT("/:id", c.UpdateTimeTemplate)
+			timeTemplate.GET("", c.GetTimeTemplates)
+			timeTemplate.GET("/builtin", c.GetBuiltInTimeTemplates)
+			timeTemplate.POST("/check", c.CheckTimeAccess)
+			timeTemplate.POST("/init", c.InitBuiltInTemplates)
+		}
+
+		// Command template management routes
+		commandTemplate := v1.Group("/command_template")
+		{
+			commandTemplate.POST("", c.CreateCommandTemplate)
+			commandTemplate.DELETE("/:id", c.DeleteCommandTemplate)
+			commandTemplate.PUT("/:id", c.UpdateCommandTemplate)
+			commandTemplate.GET("", c.GetCommandTemplates)
+			commandTemplate.GET("/builtin", c.GetBuiltInCommandTemplates)
+			commandTemplate.GET("/:id/commands", c.GetTemplateCommands)
 		}
 	}
 }

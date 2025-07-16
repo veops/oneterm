@@ -11,7 +11,6 @@ import (
 	"github.com/veops/oneterm/internal/acl"
 	"github.com/veops/oneterm/internal/model"
 	"github.com/veops/oneterm/internal/service"
-	gsession "github.com/veops/oneterm/internal/session"
 	myErrors "github.com/veops/oneterm/pkg/errors"
 )
 
@@ -141,11 +140,6 @@ func (c *Controller) GetAuthorizations(ctx *gin.Context) {
 func handleAuthorization(ctx *gin.Context, tx *gorm.DB, action int, asset *model.Asset, auths ...*model.Authorization) (err error) {
 	// Use service layer instead of direct data processing
 	return service.DefaultAuthService.HandleAuthorization(ctx, tx, action, asset, auths...)
-}
-
-// hasAuthorization checks if the session has authorization
-func hasAuthorization(ctx *gin.Context, sess *gsession.Session) (ok bool, err error) {
-	return service.DefaultAuthService.HasAuthorization(ctx, sess)
 }
 
 func getIdsByAuthorizationIds(ctx *gin.Context) (nodeIds, assetIds, accountIds []int) {

@@ -72,19 +72,19 @@ const genOnetermRoutes = () => {
           {
             path: '/oneterm/access/auth',
             name: 'oneterm_access_auth',
-            meta: { title: 'oneterm.menu.accessAuthorization', appName: 'oneterm', icon: 'ops-oneterm-assetlist', selectedIcon: 'ops-oneterm-assetlist-selected', permission: ['oneterm_admin', 'admin'] },
+            meta: { title: 'oneterm.menu.accessAuthorization', appName: 'oneterm', icon: 'ops-oneterm-authorization', selectedIcon: 'ops-oneterm-authorization', permission: ['oneterm_admin', 'admin'] },
             component: () => import('../views/access/auth')
           },
           {
             path: '/oneterm/access/command',
             name: 'oneterm_access_command',
-            meta: { title: 'oneterm.menu.commandFilter', appName: 'oneterm', icon: 'ops-oneterm-assetlist', selectedIcon: 'ops-oneterm-assetlist-selected', permission: ['oneterm_admin', 'admin'] },
+            meta: { title: 'oneterm.menu.commandFilter', appName: 'oneterm', icon: 'ops-oneterm-command_interception1', selectedIcon: 'ops-oneterm-command_interception1', permission: ['oneterm_admin', 'admin'] },
             component: () => import('../views/access/command')
           },
           {
             path: '/oneterm/access/time',
             name: 'oneterm_access_time',
-            meta: { title: 'oneterm.menu.accessTime', appName: 'oneterm', icon: 'ops-oneterm-assetlist', selectedIcon: 'ops-oneterm-assetlist-selected', permission: ['oneterm_admin', 'admin'] },
+            meta: { title: 'oneterm.menu.accessTime', appName: 'oneterm', icon: 'ops-oneterm-access_period', selectedIcon: 'ops-oneterm-access_period', permission: ['oneterm_admin', 'admin'] },
             component: () => import('../views/access/time')
           }
         ]

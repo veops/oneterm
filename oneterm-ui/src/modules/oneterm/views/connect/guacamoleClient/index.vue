@@ -23,6 +23,7 @@
       ref="fileManagementDrawerRef"
       connectType="rdp"
       :sessionId="sessionId"
+      :assetPermissions="assetPermissions"
     />
   </div>
 </template>
@@ -32,6 +33,7 @@ import _ from 'lodash'
 import { v4 as uuidv4 } from 'uuid'
 import Guacamole from 'guacamole-common-js'
 import { pageBeforeUnload } from '@/modules/oneterm/utils/index.js'
+import { PERMISSION_TYPE } from '@/modules/oneterm/views/systemSettings/accessControl/constants.js'
 
 import ClipboardModal from './clipboardModal.vue'
 import ResolutionModal from './resolutionModal.vue'
@@ -76,7 +78,7 @@ export default {
       type: [Object, null],
       default: null
     },
-    controlConfig: {
+    assetPermissions: {
       type: Object,
       default: () => {}
     }
@@ -154,7 +156,7 @@ export default {
       // clipboard contents received by remote desktop
       client.onclipboard = this.handleClipboardReceived
 
-      if (this?.controlConfig?.[`${queryProtocol?.split?.(':')?.[0]}_config`]?.copy) {
+      if (this?.assetPermissions?.[PERMISSION_TYPE.COPY]) {
         // handle the clipboard content received from the remote desktop.
         client.onclipboard = this.handleClipboardReceived
       }

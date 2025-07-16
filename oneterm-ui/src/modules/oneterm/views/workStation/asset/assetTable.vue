@@ -53,7 +53,7 @@
         </template>
       </vxe-column>
       <vxe-column :title="$t(`oneterm.assetList.ip`)" field="ip"> </vxe-column>
-      <vxe-column :title="$t(`oneterm.assetList.catalogName`)" field="node_chain"> </vxe-column>
+      <vxe-column :title="$t(`oneterm.assetList.folderName`)" field="node_chain"> </vxe-column>
       <vxe-column
         :title="$t(`status`)"
         field="connectable"

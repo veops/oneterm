@@ -8,7 +8,7 @@
       <template #title>
         <div class="asset-list-title">
           <div class="asset-list-title-text">
-            {{ $t('oneterm.assetList.assetList') }}
+            {{ $t('oneterm.menu.assetManagement') }}
           </div>
 
           <div
@@ -19,7 +19,7 @@
               <a-icon type="plus"/>
             </span>
             <span class="asset-list-title-create-text">
-              {{ $t(`oneterm.assetList.createCatalog`) }}
+              {{ $t(`oneterm.assetList.createFolder`) }}
             </span>
           </div>
         </div>
@@ -51,11 +51,6 @@ export default {
       type: 'create',
       allTreeDepAndEmp: [],
     }
-  },
-  computed: {
-    title() {
-      return this.$t(`oneterm.assetList.assetList`)
-    },
   },
   mounted() {
     getAllDepAndEmployee({ block: 0 }).then((res) => {

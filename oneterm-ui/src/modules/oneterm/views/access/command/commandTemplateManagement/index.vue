@@ -1,67 +1,79 @@
 <template>
-  <div class="command-intercept">
+  <div class="command-template-management">
     <a-spin :tip="loadTip" :spinning="loading">
-      <div class="command-intercept-header">
+      <div class="command-template-management-header">
         <a-space>
           <a-input-search
-            allow-clear
-            v-model="filterName"
+            v-model="searchValue"
+            :placeholder="$t('placeholderSearch')"
             :style="{ width: '250px' }"
             class="ops-input ops-input-radius"
-            :placeholder="$t('placeholderSearch')"
+            allow-clear
             @search="updateTableData()"
           />
           <div class="ops-list-batch-action" v-show="!!selectedRowKeys.length">
-            <span @click="batchDelete">{{ $t(`delete`) }}</span>
+            <span @click="batchDelete">{{ $t('delete') }}</span>
             <span>{{ $t('selectRows', { rows: selectedRowKeys.length }) }}</span>
           </div>
         </a-space>
         <a-space>
-          <a-button type="primary" @click="openModal(null)">{{ $t(`create`) }}</a-button>
-          <a-button @click="updateTableData()">{{ $t(`refresh`) }}</a-button>
+          <a-button type="primary" @click="openModal(null)">{{ $t('create') }}</a-button>
+          <a-button @click="updateTableData()">{{ $t('refresh') }}</a-button>
         </a-space>
       </div>
       <ops-table
         size="small"
         ref="opsTable"
-        stripe
         class="ops-stripe-table"
-        :data="tableData"
+        stripe
         show-overflow
         show-header-overflow
-        @checkbox-change="onSelectChange"
-        @checkbox-all="onSelectChange"
-        @checkbox-range-end="onSelectRangeEnd"
+        resizable
+        :data="tableData"
         :checkbox-config="{ reserve: true, highlight: true, range: true }"
         :row-config="{ keyField: 'id' }"
         :height="tableHeight"
-        resizable
+        :filter-config="{ remote: true }"
+        @filter-change="handleFilterChange"
+        @checkbox-change="onSelectChange"
+        @checkbox-all="onSelectChange"
+        @checkbox-range-end="onSelectRangeEnd"
       >
         <vxe-column type="checkbox" width="60px"></vxe-column>
-        <vxe-column :title="$t(`oneterm.name`)" field="name"></vxe-column>
-        <vxe-column :title="$t(`oneterm.command`)" field="cmd"></vxe-column>
-        <vxe-column :title="$t(`oneterm.commandIntercept.enable`)" field="enable">
+        <vxe-column :title="$t('name')" field="name"></vxe-column>
+        <vxe-column :title="$t('description')" field="description"></vxe-column>
+        <vxe-column :title="$t('oneterm.commandFilter.commandCount')" field="description">
           <template #default="{row}">
-            <a-switch :checked="Boolean(row.enable)" @change="changeEnable(row)" />
+            {{ row.cmd_ids.length }}
           </template>
         </vxe-column>
-        <vxe-column :title="$t(`created_at`)" width="120">
+        <vxe-column
+          :title="$t('oneterm.commandFilter.category')"
+          field="category"
+          :filters="categoryFilters"
+          :filter-multiple="false"
+        >
           <template #default="{row}">
-            {{ moment(row.created_at).format('YYYY-MM-DD') }}
+            {{ $t(row.categoryName) }}
           </template>
         </vxe-column>
-        <vxe-column :title="$t(`operation`)" width="100">
+        <vxe-column :title="$t('created_at')" width="170">
+          <template #default="{row}">
+            {{ row.createdTimeText }}
+          </template>
+        </vxe-column>
+        <vxe-column :title="$t('operation')" width="100">
           <template #default="{row}">
             <a-space>
               <a @click="openModal(row)"><ops-icon type="icon-xianxing-edit"/></a>
-              <a-popconfirm :title="$t('confirmDelete')" @confirm="deleteCommand(row)">
+              <a-popconfirm :title="$t('confirmDelete')" @confirm="deleteCommandTemplate(row)">
                 <a style="color:red"><ops-icon type="icon-xianxing-delete"/></a>
               </a-popconfirm>
             </a-space>
           </template>
         </vxe-column>
       </ops-table>
-      <div class="command-intercept-pagination">
+      <div class="command-template-management-pagination">
         <a-pagination
           size="small"
           show-size-changer
@@ -82,23 +94,26 @@
         />
       </div>
     </a-spin>
-    <CommandModal ref="commandModal" @submit="updateTableData()" />
+    <CommandTemplateModal ref="commandTemplateModal" @submit="updateTableData()" />
   </div>
 </template>
 
 <script>
 import moment from 'moment'
 import { mapState } from 'vuex'
-import { getCommandList, deleteCommandById, putCommandById } from '@/modules/oneterm/api/command.js'
+import { getCommandTemplateList, deleteCommandTemplateById } from '@/modules/oneterm/api/commandTemplate.js'
+import { COMMAND_CATEGORY, COMMAND_CATEGORY_NAME } from '../constants.js'
 
-import CommandModal from './commandModal.vue'
+import CommandTemplateModal from './commandTemplateModal.vue'
 
 export default {
-  name: 'CommandIntercept',
-  components: { CommandModal },
+  name: 'CommandTemplateManagement',
+  components: { CommandTemplateModal },
   data() {
     return {
-      filterName: '',
+      searchValue: '',
+      currentCategory: [],
+
       tableData: [],
       currentPage: 1,
       pageSize: 20,
@@ -113,23 +128,38 @@ export default {
       windowHeight: (state) => state.windowHeight,
     }),
     tableHeight() {
-      return this.windowHeight - 207
+      return this.windowHeight - 254
+    },
+    categoryFilters() {
+      return Object.values(COMMAND_CATEGORY).map((value) => {
+        return {
+          value,
+          label: this.$t(COMMAND_CATEGORY_NAME[value])
+        }
+      })
     },
   },
   mounted() {
     this.updateTableData()
   },
   methods: {
-    moment,
     updateTableData() {
       this.loading = true
-      getCommandList({
+      const category = this?.currentCategory?.length ? this.currentCategory.join(',') : undefined
+
+      getCommandTemplateList({
         page_index: this.currentPage,
         page_size: this.pageSize,
-        search: this.filterName,
+        search: this.searchValue,
+        category
       })
         .then((res) => {
-          this.tableData = res?.data?.list || []
+          const tableData = res?.data?.list || []
+          tableData.forEach((row) => {
+            row.categoryName = COMMAND_CATEGORY_NAME?.[row.category] ?? '-'
+            row.createdTimeText = moment(row.created_at).format('YYYY-MM-DD HH:mm:ss')
+          })
+          this.tableData = tableData
           this.totalResult = res?.data?.count ?? 0
         })
         .finally(() => {
@@ -150,11 +180,11 @@ export default {
       this.updateTableData()
     },
     openModal(data) {
-      this.$refs.commandModal.open(data)
+      this.$refs.commandTemplateModal.open(data)
     },
-    deleteCommand(row) {
+    deleteCommandTemplate(row) {
       this.loading = true
-      deleteCommandById(row.id)
+      deleteCommandTemplateById(row.id)
         .then((res) => {
           this.$message.success(this.$t('deleteSuccess'))
           this.updateTableData()
@@ -164,17 +194,16 @@ export default {
         })
     },
     async batchDelete() {
-      const that = this
       this.$confirm({
-        title: that.$t('warning'),
-        content: that.$t('confirmDelete'),
-        async onOk() {
+        title: this.$t('warning'),
+        content: this.$t('confirmDelete'),
+        onOk: async () => {
           let successNum = 0
           let errorNum = 0
-          that.loading = true
-          that.loadTip = `${that.$t('deleting')}...`
-          for (let i = 0; i < that.selectedRowKeys.length; i++) {
-            await deleteCommandById(that.selectedRowKeys[i], false)
+          this.loading = true
+          this.loadTip = `${this.$t('deleting')}...`
+          for (let i = 0; i < this.selectedRowKeys.length; i++) {
+            await deleteCommandTemplateById(this.selectedRowKeys[i])
               .then(() => {
                 successNum += 1
               })
@@ -182,32 +211,36 @@ export default {
                 errorNum += 1
               })
               .finally(() => {
-                that.loadTip = that.$t('deletingTip', { total: that.selectedRowKeys.length, successNum, errorNum })
+                this.loadTip = this.$t('deletingTip', { total: this.selectedRowKeys.length, successNum, errorNum })
               })
           }
-          that.loading = false
-          that.loadTip = ''
-          that.selectedRowKeys = []
-          that.$refs.opsTable.getVxetableRef().clearCheckboxRow()
-          that.$refs.opsTable.getVxetableRef().clearCheckboxReserve()
-          that.$nextTick(() => {
-            that.updateTableData()
+          this.loading = false
+          this.loadTip = ''
+          this.selectedRowKeys = []
+          this.$refs.opsTable.getVxetableRef().clearCheckboxRow()
+          this.$refs.opsTable.getVxetableRef().clearCheckboxReserve()
+          this.$nextTick(() => {
+            this.updateTableData()
           })
         },
       })
     },
-    changeEnable(row) {
-      putCommandById(row.id, { ...row, enable: Boolean(!row.enable) }).then(() => {
-        this.$message.success(this.$t('editSuccess'))
-        this.updateTableData()
-      })
-    },
+    handleFilterChange(e) {
+      switch (e.field) {
+        case 'category':
+          this.currentCategory = e?.values
+          this.updateTableData()
+          break
+        default:
+          break
+      }
+    }
   },
 }
 </script>
 
 <style lang="less" scoped>
-.command-intercept {
+.command-template-management {
   background-color: #fff;
   height: 100%;
   border-radius: 6px;

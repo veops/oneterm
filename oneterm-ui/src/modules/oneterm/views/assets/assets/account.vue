@@ -1,17 +1,17 @@
 <template>
-  <a-row>
+  <a-row class="form-account">
     <a-col v-bind="colSpan">
-      <table class="account-table">
-        <tr>
-          <th>{{ $t(`oneterm.name`) }}</th>
-          <th>{{ $t(`oneterm.account`) }}</th>
-          <th>{{ $t(`oneterm.assetList.grantUser`) }}</th>
-          <th>{{ $t(`operation`) }}</th>
-        </tr>
-        <tr v-for="(item, index) in countList" :key="item.id">
-          <td>
+      <vxe-table
+        ref="xTable"
+        size="mini"
+        :data="authList"
+        :column-config="{ width: 200 }"
+        :min-height="110"
+      >
+        <vxe-column field="account" :title="$t('oneterm.account')" width="190">
+          <template #default="{ row }">
             <a-select
-              v-model="item.name"
+              v-model="row.account"
               showSearch
               :style="{
                 width: '180px',
@@ -19,7 +19,6 @@
               :placeholder="$t('placeholder2')"
               optionFilterProp="title"
               allowClear
-              @change="(value) => selectAccount(value, index)"
             >
               <a-select-option
                 v-for="(node, nodeIndex) in accountList"
@@ -27,35 +26,18 @@
                 :value="node.id"
                 :title="node.name"
               >
-                {{ node.name }}
+                <a-tooltip :title="node.toolTip">
+                  {{ node.name }}
+                  <span v-if="node.account" class="select-option-name">({{ node.account }})</span>
+                </a-tooltip>
               </a-select-option>
             </a-select>
-          </td>
-          <td>
-            <a-select
-              v-model="item.account"
-              :style="{
-                width: '180px',
-              }"
-              showSearch
-              :placeholder="$t('placeholder2')"
-              optionFilterProp="title"
-              allowClear
-              @change="(value) => selectAccount(value, index)"
-            >
-              <a-select-option
-                v-for="(node, nodeIndex) in accountList"
-                :key="node.id + nodeIndex"
-                :value="node.id"
-                :title="node.account"
-              >
-                {{ node.account }}
-              </a-select-option>
-            </a-select>
-          </td>
-          <td>
+          </template>
+        </vxe-column>
+        <vxe-column field="grantUser" :title="$t('oneterm.assetList.grantRole')" width="190">
+          <template #default="{ row }">
             <EmployeeTreeSelect
-              v-model="item.rids"
+              v-model="row.rids"
               multiple
               :idType="2"
               departmentKey="acl_rid"
@@ -70,28 +52,50 @@
               :limit="1"
               :otherOptions="visualRoleList"
             />
-          </td>
-          <td>
-            <a-space :style="{ width: '60px' }">
+          </template>
+        </vxe-column>
+        <vxe-column field="permissions" :title="$t('oneterm.assetList.operationPermissions')" width="230">
+          <template #default="{ row }">
+            <PermissionCheckbox
+              :value="row.permissions"
+              @change="(key, checked) => row.permissions[key] = checked"
+            />
+          </template>
+        </vxe-column>
+        <vxe-column field="operation" :title="$t('operation')" width="55" fixed="right">
+          <template #default="{ row }">
+            <a-space>
               <a @click="addCount"><a-icon type="plus-circle"/></a>
-              <a v-if="countList && countList.length > 1" @click="deleteCount(index)"><a-icon type="minus-circle"/></a>
+              <a v-if="authList && authList.length > 1" @click="deleteCount(row.id)"><a-icon type="minus-circle"/></a>
             </a-space>
-          </td>
-        </tr>
-      </table>
+          </template>
+        </vxe-column>
+      </vxe-table>
     </a-col>
   </a-row>
 </template>
 
 <script>
 import { v4 as uuidv4 } from 'uuid'
-import { getAccountList } from '../../../api/account'
+import { getAccountList } from '@/modules/oneterm/api/account'
 import { searchRole } from '@/modules/acl/api/role'
+import { getConfig } from '@/modules/oneterm/api/config'
+import { PERMISSION_TYPE } from '@/modules/oneterm/views/systemSettings/accessControl/constants.js'
+
 import EmployeeTreeSelect from '@/views/setting/components/employeeTreeSelect.vue'
+import PermissionCheckbox from '@/modules/oneterm/views/systemSettings/accessControl/permissionCheckbox.vue'
+
+const DEFAULT_PERMISSIONS = Object.values(PERMISSION_TYPE).reduce((config, key) => {
+  config[key] = false
+  return config
+}, {})
 
 export default {
   name: 'Account',
-  components: { EmployeeTreeSelect },
+  components: {
+    EmployeeTreeSelect,
+    PermissionCheckbox
+  },
   props: {
     colSpan: {
       type: Object,
@@ -104,17 +108,36 @@ export default {
   data() {
     return {
       accountList: [],
-      countList: [{ id: uuidv4(), name: undefined, account: undefined, rids: undefined }],
+      authList: [{
+        id: uuidv4(),
+        account: undefined,
+        rids: undefined,
+        permissions: { ...DEFAULT_PERMISSIONS }
+      }],
+      visualRoleList: []
     }
   },
   created() {
-    this.loadRoles()
-    getAccountList({ page_index: 1 }).then((res) => {
-      this.accountList = res?.data?.list || []
-    })
+    this.initDefaultPermissions()
+    this.getRoleList()
+    this.getAccountList()
   },
   methods: {
-    async loadRoles() {
+    initDefaultPermissions() {
+      getConfig({
+        info: true
+      }).then((res) => {
+        const default_permissions = res?.data?.default_permissions
+        Object.keys(DEFAULT_PERMISSIONS).forEach((key) => {
+          DEFAULT_PERMISSIONS[key] = default_permissions?.[key] ?? DEFAULT_PERMISSIONS[key]
+        })
+        this.authList.forEach((item) => {
+          item.permissions = { ...DEFAULT_PERMISSIONS }
+        })
+      })
+    },
+
+    async getRoleList() {
       const res = await searchRole({ page_size: 9999, page: 1, app_id: 'oneterm', user_role: 0, user_only: 0, is_all: true })
 
       const visualRoleList = []
@@ -137,35 +160,63 @@ export default {
       this.$set(this, 'visualRoleList', visualRoleList)
     },
 
+    async getAccountList() {
+      const res = await getAccountList({ page_index: 1 })
+      const accountList = res?.data?.list || []
+      accountList.forEach((item) => {
+        item.toolTip = item.name + (item.account ? '(item.account)' : '')
+      })
+      this.accountList = accountList
+    },
+
     addCount() {
-      this.countList.push({ id: uuidv4(), name: undefined, account: undefined, rids: undefined })
-    },
-    deleteCount(index) {
-      this.countList.splice(index, 1)
-    },
-    selectAccount(id, index) {
-      this.$nextTick(() => {
-        this.$set(this.countList[index], 'name', id)
-        this.$set(this.countList[index], 'account', id)
+      this.authList.push({
+        id: uuidv4(),
+        account: undefined,
+        rids: undefined,
+        permissions: { ...DEFAULT_PERMISSIONS }
       })
     },
+    deleteCount(id) {
+      const index = this.authList.findIndex((item) => item.id === id)
+      if (index !== -1) {
+        this.authList.splice(index, 1)
+      }
+    },
+
     getValues() {
       const authorization = {}
-      this.countList
-        .filter((count) => count.name)
-        .forEach((count) => {
-          authorization[count.name] = count?.rids?.length ? count.rids.map((r) => Number(r.split('-')[1])) : []
+
+      this.authList
+        .filter((auth) => auth.account)
+        .forEach((auth) => {
+          const rids = (auth?.rids || []).map((r) => Number(r.split('-')[1]))
+          authorization[auth.account] = {
+            rids,
+            permissions: auth.permissions
+          }
         })
       return { authorization }
     },
+
     setValues({ authorization = {} }) {
-      const authorizationList = Object.entries(authorization)
+      const authorizationList = Object.entries(authorization || {})
       if (authorizationList.length) {
-        this.countList = authorizationList.map(([acc, rids]) => {
-          return { id: uuidv4(), name: Number(acc), account: Number(acc), rids: rids.map((r) => `employee-${r}`) }
+        this.authList = authorizationList.map(([key, value]) => {
+          return {
+            id: uuidv4(),
+            account: Number(key),
+            rids: (value?.rids || []).map((r) => `employee-${r}`),
+            permissions: value.permissions
+          }
         })
       } else {
-        this.countList = [{ id: uuidv4(), name: undefined, account: undefined, rids: undefined }]
+        this.authList = [{
+          id: uuidv4(),
+          account: undefined,
+          rids: undefined,
+          permissions: { ...DEFAULT_PERMISSIONS }
+        }]
       }
     },
   },
@@ -173,16 +224,14 @@ export default {
 </script>
 
 <style lang="less" scoped>
-.account-table {
-  border-collapse: collapse;
-  border: 1px solid #e4e7ed;
-  border-spacing: 20px;
-  th {
-    background-color: #f0f5ff;
+.form-account {
+  /deep/ .ant-checkbox-wrapper {
+    margin-right: 0px;
+    width: 48%;
   }
-  th,
-  td {
-    padding: 5px 8px;
-  }
+}
+.select-option-name {
+  font-size: 12px;
+  color: #A5A9BC;
 }
 </style>

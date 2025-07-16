@@ -2,7 +2,7 @@
   <div class="oneterm-layout">
     <div class="oneterm-header">
       <a-space>
-        <span>{{ $t('oneterm.menu.gateways') }}</span>
+        <span>{{ $t('oneterm.menu.gatewayManagement') }}</span>
         <a-tooltip placement="right" :title="$t('oneterm.assetList.gatewayTip')">
           <a><a-icon type="question-circle"/></a>
         </a-tooltip>

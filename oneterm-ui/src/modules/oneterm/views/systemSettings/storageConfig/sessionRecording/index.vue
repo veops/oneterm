@@ -82,10 +82,10 @@
             </a-popconfirm>
           </template>
         </vxe-column>
-        <vxe-column :title="$t('oneterm.storageConfig.isEnable')" field="enabled" min-width="70">
+        <vxe-column :title="$t('oneterm.isEnable')" field="enabled" min-width="70">
           <template #default="{row}">
             <a-popconfirm
-              :title="$t('oneterm.storageConfig.confirmEnable')"
+              :title="$t('oneterm.confirmEnable')"
               @confirm="toggleEnabled(row)"
             >
               <a-switch :checked="row.enabled" />

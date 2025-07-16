@@ -114,7 +114,7 @@ export default {
       searchValue: '',
 
       getRequestParams: {
-        info: true
+        info: false
       }
     }
   },

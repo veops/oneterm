@@ -22,7 +22,7 @@
       <a-form-model-item :label="$t('oneterm.assetList.ip')" prop="ip">
         <a-input v-model="baseForm.ip" :placeholder="`${$t(`placeholder1`)}`" />
       </a-form-model-item>
-      <a-form-model-item :label="$t(`oneterm.catalog`)" prop="parent_id">
+      <a-form-model-item :label="$t(`oneterm.folder`)" prop="parent_id">
         <treeselect
           class="custom-treeselect custom-treeselect-white"
           :style="{
@@ -90,8 +90,8 @@
 import Protocol from './protocol.vue'
 import Account from './account.vue'
 import AccessAuth from './accessAuth.vue'
-import { getNodeList } from '../../../api/node'
-import { postAsset, putAssetById } from '../../../api/asset'
+import { getNodeList } from '@/modules/oneterm/api/node'
+import { postAsset, putAssetById } from '@/modules/oneterm/api/asset'
 
 export default {
   name: 'CreateAsset',
@@ -110,6 +110,7 @@ export default {
       },
       baseRules: {
         name: [{ required: true, message: `${this.$t(`placeholder1`)}` }],
+        ip: [{ required: true, message: `${this.$t(`placeholder1`)}` }],
         parent_id: [{ required: true, message: `${this.$t(`placeholder2`)}` }],
       },
       nodeList: [],
@@ -141,7 +142,8 @@ export default {
           gateway_id = undefined,
           protocols = [],
           authorization = {},
-          access_auth = {},
+          access_time_control = {},
+          asset_command_control = {}
         } = asset ?? {}
         this.assetId = id
         this.baseForm = {
@@ -152,7 +154,10 @@ export default {
         }
         this.$refs.protocol.setValues({ gateway_id, protocols })
         this.$refs.account.setValues({ authorization })
-        this.$refs.accessAuth.setValues(access_auth)
+        this.$refs.accessAuth.setValues({
+          access_time_control,
+          asset_command_control
+        })
       })
     },
 
@@ -181,7 +186,7 @@ export default {
           const { name, ip, parent_id, comment } = this.baseForm
           const { gateway_id, protocols } = this.$refs.protocol.getValues()
           const { authorization } = this.$refs.account.getValues()
-          const access_auth = this.$refs.accessAuth.getValues()
+          const { cmd_ids, template_ids, time_ranges, timezone } = this.$refs.accessAuth.getValues()
           const params = {
             name,
             ip: ip?.trim?.() ?? '',
@@ -190,8 +195,16 @@ export default {
             protocols,
             gateway_id,
             authorization,
-            access_auth,
+            access_time_control: {
+              time_ranges,
+              timezone
+            },
+            asset_command_control: {
+              cmd_ids,
+              template_ids
+            }
           }
+
           this.loading = true
           if (this.assetId) {
             putAssetById(this.assetId, { ...params, id: this.assetId })

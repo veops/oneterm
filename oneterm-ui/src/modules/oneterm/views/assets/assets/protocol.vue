@@ -181,9 +181,9 @@ export default {
       const _protocols = this.protocols.map((pro) => `${pro.value}:${pro.label}`)
       return { gateway_id, protocols: _protocols }
     },
-    setValues({ gateway_id = undefined, protocols = [] }) {
+    setValues({ gateway_id = undefined, protocols }) {
       this.form = { gateway_id: gateway_id || undefined }
-      this.protocols = protocols.length
+      this.protocols = protocols?.length
         ? protocols.map((p) => ({
             id: uuidv4(),
             value: p.split(':')[0],

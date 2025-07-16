@@ -24,8 +24,7 @@
 </template>
 
 <script>
-import CommandIntercept from './commandIntercept/index.vue'
-import TerminalControl from './terminalControl/index.vue'
+import AccessControl from './accessControl/index.vue'
 import PublicKey from './publicKey/index.vue'
 import QuickCommand from './quickCommand/index.vue'
 import TerminalDisplay from './terminalDisplay/index.vue'
@@ -36,8 +35,7 @@ const systemSettingTabStorageKey = 'ops_oneterm_system_setting_tab_key'
 export default {
   name: 'SystemSettings',
   components: {
-    CommandIntercept,
-    TerminalControl,
+    AccessControl,
     PublicKey,
     QuickCommand,
     TerminalDisplay,
@@ -70,16 +68,10 @@ export default {
           component: 'TerminalDisplay'
         },
         {
-          label: 'oneterm.systemSettings.terminalControl',
+          label: 'oneterm.systemSettings.accessControl',
           icon: 'basic_settings',
-          key: 'terminalControl',
-          component: 'TerminalControl',
-        },
-        {
-          label: 'oneterm.systemSettings.commandIntercept',
-          icon: 'a-command_interception1',
-          key: 'commandIntercept',
-          component: 'CommandIntercept',
+          key: 'accessControl',
+          component: 'AccessControl',
         },
         {
           label: 'oneterm.systemSettings.storageConfig',

@@ -1,160 +1,162 @@
 <template>
   <a-form-model ref="form" :model="form" :rules="rules" :label-col="{ span: 5 }" :wrapper-col="{ span: 16 }">
-    <a-form-model-item>
-      <span slot="label">
-        <a-tooltip placement="right" :title="$t('oneterm.assetList.timeTip')">
-          <a><a-icon type="question-circle"/></a>
-        </a-tooltip>
-        {{ $t(`oneterm.assetList.time`) }}
-      </span>
-      <a-radio-group v-model="form.allow" style="display:block;margin:8px 0;">
-        <a-radio :value="true">
-          {{ $t('oneterm.assetList.allowAccess') }}
-        </a-radio>
-        <a-radio :value="false">
-          {{ $t('oneterm.assetList.prohibitAccess') }}
-        </a-radio>
-      </a-radio-group>
-      <DragWeektime v-model="form.ranges" :data="weektimeData" @onClear="clearWeektime" />
+    <a-form-model-item :label="$t('oneterm.assetList.time')">
+      <DragWeektime v-model="form.ranges" :data="weekTimeData" @onClear="clearWeektime" />
     </a-form-model-item>
-    <a-form-model-item :label="$t(`oneterm.assetList.effectiveDate`)" prop="startAndEnd">
-      <a-range-picker v-model="form.startAndEnd" />
+    <a-form-model-item :wrapper-col="{ span: 16 }" :label="$t('oneterm.timeTemplate.timeZone')" prop="timezone">
+      <a-select
+        v-model="form.timezone"
+        showSearch
+        :placeholder="$t('placeholder2')"
+        :options="timezoneSelectOptions"
+      />
     </a-form-model-item>
     <a-form-model-item :label="$t(`oneterm.assetList.commandIntercept`)" prop="cmd_ids">
-      <treeselect
-        class="custom-treeselect custom-treeselect-white"
-        :style="{
-          '--custom-height': '32px',
-          lineHeight: '32px',
-          '--custom-multiple-lineHeight': '18px',
-        }"
+      <a-select
         v-model="form.cmd_ids"
-        :multiple="true"
-        :clearable="true"
-        searchable
-        :options="cmdList"
-        :placeholder="`${$t(`placeholder2`)}`"
-        :normalizer="
-          (node) => {
-            return {
-              id: node.id,
-              label: node.name,
-            }
-          }
-        "
-        appendToBody
-        :z-index="1056"
-      >
-      </treeselect>
+        mode="multiple"
+        :options="commandSelectOptions"
+        :placeholder="$t('oneterm.auth.commandTip1')"
+      />
+      <a-select
+        mode="multiple"
+        v-model="form.template_ids"
+        :options="commandTemplateSelectOptions"
+        :placeholder="$t('oneterm.auth.commandTip2')"
+      />
     </a-form-model-item>
   </a-form-model>
 </template>
 
 <script>
-import moment from 'moment'
-import { getCommandList } from '../../../api/command'
-import DragWeektime from '../../../components/dragWeektime'
-import weektimeData from '../../../components/dragWeektime/weektimeData'
+import _ from 'lodash'
+import momentTimezone from 'moment-timezone'
+import { getCommandList } from '@/modules/oneterm/api/command'
+import { getCommandTemplateList } from '@/modules/oneterm/api/commandTemplate.js'
+import { mergeTimeRange } from '@/modules/oneterm/views/access/time/mergeTimeRange.js'
+import { splitTimeRange } from '@/modules/oneterm/views/access/time/splitTimeRange.js'
+
+import DragWeektime from '@/modules/oneterm/components/dragWeektime'
+import weekTimeData from '@/modules/oneterm/components/dragWeektime/weektimeData'
 
 export default {
   name: 'AccessAuth',
   components: { DragWeektime },
   data() {
     return {
-      weektimeData,
-      weekMap: {
-        0: '一',
-        1: '二',
-        2: '三',
-        3: '四',
-        4: '五',
-        5: '六',
-        6: '七',
-      },
+      weekTimeData: _.cloneDeep(weekTimeData),
       form: {
-        cmd_ids: undefined,
-        startAndEnd: [],
         ranges: [],
-        allow: true,
+        timezone: momentTimezone.tz.guess(),
+        cmd_ids: undefined,
+        template_ids: undefined
       },
       rules: {},
-      allRoleList: [],
-      roleList: [],
-      cmdList: [],
+      commandSelectOptions: [],
+      commandTemplateSelectOptions: [],
     }
   },
-  created() {
-    getCommandList({ page_index: 1 }).then((res) => {
-      this.cmdList = res?.data?.list || []
-    })
-    this.form.ranges = this.weektimeData.map((item) => {
-      return {
-        id: item.row,
-        week: item.week,
-        value: [],
-      }
-    })
+  computed: {
+    timezoneSelectOptions() {
+      const names = momentTimezone.tz.names()
+      return names.map((value) => {
+        return {
+          value,
+          label: value
+        }
+      })
+    }
+  },
+  mounted() {
+    this.getCommandList()
+    this.getCommandTemplateList()
   },
   beforeDestroy() {
     this.clearWeektime()
   },
   methods: {
+    getCommandList() {
+      getCommandList({
+        page_index: 1,
+        page_size: 9999
+      }).then((res) => {
+        const list = res?.data?.list || []
+        this.commandSelectOptions = list.map((item) => ({
+          value: item.id,
+          label: item.name
+        }))
+      })
+    },
+    getCommandTemplateList() {
+      getCommandTemplateList({
+        page_index: 1,
+        page_size: 9999
+      }).then((res) => {
+        const list = res?.data?.list || []
+        this.commandTemplateSelectOptions = list.map((item) => ({
+          value: item.id,
+          label: item.name
+        }))
+      })
+    },
     clearWeektime() {
-      this.weektimeData.forEach((item) => {
+      this.weekTimeData.forEach((item) => {
         item.child.forEach((t) => {
           this.$set(t, 'check', false)
         })
       })
-      this.form.ranges = this.weektimeData.map((item) => {
-        return {
-          id: item.row,
-          week: item.week,
-          value: [],
-        }
-      })
+      this.form.ranges = []
     },
     getValues() {
-      const { cmd_ids, startAndEnd, ranges, allow } = this.form
+      const { ranges, timezone, cmd_ids, template_ids } = this.form
+      let time_ranges = []
+      if (ranges.length) {
+        time_ranges = mergeTimeRange(ranges)
+      }
+
       return {
         cmd_ids,
-        start: startAndEnd[0]
-          ? moment(startAndEnd[0])
-              .startOf('day')
-              .format()
-          : null,
-        end: startAndEnd[1]
-          ? moment(startAndEnd[1])
-              .endOf('day')
-              .format()
-          : null,
-        ranges: ranges.map((r) => ({
-          week: r.id,
-          times: r.value,
-        })),
-        allow,
+        template_ids,
+        time_ranges,
+        timezone
       }
     },
-    async setValues(access_auth) {
-      const { cmd_ids = undefined, start, end, ranges = [], allow = true } = access_auth
+    async setValues({
+      access_time_control,
+      asset_command_control
+    }) {
+      const { time_ranges = [], timezone = momentTimezone.tz.guess() } = access_time_control
+      const { cmd_ids = undefined, template_ids = undefined } = asset_command_control
+
+      let ranges = []
+      if (time_ranges?.length) {
+        const timeRanges = splitTimeRange(time_ranges)
+        ranges = timeRanges.map((item) => {
+          const childData = this.weekTimeData?.[item?.day - 1]?.child
+          if (childData?.length) {
+            childData.forEach((t) => {
+              this.$set(t, 'check', Boolean(item?.value?.length) && item.value.includes(t.value))
+            })
+          }
+
+          return {
+            id: item.day,
+            day: item.day,
+            value: item.value,
+          }
+        })
+      }
+
       this.form = {
         cmd_ids,
-        allow,
-        startAndEnd: [start ? moment(start) : null, end ? moment(end) : null],
-        ranges: ranges.map((r, index) => {
-          this.weektimeData[index].child.forEach((t) => {
-            this.$set(t, 'check', !!r.times && r.times.includes(t.value))
-          })
-          return {
-            id: index,
-            week: `星期${this.weekMap[index]}`,
-            value: r.times,
-          }
-        }),
+        template_ids,
+        ranges,
+        timezone
       }
       if (!ranges.length) {
         this.clearWeektime()
       }
-    },
+    }
   },
 }
 </script>

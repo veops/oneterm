@@ -15,7 +15,7 @@
       </div>
       <div class="file-management-title-right">
         <a-tooltip
-          v-if="selectedRows.length"
+          v-if="selectedRows.length && showDownload"
           :title="$t('oneterm.fileManagement.batchDownloadFiles')"
         >
           <a-icon
@@ -24,6 +24,7 @@
           />
         </a-tooltip>
         <UploadFile
+          v-if="showUpload"
           :sessionId="sessionId"
           :pathStr="pathStr"
           :connectType="connectType"
@@ -87,7 +88,11 @@
         @checkbox-all="onSelectChange"
         @checkbox-range-end="onSelectChange"
       >
-        <vxe-column type="checkbox" width="40px"></vxe-column>
+        <vxe-column
+          v-if="showDownload"
+          type="checkbox"
+          width="40px"
+        ></vxe-column>
         <vxe-column
           :title="$t('name')"
           field="name"
@@ -144,6 +149,7 @@ import moment from 'moment'
 import { mapState } from 'vuex'
 import { getFileListBySessionId } from '@/modules/oneterm/api/file.js'
 import { getRDPFileList } from '@/modules/oneterm/api/rdp.js'
+import { PERMISSION_TYPE } from '@/modules/oneterm/views/systemSettings/accessControl/constants.js'
 
 import UploadFile from './uploadFile.vue'
 
@@ -160,6 +166,10 @@ export default {
     connectType: {
       type: String,
       default: 'ssh' // 'ssh' | 'rdp'
+    },
+    assetPermissions: {
+      type: Object,
+      default: () => {}
     }
   },
   data() {
@@ -179,6 +189,12 @@ export default {
     }),
     pathStr() {
       return `/${this.pathList.join('/')}`
+    },
+    showDownload() {
+      return this.assetPermissions?.[PERMISSION_TYPE.FILE_DOWNLOAD] || false
+    },
+    showUpload() {
+      return this.assetPermissions?.[PERMISSION_TYPE.FILE_UPLOAD] || false
     }
   },
   methods: {

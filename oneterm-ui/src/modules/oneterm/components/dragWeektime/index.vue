@@ -6,7 +6,7 @@
     <table :class="{ 'c-min-table': colspan < 2 }" class="c-weektime-table">
       <thead class="c-weektime-head">
         <tr>
-          <th rowspan="8" class="week-td">{{ $t('oneterm.assetList.weektime') }}</th>
+          <th rowspan="8" class="week-td">{{ $t('oneterm.timeTemplate.weektime') }}</th>
           <th :colspan="12 * colspan">00:00 - 12:00</th>
           <th :colspan="12 * colspan">12:00 - 24:00</th>
         </tr>
@@ -16,7 +16,7 @@
       </thead>
       <tbody class="c-weektime-body">
         <tr v-for="t in data" :key="t.row">
-          <td>{{ $t(t.week) }}</td>
+          <td>{{ $t(`oneterm.timeTemplate.day${t.day}`) }}</td>
           <td
             v-for="n in t.child"
             :key="`${n.row}-${n.col}`"
@@ -32,15 +32,15 @@
         <tr>
           <td colspan="49" class="c-weektime-preview">
             <div class="g-clearfix c-weektime-con">
-              <span class="g-pull-left">{{
-                selectState ? $t(`oneterm.assetList.selectedTime`) : $t(`oneterm.assetList.drag`)
-              }}</span>
+              <span class="g-pull-left">
+                {{ selectState ? $t('oneterm.timeTemplate.selectedTime') : $t('oneterm.timeTemplate.drag') }}
+              </span>
               <a @click.prevent="$emit('onClear')" class="g-pull-right">{{ $t(`clear`) }}</a>
             </div>
             <div v-if="selectState" class="c-weektime-time">
               <div v-for="t in selectValue" :key="t.id">
                 <p v-if="t.value && t.value.length">
-                  <span class="g-tip-text">{{ $t(t.week) }}：</span>
+                  <span class="g-tip-text">{{ $t(`oneterm.timeTemplate.day${t.day}`) }}：</span>
                   <span>{{ formatSelectValue(t.value) }}</span>
                 </p>
               </div>
@@ -178,7 +178,7 @@ export default {
       const _selectValue = this.data.map((item) => {
         return {
           id: item.row,
-          week: item.week,
+          day: item.day,
           value: item.child.filter((c) => c.check).map((c) => c.value),
         }
       })

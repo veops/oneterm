@@ -41,7 +41,7 @@
       <a-form-model-item :label="$t('oneterm.storageConfig.isPrimary')" prop="is_primary">
         <a-switch v-model="form.is_primary" />
       </a-form-model-item>
-      <a-form-model-item :label="$t('oneterm.storageConfig.isEnable')" prop="enabled">
+      <a-form-model-item :label="$t('oneterm.isEnable')" prop="enabled">
         <a-switch v-model="form.enabled" />
       </a-form-model-item>
 

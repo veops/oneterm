@@ -1,70 +1,39 @@
-const formatDate = (date, fmt) => {
-    const o = {
-        'M+': date.getMonth() + 1,
-        'd+': date.getDate(),
-        'h+': date.getHours(),
-        'm+': date.getMinutes(),
-        's+': date.getSeconds(),
-        'q+': Math.floor((date.getMonth() + 3) / 3),
-        S: date.getMilliseconds()
-    }
-    if (/(y+)/.test(fmt)) {
-        fmt = fmt.replace(
-            RegExp.$1,
-            (date.getFullYear() + '').substr(4 - RegExp.$1.length)
-        )
-    }
-    for (const k in o) {
-        if (new RegExp('(' + k + ')').test(fmt)) {
-            fmt = fmt.replace(
-                RegExp.$1,
-                RegExp.$1.length === 1 ? o[k] : ('00' + o[k]).substr(('' + o[k]).length)
-            )
-        }
-    }
-    return fmt
+// Format a Date object to 'HH:mm'
+const formatTime = (date) => {
+  const h = String(date.getHours()).padStart(2, '0')
+  const m = String(date.getMinutes()).padStart(2, '0')
+  return `${h}:${m}`
 }
 
-const createArr = (len) => {
-    return Array.from(Array(len)).map((ret, id) => id)
+// Generate half-hour intervals for one day, last end is 23:59
+const generateDayIntervals = (day, row, total = 48) => {
+  const intervals = []
+  for (let i = 0; i < total; i++) {
+    const startMinutes = i * 30
+    const endMinutes = (i + 1) * 30
+    const begin = formatTime(new Date(2000, 0, 1, 0, startMinutes))
+    // Last interval ends at 23:59, others at next half hour
+    const end =
+      i === total - 1
+        ? '23:59'
+        : formatTime(new Date(2000, 0, 1, 0, endMinutes))
+    intervals.push({
+      day,
+      value: `${begin}~${end}`,
+      begin,
+      end,
+      row,
+      col: i
+    })
+  }
+  return intervals
 }
 
-const formatWeektime = (col) => {
-    const timestamp = 1542384000000 // '2018-11-17 00:00:00'
-    const beginstamp = timestamp + col * 1800000 // col * 30 * 60 * 1000
-    const endstamp = beginstamp + 1800000
+// Generate week data: 7 days, each with 48 half-hour intervals
+const weekTimeData = Array.from({ length: 7 }, (_, i) => ({
+  day: i + 1,
+  row: i,
+  child: generateDayIntervals(i + 1, i, 48)
+}))
 
-    const begin = formatDate(new Date(beginstamp), 'hh:mm')
-    const end = formatDate(new Date(endstamp), 'hh:mm')
-    return `${begin}~${end}`
-}
-
-const data = [
-    '星期一',
-    '星期二',
-    '星期三',
-    '星期四',
-    '星期五',
-    '星期六',
-    '星期日'
-].map((ret, index) => {
-    const children = (ret, row, max) => {
-        return createArr(max).map((t, col) => {
-            return {
-                week: ret,
-                value: formatWeektime(col),
-                begin: formatWeektime(col).split('~')[0],
-                end: formatWeektime(col).split('~')[1],
-                row,
-                col
-            }
-        })
-    }
-    return {
-        week: ret,
-        row: index,
-        child: children(ret, index, 48)
-    }
-})
-
-export default data
+export default weekTimeData

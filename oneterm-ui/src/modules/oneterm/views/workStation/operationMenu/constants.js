@@ -7,5 +7,6 @@ export const OPERATION_MENU_TYPE = {
   QUICK_COMMAND: 'quickCommand',
   FILE_MANAGEMENT: 'fileManagement',
   CLIPBOARD: 'clipboard',
-  RESOLUTION: 'resolution'
+  RESOLUTION: 'resolution',
+  SHARE: 'share'
 }

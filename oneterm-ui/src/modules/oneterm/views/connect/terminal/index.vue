@@ -22,6 +22,7 @@
       ref="fileManagementDrawerRef"
       connectType="ssh"
       :sessionId="connectData.sessionId"
+      :assetPermissions="assetPermissions"
     />
   </div>
 </template>
@@ -71,6 +72,10 @@ export default {
     preferenceSetting: {
       type: [Object, null],
       default: null
+    },
+    assetPermissions: {
+      type: Object,
+      default: () => {}
     }
   },
   data() {

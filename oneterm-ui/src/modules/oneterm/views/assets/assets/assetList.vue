@@ -43,21 +43,21 @@
                   <a-menu>
                     <a-menu-item key="1" v-if="showNodeOperation(node.dataRef, ['write'])" @click="$emit('openNode', { parent_id: node.dataRef.id })">
                       <a-icon type="plus-circle" />
-                      {{ $t(`oneterm.assetList.createSubCatalog`) }}
+                      {{ $t(`oneterm.assetList.createSubFolder`) }}
                     </a-menu-item>
                     <a-menu-item key="2" v-if="showNodeOperation(node.dataRef, ['write'])" @click="$emit('openNode', node.dataRef)">
                       <ops-icon type="icon-xianxing-edit" />
-                      {{ $t(`oneterm.assetList.editCatalog`) }}
+                      {{ $t(`oneterm.assetList.editFolder`) }}
                     </a-menu-item>
                     <a-menu-item key="3" v-if="showNodeOperation(node.dataRef, ['delete'])" @click="deleteNode(node.dataRef)">
                       <ops-icon type="veops-delete" />
-                      {{ $t(`oneterm.assetList.deleteCatalog`) }}
+                      {{ $t(`oneterm.assetList.deleteFolder`) }}
                     </a-menu-item>
                     <template v-if="showNodeOperation(node.dataRef, ['grant'])">
                       <a-divider style="margin: 4px 0" />
                       <a-menu-item key="4" @click="openGrantModal(node.dataRef)">
                         <a-icon type="user-add" />
-                        {{ $t(`oneterm.assetList.grantCatalog`) }}
+                        {{ $t(`oneterm.assetList.grantFolder`) }}
                       </a-menu-item>
                     </template>
                   </a-menu>
@@ -125,7 +125,7 @@
               <vxe-column type="checkbox" width="60px"></vxe-column>
               <vxe-column :title="$t(`oneterm.name`)" field="name"></vxe-column>
               <vxe-column :title="$t(`oneterm.assetList.ip`)" field="ip"> </vxe-column>
-              <vxe-column :title="$t(`oneterm.assetList.catalogName`)" field="node_chain"> </vxe-column>
+              <vxe-column :title="$t(`oneterm.assetList.folderName`)" field="node_chain"> </vxe-column>
               <vxe-column
                 :title="$t(`status`)"
                 field="connectable"
@@ -242,7 +242,7 @@ export default {
       searchValue: '',
 
       getRequestParams: {
-        info: false
+        info: true
       }
     }
   },
@@ -544,7 +544,7 @@ export default {
     authAsset() {
       const assetIds = this.selectedRowKeys.map((item) => item.id)
       this.$refs.grantModalRef.open({
-        resourceId: this.selectedRowKeys?.[0]?.resource_id || '',
+        resourceId: this.selectedRowKeys?.[0]?.resource_id ?? '',
         type: 'asset',
         ids: assetIds
       })

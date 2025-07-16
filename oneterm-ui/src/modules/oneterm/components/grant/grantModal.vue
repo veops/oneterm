@@ -2,42 +2,33 @@
   <a-modal
     :visible="visible"
     :width="800"
+    :footer="null"
     @cancel="handleCancel"
-    @ok="handleOk"
   >
-    <template v-if="showACLConfig">
-      <div class="auth-node-title">
-        {{ $t(grantTitle) }}
-      </div>
-      <ACLTable
-        :tableData="aclTableData"
-        :resourceId="resourceId"
-      />
-      <a-space>
-        <span class="grant-button" @click="openGrantUserModal('depart')">{{ $t('oneterm.assetList.grantUserOrDep') }}</span>
-        <span class="grant-button" @click="openGrantUserModal('role')">{{ $t('oneterm.assetList.grantRole') }}</span>
-      </a-space>
-    </template>
-
-    <div class="auth-node-title">
-      {{ $t('oneterm.assetList.grantLogin') }}
-    </div>
-    <EmployeeTreeSelect
-      v-model="rids"
-      multiple
-      :idType="2"
-      departmentKey="acl_rid"
-      employeeKey="acl_rid"
-      :placeholder="`${$t(`placeholder2`)}`"
-      class="custom-treeselect custom-treeselect-white"
-      :style="{
-        '--custom-height': '32px',
-        lineHeight: '32px',
-        '--custom-multiple-lineHeight': '18px',
-      }"
-      :limit="1"
-      :otherOptions="visualRoleList"
-    />
+    <a-tabs v-model="tabKey">
+      <a-tab-pane key="accessPermission" :tab="$t('oneterm.assetList.accessPermission')">
+        <PermissionForm
+          ref="permissionFormRef"
+          :dataType="dataType"
+          :ids="ids"
+          @cancel="handleCancel"
+        />
+      </a-tab-pane>
+      <a-tab-pane
+        v-if="showACLConfig"
+        key="operationPermissions"
+        :tab="$t(grantTitle)"
+      >
+        <ACLTable
+          :tableData="aclTableData"
+          :resourceId="resourceId"
+        />
+        <a-space>
+          <span class="grant-button" @click="openGrantUserModal('depart')">{{ $t('oneterm.assetList.grantUserOrDep') }}</span>
+          <span class="grant-button" @click="openGrantUserModal('role')">{{ $t('oneterm.assetList.grantRole') }}</span>
+        </a-space>
+      </a-tab-pane>
+    </a-tabs>
 
     <GrantUserModal
       ref="grantUserModalRef"
@@ -49,30 +40,28 @@
 <script>
 import _ from 'lodash'
 import { mapState } from 'vuex'
-import { getAuth, postAuth } from '@/modules/oneterm/api/authorization.js'
 import { getResourcePerms } from '@/modules/acl/api/permission'
-import { searchRole } from '@/modules/acl/api/role'
-import EmployeeTreeSelect from '@/views/setting/components/employeeTreeSelect.vue'
+
+import PermissionForm from './permissionForm.vue'
 import ACLTable from './aclTable.vue'
 import GrantUserModal from './grantUserModal.vue'
 
 export default {
   name: 'GrantModal',
   components: {
-    EmployeeTreeSelect,
+    PermissionForm,
     ACLTable,
     GrantUserModal
   },
   data() {
     return {
+      tabKey: 'accessPermission',
       visible: false,
-      rids: [], // 登录权限
       resourceId: '', // acl resource id
       aclTableData: [], // acl data
-      ids: [], // id 列表
+      ids: [], // id list
       dataType: 'node',
-      showACLConfig: true, // 是否展示acl 配置
-      visualRoleList: [], // 虚拟角色
+      showACLConfig: true,
     }
   },
   computed: {
@@ -83,11 +72,11 @@ export default {
     grantTitle() {
       switch (this.dataType) {
         case 'node':
-          return 'oneterm.assetList.grantCatalog'
+          return 'oneterm.assetList.folderOperationPermissions'
         case 'asset':
-          return 'oneterm.assetList.grantAsset'
+          return 'oneterm.assetList.assetOperationPermissions'
         case 'account':
-          return 'oneterm.assetList.grantAccount'
+          return 'oneterm.assetList.accountOperationPermissions'
         default:
           return ''
       }
@@ -99,12 +88,11 @@ export default {
       ids,
       resourceId,
     }) {
+      this.tabKey = 'accessPermission'
       this.showACLConfig = type === 'node' || (type !== 'node' && ids.length === 1)
       this.ids = ids
       this.dataType = type
-      this.resourceId = resourceId || ''
-
-      this.loadRoles()
+      this.resourceId = resourceId ?? ''
 
       let aclTableData = []
       if (this.showACLConfig) {
@@ -134,130 +122,20 @@ export default {
         }
       }
       this.aclTableData = aclTableData
-
-      const getAuthParams = {
-        page_index: 1,
-        page_size: 9999,
-      }
-      switch (type) {
-        case 'node':
-          getAuthParams.node_id = ids[0]
-          break
-        case 'asset':
-          if (ids.length === 1) {
-            getAuthParams.asset_id = ids[0]
-          }
-          break
-        case 'account':
-          if (ids.length === 1) {
-            getAuthParams.account_id = ids[0]
-          }
-          break
-        default:
-          break
-      }
-
-      let rids = []
-      if (
-        getAuthParams.node_id ||
-        getAuthParams.asset_id ||
-        getAuthParams.account_id
-      ) {
-        const res = await getAuth(getAuthParams)
-
-        let newRids = []
-        if (res?.data?.list?.length) {
-          res.data.list.forEach((item) => {
-            newRids.push(...(item?.rids || []))
-          })
-        }
-        newRids = _.uniq(newRids)
-        if (newRids?.length) {
-          rids = newRids.map((id) => `employee-${id}`)
-        }
-      }
-
-      this.rids = rids
       this.visible = true
-    },
-
-    async loadRoles() {
-      const res = await searchRole({ page_size: 9999, page: 1, app_id: 'oneterm', user_role: 0, user_only: 0, is_all: true })
-
-      const visualRoleList = []
-      const roleList = (res?.roles || []).filter((item) => !/_virtual$/.test(item.name))
-
-      if (roleList.length) {
-        visualRoleList.push({
-          acl_rid: -100,
-          department_name: this.$t('acl.visualRole'),
-          sub_departments: [],
-          employees: roleList.map((item) => {
-            return {
-              nickname: item.name,
-              acl_rid: item.id
-            }
-          })
-        })
-      }
-
-      this.$set(this, 'visualRoleList', visualRoleList)
     },
 
     handleCancel() {
       this.rids = []
       this.visible = false
+      if (this.$refs.permissionFormRef) {
+        this.$refs.permissionFormRef.resetFields()
+      }
       this.resourceId = ''
       this.aclTableData = []
       this.ids = []
       this.dataType = 'node'
       this.showACLConfig = true
-    },
-
-    handleOk() {
-      const rids = this.rids.map((rid) => {
-        return Number(rid?.split?.('-')?.[1])
-      })
-
-      switch (this.dataType) {
-        case 'node':
-          postAuth({
-            rids,
-            node_id: this.ids[0]
-          }).then(() => {
-            this.$message.success(this.$t('updateSuccess'))
-            this.handleCancel()
-          })
-          break
-        case 'asset':
-          Promise.all(
-            this.ids.map((id) => {
-              return postAuth({
-                rids,
-                asset_id: id
-              })
-            })
-          ).then(() => {
-            this.$message.success(this.$t('updateSuccess'))
-            this.handleCancel()
-          })
-          break
-        case 'account':
-          Promise.all(
-            this.ids.map((id) => {
-              return postAuth({
-                rids,
-                account_id: id
-              })
-            })
-          ).then(() => {
-            this.$message.success(this.$t('updateSuccess'))
-            this.handleCancel()
-          })
-          break
-        default:
-          break
-      }
     },
 
     openGrantUserModal(type) {

@@ -1,6 +1,6 @@
 <template>
   <div class="oneterm-layout">
-    <div class="oneterm-header">{{ $t('oneterm.menu.accounts') }}</div>
+    <div class="oneterm-header">{{ $t('oneterm.menu.accountManagement') }}</div>
     <a-spin :tip="loadTip" :spinning="loading">
       <div class="oneterm-layout-container">
         <div class="oneterm-layout-container-header">

@@ -89,6 +89,7 @@
                 :assetId="item.assetId"
                 :accountId="item.accountId"
                 :protocol="item.protocol"
+                :assetPermissions="item.permissions"
                 :isFullScreen="false"
                 :preferenceSetting="preferenceSetting"
                 @close="handleTerminalError(item)"
@@ -103,9 +104,9 @@
                 :assetId="item.assetId"
                 :accountId="item.accountId"
                 :protocol="item.protocol"
+                :assetPermissions="item.permissions"
                 :isFullScreen="false"
                 :preferenceSetting="preferenceSetting"
-                :controlConfig="controlConfig"
                 @close="handleTerminalError(item)"
                 @open="getOfUserStat()"
                 @updatePreferenceSetting="getPreference"
@@ -128,7 +129,6 @@
           :openFullScreen="openFullScreen"
           :accountList="accountList"
           :currentTabData="currentTabData"
-          :controlConfig="controlConfig"
           @toggleFullScreen="toggleFullScreen"
           @openRecentSession="openRecentSession"
           @openBatchExecution="openBatchExecution"
@@ -154,6 +154,7 @@ import { getOfUserStat } from '@/modules/oneterm/api/stat'
 import { getPreference } from '@/modules/oneterm/api/preference.js'
 import { getAccountList } from '@/modules/oneterm/api/account'
 import { getConfig } from '@/modules/oneterm/api/config'
+import { getAssetPermissions } from '@/modules/oneterm/api/asset'
 import { defaultPreferenceSetting } from '../systemSettings/terminalDisplay/constants.js'
 import { WORKSTATION_TAB_TYPE } from './constants.js'
 import FullScreenMixin from '@/modules/oneterm/mixins/fullScreenMixin'
@@ -289,23 +290,27 @@ export default {
       this.selectedKeys = keys
     },
 
-    openTerminal(data) {
+    async openTerminal(data) {
       const id = uuidv4()
       const accountName = this.getAccountName(data.accountId)
       const name = accountName ? `${accountName}@${data.assetName}` : data.assetName
+      const permissions = await this.getAssetPermissions(data.assetId, data.accountId)
 
       this.terminalList.push({
         ...data,
         socketStatus: true,
         id,
         name,
-        type: this.getConnectType(data.protocolType)
+        type: this.getConnectType(data.protocolType),
+        permissions: permissions?.[data.accountId] || {}
       })
 
       this.tabActiveKey = id
     },
 
-    openTerminalList(data) {
+    async openTerminalList(data) {
+      const permissions = await this.getAssetPermissions(data.assetId, data.accountList.map((id) => id).join(','))
+
       const newList = data.accountList.map((id) => {
         const accountName = this.getAccountName(id)
         const name = accountName ? `${accountName}@${data.assetName}` : data.assetName
@@ -318,11 +323,33 @@ export default {
           accountId: id,
           socketStatus: true,
           id: uuidv4(),
-          type: this.getConnectType(data.protocolType)
+          type: this.getConnectType(data.protocolType),
+          permissions: permissions?.[id] || {}
         }
       })
+
       this.tabActiveKey = newList[0].id
       this.terminalList.push(...newList)
+    },
+
+    async getAssetPermissions(assetId, account_ids) {
+      const defaultPermissions = this.controlConfig?.default_permissions
+      const permissions = {}
+
+      try {
+        const res = await getAssetPermissions(assetId, { account_ids })
+        const data = res?.data?.results || {}
+        Object.keys(data).forEach((accountId) => {
+          const permissionData = data?.[accountId]?.results || {}
+          permissions[accountId] = {}
+          Object.keys(defaultPermissions).forEach((permissionType) => {
+            permissions[accountId][permissionType] = permissionData?.[permissionType]?.allowed ?? defaultPermissions?.[permissionType] ?? false
+          })
+        })
+      } catch (error) {
+        console.error('getAssetPermissions error', error)
+      }
+      return permissions
     },
 
     closeTerminal(item, index) {

@@ -61,6 +61,17 @@
     ></a-divider>
 
     <a-tooltip
+      v-if="controlDisplayList.includes(OPERATION_MENU_TYPE.SHARE)"
+      :title="$t('oneterm.workStation.assetShare')"
+      placement="left"
+    >
+      <ops-icon
+        type="veops-share"
+        @click="shareAsset"
+      />
+    </a-tooltip>
+
+    <a-tooltip
       v-if="controlDisplayList.includes(OPERATION_MENU_TYPE.QUICK_COMMAND)"
       :title="$t('oneterm.quickCommand.name')"
       placement="left"
@@ -109,19 +120,26 @@
       :accountList="accountList"
       @ok="openBatchExecution"
     />
+    <ShareAssetModal
+      ref="shareAssetModalRef"
+      :assetData="currentTabData"
+    />
   </div>
 </template>
 
 <script>
 import { WORKSTATION_TAB_TYPE } from '@/modules/oneterm/views/workStation/constants.js'
 import { OPERATION_MENU_TYPE } from './constants.js'
+import { PERMISSION_TYPE } from '@/modules/oneterm/views/systemSettings/accessControl/constants.js'
 
 import ChooseAssetsModal from '../batchExecution/chooseAssetsModal.vue'
+import ShareAssetModal from './shareAssetModal.vue'
 
 export default {
   name: 'OperationMenu',
   components: {
-    ChooseAssetsModal
+    ChooseAssetsModal,
+    ShareAssetModal
   },
   props: {
     openFullScreen: {
@@ -133,10 +151,6 @@ export default {
       default: () => []
     },
     currentTabData: {
-      type: Object,
-      default: () => {}
-    },
-    controlConfig: {
       type: Object,
       default: () => {}
     }
@@ -155,6 +169,8 @@ export default {
       return this.currentTabData?.type === WORKSTATION_TAB_TYPE.GUACAMOLE
     },
     controlDisplayList() {
+      const assetPermissions = this.currentTabData?.permissions || {}
+
       const controlDisplayList = [
         OPERATION_MENU_TYPE.FULL_SCREEN,
         OPERATION_MENU_TYPE.RECENT_SESSION,
@@ -167,15 +183,22 @@ export default {
         controlDisplayList.push(OPERATION_MENU_TYPE.RESOLUTION)
       }
 
+      const showShare = assetPermissions?.[PERMISSION_TYPE.SHARE] || false
+      if (showShare && (this.isGuacamole || this.isTerminal)) {
+        controlDisplayList.push(OPERATION_MENU_TYPE.SHARE)
+      }
+
       if (this.isTerminal) {
         controlDisplayList.push(OPERATION_MENU_TYPE.QUICK_COMMAND)
       }
 
-      if (['ssh', 'rdp'].includes(this.currentTabData?.protocolType)) {
+      const showUpload = assetPermissions?.[PERMISSION_TYPE.FILE_UPLOAD] || false
+      const showDownload = assetPermissions?.[PERMISSION_TYPE.FILE_DOWNLOAD] || false
+      if (['ssh', 'rdp'].includes(this.currentTabData?.protocolType) && (showUpload || showDownload)) {
         controlDisplayList.push(OPERATION_MENU_TYPE.FILE_MANAGEMENT)
       }
 
-      const showClipboard = this?.controlConfig?.[`${this.currentTabData?.protocolType}_config`]?.paste
+      const showClipboard = assetPermissions?.[PERMISSION_TYPE.PASTE] || false
       if (this.isGuacamole && showClipboard) {
         controlDisplayList.push(OPERATION_MENU_TYPE.CLIPBOARD)
       }
@@ -211,6 +234,9 @@ export default {
     },
     callComponentFn(name) {
       this.$emit('callComponentFn', name)
+    },
+    shareAsset() {
+      this.$refs.shareAssetModalRef.open()
     }
   }
 }

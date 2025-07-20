@@ -102,15 +102,24 @@
 <script>
 import moment from 'moment'
 import { mapState } from 'vuex'
-import AccountModal from './accountModal.vue'
-import { getAccountList, deleteAccountById } from '../../../api/account'
+import { getAccountList, deleteAccountById } from '@/modules/oneterm/api/account'
+import { getAllDepAndEmployee } from '@/api/company'
+
 import GrantModal from '@/modules/oneterm/components/grant/grantModal.vue'
+import AccountModal from './accountModal.vue'
 
 export default {
   name: 'Account',
   components: {
     AccountModal,
     GrantModal
+  },
+  provide() {
+    return {
+      provide_allTreeDepAndEmp: () => {
+        return this.allTreeDepAndEmp
+      },
+    }
   },
   data() {
     return {
@@ -124,6 +133,7 @@ export default {
       selectedRowKeys: [],
       loading: false,
       loadTip: '',
+      allTreeDepAndEmp: [],
     }
   },
   computed: {
@@ -137,6 +147,9 @@ export default {
   },
   mounted() {
     this.updateTableData()
+    getAllDepAndEmployee({ block: 0 }).then((res) => {
+      this.allTreeDepAndEmp = res
+    })
   },
   methods: {
     moment,

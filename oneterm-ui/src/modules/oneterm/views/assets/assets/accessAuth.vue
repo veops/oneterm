@@ -126,7 +126,7 @@ export default {
       asset_command_control
     }) {
       const { time_ranges = [], timezone = momentTimezone.tz.guess() } = access_time_control
-      const { cmd_ids = undefined, template_ids = undefined } = asset_command_control
+      const { cmd_ids, template_ids } = asset_command_control
 
       let ranges = []
       if (time_ranges?.length) {
@@ -148,8 +148,8 @@ export default {
       }
 
       this.form = {
-        cmd_ids,
-        template_ids,
+        cmd_ids: cmd_ids ?? undefined,
+        template_ids: template_ids ?? undefined,
         ranges,
         timezone
       }

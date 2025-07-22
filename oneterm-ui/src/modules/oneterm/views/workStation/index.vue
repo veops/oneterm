@@ -40,10 +40,16 @@
             >
               <template #tab>
                 <div class="oneterm-workstation-tab-terminal">
-                  <span
-                    v-if="![WORKSTATION_TAB_TYPE.DISPLAY_SETTING, WORKSTATION_TAB_TYPE.THEME_SETTING, WORKSTATION_TAB_TYPE.BATCH_EXECUTION].includes(item.type)"
-                    :class="['oneterm-workstation-tab-terminal-status', !item.socketStatus ? 'oneterm-workstation-tab-terminal-status_error' : '']"
-                  ></span>
+                  <template v-if="![WORKSTATION_TAB_TYPE.DISPLAY_SETTING, WORKSTATION_TAB_TYPE.THEME_SETTING, WORKSTATION_TAB_TYPE.BATCH_EXECUTION].includes(item.type)">
+                    <a-icon
+                      v-if="item.socketStatus === SOCKET_STATUS.LOADING"
+                      type="loading"
+                    />
+                    <span
+                      v-else
+                      :class="['oneterm-workstation-tab-terminal-status', item.socketStatus === SOCKET_STATUS.ERROR ? 'oneterm-workstation-tab-terminal-status_error' : '']"
+                    ></span>
+                  </template>
 
                   <a-tooltip :title="item.name">
                     <span class="oneterm-workstation-tab-terminal-title">{{ item.name }}</span>
@@ -92,8 +98,8 @@
                 :assetPermissions="item.permissions"
                 :isFullScreen="false"
                 :preferenceSetting="preferenceSetting"
-                @close="handleTerminalError(item)"
-                @open="getOfUserStat()"
+                @close="handleTerminalSocketStatus(item, SOCKET_STATUS.ERROR)"
+                @open="handleTerminalSocketStatus(item, SOCKET_STATUS.SUCCESS)"
                 @openSystemSetting="openSystemSetting"
               />
 
@@ -107,8 +113,8 @@
                 :assetPermissions="item.permissions"
                 :isFullScreen="false"
                 :preferenceSetting="preferenceSetting"
-                @close="handleTerminalError(item)"
-                @open="getOfUserStat()"
+                @close="handleTerminalSocketStatus(item, SOCKET_STATUS.ERROR)"
+                @open="handleTerminalSocketStatus(item, SOCKET_STATUS.SUCCESS)"
                 @updatePreferenceSetting="getPreference"
               />
             </a-tab-pane>
@@ -156,7 +162,7 @@ import { getAccountList } from '@/modules/oneterm/api/account'
 import { getConfig } from '@/modules/oneterm/api/config'
 import { getAssetPermissions } from '@/modules/oneterm/api/asset'
 import { defaultPreferenceSetting } from '../systemSettings/terminalDisplay/constants.js'
-import { WORKSTATION_TAB_TYPE } from './constants.js'
+import { WORKSTATION_TAB_TYPE, SOCKET_STATUS } from './constants.js'
 import FullScreenMixin from '@/modules/oneterm/mixins/fullScreenMixin'
 
 import RecentSession from './recentSession.vue'
@@ -198,6 +204,7 @@ export default {
       accountList: [],
       loading: false,
       WORKSTATION_TAB_TYPE,
+      SOCKET_STATUS,
       showOperationMenu: localStorage.getItem(operationMenuExpandKey) ? localStorage.getItem(operationMenuExpandKey) === 'true' : true,
       controlConfig: {},
     }
@@ -298,7 +305,7 @@ export default {
 
       this.terminalList.push({
         ...data,
-        socketStatus: true,
+        socketStatus: SOCKET_STATUS.LOADING,
         id,
         name,
         type: this.getConnectType(data.protocolType),
@@ -321,7 +328,7 @@ export default {
           assetId: data.assetId,
           name,
           accountId: id,
-          socketStatus: true,
+          socketStatus: SOCKET_STATUS.LOADING,
           id: uuidv4(),
           type: this.getConnectType(data.protocolType),
           permissions: permissions?.[id] || {}
@@ -364,7 +371,7 @@ export default {
       const id = uuidv4()
       this.terminalList.push({
         ...item,
-        socketStatus: true,
+        socketStatus: SOCKET_STATUS.LOADING,
         id
       })
 
@@ -379,10 +386,10 @@ export default {
       }
     },
 
-    handleTerminalError(item) {
+    handleTerminalSocketStatus(item, status) {
       const terminalIndex = this.terminalList.findIndex((terminal) => terminal.id === item.id)
       if (terminalIndex > -1) {
-        this.terminalList[terminalIndex].socketStatus = false
+        this.terminalList[terminalIndex].socketStatus = status
         this.getOfUserStat()
       }
     },
@@ -444,7 +451,7 @@ export default {
 
     callComponentFn(fnName) {
       const component = this.$refs?.[`workStationPanelRef${this.tabActiveKey}`]?.[0]
-      if (component[fnName]) {
+      if (component?.[fnName]) {
         component[fnName]()
       }
     },

@@ -128,7 +128,7 @@
 </template>
 
 <script>
-import { WORKSTATION_TAB_TYPE } from '@/modules/oneterm/views/workStation/constants.js'
+import { WORKSTATION_TAB_TYPE, SOCKET_STATUS } from '@/modules/oneterm/views/workStation/constants.js'
 import { OPERATION_MENU_TYPE } from './constants.js'
 import { PERMISSION_TYPE } from '@/modules/oneterm/views/systemSettings/accessControl/constants.js'
 
@@ -170,6 +170,7 @@ export default {
     },
     controlDisplayList() {
       const assetPermissions = this.currentTabData?.permissions || {}
+      const socketStatus = this.currentTabData?.socketStatus || SOCKET_STATUS.LOADING
 
       const controlDisplayList = [
         OPERATION_MENU_TYPE.FULL_SCREEN,
@@ -179,7 +180,7 @@ export default {
         OPERATION_MENU_TYPE.THEME_SETTING
       ]
 
-      if (this.isGuacamole) {
+      if (this.isGuacamole && socketStatus === SOCKET_STATUS.SUCCESS) {
         controlDisplayList.push(OPERATION_MENU_TYPE.RESOLUTION)
       }
 
@@ -188,18 +189,26 @@ export default {
         controlDisplayList.push(OPERATION_MENU_TYPE.SHARE)
       }
 
-      if (this.isTerminal) {
+      if (this.isTerminal && socketStatus === SOCKET_STATUS.SUCCESS) {
         controlDisplayList.push(OPERATION_MENU_TYPE.QUICK_COMMAND)
       }
 
       const showUpload = assetPermissions?.[PERMISSION_TYPE.FILE_UPLOAD] || false
       const showDownload = assetPermissions?.[PERMISSION_TYPE.FILE_DOWNLOAD] || false
-      if (['ssh', 'rdp'].includes(this.currentTabData?.protocolType) && (showUpload || showDownload)) {
+      if (
+        ['ssh', 'rdp'].includes(this.currentTabData?.protocolType) &&
+        (showUpload || showDownload) &&
+        socketStatus === SOCKET_STATUS.SUCCESS
+      ) {
         controlDisplayList.push(OPERATION_MENU_TYPE.FILE_MANAGEMENT)
       }
 
       const showClipboard = assetPermissions?.[PERMISSION_TYPE.PASTE] || false
-      if (this.isGuacamole && showClipboard) {
+      if (
+        this.isGuacamole &&
+        showClipboard &&
+        socketStatus === SOCKET_STATUS.SUCCESS
+      ) {
         controlDisplayList.push(OPERATION_MENU_TYPE.CLIPBOARD)
       }
 

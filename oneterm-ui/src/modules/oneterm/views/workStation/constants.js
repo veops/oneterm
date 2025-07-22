@@ -6,3 +6,9 @@ export const WORKSTATION_TAB_TYPE = {
   THEME_SETTING: 'themeSetting',
   BATCH_EXECUTION: 'batchExecution'
 }
+
+export const SOCKET_STATUS = {
+  LOADING: 'loading',
+  SUCCESS: 'success',
+  ERROR: 'error'
+}

@@ -144,6 +144,7 @@ import _ from 'lodash'
 import moment from 'moment'
 import { mapState } from 'vuex'
 import { getAuthList, deleteAuthById, putAuthById } from '@/modules/oneterm/api/authorizationV2.js'
+import { getAllDepAndEmployee } from '@/api/company'
 import { TARGET_SELECT_TYPE } from './constants.js'
 import { PERMISSION_TYPE_NAME, PERMISSION_TYPE } from '@/modules/oneterm/views/systemSettings/accessControl/constants.js'
 
@@ -155,6 +156,13 @@ export default {
   components: {
     AuthDrawer,
     EnabledStatus
+  },
+  provide() {
+    return {
+      provide_allTreeDepAndEmp: () => {
+        return this.allTreeDepAndEmp
+      },
+    }
   },
   data() {
     return {
@@ -182,7 +190,8 @@ export default {
         'rids',
         'valid_from',
         'valid_to'
-      ]
+      ],
+      allTreeDepAndEmp: [],
     }
   },
   computed: {
@@ -195,6 +204,9 @@ export default {
   },
   mounted() {
     this.updateTableData()
+    getAllDepAndEmployee({ block: 0 }).then((res) => {
+      this.allTreeDepAndEmp = res
+    })
   },
   methods: {
     updateTableData() {

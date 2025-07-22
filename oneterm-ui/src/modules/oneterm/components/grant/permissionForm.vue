@@ -160,7 +160,7 @@ export default {
 
       ;['node', 'account', 'asset'].forEach((key) => {
         params[`${key}_selector`] = {
-          type: TARGET_SELECT_TYPE.ID,
+          type: key === this.dataType ? TARGET_SELECT_TYPE.ID : TARGET_SELECT_TYPE.ALL,
           values: key === this.dataType ? this.ids.map((id) => String(id)) : []
         }
       })

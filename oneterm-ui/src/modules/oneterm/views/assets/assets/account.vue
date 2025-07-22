@@ -191,10 +191,14 @@ export default {
         .filter((auth) => auth.account)
         .forEach((auth) => {
           const rids = (auth?.rids || []).map((r) => Number(r.split('-')[1]))
-          authorization[auth.account] = {
+          const authorizationItem = {
             rids,
             permissions: auth.permissions
           }
+          if (auth?.rule_id) {
+            authorizationItem.rule_id = auth.rule_id
+          }
+          authorization[auth.account] = authorizationItem
         })
       return { authorization }
     },
@@ -206,6 +210,7 @@ export default {
           return {
             id: uuidv4(),
             account: Number(key),
+            rule_id: value?.rule_id ?? undefined,
             rids: (value?.rids || []).map((r) => `employee-${r}`),
             permissions: value.permissions
           }

@@ -108,11 +108,15 @@ func doCreate[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType 
 
 		switch t := any(md).(type) {
 		case *model.Asset:
-			if err = handleAuthorization(ctx, tx, model.ACTION_CREATE, t, nil); err != nil {
+			if err = service.DefaultAuthService.HandleAuthorization(ctx, tx, model.ACTION_CREATE, t, nil); err != nil {
 				handleRemoteErr(ctx, err)
 				return
 			}
 		case *model.Node:
+			if err = handleNodeAuthorization(ctx, tx, model.ACTION_CREATE, t); err != nil {
+				handleRemoteErr(ctx, err)
+				return
+			}
 			if err = acl.UpdateResource(ctx, currentUser.GetUid(), resourceId, map[string]string{"name": cast.ToString(md.GetId())}); err != nil {
 				handleRemoteErr(ctx, err)
 				return
@@ -192,7 +196,12 @@ func doDelete[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType 
 	if err = baseService.ExecuteInTransaction(ctx, func(tx *gorm.DB) (err error) {
 		switch t := any(md).(type) {
 		case *model.Asset:
-			if err = handleAuthorization(ctx, tx, model.ACTION_DELETE, t, nil, nil); err != nil {
+			if err = service.DefaultAuthService.HandleAuthorization(ctx, tx, model.ACTION_DELETE, t, nil); err != nil {
+				handleRemoteErr(ctx, err)
+				return
+			}
+		case *model.Node:
+			if err = handleNodeAuthorization(ctx, tx, model.ACTION_DELETE, t); err != nil {
 				handleRemoteErr(ctx, err)
 				return
 			}
@@ -283,12 +292,17 @@ func doUpdate[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType 
 		selects := []string{"*"}
 		switch t := any(md).(type) {
 		case *model.Asset:
-			if err = handleAuthorization(ctx, tx, model.ACTION_UPDATE, t, nil); err != nil {
+			if err = service.DefaultAuthService.HandleAuthorization(ctx, tx, model.ACTION_UPDATE, t, nil); err != nil {
 				handleRemoteErr(ctx, err)
 				return
 			}
 			if cast.ToBool(ctx.Value("isAuthWithKey")) {
 				selects = []string{"ip", "protocols", "authorization"}
+			}
+		case *model.Node:
+			if err = handleNodeAuthorization(ctx, tx, model.ACTION_UPDATE, t); err != nil {
+				handleRemoteErr(ctx, err)
+				return
 			}
 		case *model.Account:
 			if cast.ToBool(ctx.Value("isAuthWithKey")) {
@@ -518,4 +532,8 @@ func handleAcl[T any](ctx *gin.Context, dbFind *gorm.DB, resourceType string) (d
 	}
 
 	return
+}
+
+func handleNodeAuthorization(ctx *gin.Context, tx *gorm.DB, action int, node *model.Node, auths ...*model.Authorization) error {
+	return service.DefaultAuthService.HandleAuthorizationV2(ctx, tx, action, nil, node, auths...)
 }

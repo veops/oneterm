@@ -11,14 +11,14 @@ const (
 )
 
 type Node struct {
-	Id            int                  `json:"id" gorm:"column:id;primarykey;autoIncrement"`
-	Name          string               `json:"name" gorm:"column:name"`
-	Comment       string               `json:"comment" gorm:"column:comment"`
-	ParentId      int                  `json:"parent_id" gorm:"column:parent_id"`
-	Authorization Map[int, Slice[int]] `json:"authorization" gorm:"column:authorization;type:text"`
-	AccessAuth    AccessAuth           `json:"access_auth" gorm:"embedded;column:access_auth"`
-	Protocols     Slice[string]        `json:"protocols" gorm:"column:protocols;type:text"`
-	GatewayId     int                  `json:"gateway_id" gorm:"column:gateway_id"`
+	Id            int              `json:"id" gorm:"column:id;primarykey;autoIncrement"`
+	Name          string           `json:"name" gorm:"column:name"`
+	Comment       string           `json:"comment" gorm:"column:comment"`
+	ParentId      int              `json:"parent_id" gorm:"column:parent_id"`
+	Authorization AuthorizationMap `json:"authorization" gorm:"column:authorization;type:text"`
+	AccessAuth    AccessAuth       `json:"access_auth" gorm:"embedded;column:access_auth"`
+	Protocols     Slice[string]    `json:"protocols" gorm:"column:protocols;type:text"`
+	GatewayId     int              `json:"gateway_id" gorm:"column:gateway_id"`
 
 	Permissions []string              `json:"permissions" gorm:"-"`
 	ResourceId  int                   `json:"resource_id" gorm:"column:resource_id"`

@@ -93,7 +93,7 @@ func (c *Controller) GetNodes(ctx *gin.Context) {
 
 	// Apply info mode settings
 	if info {
-		db = db.Select("id", "parent_id", "name")
+		db = db.Select("id", "parent_id", "name", "authorization")
 	}
 
 	if recursive {

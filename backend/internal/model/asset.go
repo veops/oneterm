@@ -16,6 +16,7 @@ const (
 type AccountAuthorization struct {
 	Rids        Slice[int]       `json:"rids"`        // Role IDs for ACL system
 	Permissions *AuthPermissions `json:"permissions"` // V2 permissions (connect, file_upload, etc.)
+	RuleId      int              `json:"rule_id"`     // V2 authorization rule ID for tracking
 }
 
 // AuthorizationMap is a custom type that handles V1 to V2 authorization format conversion

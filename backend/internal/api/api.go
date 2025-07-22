@@ -42,9 +42,6 @@ func initDB() {
 		logger.L().Fatal("Failed to drop index", zap.Error(err))
 	}
 
-	acl.MigrateNode()
-	acl.MigrateCommand()
-
 	gsession.InitSessionCleanup()
 }
 
@@ -62,6 +59,9 @@ func initServices() {
 	if err := timeTemplateService.InitializeBuiltInTemplates(ctx); err != nil {
 		logger.L().Error("Failed to initialize built-in time templates", zap.Error(err))
 	}
+
+	acl.MigrateNode()
+	acl.MigrateCommand()
 }
 
 func initStorage() error {

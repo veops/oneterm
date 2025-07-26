@@ -98,9 +98,7 @@
                 :assetPermissions="item.permissions"
                 :isFullScreen="false"
                 :preferenceSetting="preferenceSetting"
-                @close="handleTerminalSocketStatus(item, SOCKET_STATUS.ERROR)"
-                @open="handleTerminalSocketStatus(item, SOCKET_STATUS.SUCCESS)"
-                @openSystemSetting="openSystemSetting"
+                @terminalSocketStatus="(status) => handleTerminalSocketStatus(item, status)"
               />
 
               <GuacamolePanel
@@ -112,10 +110,19 @@
                 :protocol="item.protocol"
                 :assetPermissions="item.permissions"
                 :isFullScreen="false"
-                :preferenceSetting="preferenceSetting"
-                @close="handleTerminalSocketStatus(item, SOCKET_STATUS.ERROR)"
-                @open="handleTerminalSocketStatus(item, SOCKET_STATUS.SUCCESS)"
-                @updatePreferenceSetting="getPreference"
+                @guacamoleSocketStatus="(status) => handleTerminalSocketStatus(item, status)"
+              />
+
+              <WebPanel
+                v-else-if="item.type === WORKSTATION_TAB_TYPE.WEB"
+                class="oneterm-workstation-panel"
+                :ref="'workStationPanelRef' + item.id"
+                :assetId="item.assetId"
+                :accountId="item.accountId"
+                :protocol="item.protocol"
+                :assetPermissions="item.permissions"
+                :isFullScreen="false"
+                @webSocketStatus="(status) => handleTerminalSocketStatus(item, status)"
               />
             </a-tab-pane>
           </template>
@@ -174,6 +181,7 @@ import ThemeSetting from '../systemSettings/terminalDisplay/themeSetting.vue'
 import AssetTable from './asset/assetTable.vue'
 import BatchExecution from './batchExecution/index.vue'
 import OperationMenu from './operationMenu/index.vue'
+import WebPanel from '@/modules/oneterm/views/connect/webClient/index.vue'
 
 const operationMenuExpandKey = 'ops_oneterm_work_station_menu_expand'
 
@@ -189,7 +197,8 @@ export default {
     ThemeSetting,
     AssetTable,
     BatchExecution,
-    OperationMenu
+    OperationMenu,
+    WebPanel
   },
   data() {
     return {
@@ -381,6 +390,10 @@ export default {
     getConnectType(protocolType) {
       if (['ssh', 'telnet', 'mysql', 'redis', 'postgresql', 'mongodb'].includes(protocolType)) {
         return WORKSTATION_TAB_TYPE.TERMINAL
+      } else if (['rdp', 'vnc'].includes(protocolType)) {
+        return WORKSTATION_TAB_TYPE.GUACAMOLE
+      } else if (['http', 'https'].includes(protocolType)) {
+        return WORKSTATION_TAB_TYPE.WEB
       } else {
         return WORKSTATION_TAB_TYPE.GUACAMOLE
       }

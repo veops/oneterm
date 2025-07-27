@@ -104,19 +104,19 @@
               />
 
               <GuacamolePanel
-                v-else-if="item.type === WORKSTATION_TAB_TYPE.GUACAMOLE"
+                v-else-if="item.type === WORKSTATION_TAB_TYPE.RDP || item.type === WORKSTATION_TAB_TYPE.VNC"
                 class="oneterm-workstation-panel"
                 :ref="'workStationPanelRef' + item.id"
                 :assetId="item.assetId"
                 :accountId="item.accountId"
                 :protocol="item.protocol"
-                :assetPermissions="item.permissions"
-                :isFullScreen="false"
                 :preferenceSetting="preferenceSetting"
                 @close="handleTerminalSocketStatus(item, SOCKET_STATUS.ERROR)"
                 @open="handleTerminalSocketStatus(item, SOCKET_STATUS.SUCCESS)"
                 @updatePreferenceSetting="getPreference"
               />
+
+              <!-- Web协议现在直接跳转到全屏代理页面，不在这里渲染 -->
             </a-tab-pane>
           </template>
 
@@ -174,6 +174,7 @@ import ThemeSetting from '../systemSettings/terminalDisplay/themeSetting.vue'
 import AssetTable from './asset/assetTable.vue'
 import BatchExecution from './batchExecution/index.vue'
 import OperationMenu from './operationMenu/index.vue'
+// 移除WebPanel引入，因为Web协议现在使用全屏代理
 
 const operationMenuExpandKey = 'ops_oneterm_work_station_menu_expand'
 
@@ -190,6 +191,7 @@ export default {
     AssetTable,
     BatchExecution,
     OperationMenu
+    // 移除WebPanel，因为Web协议现在使用全屏代理
   },
   data() {
     return {
@@ -298,9 +300,39 @@ export default {
     },
 
     async openTerminal(data) {
+      // Web协议特殊处理：直接跳转到全屏代理页面
+      if (['http', 'https'].includes(data.protocolType)) {
+        // 保存当前工作台状态
+        sessionStorage.setItem('oneterm_workstation_state', JSON.stringify({
+          selectedKeys: this.selectedKeys,
+          terminalList: this.terminalList.map(item => ({
+            id: item.id,
+            name: item.name,
+            type: item.type
+          }))
+        }))
+        
+        // 直接跳转到Web代理页面
+        this.$router.push({
+          name: 'web_proxy_fullscreen',
+          params: { assetId: data.assetId },
+          query: { 
+            protocol: data.protocolType,
+            asset_name: data.assetName,
+            account_id: data.accountId || 'default'
+          }
+        })
+        return
+      }
+
+      // 其他协议保持原有逻辑
       const id = uuidv4()
       const accountName = this.getAccountName(data.accountId)
-      const name = accountName ? `${accountName}@${data.assetName}` : data.assetName
+      let name = data.assetName
+      
+      // For non-Web assets, show account name
+      name = accountName ? `${accountName}@${data.assetName}` : data.assetName
+      
       const permissions = await this.getAssetPermissions(data.assetId, data.accountId)
 
       this.terminalList.push({
@@ -381,6 +413,8 @@ export default {
     getConnectType(protocolType) {
       if (['ssh', 'telnet', 'mysql', 'redis', 'postgresql', 'mongodb'].includes(protocolType)) {
         return WORKSTATION_TAB_TYPE.TERMINAL
+      } else if (['http', 'https'].includes(protocolType)) {
+        return WORKSTATION_TAB_TYPE.WEB
       } else {
         return WORKSTATION_TAB_TYPE.GUACAMOLE
       }

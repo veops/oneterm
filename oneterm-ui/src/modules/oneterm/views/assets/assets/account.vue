@@ -1,7 +1,82 @@
 <template>
   <a-row class="form-account">
     <a-col v-bind="colSpan">
+      <!-- Web资产特殊提示 -->
+      <div v-if="isWebAsset" class="web-asset-notice">
+        <a-alert
+          type="info"
+          show-icon
+          :message="$t('oneterm.webAsset.authNotice')"
+          :description="$t('oneterm.webAsset.authDescription')"
+        />
+        <div class="web-asset-auth-form">
+          <h4>{{ $t('oneterm.webAsset.webConfigAuth') }}</h4>
+          <vxe-table
+            ref="xTable"
+            size="mini"
+            :data="authList"
+            :column-config="{ width: 200 }"
+            :min-height="110"
+          >
+            <vxe-column field="webAsset" :title="$t('oneterm.webAsset.target')" width="190">
+              <template #default="{ row }">
+                <span class="web-asset-label">{{ $t('oneterm.webAsset.entireAsset') }}</span>
+              </template>
+            </vxe-column>
+            <vxe-column field="grantUser" :title="$t('oneterm.assetList.grantRole')" width="190">
+              <template #default="{ row }">
+                <EmployeeTreeSelect
+                  v-model="row.rids"
+                  multiple
+                  :idType="2"
+                  departmentKey="acl_rid"
+                  employeeKey="acl_rid"
+                  :placeholder="`${$t(`placeholder2`)}`"
+                  class="custom-treeselect custom-treeselect-white"
+                  :style="{
+                    '--custom-height': '32px',
+                    lineHeight: '32px',
+                    '--custom-multiple-lineHeight': '18px',
+                  }"
+                  :limit="1"
+                  :otherOptions="visualRoleList"
+                />
+              </template>
+            </vxe-column>
+            <vxe-column field="permissions" :title="$t('oneterm.assetList.operationPermissions')" width="230">
+              <template #default="{ row }">
+                <PermissionCheckbox
+                  :value="row.permissions"
+                  @change="(e) => handlePermissionChange(row, e)"
+                />
+              </template>
+            </vxe-column>
+            <vxe-column field="operate" :title="$t('oneterm.assetList.operation')" width="120">
+              <template #default="{ row, rowIndex }">
+                <a-space>
+                  <a
+                    v-if="authList && authList.length > 1"
+                    style="color:red"
+                    @click="deleteCount(row.id)"
+                  >
+                    <ops-icon type="veops-delete" />
+                  </a>
+                  <a
+                    v-if="rowIndex === authList.length - 1 && authList.length < 10"
+                    @click="addCount"
+                  >
+                    <a-icon type="plus-circle" />
+                  </a>
+                </a-space>
+              </template>
+            </vxe-column>
+          </vxe-table>
+        </div>
+      </div>
+
+      <!-- 传统资产账号选择 -->
       <vxe-table
+        v-else
         ref="xTable"
         size="mini"
         :data="authList"
@@ -58,15 +133,26 @@
           <template #default="{ row }">
             <PermissionCheckbox
               :value="row.permissions"
-              @change="(key, checked) => row.permissions[key] = checked"
+              @change="(e) => handlePermissionChange(row, e)"
             />
           </template>
         </vxe-column>
-        <vxe-column field="operation" :title="$t('operation')" width="55" fixed="right">
-          <template #default="{ row }">
+        <vxe-column field="operate" :title="$t('oneterm.assetList.operation')" width="120">
+          <template #default="{ row, rowIndex }">
             <a-space>
-              <a @click="addCount"><a-icon type="plus-circle"/></a>
-              <a v-if="authList && authList.length > 1" @click="deleteCount(row.id)"><a-icon type="minus-circle"/></a>
+              <a
+                v-if="authList && authList.length > 1"
+                style="color:red"
+                @click="deleteCount(row.id)"
+              >
+                <ops-icon type="veops-delete" />
+              </a>
+              <a
+                v-if="rowIndex === authList.length - 1 && authList.length < 10"
+                @click="addCount"
+              >
+                <a-icon type="plus-circle" />
+              </a>
             </a-space>
           </template>
         </vxe-column>

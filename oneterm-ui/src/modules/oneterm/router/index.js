@@ -34,6 +34,19 @@ const genOnetermRoutes = () => {
         title: 'oneterm.menu.workStation', icon: 'ops-oneterm-workstation-selected', selectedIcon: 'ops-oneterm-workstation-selected', keepAlive: false
         }
       },
+      // Web代理专用路由 - 全屏体验，不使用BasicLayout
+      {
+        path: '/oneterm/web-proxy/:assetId',
+        name: 'oneterm_web_proxy',
+        component: () => import('../views/connect/webProxy'),
+        meta: { 
+          title: 'Web代理', 
+          appName: 'oneterm', 
+          keepAlive: false,
+          hideLayout: true, // 标记为隐藏布局
+          fullscreen: true  // 标记为全屏模式
+        }
+      },
       {
         path: '/oneterm/resource',
         name: 'oneterm_resource',

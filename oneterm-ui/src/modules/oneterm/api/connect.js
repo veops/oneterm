@@ -18,6 +18,38 @@ export function postConnectIsRight(asset_id, account_id, protocol, query = null)
   })
 }
 
+// Web asset connection APIs
+export function getWebAssetConfig(assetId) {
+  return axios({
+    url: `/oneterm/v1/web_proxy/config/${assetId}`,
+    method: 'get'
+  })
+}
+
+export function startWebSession(data) {
+  return axios({
+    url: `/oneterm/v1/web_proxy/start`,
+    method: 'post',
+    data
+  })
+}
+
+export function analyzeWebSite(data) {
+  return axios({
+    url: `/oneterm/v1/web_proxy/analyze`,
+    method: 'post',
+    data
+  })
+}
+
+export function testWebAuth(data) {
+  return axios({
+    url: `/oneterm/v1/web_proxy/test_auth`,
+    method: 'post',
+    data
+  })
+}
+
 export function postShareLink(data) {
   return axios({
     url: `/oneterm/v1/share`,

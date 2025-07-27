@@ -27,6 +27,18 @@ export const generatorDynamicRouter = async () => {
   let routes = packages
   routes = routes.concat([
     { path: '*', redirect: '/404', hidden: true },
+    // Web代理独立路由 - 全屏模式，不使用任何布局
+    {
+      path: '/web-proxy/:assetId',
+      name: 'web_proxy_fullscreen',
+      component: () => import('@/modules/oneterm/views/connect/webProxy'),
+      meta: { 
+        title: 'OneTerm Web代理',
+        requiresAuth: true,
+        fullscreen: true,
+        hideNavigation: true
+      }
+    },
     {
       path: '/setting',
       component: BasicLayout,

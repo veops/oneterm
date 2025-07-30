@@ -254,7 +254,13 @@ func SetupRouter(r *gin.Engine) {
 		// Web proxy management API routes
 		webProxyGroup := v1.Group("/web_proxy")
 		{
+			webProxyGroup.GET("/config/:asset_id", webProxy.GetWebAssetConfig)
 			webProxyGroup.POST("/start", webProxy.StartWebSession)
+			webProxyGroup.GET("/external_redirect", webProxy.HandleExternalRedirect)
+			webProxyGroup.POST("/close", webProxy.CloseWebSession)
+			webProxyGroup.GET("/sessions/:asset_id", webProxy.GetActiveWebSessions)
+			webProxyGroup.POST("/heartbeat", webProxy.UpdateWebSessionHeartbeat)
+			webProxyGroup.POST("/cleanup", webProxy.CleanupWebSession)
 		}
 	}
 }

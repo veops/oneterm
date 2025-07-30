@@ -2326,6 +2326,58 @@
                 }
             }
         },
+        "/proxy": {
+            "get": {
+                "description": "Handle web proxy requests for subdomain-based assets",
+                "consumes": [
+                    "*/*"
+                ],
+                "produces": [
+                    "*/*"
+                ],
+                "tags": [
+                    "WebProxy"
+                ],
+                "summary": "Proxy web requests",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Asset subdomain (asset-123.domain.com)",
+                        "name": "Host",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Session ID (alternative to cookie)",
+                        "name": "session_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Proxied content"
+                    },
+                    "400": {
+                        "description": "Invalid subdomain format",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Session expired page"
+                    },
+                    "403": {
+                        "description": "Access denied",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/public_key": {
             "get": {
                 "tags": [
@@ -4195,9 +4247,109 @@
                 }
             }
         },
+        "/web_proxy/cleanup": {
+            "post": {
+                "description": "Clean up web session when browser tab is closed",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "WebProxy"
+                ],
+                "summary": "Cleanup web session",
+                "parameters": [
+                    {
+                        "description": "Cleanup request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Session cleaned up",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/web_proxy/close": {
+            "post": {
+                "description": "Close an active web session and clean up resources",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "WebProxy"
+                ],
+                "summary": "Close web session",
+                "parameters": [
+                    {
+                        "description": "Session close request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Session closed successfully",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "404": {
+                        "description": "Session not found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/web_proxy/config/{asset_id}": {
             "get": {
                 "description": "Get web asset configuration by asset ID",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
                 "tags": [
                     "WebProxy"
                 ],
@@ -4216,6 +4368,146 @@
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/model.WebConfig"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid asset ID",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "404": {
+                        "description": "Asset not found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/web_proxy/external_redirect": {
+            "get": {
+                "description": "Show a page when an external redirect is blocked by the proxy",
+                "consumes": [
+                    "text/html"
+                ],
+                "produces": [
+                    "text/html"
+                ],
+                "tags": [
+                    "WebProxy"
+                ],
+                "summary": "Handle external redirect",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Target URL that was blocked",
+                        "name": "url",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "External redirect blocked page"
+                    }
+                }
+            }
+        },
+        "/web_proxy/heartbeat": {
+            "post": {
+                "description": "Update the last activity time for a web session (heartbeat)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "WebProxy"
+                ],
+                "summary": "Update session heartbeat",
+                "parameters": [
+                    {
+                        "description": "Heartbeat request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Heartbeat updated",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "404": {
+                        "description": "Session not found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/web_proxy/sessions/{asset_id}": {
+            "get": {
+                "description": "Get list of active web sessions for a specific asset",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "WebProxy"
+                ],
+                "summary": "Get active web sessions",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Asset ID",
+                        "name": "asset_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of active sessions",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": true
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid asset ID",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     }
                 }
@@ -4241,7 +4533,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/controller.StartWebSessionRequest"
+                            "$ref": "#/definitions/web_proxy.StartWebSessionRequest"
                         }
                     }
                 ],
@@ -4249,7 +4541,42 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/controller.StartWebSessionResponse"
+                            "$ref": "#/definitions/web_proxy.StartWebSessionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "403": {
+                        "description": "No permission",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "404": {
+                        "description": "Asset not found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "429": {
+                        "description": "Maximum concurrent connections exceeded",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     }
                 }
@@ -4376,40 +4703,6 @@
                 "list": {
                     "type": "array",
                     "items": {}
-                }
-            }
-        },
-        "controller.StartWebSessionRequest": {
-            "type": "object",
-            "required": [
-                "asset_id"
-            ],
-            "properties": {
-                "account_id": {
-                    "type": "integer"
-                },
-                "asset_id": {
-                    "type": "integer"
-                },
-                "asset_name": {
-                    "type": "string"
-                },
-                "auth_mode": {
-                    "type": "string"
-                }
-            }
-        },
-        "controller.StartWebSessionResponse": {
-            "type": "object",
-            "properties": {
-                "message": {
-                    "type": "string"
-                },
-                "proxy_url": {
-                    "type": "string"
-                },
-                "session_id": {
-                    "type": "string"
                 }
             }
         },
@@ -5915,6 +6208,40 @@
                 "watermark_enabled": {
                     "description": "Enable watermark",
                     "type": "boolean"
+                }
+            }
+        },
+        "web_proxy.StartWebSessionRequest": {
+            "type": "object",
+            "required": [
+                "asset_id"
+            ],
+            "properties": {
+                "account_id": {
+                    "type": "integer"
+                },
+                "asset_id": {
+                    "type": "integer"
+                },
+                "asset_name": {
+                    "type": "string"
+                },
+                "auth_mode": {
+                    "type": "string"
+                }
+            }
+        },
+        "web_proxy.StartWebSessionResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                },
+                "proxy_url": {
+                    "type": "string"
+                },
+                "session_id": {
+                    "type": "string"
                 }
             }
         }

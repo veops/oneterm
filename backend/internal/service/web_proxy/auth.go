@@ -1,4 +1,4 @@
-package service
+package web_proxy
 
 import (
 	"bytes"
@@ -18,41 +18,41 @@ import (
 	"github.com/veops/oneterm/pkg/logger"
 )
 
-// WebAuthService handles Web authentication
-type WebAuthService struct {
-	strategies []WebAuthStrategy
+// AuthService handles Web authentication
+type AuthService struct {
+	strategies []AuthStrategy
 }
 
-// WebAuthStrategy defines the interface for Web authentication strategies
-type WebAuthStrategy interface {
+// AuthStrategy defines the interface for Web authentication strategies
+type AuthStrategy interface {
 	Name() string
 	Priority() int
-	CanHandle(ctx context.Context, siteInfo *WebSiteInfo) bool
-	Authenticate(ctx context.Context, credentials *WebCredentials, siteInfo *WebSiteInfo) (*WebAuthResult, error)
+	CanHandle(ctx context.Context, siteInfo *SiteInfo) bool
+	Authenticate(ctx context.Context, credentials *Credentials, siteInfo *SiteInfo) (*AuthResult, error)
 }
 
-// WebSiteInfo contains information about the target Web site
-type WebSiteInfo struct {
+// SiteInfo contains information about the target Web site
+type SiteInfo struct {
 	URL         string
 	HTMLContent string
 	Headers     http.Header
 	StatusCode  int
-	LoginForms  []WebLoginForm
+	LoginForms  []LoginForm
 }
 
-// WebLoginForm represents a login form found on the page
-type WebLoginForm struct {
-	Action           string         `json:"action"`
-	Method           string         `json:"method"`
-	UsernameField    WebFormField   `json:"username_field"`
-	PasswordField    WebFormField   `json:"password_field"`
-	SubmitButton     WebFormField   `json:"submit_button"`
-	AdditionalFields []WebFormField `json:"additional_fields"`
-	CSRFToken        string         `json:"csrf_token"`
+// LoginForm represents a login form found on the page
+type LoginForm struct {
+	Action           string      `json:"action"`
+	Method           string      `json:"method"`
+	UsernameField    FormField   `json:"username_field"`
+	PasswordField    FormField   `json:"password_field"`
+	SubmitButton     FormField   `json:"submit_button"`
+	AdditionalFields []FormField `json:"additional_fields"`
+	CSRFToken        string      `json:"csrf_token"`
 }
 
-// WebFormField represents a form field
-type WebFormField struct {
+// FormField represents a form field
+type FormField struct {
 	Name        string `json:"name"`
 	ID          string `json:"id"`
 	Type        string `json:"type"`
@@ -61,14 +61,14 @@ type WebFormField struct {
 	Placeholder string `json:"placeholder"`
 }
 
-// WebCredentials contains authentication credentials
-type WebCredentials struct {
+// Credentials contains authentication credentials
+type Credentials struct {
 	Username string
 	Password string
 }
 
-// WebAuthResult contains authentication result
-type WebAuthResult struct {
+// AuthResult contains authentication result
+type AuthResult struct {
 	Success     bool
 	Message     string
 	Cookies     []*http.Cookie
@@ -76,10 +76,10 @@ type WebAuthResult struct {
 	SessionData map[string]interface{}
 }
 
-// NewWebAuthService creates a new Web authentication service
-func NewWebAuthService() *WebAuthService {
-	service := &WebAuthService{
-		strategies: []WebAuthStrategy{
+// NewAuthService creates a new Web authentication service
+func NewAuthService() *AuthService {
+	service := &AuthService{
+		strategies: []AuthStrategy{
 			&HTTPBasicAuthStrategy{},
 			&SmartFormAuthStrategy{},
 			&APILoginAuthStrategy{},
@@ -89,7 +89,7 @@ func NewWebAuthService() *WebAuthService {
 }
 
 // AnalyzeSite analyzes a Web site for authentication methods
-func (s *WebAuthService) AnalyzeSite(ctx context.Context, targetURL string) (*WebSiteInfo, error) {
+func (s *AuthService) AnalyzeSite(ctx context.Context, targetURL string) (*SiteInfo, error) {
 	client := &http.Client{
 		Timeout: 10 * time.Second,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
@@ -109,7 +109,7 @@ func (s *WebAuthService) AnalyzeSite(ctx context.Context, targetURL string) (*We
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	siteInfo := &WebSiteInfo{
+	siteInfo := &SiteInfo{
 		URL:         targetURL,
 		HTMLContent: string(body),
 		Headers:     resp.Header,
@@ -130,8 +130,8 @@ func (s *WebAuthService) AnalyzeSite(ctx context.Context, targetURL string) (*We
 }
 
 // SelectBestStrategy selects the best authentication strategy for a site
-func (s *WebAuthService) SelectBestStrategy(ctx context.Context, siteInfo *WebSiteInfo) WebAuthStrategy {
-	var bestStrategy WebAuthStrategy
+func (s *AuthService) SelectBestStrategy(ctx context.Context, siteInfo *SiteInfo) AuthStrategy {
+	var bestStrategy AuthStrategy
 	highestPriority := -1
 
 	for _, strategy := range s.strategies {
@@ -145,10 +145,10 @@ func (s *WebAuthService) SelectBestStrategy(ctx context.Context, siteInfo *WebSi
 }
 
 // Authenticate performs authentication using the best available strategy
-func (s *WebAuthService) Authenticate(ctx context.Context, credentials *WebCredentials, siteInfo *WebSiteInfo) (*WebAuthResult, error) {
+func (s *AuthService) Authenticate(ctx context.Context, credentials *Credentials, siteInfo *SiteInfo) (*AuthResult, error) {
 	strategy := s.SelectBestStrategy(ctx, siteInfo)
 	if strategy == nil {
-		return &WebAuthResult{
+		return &AuthResult{
 			Success: false,
 			Message: "No suitable authentication strategy found",
 		}, nil
@@ -158,9 +158,9 @@ func (s *WebAuthService) Authenticate(ctx context.Context, credentials *WebCrede
 }
 
 // AuthenticateWithRetry performs authentication with automatic account retry
-func (s *WebAuthService) AuthenticateWithRetry(ctx context.Context, accounts []WebCredentials, siteInfo *WebSiteInfo) (*WebAuthResult, error) {
+func (s *AuthService) AuthenticateWithRetry(ctx context.Context, accounts []Credentials, siteInfo *SiteInfo) (*AuthResult, error) {
 	if len(accounts) == 0 {
-		return &WebAuthResult{
+		return &AuthResult{
 			Success: false,
 			Message: "No accounts available for authentication",
 		}, nil
@@ -168,14 +168,14 @@ func (s *WebAuthService) AuthenticateWithRetry(ctx context.Context, accounts []W
 
 	strategy := s.SelectBestStrategy(ctx, siteInfo)
 	if strategy == nil {
-		return &WebAuthResult{
+		return &AuthResult{
 			Success: false,
 			Message: "No suitable authentication strategy found",
 		}, nil
 	}
 
 	var lastError error
-	var lastResult *WebAuthResult
+	var lastResult *AuthResult
 
 	// 尝试每个账号，直到成功
 	for i, credentials := range accounts {
@@ -216,23 +216,23 @@ func (s *WebAuthService) AuthenticateWithRetry(ctx context.Context, accounts []W
 		return lastResult, nil
 	}
 
-	return &WebAuthResult{
+	return &AuthResult{
 		Success: false,
 		Message: "All configured accounts failed to authenticate",
 	}, nil
 }
 
 // analyzeLoginForms analyzes HTML content for login forms
-func (s *WebAuthService) analyzeLoginForms(htmlContent string) ([]WebLoginForm, error) {
+func (s *AuthService) analyzeLoginForms(htmlContent string) ([]LoginForm, error) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlContent))
 	if err != nil {
 		return nil, err
 	}
 
-	var forms []WebLoginForm
+	var forms []LoginForm
 
 	doc.Find("form").Each(func(i int, formSel *goquery.Selection) {
-		form := WebLoginForm{
+		form := LoginForm{
 			Method: strings.ToUpper(formSel.AttrOr("method", "GET")),
 			Action: formSel.AttrOr("action", ""),
 		}
@@ -244,7 +244,7 @@ func (s *WebAuthService) analyzeLoginForms(htmlContent string) ([]WebLoginForm, 
 			inputID := inputSel.AttrOr("id", "")
 			placeholder := inputSel.AttrOr("placeholder", "")
 
-			field := WebFormField{
+			field := FormField{
 				Name:        inputName,
 				ID:          inputID,
 				Type:        inputType,
@@ -263,7 +263,7 @@ func (s *WebAuthService) analyzeLoginForms(htmlContent string) ([]WebLoginForm, 
 		// Find submit button
 		formSel.Find("button, input[type=submit]").Each(func(j int, btnSel *goquery.Selection) {
 			if form.SubmitButton.Name == "" {
-				form.SubmitButton = WebFormField{
+				form.SubmitButton = FormField{
 					Name:     btnSel.AttrOr("name", ""),
 					ID:       btnSel.AttrOr("id", ""),
 					Type:     btnSel.AttrOr("type", "submit"),
@@ -282,7 +282,7 @@ func (s *WebAuthService) analyzeLoginForms(htmlContent string) ([]WebLoginForm, 
 }
 
 // isUsernameField determines if a field is likely a username field
-func (s *WebAuthService) isUsernameField(inputType, name, id, placeholder string) bool {
+func (s *AuthService) isUsernameField(inputType, name, id, placeholder string) bool {
 	if inputType == "password" {
 		return false
 	}
@@ -296,7 +296,7 @@ func (s *WebAuthService) isUsernameField(inputType, name, id, placeholder string
 }
 
 // generateSelector generates a CSS selector for an element
-func (s *WebAuthService) generateSelector(sel *goquery.Selection) string {
+func (s *AuthService) generateSelector(sel *goquery.Selection) string {
 	if id := sel.AttrOr("id", ""); id != "" {
 		return "#" + id
 	}
@@ -318,12 +318,12 @@ type HTTPBasicAuthStrategy struct{}
 func (s *HTTPBasicAuthStrategy) Name() string  { return "http_basic" }
 func (s *HTTPBasicAuthStrategy) Priority() int { return 10 }
 
-func (s *HTTPBasicAuthStrategy) CanHandle(ctx context.Context, siteInfo *WebSiteInfo) bool {
+func (s *HTTPBasicAuthStrategy) CanHandle(ctx context.Context, siteInfo *SiteInfo) bool {
 	return siteInfo.StatusCode == 401 &&
 		strings.Contains(siteInfo.Headers.Get("WWW-Authenticate"), "Basic")
 }
 
-func (s *HTTPBasicAuthStrategy) Authenticate(ctx context.Context, credentials *WebCredentials, siteInfo *WebSiteInfo) (*WebAuthResult, error) {
+func (s *HTTPBasicAuthStrategy) Authenticate(ctx context.Context, credentials *Credentials, siteInfo *SiteInfo) (*AuthResult, error) {
 	client := &http.Client{Timeout: 10 * time.Second}
 
 	req, err := http.NewRequestWithContext(ctx, "GET", siteInfo.URL, nil)
@@ -340,7 +340,7 @@ func (s *HTTPBasicAuthStrategy) Authenticate(ctx context.Context, credentials *W
 	defer resp.Body.Close()
 
 	success := resp.StatusCode != 401
-	return &WebAuthResult{
+	return &AuthResult{
 		Success: success,
 		Message: fmt.Sprintf("HTTP Basic auth %s", map[bool]string{true: "succeeded", false: "failed"}[success]),
 		Cookies: resp.Cookies(),
@@ -353,11 +353,11 @@ type SmartFormAuthStrategy struct{}
 func (s *SmartFormAuthStrategy) Name() string  { return "smart_form" }
 func (s *SmartFormAuthStrategy) Priority() int { return 5 }
 
-func (s *SmartFormAuthStrategy) CanHandle(ctx context.Context, siteInfo *WebSiteInfo) bool {
+func (s *SmartFormAuthStrategy) CanHandle(ctx context.Context, siteInfo *SiteInfo) bool {
 	return len(siteInfo.LoginForms) > 0
 }
 
-func (s *SmartFormAuthStrategy) Authenticate(ctx context.Context, credentials *WebCredentials, siteInfo *WebSiteInfo) (*WebAuthResult, error) {
+func (s *SmartFormAuthStrategy) Authenticate(ctx context.Context, credentials *Credentials, siteInfo *SiteInfo) (*AuthResult, error) {
 	if len(siteInfo.LoginForms) == 0 {
 		return nil, fmt.Errorf("no login forms found")
 	}
@@ -407,7 +407,7 @@ func (s *SmartFormAuthStrategy) Authenticate(ctx context.Context, credentials *W
 	// Usually a successful login redirects or returns 200 with cookies
 	success := resp.StatusCode >= 200 && resp.StatusCode < 400 && len(resp.Cookies()) > 0
 
-	return &WebAuthResult{
+	return &AuthResult{
 		Success:     success,
 		Message:     fmt.Sprintf("Form auth %s", map[bool]string{true: "succeeded", false: "failed"}[success]),
 		Cookies:     resp.Cookies(),
@@ -421,7 +421,7 @@ type APILoginAuthStrategy struct{}
 func (s *APILoginAuthStrategy) Name() string  { return "api_login" }
 func (s *APILoginAuthStrategy) Priority() int { return 8 }
 
-func (s *APILoginAuthStrategy) CanHandle(ctx context.Context, siteInfo *WebSiteInfo) bool {
+func (s *APILoginAuthStrategy) CanHandle(ctx context.Context, siteInfo *SiteInfo) bool {
 	// Check for common API login endpoints
 	commonEndpoints := []string{"/api/login", "/auth/login", "/login", "/signin"}
 	baseURL, err := url.Parse(siteInfo.URL)
@@ -441,7 +441,7 @@ func (s *APILoginAuthStrategy) CanHandle(ctx context.Context, siteInfo *WebSiteI
 	return false
 }
 
-func (s *APILoginAuthStrategy) Authenticate(ctx context.Context, credentials *WebCredentials, siteInfo *WebSiteInfo) (*WebAuthResult, error) {
+func (s *APILoginAuthStrategy) Authenticate(ctx context.Context, credentials *Credentials, siteInfo *SiteInfo) (*AuthResult, error) {
 	baseURL, err := url.Parse(siteInfo.URL)
 	if err != nil {
 		return nil, err
@@ -481,7 +481,7 @@ func (s *APILoginAuthStrategy) Authenticate(ctx context.Context, credentials *We
 
 		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 			defer resp.Body.Close()
-			return &WebAuthResult{
+			return &AuthResult{
 				Success: true,
 				Message: "API login succeeded",
 				Cookies: resp.Cookies(),
@@ -490,7 +490,7 @@ func (s *APILoginAuthStrategy) Authenticate(ctx context.Context, credentials *We
 		resp.Body.Close()
 	}
 
-	return &WebAuthResult{
+	return &AuthResult{
 		Success: false,
 		Message: "API login failed - no valid endpoint found",
 	}, nil

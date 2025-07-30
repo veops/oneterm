@@ -5,6 +5,8 @@ import (
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 
+	"strings"
+
 	"github.com/veops/oneterm/internal/api/controller"
 	"github.com/veops/oneterm/internal/api/docs"
 	"github.com/veops/oneterm/internal/api/middleware"
@@ -12,8 +14,32 @@ import (
 
 func SetupRouter(r *gin.Engine) {
 	r.SetTrustedProxies([]string{"0.0.0.0/0", "::/0"})
-	r.MaxMultipartMemory = 32 << 20 // 32MB, match with controller constant
+	r.MaxMultipartMemory = 1 << 20 // 1MB to prevent memory overflow
 	r.Use(gin.Recovery(), middleware.LoggerMiddleware())
+
+	// Start web session cleanup routine
+	controller.StartSessionCleanupRoutine()
+
+	// Subdomain proxy middleware for asset- subdomains
+	webProxy := controller.NewWebProxyController()
+	r.Use(func(c *gin.Context) {
+		host := c.Request.Host
+
+		// Check if this is an asset subdomain request
+		if strings.HasPrefix(host, "asset-") {
+			// Handle external redirect requests
+			if c.Request.URL.Path == "/external" {
+				webProxy.HandleExternalRedirect(c)
+				return
+			}
+
+			// Handle normal proxy requests
+			webProxy.ProxyWebRequest(c)
+			return
+		}
+
+		c.Next()
+	})
 
 	docs.SwaggerInfo.Title = "ONETERM API"
 	docs.SwaggerInfo.BasePath = "/api/oneterm/v1"
@@ -223,6 +249,12 @@ func SetupRouter(r *gin.Engine) {
 			commandTemplate.GET("", c.GetCommandTemplates)
 			commandTemplate.GET("/builtin", c.GetBuiltInCommandTemplates)
 			commandTemplate.GET("/:id/commands", c.GetTemplateCommands)
+		}
+
+		// Web proxy management API routes
+		webProxyGroup := v1.Group("/web_proxy")
+		{
+			webProxyGroup.POST("/start", webProxy.StartWebSession)
 		}
 	}
 }

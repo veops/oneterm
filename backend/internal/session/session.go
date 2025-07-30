@@ -132,6 +132,10 @@ type Session struct {
 	// SSH connection reuse for file transfers
 	SSHClient *gossh.Client `json:"-" gorm:"-"`
 	sshMutex  sync.RWMutex  `json:"-" gorm:"-"`
+
+	// Web session support
+	WebSession  interface{}            `json:"-" gorm:"-"`
+	Permissions *model.AuthPermissions `json:"-" gorm:"-"`
 }
 
 func (m *Session) HasMonitors() (has bool) {
@@ -205,4 +209,24 @@ func (s *Session) HasSSHClient() bool {
 	s.sshMutex.RLock()
 	defer s.sshMutex.RUnlock()
 	return s.SSHClient != nil
+}
+
+// SetWebSession stores a Web session object
+func (s *Session) SetWebSession(webSession interface{}) {
+	s.WebSession = webSession
+}
+
+// GetWebSession returns the stored Web session object
+func (s *Session) GetWebSession() interface{} {
+	return s.WebSession
+}
+
+// SetPermissions stores the user permissions for this session
+func (s *Session) SetPermissions(permissions *model.AuthPermissions) {
+	s.Permissions = permissions
+}
+
+// GetPermissions returns the stored permissions
+func (s *Session) GetPermissions() *model.AuthPermissions {
+	return s.Permissions
 }

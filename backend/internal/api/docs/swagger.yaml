@@ -80,6 +80,28 @@ definitions:
         items: {}
         type: array
     type: object
+  controller.StartWebSessionRequest:
+    properties:
+      account_id:
+        type: integer
+      asset_id:
+        type: integer
+      asset_name:
+        type: string
+      auth_mode:
+        type: string
+    required:
+    - asset_id
+    type: object
+  controller.StartWebSessionResponse:
+    properties:
+      message:
+        type: string
+      proxy_url:
+        type: string
+      session_id:
+        type: string
+    type: object
   model.AccessAuth:
     properties:
       allow:
@@ -187,6 +209,9 @@ definitions:
         items:
           type: integer
         type: array
+      rule_id:
+        description: V2 authorization rule ID for tracking
+        type: integer
     type: object
   model.Asset:
     properties:
@@ -236,6 +261,11 @@ definitions:
         type: string
       updater_id:
         type: integer
+      web_config:
+        allOf:
+        - $ref: '#/definitions/model.WebConfig'
+        description: Web-specific configuration (only valid when protocols contain
+          http/https)
     type: object
   model.AssetCommandControl:
     properties:
@@ -593,12 +623,6 @@ definitions:
   model.JSON:
     additionalProperties: true
     type: object
-  model.Map-int-model_Slice-int:
-    additionalProperties:
-      items:
-        type: integer
-      type: array
-    type: object
   model.Map-string-any:
     additionalProperties: {}
     type: object
@@ -609,7 +633,7 @@ definitions:
       asset_count:
         type: integer
       authorization:
-        $ref: '#/definitions/model.Map-int-model_Slice-int'
+        $ref: '#/definitions/model.AuthorizationMap'
       children:
         items:
           $ref: '#/definitions/model.Node'
@@ -1033,6 +1057,58 @@ definitions:
       user_id:
         description: User ID with unique index
         type: integer
+    type: object
+  model.WebConfig:
+    properties:
+      access_policy:
+        description: full_access, read_only
+        type: string
+      auth_mode:
+        description: none, smart, manual
+        type: string
+      login_accounts:
+        description: Web login credentials
+        items:
+          $ref: '#/definitions/model.WebLoginAccount'
+        type: array
+      proxy_settings:
+        allOf:
+        - $ref: '#/definitions/model.WebProxySettings'
+        description: Proxy configuration
+    type: object
+  model.WebLoginAccount:
+    properties:
+      is_default:
+        type: boolean
+      password:
+        type: string
+      status:
+        description: active, inactive
+        type: string
+      username:
+        type: string
+    type: object
+  model.WebProxySettings:
+    properties:
+      allowed_methods:
+        description: Allowed HTTP methods
+        items:
+          type: string
+        type: array
+      blocked_paths:
+        description: Blocked URL paths
+        items:
+          type: string
+        type: array
+      max_concurrent:
+        description: Max concurrent connections
+        type: integer
+      recording_enabled:
+        description: Enable session recording
+        type: boolean
+      watermark_enabled:
+        description: Enable watermark
+        type: boolean
     type: object
 info:
   contact: {}
@@ -1634,6 +1710,10 @@ paths:
         in: query
         name: page_size
         type: integer
+      - description: search by name or description
+        in: query
+        name: search
+        type: string
       - description: template category
         in: query
         name: category
@@ -3438,6 +3518,10 @@ paths:
         in: query
         name: page_size
         type: integer
+      - description: search by name or description
+        in: query
+        name: search
+        type: string
       - description: template category
         in: query
         name: category
@@ -3560,4 +3644,43 @@ paths:
             $ref: '#/definitions/controller.HttpResponse'
       tags:
       - time_template
+  /web_proxy/config/{asset_id}:
+    get:
+      description: Get web asset configuration by asset ID
+      parameters:
+      - description: Asset ID
+        in: path
+        name: asset_id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.WebConfig'
+      summary: Get web asset configuration
+      tags:
+      - WebProxy
+  /web_proxy/start:
+    post:
+      consumes:
+      - application/json
+      description: Start a new web session for the specified asset
+      parameters:
+      - description: Start session request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/controller.StartWebSessionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.StartWebSessionResponse'
+      summary: Start web session
+      tags:
+      - WebProxy
 swagger: "2.0"

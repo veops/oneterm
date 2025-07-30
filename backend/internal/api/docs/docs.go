@@ -1008,6 +1008,12 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
+                        "description": "search by name or description",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
                         "description": "template category",
                         "name": "category",
                         "in": "query"
@@ -3990,6 +3996,12 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
+                        "description": "search by name or description",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
                         "description": "template category",
                         "name": "category",
                         "in": "query"
@@ -4193,6 +4205,66 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/web_proxy/config/{asset_id}": {
+            "get": {
+                "description": "Get web asset configuration by asset ID",
+                "tags": [
+                    "WebProxy"
+                ],
+                "summary": "Get web asset configuration",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Asset ID",
+                        "name": "asset_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.WebConfig"
+                        }
+                    }
+                }
+            }
+        },
+        "/web_proxy/start": {
+            "post": {
+                "description": "Start a new web session for the specified asset",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "WebProxy"
+                ],
+                "summary": "Start web session",
+                "parameters": [
+                    {
+                        "description": "Start session request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controller.StartWebSessionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controller.StartWebSessionResponse"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -4315,6 +4387,40 @@ const docTemplate = `{
                 "list": {
                     "type": "array",
                     "items": {}
+                }
+            }
+        },
+        "controller.StartWebSessionRequest": {
+            "type": "object",
+            "required": [
+                "asset_id"
+            ],
+            "properties": {
+                "account_id": {
+                    "type": "integer"
+                },
+                "asset_id": {
+                    "type": "integer"
+                },
+                "asset_name": {
+                    "type": "string"
+                },
+                "auth_mode": {
+                    "type": "string"
+                }
+            }
+        },
+        "controller.StartWebSessionResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                },
+                "proxy_url": {
+                    "type": "string"
+                },
+                "session_id": {
+                    "type": "string"
                 }
             }
         },
@@ -4481,6 +4587,10 @@ const docTemplate = `{
                     "items": {
                         "type": "integer"
                     }
+                },
+                "rule_id": {
+                    "description": "V2 authorization rule ID for tracking",
+                    "type": "integer"
                 }
             }
         },
@@ -4559,6 +4669,14 @@ const docTemplate = `{
                 },
                 "updater_id": {
                     "type": "integer"
+                },
+                "web_config": {
+                    "description": "Web-specific configuration (only valid when protocols contain http/https)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.WebConfig"
+                        }
+                    ]
                 }
             }
         },
@@ -5091,15 +5209,6 @@ const docTemplate = `{
             "type": "object",
             "additionalProperties": true
         },
-        "model.Map-int-model_Slice-int": {
-            "type": "object",
-            "additionalProperties": {
-                "type": "array",
-                "items": {
-                    "type": "integer"
-                }
-            }
-        },
         "model.Map-string-any": {
             "type": "object",
             "additionalProperties": {}
@@ -5114,7 +5223,7 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "authorization": {
-                    "$ref": "#/definitions/model.Map-int-model_Slice-int"
+                    "$ref": "#/definitions/model.AuthorizationMap"
                 },
                 "children": {
                     "type": "array",
@@ -5740,6 +5849,83 @@ const docTemplate = `{
                 "user_id": {
                     "description": "User ID with unique index",
                     "type": "integer"
+                }
+            }
+        },
+        "model.WebConfig": {
+            "type": "object",
+            "properties": {
+                "access_policy": {
+                    "description": "full_access, read_only",
+                    "type": "string"
+                },
+                "auth_mode": {
+                    "description": "none, smart, manual",
+                    "type": "string"
+                },
+                "login_accounts": {
+                    "description": "Web login credentials",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.WebLoginAccount"
+                    }
+                },
+                "proxy_settings": {
+                    "description": "Proxy configuration",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.WebProxySettings"
+                        }
+                    ]
+                }
+            }
+        },
+        "model.WebLoginAccount": {
+            "type": "object",
+            "properties": {
+                "is_default": {
+                    "type": "boolean"
+                },
+                "password": {
+                    "type": "string"
+                },
+                "status": {
+                    "description": "active, inactive",
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.WebProxySettings": {
+            "type": "object",
+            "properties": {
+                "allowed_methods": {
+                    "description": "Allowed HTTP methods",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "blocked_paths": {
+                    "description": "Blocked URL paths",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "max_concurrent": {
+                    "description": "Max concurrent connections",
+                    "type": "integer"
+                },
+                "recording_enabled": {
+                    "description": "Enable session recording",
+                    "type": "boolean"
+                },
+                "watermark_enabled": {
+                    "description": "Enable watermark",
+                    "type": "boolean"
                 }
             }
         }

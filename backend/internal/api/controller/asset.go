@@ -10,6 +10,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/samber/lo"
+	"github.com/veops/oneterm/internal/acl"
 	"github.com/veops/oneterm/internal/model"
 	"github.com/veops/oneterm/internal/service"
 	"github.com/veops/oneterm/pkg/config"
@@ -39,6 +40,14 @@ var (
 			if err := assetService.AttachNodeChain(ctx, data); err != nil {
 				logger.L().Error("attach node chain failed", zap.Error(err))
 				return
+			}
+		},
+		// Filter web_config based on write permissions
+		func(ctx *gin.Context, data []*model.Asset) {
+			for _, asset := range data {
+				if asset.Permissions == nil || !lo.Contains(asset.Permissions, acl.WRITE) {
+					asset.WebConfig = nil
+				}
 			}
 		},
 	}
@@ -115,7 +124,7 @@ func (c *Controller) GetAssets(ctx *gin.Context) {
 
 	// Apply info mode settings
 	if info {
-		db = db.Select("id", "parent_id", "name", "ip", "protocols", "connectable", "authorization", "resource_id", "access_time_control", "asset_command_control")
+		db = db.Select("id", "parent_id", "name", "ip", "protocols", "connectable", "authorization", "resource_id", "access_time_control", "asset_command_control", "web_config")
 	}
 
 	doGet(ctx, false, db, config.RESOURCE_ASSET, assetPostHooks...)

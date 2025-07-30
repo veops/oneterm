@@ -239,6 +239,11 @@ func DoConnect(ctx *gin.Context, ws *websocket.Conn) (sess *gsession.Session, er
 		requiredActions = append(requiredActions, model.ActionFileUpload, model.ActionFileDownload)
 	}
 
+	// Web protocols need file download permission check
+	if protocol == "http" || protocol == "https" {
+		requiredActions = append(requiredActions, model.ActionFileDownload)
+	}
+
 	// RDP/VNC are handled separately in ConnectGuacd with their own batch permission check
 	// but we still check connect permission here for consistency
 
@@ -252,6 +257,19 @@ func DoConnect(ctx *gin.Context, ws *websocket.Conn) (sess *gsession.Session, er
 	if !result.IsAllowed(model.ActionConnect) {
 		err = &myErrors.ApiError{Code: myErrors.ErrUnauthorized, Data: map[string]any{"perm": "connect"}}
 		return sess, err
+	}
+
+	// Set permissions in session for protocol-specific usage
+	if protocol == "http" || protocol == "https" {
+		// For Web protocols, store all relevant permissions
+		permissions := &model.AuthPermissions{
+			Connect:      result.IsAllowed(model.ActionConnect),
+			FileDownload: result.IsAllowed(model.ActionFileDownload),
+			Copy:         result.IsAllowed(model.ActionCopy),
+			Paste:        result.IsAllowed(model.ActionPaste),
+			Share:        result.IsAllowed(model.ActionShare),
+		}
+		sess.SetPermissions(permissions)
 	}
 
 	// For SSH, check if user has any file permissions before initializing SFTP
@@ -269,6 +287,11 @@ func DoConnect(ctx *gin.Context, ws *websocket.Conn) (sess *gsession.Session, er
 		go protocols.ConnectTelnet(ctx, sess, asset, account, gateway)
 	case "vnc", "rdp":
 		go protocols.ConnectGuacd(ctx, sess, asset, account, gateway)
+	case "http", "https":
+		// Web assets are handled through separate web proxy API endpoints
+		err = &myErrors.ApiError{Code: myErrors.ErrConnectServer, Data: map[string]any{"err": "Web assets should use web proxy API"}}
+		sess.Chans.ErrChan <- err
+		return
 	default:
 		logger.L().Error("wrong protocol " + sess.Protocol)
 	}

@@ -3,9 +3,17 @@ package model
 import (
 	"database/sql/driver"
 	"encoding/json"
+	"strconv"
+	"strings"
 	"time"
 
+	"github.com/samber/lo"
 	"gorm.io/plugin/soft_delete"
+)
+
+// Web asset constants
+const (
+	WebAssetDefaultAccountID = -1 // Virtual account ID for Web assets
 )
 
 const (
@@ -128,6 +136,9 @@ type Asset struct {
 	AccessTimeControl   *AccessTimeControl   `json:"access_time_control,omitempty" gorm:"column:access_time_control;type:json"`
 	AssetCommandControl *AssetCommandControl `json:"asset_command_control,omitempty" gorm:"column:asset_command_control;type:json"`
 
+	// Web-specific configuration (only valid when protocols contain http/https)
+	WebConfig *WebConfig `json:"web_config,omitempty" gorm:"column:web_config;type:json"`
+
 	Permissions []string              `json:"permissions" gorm:"-"`
 	ResourceId  int                   `json:"resource_id" gorm:"column:resource_id"`
 	CreatorId   int                   `json:"creator_id" gorm:"column:creator_id"`
@@ -206,4 +217,85 @@ type AssetIdPid struct {
 
 func (m *AssetIdPid) TableName() string {
 	return TABLE_NAME_ASSET
+}
+
+// WebConfig contains Web-specific configuration for assets
+type WebConfig struct {
+	AuthMode      string            `json:"auth_mode"`      // none, smart, manual
+	LoginAccounts []WebLoginAccount `json:"login_accounts"` // Web login credentials
+	AccessPolicy  string            `json:"access_policy"`  // full_access, read_only
+	ProxySettings *WebProxySettings `json:"proxy_settings"` // Proxy configuration
+}
+
+func (w *WebConfig) Scan(value interface{}) error {
+	if value == nil {
+		return nil
+	}
+	bytes, ok := value.([]byte)
+	if !ok {
+		return nil
+	}
+	return json.Unmarshal(bytes, w)
+}
+
+func (w WebConfig) Value() (driver.Value, error) {
+	if w.AuthMode == "" {
+		return nil, nil
+	}
+	return json.Marshal(w)
+}
+
+// WebLoginAccount represents login credentials for Web authentication
+type WebLoginAccount struct {
+	Username  string `json:"username"`
+	Password  string `json:"password"`
+	IsDefault bool   `json:"is_default"`
+	Status    string `json:"status"` // active, inactive
+}
+
+// WebProxySettings contains proxy-specific settings
+type WebProxySettings struct {
+	MaxConcurrent    int      `json:"max_concurrent"`    // Max concurrent connections
+	AllowedMethods   []string `json:"allowed_methods"`   // Allowed HTTP methods
+	BlockedPaths     []string `json:"blocked_paths"`     // Blocked URL paths
+	RecordingEnabled bool     `json:"recording_enabled"` // Enable session recording
+	WatermarkEnabled bool     `json:"watermark_enabled"` // Enable watermark
+}
+
+// IsWebAsset checks if the asset is a Web asset
+func (a *Asset) IsWebAsset() bool {
+	return lo.SomeBy(a.Protocols, func(protocol string) bool {
+		protocolName := strings.ToLower(strings.Split(protocol, ":")[0])
+		return protocolName == "http" || protocolName == "https"
+	})
+}
+
+// GetWebProtocol returns the Web protocol (http/https) and port
+func (a *Asset) GetWebProtocol() (string, int) {
+	if protocol, found := lo.Find(a.Protocols, func(protocol string) bool {
+		parts := strings.Split(protocol, ":")
+		if len(parts) >= 1 {
+			protocolName := strings.ToLower(parts[0])
+			return protocolName == "http" || protocolName == "https"
+		}
+		return false
+	}); found {
+		parts := strings.Split(protocol, ":")
+		protocolName := strings.ToLower(parts[0])
+
+		port := 80
+		if protocolName == "https" {
+			port = 443
+		}
+
+		if len(parts) >= 2 {
+			if customPort, err := strconv.Atoi(parts[1]); err == nil {
+				port = customPort
+			}
+		}
+
+		return protocolName, port
+	}
+
+	return "", 0
 }

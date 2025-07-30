@@ -137,11 +137,6 @@ func (c *Controller) GetAuthorizations(ctx *gin.Context) {
 	})
 }
 
-func handleAuthorization(ctx *gin.Context, tx *gorm.DB, action int, asset *model.Asset, auths ...*model.Authorization) (err error) {
-	// Use service layer instead of direct data processing
-	return service.DefaultAuthService.HandleAuthorization(ctx, tx, action, asset, auths...)
-}
-
 func getIdsByAuthorizationIds(ctx *gin.Context) (nodeIds, assetIds, accountIds []int) {
 	authorizationIds, ok := ctx.Value(kAuthorizationIds).([]*model.AuthorizationIds)
 	if !ok || len(authorizationIds) == 0 {

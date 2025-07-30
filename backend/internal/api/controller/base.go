@@ -372,6 +372,10 @@ func doGet[T any](ctx *gin.Context, needAcl bool, dbFind *gorm.DB, resourceType 
 		return
 	}
 
+	if err = handlePermissions(ctx, list, resourceType); err != nil {
+		return
+	}
+
 	for _, hook := range postHooks {
 		if hook == nil {
 			continue
@@ -380,10 +384,6 @@ func doGet[T any](ctx *gin.Context, needAcl bool, dbFind *gorm.DB, resourceType 
 		if ctx.IsAborted() {
 			return
 		}
-	}
-
-	if err = handlePermissions(ctx, list, resourceType); err != nil {
-		return
 	}
 
 	res := &ListData{

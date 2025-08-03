@@ -79,8 +79,8 @@
           </vxe-column>
           <vxe-column :title="$t(`operation`)" width="100" align="center">
             <template #default="{row}">
-              <a-space>
-                <template v-if="status === 2 && !['https', 'http'].includes(row.protocolType)">
+              <a-space v-if="!['https', 'http'].includes(row.protocolType)">
+                <template v-if="status === 2">
                   <a-tooltip :title="$t('oneterm.sessionTable.replay')">
                     <a @click="openReplay(row)"><ops-icon type="oneterm-playback"/></a>
                   </a-tooltip>

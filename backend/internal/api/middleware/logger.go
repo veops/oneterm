@@ -16,12 +16,24 @@ func LoggerMiddleware() gin.HandlerFunc {
 		ctx.Next()
 
 		cost := time.Since(start)
-		logger.L().Info(ctx.Request.URL.String(),
-			zap.String("method", ctx.Request.Method),
-			zap.Int("status", ctx.Writer.Status()),
-			zap.String("ip", ctx.ClientIP()),
-			zap.Duration("cost", cost),
-		)
+		// Only log errors and slow requests
+		status := ctx.Writer.Status()
+		if status >= 400 || cost > 1*time.Second {
+			logger.L().Info(ctx.Request.URL.String(),
+				zap.String("method", ctx.Request.Method),
+				zap.Int("status", status),
+				zap.String("ip", ctx.ClientIP()),
+				zap.Duration("cost", cost),
+			)
+		} else {
+			// Normal requests use debug level to reduce log noise
+			logger.L().Debug(ctx.Request.URL.String(),
+				zap.String("method", ctx.Request.Method),
+				zap.Int("status", status),
+				zap.String("ip", ctx.ClientIP()),
+				zap.Duration("cost", cost),
+			)
+		}
 
 	}
 }

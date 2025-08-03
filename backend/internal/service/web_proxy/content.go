@@ -66,6 +66,14 @@ func RewriteHTMLContent(resp *http.Response, assetID int, scheme, proxyHost stri
 				return fmt.Sprintf(`%s%s://asset-%d.%s%s"`, matches[1], scheme, assetID, baseDomain, path)
 			},
 		},
+		// Static resources: <img src=""> <script src=""> <link href="">
+		{
+			`(src\s*=\s*["'])https?://([^/'"]+)(/[^"']*)?["']`,
+			func(matches []string) string {
+				path := lo.Ternary(len(matches) > 3 && matches[3] != "", matches[3], "")
+				return fmt.Sprintf(`%s%s://asset-%d.%s%s"`, matches[1], scheme, assetID, baseDomain, path)
+			},
+		},
 	}
 
 	for _, p := range patterns {
@@ -122,7 +130,7 @@ func ProcessHTMLResponse(resp *http.Response, assetID int, scheme, proxyHost str
 
 	content := string(body)
 
-	// Step 1: URL rewriting for external links
+	// URL rewriting for external links
 	baseDomain := lo.Ternary(strings.HasPrefix(proxyHost, "asset-"),
 		func() string {
 			parts := strings.SplitN(proxyHost, ".", 2)
@@ -150,6 +158,13 @@ func ProcessHTMLResponse(resp *http.Response, assetID int, scheme, proxyHost str
 		},
 		{
 			`(href\s*=\s*["'])https?://([^/'"]+)(/[^"']*)?["']`,
+			func(matches []string) string {
+				path := lo.Ternary(len(matches) > 3 && matches[3] != "", matches[3], "")
+				return fmt.Sprintf(`%s%s://asset-%d.%s%s"`, matches[1], scheme, assetID, baseDomain, path)
+			},
+		},
+		{
+			`(src\s*=\s*["'])https?://([^/'"]+)(/[^"']*)?["']`,
 			func(matches []string) string {
 				path := lo.Ternary(len(matches) > 3 && matches[3] != "", matches[3], "")
 				return fmt.Sprintf(`%s%s://asset-%d.%s%s"`, matches[1], scheme, assetID, baseDomain, path)
@@ -210,46 +225,6 @@ func ProcessHTMLResponse(resp *http.Response, assetID int, scheme, proxyHost str
 			%s
 		</div>`, strings.Join(watermarkTexts, "\n"))
 
-		// Add session management JavaScript
-		sessionJS := fmt.Sprintf(`
-		<script>
-		(function() {
-			var sessionId = '%s';
-			var heartbeatInterval;
-			
-			// Send heartbeat every 30 seconds
-			function sendHeartbeat() {
-				fetch('/api/oneterm/v1/web_proxy/heartbeat', {
-					method: 'POST',
-					headers: {'Content-Type': 'application/json'},
-					body: JSON.stringify({session_id: sessionId})
-				}).catch(function() {});
-			}
-			
-			// Start heartbeat
-			heartbeatInterval = setInterval(sendHeartbeat, 30000);
-			
-			// Handle page unload (tab close, navigation away)
-			window.addEventListener('beforeunload', function() {
-				clearInterval(heartbeatInterval);
-				// Use sendBeacon for reliable cleanup on page unload
-				if (navigator.sendBeacon) {
-					navigator.sendBeacon('/api/oneterm/v1/web_proxy/cleanup', 
-						JSON.stringify({session_id: sessionId}));
-				}
-			});
-			
-			// Handle visibility change (tab switching)
-			document.addEventListener('visibilitychange', function() {
-				if (document.hidden) {
-					clearInterval(heartbeatInterval);
-				} else {
-					heartbeatInterval = setInterval(sendHeartbeat, 30000);
-				}
-			});
-		})();
-		</script>`, session.SessionId)
-
 		if strings.Contains(content, "</head>") {
 			content = strings.Replace(content, "</head>", watermarkCSS+"</head>", 1)
 		} else {
@@ -257,10 +232,208 @@ func ProcessHTMLResponse(resp *http.Response, assetID int, scheme, proxyHost str
 		}
 
 		if strings.Contains(content, "</body>") {
-			content = strings.Replace(content, "</body>", watermarkHTML+sessionJS+"</body>", 1)
+			content = strings.Replace(content, "</body>", watermarkHTML+"</body>", 1)
 		} else {
-			content = content + watermarkHTML + sessionJS
+			content = content + watermarkHTML
 		}
+	}
+
+	// Add session management JavaScript (always inject)
+	sessionJS := fmt.Sprintf(`
+		<script>
+		(function() {tbeat', {
+					method: 'POST',
+					headers: {'Content-Type': 'application/json'},
+					body: JSON.stringify({session_id: sessionId})
+				}).catch(function() {});
+			}
+			var sessionId = '%s';
+			var heartbeatInterval;
+			
+			// Send heartbeat every 15 seconds
+			function sendHeartbeat() {
+				fetch('/api/oneterm/v1/web_proxy/hear
+			
+			// Universal heartbeat mechanism - no complex event handling
+			// The server will handle session cleanup based on heartbeat timeout
+			heartbeatInterval = setInterval(sendHeartbeat, 15000);
+			
+			// Send initial heartbeat immediately
+			sendHeartbeat();
+		})();
+		</script>`, session.SessionId)
+
+	// Add JavaScript URL interceptor for dynamic requests (always inject - moved outside watermark condition)
+
+	urlInterceptorJS := fmt.Sprintf(`
+	<script>
+	(function() {
+		var originalHost = '%s';
+		var proxyHost = 'asset-%d.%s';
+		var proxyScheme = '%s';
+		
+		function rewriteUrl(url) {
+			try {
+				// Handle absolute URLs
+				if (url.startsWith('http://') || url.startsWith('https://')) {
+					var urlObj = new URL(url);
+					// Only rewrite external domains, not our proxy domain
+					if (urlObj.hostname !== window.location.hostname && 
+						urlObj.hostname !== 'localhost' && 
+						urlObj.hostname !== '127.0.0.1') {
+						// Preserve the original path and query, but use proxy hostname
+						var newUrl = proxyScheme + '://' + proxyHost + urlObj.pathname + urlObj.search + urlObj.hash;
+						console.log('Rewriting URL:', url, '->', newUrl);
+						return newUrl;
+					}
+				}
+				// Handle relative URLs starting with /
+				else if (url.startsWith('/')) {
+					// Keep relative URLs as-is, they will be relative to current proxy domain
+					return url;
+				}
+				return url;
+			} catch (e) {
+				console.warn('URL rewrite error:', e, 'for URL:', url);
+				return url;
+			}
+		}
+		
+		// Download control enforcement
+		var hasDownloadPermission = %t;
+		
+		// Override fetch API with download control
+		if (window.fetch) {
+			var originalFetch = window.fetch;
+			window.fetch = function(input, init) {
+				// Handle both string URLs and Request objects
+				if (typeof input === 'string') {
+					input = rewriteUrl(input);
+				} else if (input && typeof input === 'object' && input.url) {
+					// Handle Request object
+					var rewrittenUrl = rewriteUrl(input.url);
+					if (rewrittenUrl !== input.url) {
+						input = new Request(rewrittenUrl, input);
+					}
+				}
+				
+				// Monitor for potential data export APIs
+				if (!hasDownloadPermission) {
+					var url = typeof input === 'string' ? input : (input.url || '');
+					if (url.includes('/export') || url.includes('/download') || 
+						url.includes('/report') || url.includes('/data')) {
+						console.warn('Data export API access detected, but download permission denied');
+						alert('File download denied: You do not have download permission to access data export APIs');
+						return Promise.reject(new Error('Download permission required'));
+					}
+				}
+				
+				return originalFetch.call(this, input, init);
+			};
+		}
+		
+		// Override XMLHttpRequest with download control
+		if (window.XMLHttpRequest) {
+			var OriginalXHR = window.XMLHttpRequest;
+			window.XMLHttpRequest = function() {
+				var xhr = new OriginalXHR();
+				var originalOpen = xhr.open;
+				xhr.open = function(method, url, async, user, password) {
+					if (typeof url === 'string') {
+						url = rewriteUrl(url);
+						
+						// Monitor for potential data export APIs in XHR
+						if (!hasDownloadPermission && (
+							url.includes('/export') || url.includes('/download') || 
+							url.includes('/report') || url.includes('/data'))) {
+							console.warn('XHR data export API access detected, download permission denied');
+							alert('File download denied: You do not have download permission to access data export APIs');
+							throw new Error('Download permission required');
+						}
+					}
+					return originalOpen.call(this, method, url, async, user, password);
+				};
+				return xhr;
+			};
+			// Copy static properties
+			for (var prop in OriginalXHR) {
+				if (OriginalXHR.hasOwnProperty(prop)) {
+					window.XMLHttpRequest[prop] = OriginalXHR[prop];
+				}
+			}
+		}
+		
+		// Override window.open for popup windows
+		if (window.open) {
+			var originalOpen = window.open;
+			window.open = function(url, name, specs) {
+				if (typeof url === 'string') {
+					url = rewriteUrl(url);
+				}
+				return originalOpen.call(this, url, name, specs);
+			};
+		}
+		
+		// Client-side download monitoring
+		if (!hasDownloadPermission) {
+			// Monitor blob URL creation (used by XLSX.js and similar libraries)
+			if (window.URL && window.URL.createObjectURL) {
+				var originalCreateObjectURL = window.URL.createObjectURL;
+				window.URL.createObjectURL = function(blob) {
+					console.warn('Blob URL creation detected, download permission denied');
+					// Block blob URL creation for file downloads
+					if (blob && blob.type && (
+						blob.type.includes('sheet') || 
+						blob.type.includes('excel') ||
+						blob.type.includes('pdf') ||
+						blob.type.includes('zip') ||
+						blob.type.includes('octet-stream')
+					)) {
+						alert('File download denied: You do not have download permission to create file download links');
+						throw new Error('File download not permitted');
+					}
+					return originalCreateObjectURL.call(this, blob);
+				};
+			}
+			
+			// Monitor file download through anchor elements with download attribute
+			document.addEventListener('click', function(e) {
+				if (e.target && e.target.tagName === 'A' && e.target.hasAttribute('download')) {
+					console.warn('Direct file download attempt detected, download permission denied');
+					e.preventDefault();
+					e.stopPropagation();
+					alert('File download denied: You do not have download permission');
+					return false;
+				}
+			}, true);
+			
+			// Monitor common file export libraries
+			setTimeout(function() {
+				// Block XLSX library
+				if (window.XLSX && window.XLSX.writeFile) {
+					window.XLSX.writeFile = function() {
+						alert('File export denied: You do not have download permission to export Excel files');
+						throw new Error('Excel export not permitted');
+					};
+				}
+				// Block FileSaver.js
+				if (window.saveAs) {
+					window.saveAs = function() {
+						alert('File save denied: You do not have download permission to save files');
+						throw new Error('File save not permitted');
+					};
+				}
+			}, 1000);
+		}
+	})();
+	</script>`, session.CurrentHost, assetID, baseDomain, scheme, session.Permissions.FileDownload)
+
+	// Always inject session management and URL interceptor
+
+	if strings.Contains(content, "</body>") {
+		content = strings.Replace(content, "</body>", sessionJS+urlInterceptorJS+"</body>", 1)
+	} else {
+		content = content + sessionJS + urlInterceptorJS
 	}
 
 	// Step 3: Record activity if enabled
@@ -284,7 +457,7 @@ func RenderExternalRedirectPage(targetURL string) string {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-        body {
+        body { 
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%);
             min-height: 100vh;
@@ -331,8 +504,147 @@ func RenderExternalRedirectPage(targetURL string) string {
 </html>`, targetURL)
 }
 
+// RenderErrorPage renders a general error page for web proxy errors
+func RenderErrorPage(errorType, title, reason, details string) string {
+	var bgColor, iconEmoji string
+
+	switch errorType {
+	case "access_denied":
+		bgColor = "#ff6b6b 0%, #ee5a52 100%"
+		iconEmoji = "🚫"
+	case "session_expired":
+		bgColor = "#f39c12 0%, #e67e22 100%"
+		iconEmoji = "⏰"
+	case "connection_error":
+		bgColor = "#95a5a6 0%, #7f8c8d 100%"
+		iconEmoji = "🔌"
+	case "server_error":
+		bgColor = "#8e44ad 0%, #9b59b6 100%"
+		iconEmoji = "⚠️"
+	case "concurrent_limit":
+		bgColor = "#e74c3c 0%, #c0392b 100%"
+		iconEmoji = "🚦"
+	default:
+		bgColor = "#34495e 0%, #2c3e50 100%"
+		iconEmoji = "❌"
+	}
+
+	detailsHtml := ""
+	if details != "" {
+		detailsHtml = fmt.Sprintf(`
+		<div class="info"><strong>Details:</strong></div>
+		<div class="details">%s</div>`, details)
+	}
+
+	return fmt.Sprintf(`<!DOCTYPE html>
+<html>
+<head>
+    <title>%s - OneTerm</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, %s);
+            min-height: 100vh;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            max-width: 600px;
+            text-align: center;
+        }
+        .error-title { color: #e74c3c; font-size: 2em; margin-bottom: 20px; }
+        .info { color: #666; margin: 20px 0; text-align: left; }
+        .details { 
+            background: #f8f9fa; 
+            padding: 15px; 
+            border-radius: 4px; 
+            border-left: 4px solid #e74c3c;
+            font-family: monospace;
+            font-size: 14px;
+            text-align: left;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .action { 
+            background: #e8f5e8; 
+            padding: 15px; 
+            border-radius: 4px; 
+            border-left: 4px solid #27ae60;
+            margin-top: 20px;
+            text-align: center;
+        }
+        .back-link {
+            color: #3498db;
+            text-decoration: none;
+            font-weight: 500;
+            margin: 0 10px;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        .reason {
+            background: #fff3cd;
+            color: #856404;
+            padding: 15px;
+            border-radius: 4px;
+            border-left: 4px solid #ffc107;
+            margin: 20px 0;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="error-title">%s %s</h1>
+        <div class="reason">%s</div>
+        %s
+        <div class="action">
+            <a href="javascript:history.back()" class="back-link">← Go Back</a>
+            <a href="javascript:location.reload()" class="back-link">🔄 Refresh</a>
+            <a href="/" class="back-link">🏠 Home</a>
+        </div>
+    </div>
+</body>
+</html>`, title, bgColor, iconEmoji, title, reason, detailsHtml)
+}
+
+// RenderAccessDeniedPage renders the page shown when access is denied (download, read-only, etc.)
+func RenderAccessDeniedPage(reason, details string) string {
+	return RenderErrorPage("access_denied", "Access Denied", reason, details)
+}
+
 // RenderSessionExpiredPage renders the page shown when session has expired
 func RenderSessionExpiredPage(reason string) string {
+	return RenderErrorPage("session_expired", "Session Expired", reason, "")
+}
+
+// RenderConcurrentLimitPage renders the page when concurrent limit is exceeded
+func RenderConcurrentLimitPage(maxConcurrent int) string {
+	reason := fmt.Sprintf("Maximum concurrent connections (%d) exceeded", maxConcurrent)
+	details := "Please wait for an existing session to end, or contact your administrator to increase the limit."
+	return RenderErrorPage("concurrent_limit", "Connection Limit Exceeded", reason, details)
+}
+
+// RenderServerErrorPage renders the page for server errors
+func RenderServerErrorPage(reason, details string) string {
+	return RenderErrorPage("server_error", "Server Error", reason, details)
+}
+
+// RenderConnectionErrorPage renders the page for connection errors
+func RenderConnectionErrorPage(reason, details string) string {
+	return RenderErrorPage("connection_error", "Connection Error", reason, details)
+}
+
+// Legacy function - keeping the original style for compatibility
+func RenderSessionExpiredPageOld(reason string) string {
 	return fmt.Sprintf(`<!DOCTYPE html>
 <html>
 <head>

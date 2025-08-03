@@ -27,6 +27,12 @@ func SetupRouter(r *gin.Engine) {
 
 		// Check if this is an asset subdomain request
 		if strings.HasPrefix(host, "asset-") {
+			// Allow API requests to pass through to normal routing
+			if strings.HasPrefix(c.Request.URL.Path, "/api/oneterm/v1/") {
+				c.Next()
+				return
+			}
+
 			// Handle external redirect requests
 			if c.Request.URL.Path == "/external" {
 				webProxy.HandleExternalRedirect(c)
@@ -259,8 +265,13 @@ func SetupRouter(r *gin.Engine) {
 			webProxyGroup.GET("/external_redirect", webProxy.HandleExternalRedirect)
 			webProxyGroup.POST("/close", webProxy.CloseWebSession)
 			webProxyGroup.GET("/sessions/:asset_id", webProxy.GetActiveWebSessions)
-			webProxyGroup.POST("/heartbeat", webProxy.UpdateWebSessionHeartbeat)
-			webProxyGroup.POST("/cleanup", webProxy.CleanupWebSession)
+		}
+
+		// Web proxy routes that don't require auth (heartbeat, cleanup)
+		webProxyNoAuth := v1AuthAbandoned.Group("/web_proxy")
+		{
+			webProxyNoAuth.POST("/heartbeat", webProxy.UpdateWebSessionHeartbeat)
+			webProxyNoAuth.POST("/cleanup", webProxy.CleanupWebSession)
 		}
 	}
 }

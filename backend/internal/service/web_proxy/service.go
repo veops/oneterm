@@ -2,6 +2,9 @@ package web_proxy
 
 import (
 	"fmt"
+	"io"
+	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"strconv"
 	"strings"
@@ -11,6 +14,7 @@ import (
 	"github.com/samber/lo"
 	"go.uber.org/zap"
 
+	"github.com/veops/oneterm/internal/acl"
 	"github.com/veops/oneterm/internal/model"
 	"github.com/veops/oneterm/internal/service"
 	gsession "github.com/veops/oneterm/internal/session"
@@ -67,7 +71,6 @@ func StartWebSession(ctx *gin.Context, req StartWebSessionRequest) (*StartWebSes
 		},
 	}
 
-	// Use standard V2 authorization check (same as other asset types)
 	requiredActions := []model.AuthAction{
 		model.ActionConnect,
 		model.ActionFileDownload,
@@ -99,6 +102,10 @@ func StartWebSession(ctx *gin.Context, req StartWebSessionRequest) (*StartWebSes
 	if asset.WebConfig != nil && asset.WebConfig.ProxySettings != nil && asset.WebConfig.ProxySettings.MaxConcurrent > 0 {
 		activeCount := GetActiveSessionsForAsset(req.AssetId)
 		if activeCount >= asset.WebConfig.ProxySettings.MaxConcurrent {
+			logger.L().Warn("Maximum concurrent connections exceeded",
+				zap.Int("assetID", req.AssetId),
+				zap.Int("activeCount", activeCount),
+				zap.Int("maxConcurrent", asset.WebConfig.ProxySettings.MaxConcurrent))
 			return nil, fmt.Errorf("maximum concurrent connections (%d) exceeded", asset.WebConfig.ProxySettings.MaxConcurrent)
 		}
 	}
@@ -109,15 +116,17 @@ func StartWebSession(ctx *gin.Context, req StartWebSessionRequest) (*StartWebSes
 	initialHost := GetAssetHost(asset)
 
 	webSession := &WebProxySession{
-		SessionId:    sessionId,
-		AssetId:      asset.Id,
-		AccountId:    req.AccountId,
-		Asset:        asset,
-		CreatedAt:    now,
-		LastActivity: now,
-		CurrentHost:  initialHost,
-		Permissions:  permissions,
-		WebConfig:    asset.WebConfig,
+		SessionId:     sessionId,
+		AssetId:       asset.Id,
+		AccountId:     req.AccountId,
+		Asset:         asset,
+		CreatedAt:     now,
+		LastActivity:  now,
+		LastHeartbeat: now,  // Initialize heartbeat timestamp
+		IsActive:      true, // Initially active
+		CurrentHost:   initialHost,
+		Permissions:   permissions,
+		WebConfig:     asset.WebConfig,
 	}
 	StoreSession(sessionId, webSession)
 
@@ -141,6 +150,50 @@ func StartWebSession(ctx *gin.Context, req StartWebSessionRequest) (*StartWebSes
 	// Create subdomain URL with session_id for first access (cookie will handle subsequent requests)
 	subdomainHost := fmt.Sprintf("asset-%d.%s%s", req.AssetId, baseDomain, portSuffix)
 	proxyURL := fmt.Sprintf("%s://%s/?session_id=%s", scheme, subdomainHost, sessionId)
+
+	// Create database session record for history (same as other protocols)
+	currentUser, _ := acl.GetSessionFromCtx(ctx)
+
+	// Get actual protocol from asset
+	protocol, port := asset.GetWebProtocol()
+	if protocol == "" {
+		protocol = "http"
+		port = 80
+	}
+
+	// Format protocol as "protocol:port"
+	protocolStr := fmt.Sprintf("%s:%d", protocol, port)
+
+	dbSession := &model.Session{
+		SessionType: model.SESSIONTYPE_WEB,
+		SessionId:   sessionId,
+		Uid:         currentUser.GetUid(),
+		UserName:    currentUser.GetUserName(),
+		AssetId:     asset.Id,
+		AssetInfo:   fmt.Sprintf("%s(%s)", asset.Name, asset.Ip),
+		AccountId:   req.AccountId,
+		AccountInfo: "", // Web assets don't have named accounts
+		GatewayId:   asset.GatewayId,
+		GatewayInfo: "",
+		ClientIp:    ctx.ClientIP(),
+		Protocol:    protocolStr, // Now shows "http:80" or "https:443" etc.
+		Status:      model.SESSIONSTATUS_ONLINE,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+
+	// Set gateway info if exists
+	if asset.GatewayId > 0 {
+		dbSession.GatewayInfo = fmt.Sprintf("Gateway_%d", asset.GatewayId)
+	}
+
+	// Save session to database using gsession
+	fullSession := &gsession.Session{Session: dbSession}
+	if err := gsession.UpsertSession(fullSession); err != nil {
+		logger.L().Error("Failed to save web session to database",
+			zap.String("sessionId", sessionId), zap.Error(err))
+		// Don't fail the request, just log the error
+	}
 
 	logger.L().Info("Web session started", zap.String("sessionId", sessionId), zap.String("proxyURL", proxyURL), zap.String("authMode", authMode))
 
@@ -168,6 +221,13 @@ func BuildTargetURL(asset *model.Asset) string {
 		port = 80
 	}
 
+	// Check if asset.Ip already includes port (case 1: 127.0.0.1:8000)
+	if strings.Contains(asset.Ip, ":") {
+		// IP already has port, use as-is
+		return fmt.Sprintf("%s://%s", protocol, asset.Ip)
+	}
+
+	// Case 2: IP without port (127.0.0.1), use port from protocol
 	// If port is default port for protocol, don't include it
 	if (protocol == "http" && port == 80) || (protocol == "https" && port == 443) {
 		return fmt.Sprintf("%s://%s", protocol, asset.Ip)
@@ -184,8 +244,14 @@ func BuildTargetURLWithHost(asset *model.Asset, host string) string {
 		port = 80
 	}
 
+	// Check if host already includes port
+	if strings.Contains(host, ":") {
+		// Host already has port, use as-is
+		return fmt.Sprintf("%s://%s", protocol, host)
+	}
+
 	// Use custom host instead of asset's original host
-	if port == 80 && protocol == "http" || port == 443 && protocol == "https" {
+	if (port == 80 && protocol == "http") || (port == 443 && protocol == "https") {
 		return fmt.Sprintf("%s://%s", protocol, host)
 	}
 	return fmt.Sprintf("%s://%s:%d", protocol, host, port)
@@ -286,17 +352,327 @@ func IsDownloadRequest(ctx *gin.Context) bool {
 		return true
 	}
 
-	// Check common download file extensions
+	// Check common download file extensions in URL path
 	path := ctx.Request.URL.Path
-	downloadExts := []string{".pdf", ".doc", ".docx", ".xls", ".xlsx", ".zip", ".rar", ".tar", ".gz"}
-	return lo.SomeBy(downloadExts, func(ext string) bool {
-		return strings.HasSuffix(strings.ToLower(path), ext)
-	})
+	downloadExts := []string{".pdf", ".doc", ".docx", ".xls", ".xlsx", ".zip", ".rar", ".tar", ".gz", ".csv", ".txt"}
+	for _, ext := range downloadExts {
+		if strings.HasSuffix(strings.ToLower(path), ext) {
+			return true
+		}
+	}
+
+	// Check query parameters that indicate download intent
+	if ctx.Query("download") != "" || ctx.Query("export") != "" || ctx.Query("attachment") != "" {
+		return true
+	}
+
+	// Check Accept header for file download types
+	accept := ctx.GetHeader("Accept")
+	downloadMimeTypes := []string{
+		"application/vnd.ms-excel",
+		"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+		"application/pdf",
+		"application/zip",
+		"application/octet-stream",
+	}
+	for _, mimeType := range downloadMimeTypes {
+		if strings.Contains(accept, mimeType) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // RecordWebActivity records web session activity for auditing
 func RecordWebActivity(sessionId string, ctx *gin.Context) {
 	// Activity recording logic would go here
 	// This is a placeholder to maintain API compatibility
-	logger.L().Debug("Recording web activity", zap.String("sessionId", sessionId), zap.String("path", ctx.Request.URL.Path))
+}
+
+// ProxyRequestContext holds the context for a proxy request
+type ProxyRequestContext struct {
+	SessionID        string
+	AssetID          int
+	Session          *WebProxySession
+	Host             string
+	IsStaticResource bool
+}
+
+// ExtractSessionAndAssetInfo extracts session ID and asset ID from the request
+func ExtractSessionAndAssetInfo(ctx *gin.Context, extractAssetIDFromHost func(string) (int, error)) (*ProxyRequestContext, error) {
+	host := ctx.Request.Host
+
+	// Try to get session_id from multiple sources (priority order)
+	sessionID := ctx.Query("session_id")
+
+	// 1. Try from Cookie (preferred method)
+	if sessionID == "" {
+		if cookie, err := ctx.Cookie("oneterm_session_id"); err == nil && cookie != "" {
+			sessionID = cookie
+		}
+	}
+
+	// 2. Try from redirect parameter (for login redirects)
+	if sessionID == "" {
+		if redirect := ctx.Query("redirect"); redirect != "" {
+			if decoded, err := url.QueryUnescape(redirect); err == nil {
+				if decodedURL, err := url.Parse(decoded); err == nil {
+					sessionID = decodedURL.Query().Get("session_id")
+				}
+			}
+		}
+	}
+
+	// Extract asset ID from Host header: asset-11.oneterm.com -> 11
+	assetID, err := extractAssetIDFromHost(host)
+	if err != nil {
+		return nil, fmt.Errorf("invalid subdomain format: %w", err)
+	}
+
+	// Try to get session_id from Referer header as fallback
+	if sessionID == "" {
+		referer := ctx.GetHeader("Referer")
+		if referer != "" {
+			if refererURL, err := url.Parse(referer); err == nil {
+				sessionID = refererURL.Query().Get("session_id")
+				// Also try to extract from fragment/hash part if URL encoded
+				if sessionID == "" && strings.Contains(refererURL.RawQuery, "session_id") {
+					// Handle URL encoded session_id in redirect parameter
+					if redirect := refererURL.Query().Get("redirect"); redirect != "" {
+						if decoded, err := url.QueryUnescape(redirect); err == nil {
+							if decodedURL, err := url.Parse(decoded); err == nil {
+								sessionID = decodedURL.Query().Get("session_id")
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// For static resources, try harder to find session_id
+	if sessionID == "" {
+		// Check if this looks like a static resource
+		isStaticResource := strings.Contains(ctx.Request.URL.Path, "/img/") ||
+			strings.Contains(ctx.Request.URL.Path, "/css/") ||
+			strings.Contains(ctx.Request.URL.Path, "/js/") ||
+			strings.Contains(ctx.Request.URL.Path, "/assets/") ||
+			strings.HasSuffix(ctx.Request.URL.Path, ".png") ||
+			strings.HasSuffix(ctx.Request.URL.Path, ".jpg") ||
+			strings.HasSuffix(ctx.Request.URL.Path, ".gif") ||
+			strings.HasSuffix(ctx.Request.URL.Path, ".css") ||
+			strings.HasSuffix(ctx.Request.URL.Path, ".js") ||
+			strings.HasSuffix(ctx.Request.URL.Path, ".ico")
+
+		if isStaticResource {
+			// For static resources, find any valid session for this asset
+			allSessions := GetAllSessions()
+			for sid, session := range allSessions {
+				if session.AssetId == assetID {
+					sessionID = sid
+					break
+				}
+			}
+		}
+	}
+
+	if sessionID == "" {
+		return nil, fmt.Errorf("session ID required - please start a new web session")
+	}
+
+	// Determine if this is a static resource request
+	isStaticResource := strings.Contains(ctx.Request.URL.Path, "/img/") ||
+		strings.Contains(ctx.Request.URL.Path, "/css/") ||
+		strings.Contains(ctx.Request.URL.Path, "/js/") ||
+		strings.Contains(ctx.Request.URL.Path, "/assets/") ||
+		strings.HasSuffix(ctx.Request.URL.Path, ".png") ||
+		strings.HasSuffix(ctx.Request.URL.Path, ".jpg") ||
+		strings.HasSuffix(ctx.Request.URL.Path, ".gif") ||
+		strings.HasSuffix(ctx.Request.URL.Path, ".css") ||
+		strings.HasSuffix(ctx.Request.URL.Path, ".js") ||
+		strings.HasSuffix(ctx.Request.URL.Path, ".ico") ||
+		strings.HasSuffix(ctx.Request.URL.Path, ".woff") ||
+		strings.HasSuffix(ctx.Request.URL.Path, ".woff2") ||
+		strings.HasSuffix(ctx.Request.URL.Path, ".ttf") ||
+		strings.HasSuffix(ctx.Request.URL.Path, ".svg")
+
+	return &ProxyRequestContext{
+		SessionID:        sessionID,
+		AssetID:          assetID,
+		Host:             host,
+		IsStaticResource: isStaticResource,
+	}, nil
+}
+
+// ValidateSessionAndPermissions validates the session and checks permissions
+func ValidateSessionAndPermissions(ctx *gin.Context, proxyCtx *ProxyRequestContext, checkWebAccessControls func(*gin.Context, *WebProxySession) error) error {
+	// Validate session ID and get session information
+	session, exists := GetSession(proxyCtx.SessionID)
+	if !exists {
+		return fmt.Errorf("invalid or expired session")
+	}
+
+	// Check session timeout using system config (same as other protocols)
+	now := time.Now()
+	maxInactiveTime := time.Duration(model.GlobalConfig.Load().Timeout) * time.Second
+	if now.Sub(session.LastActivity) > maxInactiveTime {
+		CloseWebSession(proxyCtx.SessionID)
+		return fmt.Errorf("session expired due to inactivity")
+	}
+
+	// Only update LastActivity for real user operations (not static resources)
+	if !proxyCtx.IsStaticResource {
+		UpdateSessionActivity(proxyCtx.SessionID)
+
+		// Auto-renew cookie for user operations
+		cookieMaxAge := int(model.GlobalConfig.Load().Timeout)
+		ctx.SetCookie("oneterm_session_id", proxyCtx.SessionID, cookieMaxAge, "/", "", false, true)
+	}
+
+	// Check Web-specific access controls
+	if err := checkWebAccessControls(ctx, session); err != nil {
+		return err
+	}
+
+	if session.AssetId != proxyCtx.AssetID {
+		return fmt.Errorf("asset ID mismatch")
+	}
+
+	// Store session in context
+	proxyCtx.Session = session
+	return nil
+}
+
+// SetupReverseProxy creates and configures a reverse proxy
+func SetupReverseProxy(ctx *gin.Context, proxyCtx *ProxyRequestContext, buildTargetURLWithHost func(*model.Asset, string) string, processHTMLResponse func(*http.Response, int, string, string, *WebProxySession), recordWebActivity func(*WebProxySession, *http.Request), isSameDomainOrSubdomain func(string, string) bool) (*httputil.ReverseProxy, error) {
+	targetURL := buildTargetURLWithHost(proxyCtx.Session.Asset, proxyCtx.Session.CurrentHost)
+	target, err := url.Parse(targetURL)
+	if err != nil {
+		return nil, fmt.Errorf("invalid target URL")
+	}
+
+	currentScheme := lo.Ternary(ctx.Request.TLS != nil, "https", "http")
+
+	// Create transparent reverse proxy
+	proxy := httputil.NewSingleHostReverseProxy(target)
+
+	// Configure proxy director for transparent proxying
+	originalDirector := proxy.Director
+	proxy.Director = func(req *http.Request) {
+		originalDirector(req)
+
+		req.Host = target.Host
+		req.Header.Set("Host", target.Host)
+
+		if origin := req.Header.Get("Origin"); origin != "" {
+			req.Header.Set("Origin", target.Scheme+"://"+target.Host)
+		}
+
+		if referer := req.Header.Get("Referer"); referer != "" {
+			if refererURL, err := url.Parse(referer); err == nil {
+				refererURL.Scheme = target.Scheme
+				refererURL.Host = target.Host
+				req.Header.Set("Referer", refererURL.String())
+			}
+		}
+
+		q := req.URL.Query()
+		q.Del("session_id")
+		req.URL.RawQuery = q.Encode()
+	}
+
+	// Redirect interception for bastion control
+	proxy.ModifyResponse = func(resp *http.Response) error {
+		// Check file download permissions based on response headers
+		contentDisposition := resp.Header.Get("Content-Disposition")
+		contentType := resp.Header.Get("Content-Type")
+
+		// Check if this is a file download response
+		isDownload := strings.Contains(contentDisposition, "attachment") ||
+			strings.Contains(contentType, "application/octet-stream") ||
+			strings.Contains(contentType, "application/vnd.ms-excel") ||
+			strings.Contains(contentType, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") ||
+			strings.Contains(contentType, "application/pdf") ||
+			strings.Contains(contentType, "application/zip")
+
+		if isDownload && proxyCtx.Session.Permissions != nil && !proxyCtx.Session.Permissions.FileDownload {
+			// Replace the response with a 403 error page
+			resp.StatusCode = http.StatusForbidden
+			resp.Status = "403 Forbidden"
+			resp.Header.Set("Content-Type", "text/html; charset=utf-8")
+			resp.Header.Del("Content-Disposition")
+
+			errorPage := RenderAccessDeniedPage(
+				"File download not permitted", 
+				"Your user permissions do not allow file downloads through the web proxy.")
+			resp.Body = io.NopCloser(strings.NewReader(errorPage))
+			resp.ContentLength = int64(len(errorPage))
+			resp.Header.Set("Content-Length", fmt.Sprintf("%d", len(errorPage)))
+
+			return nil
+		}
+
+		// Process HTML content for injection
+		if resp.StatusCode == 200 && strings.Contains(contentType, "text/html") {
+			processHTMLResponse(resp, proxyCtx.AssetID, currentScheme, proxyCtx.Host, proxyCtx.Session)
+		}
+
+		// Record activity if enabled
+		if proxyCtx.Session.WebConfig != nil && proxyCtx.Session.WebConfig.ProxySettings != nil && proxyCtx.Session.WebConfig.ProxySettings.RecordingEnabled {
+			recordWebActivity(proxyCtx.Session, ctx.Request)
+		}
+
+		if resp.StatusCode >= 300 && resp.StatusCode < 400 {
+			location := resp.Header.Get("Location")
+			if location != "" {
+				redirectURL, err := url.Parse(location)
+				if err != nil {
+					return nil
+				}
+
+				shouldIntercept := redirectURL.IsAbs()
+
+				if shouldIntercept {
+					baseDomain := lo.Ternary(strings.HasPrefix(proxyCtx.Host, "asset-"),
+						func() string {
+							parts := strings.SplitN(proxyCtx.Host, ".", 2)
+							return lo.Ternary(len(parts) > 1, parts[1], proxyCtx.Host)
+						}(),
+						proxyCtx.Host)
+
+					if isSameDomainOrSubdomain(target.Host, redirectURL.Host) {
+						UpdateSessionHost(proxyCtx.SessionID, redirectURL.Host)
+						newProxyURL := fmt.Sprintf("%s://asset-%d.%s%s", currentScheme, proxyCtx.AssetID, baseDomain, redirectURL.Path)
+						if redirectURL.RawQuery != "" {
+							newProxyURL += "?" + redirectURL.RawQuery
+						}
+						resp.Header.Set("Location", newProxyURL)
+					} else {
+						newLocation := fmt.Sprintf("%s://asset-%d.%s/external?url=%s",
+							currentScheme, proxyCtx.AssetID, baseDomain, url.QueryEscape(redirectURL.String()))
+						resp.Header.Set("Location", newLocation)
+					}
+				} else {
+					resp.Header.Set("Location", redirectURL.String())
+				}
+			}
+		}
+
+		if cookies := resp.Header["Set-Cookie"]; len(cookies) > 0 {
+			proxyDomain := strings.Split(proxyCtx.Host, ":")[0]
+
+			newCookies := lo.Map(cookies, func(cookie string, _ int) string {
+				if strings.Contains(cookie, "Domain="+target.Host) {
+					return strings.Replace(cookie, "Domain="+target.Host, "Domain="+proxyDomain, 1)
+				}
+				return cookie
+			})
+			resp.Header["Set-Cookie"] = newCookies
+		}
+
+		return nil
+	}
+
+	return proxy, nil
 }

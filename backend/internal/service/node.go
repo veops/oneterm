@@ -210,24 +210,18 @@ func (s *NodeService) AttachAssetCount(ctx *gin.Context, data []*model.Node) err
 	db := dbpkg.DB.Model(model.DefaultAsset)
 
 	if !acl.IsAdmin(currentUser) {
-		info := cast.ToBool(ctx.Query("info"))
-		if info {
-			// Use V2 authorization system for asset filtering
-			authV2Service := NewAuthorizationV2Service()
-			_, assetIds, _, err := authV2Service.GetAuthorizationScopeByACL(ctx)
-			if err != nil {
-				return err
-			}
-			db = db.Where("id IN ?", assetIds)
+		// Always use V2 authorization system for consistent permission control
+		authV2Service := NewAuthorizationV2Service()
+		_, assetIds, _, err := authV2Service.GetAuthorizationScopeByACL(ctx)
+		if err != nil {
+			return err
+		}
+
+		if len(assetIds) == 0 {
+			// No access to any assets
+			db = db.Where("1 = 0")
 		} else {
-			assetResId, err := acl.GetRoleResourceIds(ctx, currentUser.GetRid(), config.RESOURCE_ASSET)
-			if err != nil {
-				return err
-			}
-			db, err = s.handleAssetIds(ctx, db, assetResId)
-			if err != nil {
-				return err
-			}
+			db = db.Where("id IN ?", assetIds)
 		}
 	}
 

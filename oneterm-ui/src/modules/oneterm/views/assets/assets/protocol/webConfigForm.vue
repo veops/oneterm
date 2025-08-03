@@ -123,6 +123,7 @@
       <a-form-model-item
         prop="web_config.proxy_settings.max_concurrent"
         :label="$t('oneterm.web.maxConcurrent')"
+        :extra="$t('oneterm.web.maxConcurrentTip')"
         v-bind="formItemCol"
       >
         <a-input-number

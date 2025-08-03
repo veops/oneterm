@@ -191,6 +191,7 @@ const oneterm_en = {
     fullAccess: 'Full Access',
     allowedMethods: 'Allowed Methods',
     maxConcurrent: 'Max Concurrent',
+    maxConcurrentTip: 'Maximum number of simultaneous sessions on this site',
     blockedPaths: 'Blocked Paths',
     enableRecording: 'Enable Recording',
     enableWatermark: 'Enable Watermark',

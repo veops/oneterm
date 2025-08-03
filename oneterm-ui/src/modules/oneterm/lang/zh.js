@@ -190,6 +190,7 @@ const oneterm_zh = {
     fullAccess: '完全访问',
     allowedMethods: '允许方法',
     maxConcurrent: '最大并发',
+    maxConcurrentTip: '同时打开这个网站的最大会话数',
     blockedPaths: '阻止路径',
     enableRecording: '启用录制',
     enableWatermark: '启用水印',

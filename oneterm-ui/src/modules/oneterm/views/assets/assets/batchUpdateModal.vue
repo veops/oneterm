@@ -14,10 +14,10 @@
 </template>
 
 <script>
-import Protocol from './protocol.vue'
+import Protocol from './protocol/index.vue'
 import Account from './account.vue'
 import AccessAuth from './accessAuth.vue'
-import { putAssetById } from '../../../api/asset'
+import { putAssetById } from '@/modules/oneterm/api/asset'
 export default {
   name: 'BatchUpdateModal',
   components: { Protocol, Account, AccessAuth },
@@ -72,7 +72,15 @@ export default {
       for (let i = 0; i < this.selectedRowKeys.length; i++) {
         const params = { ...this.selectedRowKeys[i] }
         if (this.type === 'access_auth') {
-          params.access_auth = this.$refs.accessAuth.getValues()
+          const { cmd_ids, template_ids, time_ranges, timezone } = this.$refs.accessAuth.getValues()
+          params.access_time_control = {
+            time_ranges,
+            timezone
+          }
+          params.asset_command_control = {
+            cmd_ids,
+            template_ids
+          }
         } else if (this.type === 'account_ids') {
           const { authorization } = this.$refs.account.getValues()
           params.authorization = authorization

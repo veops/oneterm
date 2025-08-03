@@ -80,18 +80,18 @@
           <vxe-column :title="$t(`operation`)" width="100" align="center">
             <template #default="{row}">
               <a-space>
-                <template v-if="status === 2">
+                <template v-if="status === 2 && !['https', 'http'].includes(row.protocolType)">
                   <a-tooltip :title="$t('oneterm.sessionTable.replay')">
                     <a @click="openReplay(row)"><ops-icon type="oneterm-playback"/></a>
                   </a-tooltip>
                   <a-tooltip :title="$t('download')">
                     <a :href="`/api/oneterm/v1/session/replay/${row.session_id}`"><a-icon type="download"/></a>
                   </a-tooltip>
-                  <a-tooltip :title="$t('oneterm.menu.commandRecord')">
+                  <a-tooltip v-if="!['rdp', 'vnc'].includes(row.protocolType)" :title="$t('oneterm.menu.commandRecord')">
                     <a @click="openDetail(row)"><ops-icon type="oneterm-command_record"/></a>
                   </a-tooltip>
                 </template>
-                <template v-else>
+                <template v-else-if="status === 1">
                   <a-tooltip :title="$t('oneterm.sessionTable.monitor')">
                     <a @click="openMonitor(row)"><a-icon type="eye"/></a>
                   </a-tooltip>
@@ -185,7 +185,13 @@ export default {
         status: this.status,
       })
         .then((res) => {
-          this.tableData = res?.data?.list || []
+          const tableData = res?.data?.list || []
+          tableData.forEach((item) => {
+            const protocolType = item?.protocol?.split(':')?.[0] || ''
+            item.protocolType = protocolType
+          })
+          this.tableData = tableData
+
           this.tablePage = {
             ...this.tablePage,
             currentPage,

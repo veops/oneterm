@@ -76,6 +76,7 @@
 import _ from 'lodash'
 import { getNodeList } from '@/modules/oneterm/api/node'
 import { getAssetList } from '@/modules/oneterm/api/asset'
+import { PROTOCOL_ICON, protocolSelectOption } from '@/modules/oneterm/views/assets/assets/protocol/constants'
 
 export default {
   name: 'ChooseAssetsModal',
@@ -98,48 +99,7 @@ export default {
         protocol: [{ required: true, message: this.$t('placeholder2') }],
         chooseConnect: [{ required: true, message: this.$t('placeholder2') }],
       },
-      protocolSelectOption: [
-        {
-          title: 'oneterm.assetList.basic',
-          list: [
-            {
-              key: 'ssh',
-              label: 'SSH',
-              icon: 'a-oneterm-ssh2'
-            },
-            {
-              key: 'telnet',
-              label: 'Telnet',
-              icon: 'a-telnet1'
-            },
-          ]
-        },
-        {
-          title: 'oneterm.assetList.database',
-          list: [
-            {
-              key: 'redis',
-              label: 'Redis',
-              icon: 'oneterm-redis'
-            },
-            {
-              key: 'mysql',
-              label: 'MySQL',
-              icon: 'oneterm-mysql'
-            },
-            {
-              key: 'mongodb',
-              label: 'MongoDB',
-              icon: 'a-mongoDB1'
-            },
-            {
-              key: 'postgresql',
-              label: 'PostgreSQL',
-              icon: 'a-postgreSQL1'
-            }
-          ]
-        }
-      ],
+      protocolSelectOption: _.cloneDeep(protocolSelectOption),
       getRequestParams: {
         info: true
       }
@@ -216,17 +176,6 @@ export default {
           info: this.getRequestParams.info,
         })
 
-        const protocolIconMap = {
-          'ssh': 'a-oneterm-ssh2',
-          'rdp': 'a-oneterm-ssh1',
-          'vnc': 'oneterm-rdp',
-          'telnet': 'a-telnet1',
-          'redis': 'oneterm-redis',
-          'mysql': 'oneterm-mysql',
-          'mongodb': 'a-mongoDB1',
-          'postgresql': 'a-postgreSQL1',
-        }
-
         const assetList = assetRes?.data?.list || []
         assetList.map((asset) => {
           const protocols = asset?.protocols?.map((item) => {
@@ -235,7 +184,7 @@ export default {
             return {
               key,
               value: item,
-              icon: protocolIconMap?.[key] || ''
+              icon: PROTOCOL_ICON?.[key] || ''
             }
           }) || []
 

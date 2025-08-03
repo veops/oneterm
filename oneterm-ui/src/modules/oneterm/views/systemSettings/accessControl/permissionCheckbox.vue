@@ -28,12 +28,21 @@ export default {
     value: {
       type: Object,
       default: () => {}
+    },
+    hideOptions: {
+      type: Array,
+      default: () => []
     }
   },
   data() {
     return {
-      PERMISSION_TYPE,
-      permissionCheckboxOptions: Object.values(PERMISSION_TYPE).map((key) => ({
+      PERMISSION_TYPE
+    }
+  },
+  computed: {
+    permissionCheckboxOptions() {
+      const keys = Object.values(PERMISSION_TYPE).filter((key) => !this.hideOptions.includes(key))
+      return keys.map((key) => ({
         value: key,
         label: PERMISSION_TYPE_NAME[key]
       }))

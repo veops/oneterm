@@ -1,5 +1,11 @@
 <template>
-  <a-modal :visible="visible" :title="$t(`login`)" @cancel="handleCancel" @ok="handleOk">
+  <a-modal
+    :visible="visible"
+    :title="$t('login')"
+    :zIndex="1004"
+    @cancel="handleCancel"
+    @ok="handleOk"
+  >
     <a-form-model
       ref="loginForm"
       :model="loginForm"

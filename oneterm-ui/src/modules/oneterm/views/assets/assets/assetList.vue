@@ -212,13 +212,15 @@
 <script>
 import _ from 'lodash'
 import { mapState } from 'vuex'
-import TwoColumnLayout from '@/components/TwoColumnLayout'
-import { getNodeList, deleteNodeById, getNodeById } from '../../../api/node'
-import { getAssetList, deleteAssetById } from '../../../api/asset'
-import { getAccountList } from '../../../api/account'
+import { getNodeList, deleteNodeById, getNodeById } from '@/modules/oneterm/api/node'
+import { getAssetList, deleteAssetById } from '@/modules/oneterm/api/asset'
+import { getAccountList } from '@/modules/oneterm/api/account'
+import { PROTOCOL_ICON } from './protocol/constants'
+
 import BatchUpdateModal from './batchUpdateModal.vue'
 import TempLinkModal from './tempLink/tempLinkModal.vue'
 import GrantModal from '@/modules/oneterm/components/grant/grantModal.vue'
+import TwoColumnLayout from '@/components/TwoColumnLayout'
 
 export default {
   name: 'AssetList',
@@ -379,17 +381,6 @@ export default {
         info: this.getRequestParams.info,
       })
         .then(async (res) => {
-          const protocolIconMap = {
-            'ssh': 'a-oneterm-ssh2',
-            'rdp': 'a-oneterm-ssh1',
-            'vnc': 'oneterm-rdp',
-            'telnet': 'a-telnet1',
-            'redis': 'oneterm-redis',
-            'mysql': 'oneterm-mysql',
-            'mongodb': 'a-mongoDB1',
-            'postgresql': 'a-postgreSQL1',
-          }
-
           const tableData = res?.data?.list || []
           tableData.forEach((row) => {
             row._protocols = row?.protocols?.map((item) => {
@@ -398,7 +389,7 @@ export default {
               return {
                 key,
                 value: item,
-                icon: protocolIconMap?.[key] || ''
+                icon: PROTOCOL_ICON?.[key] || ''
               }
             }) || []
 

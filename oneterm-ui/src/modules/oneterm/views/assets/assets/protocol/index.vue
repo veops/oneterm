@@ -22,8 +22,8 @@
               </a-select-option>
             </a-select-opt-group>
           </a-select>
-          <a-input
-            v-model="pro.label"
+          <a-input-number
+            v-model="pro.port"
             :min="0"
             :placeholder="$t('oneterm.assetList.protocolPlaceholder')"
             :precision="0"
@@ -31,7 +31,10 @@
           />
         </a-input-group>
         <a-space>
-          <a v-if="protocols.length < 3" @click="addPro">
+          <a
+            v-if="showAddProtocol"
+            @click="addPro"
+          >
             <a-icon type="plus-circle"/>
           </a>
           <a
@@ -43,7 +46,13 @@
           </a>
         </a-space>
       </div>
+
+      <WebConfigForm
+        v-if="hasWebProtocol"
+        :config="form.web_config"
+      />
     </a-form-model-item>
+
     <a-form-model-item
       :label="$t('oneterm.gateway')"
       prop="gateway_id"
@@ -86,79 +95,44 @@
 <script>
 import _ from 'lodash'
 import { v4 as uuidv4 } from 'uuid'
-import { getGatewayList } from '../../../api/gateway'
+import { getGatewayList } from '@/modules/oneterm/api/gateway'
+import { protocolSelectOption, protocolMap, DEFAULT_WEB_CONFIG } from './constants.js'
+
+import WebConfigForm from './webConfigForm.vue'
+
 export default {
   name: 'Protocol',
+  components: {
+    WebConfigForm
+  },
   data() {
     return {
       form: {
         gateway_id: undefined,
+        web_config: _.cloneDeep(DEFAULT_WEB_CONFIG)
       },
       rules: {},
-      protocolSelectOption: [
-        {
-          title: 'oneterm.assetList.basic',
-          list: [
-            {
-              key: 'ssh',
-              label: 'SSH',
-              icon: 'a-oneterm-ssh2'
-            },
-            {
-              key: 'rdp',
-              label: 'RDP',
-              icon: 'a-oneterm-ssh1'
-            },
-            {
-              key: 'vnc',
-              label: 'VNC',
-              icon: 'oneterm-rdp'
-            },
-            {
-              key: 'telnet',
-              label: 'Telnet',
-              icon: 'a-telnet1'
-            },
-          ]
-        },
-        {
-          title: 'oneterm.assetList.database',
-          list: [
-            {
-              key: 'redis',
-              label: 'Redis',
-              icon: 'oneterm-redis'
-            },
-            {
-              key: 'mysql',
-              label: 'MySQL',
-              icon: 'oneterm-mysql'
-            },
-            {
-              key: 'mongodb',
-              label: 'MongoDB',
-              icon: 'a-mongoDB1'
-            },
-            {
-              key: 'postgresql',
-              label: 'PostgreSQL',
-              icon: 'a-postgreSQL1'
-            }
-          ]
-        }
-      ],
-      protocolMap: {
-        'ssh': 22,
-        'rdp': 3389,
-        'vnc': 5900,
-        'telnet': 23,
-        'redis': 6379,
-        'mysql': 3306,
-        'mongodb': 27017,
-        'postgresql': 5432
-      },
-      protocols: [{ id: uuidv4(), value: 'ssh', label: '22' }],
+      protocolSelectOption: _.cloneDeep(protocolSelectOption),
+      protocols: [{ id: uuidv4(), value: 'ssh', port: 22 }],
       gatewayList: [],
+    }
+  },
+  computed: {
+    showAddProtocol() {
+      return this.protocols?.length < 3 && !this.hasWebProtocol
+    },
+    hasWebProtocol() {
+      return this.protocols.some((protocol) => ['https', 'http'].includes(protocol.value))
+    }
+  },
+  watch: {
+    protocols: {
+      immediate: true,
+      deep: true,
+      handler(protocols) {
+        const protocolTypeList = (protocols || []).map((protocol) => protocol.value)
+        this.$emit('updateProtocols', _.uniq(protocolTypeList))
+      }
     }
   },
   mounted() {
@@ -170,34 +144,47 @@ export default {
     addPro() {
       if (this.protocols.length < 3) {
         const value = ['ssh', 'rdp', 'vnc'].find((key) => this.protocols.every((protocol) => protocol.value !== key))
-        this.protocols.push({ id: uuidv4(), value, label: this.protocolMap?.[value] || 0 })
+        this.protocols.push({ id: uuidv4(), value, port: protocolMap?.[value] || 0 })
       }
     },
     deletePro(index) {
       this.protocols.splice(index, 1)
     },
     getValues() {
-      const { gateway_id } = this.form
-      const _protocols = this.protocols.map((pro) => `${pro.value}:${pro.label}`)
-      return { gateway_id, protocols: _protocols }
+      const { gateway_id, web_config } = this.form
+      const _protocols = this.protocols.map((pro) => `${pro.value}:${pro.port}`)
+      return {
+        gateway_id: gateway_id || undefined,
+        web_config: this.hasWebProtocol ? _.cloneDeep(web_config) : undefined,
+        protocols: _protocols
+      }
     },
-    setValues({ gateway_id = undefined, protocols }) {
-      this.form = { gateway_id: gateway_id || undefined }
+    setValues({
+      gateway_id,
+      protocols,
+      web_config
+    }) {
+      this.form = {
+        gateway_id: gateway_id || undefined,
+        web_config: web_config || _.cloneDeep(DEFAULT_WEB_CONFIG)
+      }
       this.protocols = protocols?.length
         ? protocols.map((p) => ({
             id: uuidv4(),
             value: p.split(':')[0],
-            label: Number(p.split(':')[1]),
+            port: Number(p.split(':')[1]),
           }))
-        : [{ id: uuidv4(), value: 'ssh', label: 22 }]
+        : [{ id: uuidv4(), value: 'ssh', port: 22 }]
     },
     changeProValue(value, index) {
-      const _pro = _.cloneDeep(this.protocols[index])
-      if (Object.keys(this.protocolMap).includes(value)) {
-        _pro.label = this.protocolMap[value]
+      if (Object.keys(protocolMap).includes(value)) {
+        this.protocols[index].port = protocolMap[value]
       }
-      this.$set(this.protocols, index, _pro)
-    },
+
+      if (['https', 'http'].includes(value)) {
+        this.protocols = this.protocols.filter((_, i) => index === i)
+      }
+    }
   },
 }
 </script>

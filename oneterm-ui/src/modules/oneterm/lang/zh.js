@@ -178,7 +178,32 @@ const oneterm_zh = {
     assetOperationPermissions: '资产操作权限',
     accountOperationPermissions: '帐号操作权限',
     accessPermission: '访问权限',
-    operationPermissions: '操作权限'
+    operationPermissions: '操作权限',
+    virtualAccount: '虚拟账号'
+  },
+  web: {
+    webProtocolConfig: 'Web 协议配置',
+    accessPolicy: '访问策略',
+    accessMode: '访问模式',
+    readOnly: '只读访问',
+    fullAccess: '完全访问',
+    allowedMethods: '允许方法',
+    maxConcurrent: '最大并发',
+    blockedPaths: '阻止路径',
+    enableRecording: '启用录制',
+    enableWatermark: '启用水印',
+    authConfig: '认证配置',
+    authMode: '认证模式',
+    noAuthenticationRequired: '无需认证',
+    noAuthenticationRequiredTip: '直接代理访问, 适用于内网无认证系统',
+    autoLogin: '智能登录(推荐)',
+    autoLoginTip: '系统自动识别登录方式，只需提供账号密码',
+    manualLogin: '手动登录',
+    manualLoginTip: '用户通过代理页面手动登录',
+    autoLoginAccount: '智能登录帐号',
+    addAccount: '添加帐号',
+    accountTip1: '请至少添加一个账户',
+    accountTip2: '用户名和密码是必需的'
   },
   log: {
     time: '时间',

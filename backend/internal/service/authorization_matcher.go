@@ -163,6 +163,10 @@ func (m *AuthorizationMatcher) matchSelector(ctx context.Context, selector model
 	}
 
 	switch selector.Type {
+	case "":
+		// Empty selector type means no restriction - skip this selector check
+		return true
+
 	case model.SelectorTypeAll:
 		return true
 

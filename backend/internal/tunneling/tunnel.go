@@ -236,12 +236,28 @@ func getAvailablePort() (int, error) {
 
 // Proxy establishes a proxy connection to an asset through a gateway if necessary
 func Proxy(isConnectable bool, sessionId string, protocol string, asset *model.Asset, gateway *model.Gateway) (ip string, port int, err error) {
-	ip, port = asset.Ip, 0
-	for _, tp := range strings.Split(protocol, ",") {
-		for _, p := range asset.Protocols {
-			if strings.HasPrefix(strings.ToLower(p), tp) {
-				if port = cast.ToInt(strings.Split(p, ":")[1]); port != 0 {
-					break
+	// Handle case 1: asset.Ip already contains port (e.g., "127.0.0.1:8000")
+	if strings.Contains(asset.Ip, ":") {
+		ipParts := strings.Split(asset.Ip, ":")
+		if len(ipParts) >= 2 {
+			ip = ipParts[0]
+			port = cast.ToInt(ipParts[1])
+		} else {
+			ip = asset.Ip
+			port = 0
+		}
+	} else {
+		// Case 2: asset.Ip without port (e.g., "127.0.0.1"), extract port from protocol
+		ip, port = asset.Ip, 0
+		for _, tp := range strings.Split(protocol, ",") {
+			for _, p := range asset.Protocols {
+				if strings.HasPrefix(strings.ToLower(p), tp) {
+					parts := strings.Split(p, ":")
+					if len(parts) >= 2 {
+						if port = cast.ToInt(parts[1]); port != 0 {
+							break
+						}
+					}
 				}
 			}
 		}

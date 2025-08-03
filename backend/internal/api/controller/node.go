@@ -96,8 +96,10 @@ func (c *Controller) GetNodes(ctx *gin.Context) {
 		db = db.Select("id", "parent_id", "name", "authorization")
 	}
 
+	db = db.Order("id ASC")
+
 	if recursive {
-		treeNodes, err := nodeService.GetNodesTree(ctx, db, !info, config.RESOURCE_NODE)
+		treeNodes, err := nodeService.GetNodesTree(ctx, db, false, config.RESOURCE_NODE)
 		if err != nil {
 			ctx.AbortWithError(http.StatusInternalServerError, &errors.ApiError{Code: errors.ErrInternal, Data: map[string]any{"err": err}})
 			return
@@ -110,7 +112,7 @@ func (c *Controller) GetNodes(ctx *gin.Context) {
 
 		ctx.JSON(http.StatusOK, NewHttpResponseWithData(res))
 	} else {
-		doGet(ctx, !info, db, config.RESOURCE_NODE, nodePostHooks...)
+		doGet(ctx, false, db, config.RESOURCE_NODE, nodePostHooks...)
 	}
 }
 

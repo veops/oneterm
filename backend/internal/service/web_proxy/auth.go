@@ -177,7 +177,6 @@ func (s *AuthService) AuthenticateWithRetry(ctx context.Context, accounts []Cred
 	var lastError error
 	var lastResult *AuthResult
 
-	// 尝试每个账号，直到成功
 	for i, credentials := range accounts {
 		logger.L().Info("Attempting authentication",
 			zap.String("strategy", strategy.Name()),
@@ -207,7 +206,6 @@ func (s *AuthService) AuthenticateWithRetry(ctx context.Context, accounts []Cred
 			zap.String("reason", result.Message))
 	}
 
-	// 所有账号都失败了
 	if lastError != nil {
 		return nil, fmt.Errorf("all authentication attempts failed, last error: %w", lastError)
 	}

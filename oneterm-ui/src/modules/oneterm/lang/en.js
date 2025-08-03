@@ -180,7 +180,8 @@ const oneterm_en = {
     accountOperationPermissions: 'Account Operation Permissions',
     accessPermission: 'Access Permission',
     operationPermissions: 'Operation Permissions',
-    virtualAccount: 'Virtual Account'
+    virtualAccount: 'Virtual Account',
+    createAssetTip: 'Assets can only be created after selecting or creating a folder'
   },
   web: {
     webProtocolConfig: 'Web Protocol Config',

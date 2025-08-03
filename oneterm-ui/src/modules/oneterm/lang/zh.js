@@ -179,7 +179,8 @@ const oneterm_zh = {
     accountOperationPermissions: '帐号操作权限',
     accessPermission: '访问权限',
     operationPermissions: '操作权限',
-    virtualAccount: '虚拟账号'
+    virtualAccount: '虚拟账号',
+    createAssetTip: '选择或者创建目录节点后，才能创建资产'
   },
   web: {
     webProtocolConfig: 'Web 协议配置',

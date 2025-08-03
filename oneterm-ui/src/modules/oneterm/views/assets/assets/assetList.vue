@@ -89,10 +89,19 @@
                 <span>{{ $t('selectRows', { rows: selectedRowKeys.length }) }}</span>
               </div>
               <a-button
-                v-if="selectedKeys && selectedKeys.length && showCreateNodeBtn"
+                :disabled="!openCreateAssetBtn"
                 type="primary"
                 @click="createAsset"
               >
+                <a-tooltip
+                  v-if="!openCreateAssetBtn"
+                  :title="$t('oneterm.assetList.createAssetTip')"
+                >
+                  <a-icon
+                    type="info-circle"
+                    class="create-asset-button-tip"
+                  />
+                </a-tooltip>
                 {{ $t(`create`) }}
               </a-button>
               <a-button
@@ -254,13 +263,11 @@ export default {
       rid: (state) => state.user.rid,
       roles: (state) => state.user.roles,
     }),
-    isCreateRootNode() {
-      return true
-    },
-    showCreateNodeBtn() {
-      if (this.selectedKeys.length === 0) {
-        return this.isCreateRootNode
+    openCreateAssetBtn() {
+      if (!this.selectedKeys?.length) {
+        return false
       }
+
       let currentNode = null
       this.treeForeach(this.treeData, (node) => {
         if (node.id === this.selectedKeys[0]) {
@@ -698,6 +705,10 @@ export default {
   &:not(:first-child) {
     margin-left: 6px;
   }
+}
+
+.create-asset-button-tip {
+  pointer-events: auto;
 }
 </style>
 <style lang="less">

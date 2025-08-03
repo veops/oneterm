@@ -6,9 +6,14 @@
         size="mini"
         :data="authList"
         :column-config="{ width: 200 }"
-        :min-height="110"
+        :min-height="80"
       >
-        <vxe-column field="account" :title="$t('oneterm.account')" width="190">
+        <vxe-column
+          v-if="!hasWebProtocol"
+          field="account"
+          :title="$t('oneterm.account')"
+          width="190"
+        >
           <template #default="{ row }">
             <a-select
               v-model="row.account"
@@ -34,7 +39,11 @@
             </a-select>
           </template>
         </vxe-column>
-        <vxe-column field="grantUser" :title="$t('oneterm.assetList.grantRole')" width="190">
+        <vxe-column
+          field="grantUser"
+          :title="$t('oneterm.assetList.grantRole')"
+          :width="hasWebProtocol ? 'auto' : '190'"
+        >
           <template #default="{ row }">
             <EmployeeTreeSelect
               v-model="row.rids"
@@ -54,10 +63,15 @@
             />
           </template>
         </vxe-column>
-        <vxe-column field="permissions" :title="$t('oneterm.assetList.operationPermissions')" width="230">
+        <vxe-column
+          field="permissions"
+          :title="$t('oneterm.assetList.operationPermissions')"
+          :width="hasWebProtocol ? 'auto' : '230'"
+        >
           <template #default="{ row }">
             <PermissionCheckbox
               :value="row.permissions"
+              :hideOptions="hideOperationPermissionOptions"
               @change="(key, checked) => row.permissions[key] = checked"
             />
           </template>
@@ -76,6 +90,7 @@
 </template>
 
 <script>
+import _ from 'lodash'
 import { v4 as uuidv4 } from 'uuid'
 import { getAccountList } from '@/modules/oneterm/api/account'
 import { searchRole } from '@/modules/acl/api/role'
@@ -104,6 +119,14 @@ export default {
         offset: 4,
       }),
     },
+    resourceType: {
+      type: String,
+      default: 'asset'
+    },
+    protocolTypeList: {
+      type: Array,
+      default: () => []
+    }
   },
   data() {
     return {
@@ -114,7 +137,18 @@ export default {
         rids: undefined,
         permissions: { ...DEFAULT_PERMISSIONS }
       }],
-      visualRoleList: []
+      visualRoleList: [],
+      hasWebProtocol: false,
+      hideOperationPermissionOptions: []
+    }
+  },
+  watch: {
+    protocolTypeList: {
+      immediate: true,
+      deep: true,
+      handler(protocolTypeList) {
+        this.handleWatchProtocolTypeList(protocolTypeList)
+      }
     }
   },
   created() {
@@ -169,6 +203,40 @@ export default {
       this.accountList = accountList
     },
 
+    handleWatchProtocolTypeList(protocolTypeList) {
+      const hasRDP = protocolTypeList.includes('rdp')
+      const hasSSH = protocolTypeList.includes('ssh')
+      const hasHTTP = protocolTypeList.includes('http')
+      const hasHTTPS = protocolTypeList.includes('https')
+      const hasWebProtocol = hasHTTP || hasHTTPS
+
+      const hideOptions = []
+
+      if (this.resourceType === 'asset') {
+        if (!hasRDP) {
+          hideOptions.push(PERMISSION_TYPE.COPY, PERMISSION_TYPE.PASTE)
+        }
+        if (!(hasSSH || hasRDP || hasHTTP || hasHTTPS)) {
+          hideOptions.push(PERMISSION_TYPE.FILE_DOWNLOAD)
+        }
+        if (!(hasSSH || hasRDP)) {
+          hideOptions.push(PERMISSION_TYPE.FILE_UPLOAD)
+        }
+        if (hasWebProtocol) {
+          hideOptions.push(PERMISSION_TYPE.SHARE)
+        }
+      }
+      this.hideOperationPermissionOptions = hideOptions
+
+      let authList = this.authList
+      if (hasWebProtocol) {
+        const auth = this.authList.slice(0, 1)
+        authList = auth
+      }
+      this.authList = authList
+      this.hasWebProtocol = hasWebProtocol
+    },
+
     addCount() {
       this.authList.push({
         id: uuidv4(),
@@ -187,7 +255,14 @@ export default {
     getValues() {
       const authorization = {}
 
-      this.authList
+      const authList = _.cloneDeep(this.authList)
+      if (this.hasWebProtocol) {
+        authList.forEach((auth) => {
+          auth.account = -1
+        })
+      }
+
+      authList
         .filter((auth) => auth.account)
         .forEach((auth) => {
           const rids = (auth?.rids || []).map((r) => Number(r.split('-')[1]))

@@ -125,8 +125,8 @@ export default {
       access_time_control,
       asset_command_control
     }) {
-      const { time_ranges = [], timezone = momentTimezone.tz.guess() } = access_time_control
-      const { cmd_ids, template_ids } = asset_command_control
+      const { time_ranges = [], timezone = momentTimezone.tz.guess() } = access_time_control || {}
+      const { cmd_ids, template_ids } = asset_command_control || {}
 
       let ranges = []
       if (time_ranges?.length) {

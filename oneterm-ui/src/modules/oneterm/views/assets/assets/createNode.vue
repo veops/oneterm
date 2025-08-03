@@ -51,18 +51,14 @@
           </div>
         </treeselect>
       </a-form-model-item>
-      <a-form-model-item :label="$t('oneterm.comment')" prop="comment">
-        <a-textarea v-model="baseForm.comment" :placeholder="`${$t(`placeholder1`)}`" />
-      </a-form-model-item>
     </a-form-model>
-    <p>
-      <strong>{{ $t(`oneterm.protocol`) }}</strong>
-    </p>
-    <Protocol ref="protocol" />
     <p>
       <strong>{{ $t(`oneterm.accountAuthorization`) }}</strong>
     </p>
-    <Account ref="account" />
+    <Account
+      ref="account"
+      resourceType="node"
+    />
     <div class="custom-drawer-bottom-action">
       <a-button
         :loading="loading"
@@ -81,13 +77,11 @@
 <script>
 import { getNodeList, postNode, putNodeById } from '@/modules/oneterm/api/node'
 
-import Protocol from './protocol.vue'
 import Account from './account.vue'
 
 export default {
   name: 'CreateNode',
   components: {
-    Protocol,
     Account
   },
   data() {
@@ -98,8 +92,7 @@ export default {
       loading: false,
       baseForm: {
         name: '',
-        parent_id: undefined,
-        comment: '',
+        parent_id: undefined
       },
       baseRules: {
         name: [{ required: true, message: `${this.$t(`placeholder1`)}` }],
@@ -132,35 +125,26 @@ export default {
         const {
           id = null,
           name = '',
-          comment = '',
           parent_id,
-          gateway_id = undefined,
-          protocols = [],
           authorization = {}
         } = node ?? {}
 
         this.nodeId = id
         this.baseForm = {
           name,
-          parent_id: parent_id || undefined,
-          comment,
+          parent_id: parent_id || undefined
         }
-        this.$refs.protocol.setValues({ gateway_id, protocols })
         this.$refs.account.setValues({ authorization })
       })
     },
     handleSubmit() {
       this.$refs.baseForm.validate((valid) => {
         if (valid) {
-          const { name, parent_id, comment } = this.baseForm
-          const { gateway_id, protocols } = this.$refs.protocol.getValues()
+          const { name, parent_id } = this.baseForm
           const { authorization } = this.$refs.account.getValues()
           const params = {
             name,
-            comment,
             parent_id: parent_id ?? 0,
-            protocols,
-            gateway_id,
             authorization
           }
 

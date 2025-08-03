@@ -6,6 +6,20 @@
   "description": "",
   "glyphs": [
     {
+      "icon_id": "45069619",
+      "name": "oneterm-http",
+      "font_class": "oneterm-http",
+      "unicode": "ea26",
+      "unicode_decimal": 59942
+    },
+    {
+      "icon_id": "45069616",
+      "name": "oneterm-https",
+      "font_class": "oneterm-https",
+      "unicode": "ea27",
+      "unicode_decimal": 59943
+    },
+    {
       "icon_id": "44939355",
       "name": "access_period",
       "font_class": "ops-oneterm-access_period",

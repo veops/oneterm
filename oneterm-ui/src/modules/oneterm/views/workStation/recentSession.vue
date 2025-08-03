@@ -39,7 +39,7 @@
                 <a-tooltip :title="row.protocolType">
                   <a @click="openTerminal(row)"><ops-icon :type="row.protocolIcon"/></a>
                 </a-tooltip>
-                <a-tooltip :title="$t(`oneterm.switchAccount`)">
+                <a-tooltip v-if="showSwitchAccount(row)" :title="$t(`oneterm.switchAccount`)">
                   <a @click="openLogin(row)"><ops-icon type="oneterm-switch"/></a>
                 </a-tooltip>
               </a-space>
@@ -78,9 +78,12 @@
 <script>
 import moment from 'moment'
 import { mapGetters, mapState } from 'vuex'
-import { getSessionList } from '../../api/session'
-import { getAssetList } from '../../api/asset'
+import { getSessionList } from '@/modules/oneterm/api/session'
+import { getAssetList } from '@/modules/oneterm/api/asset'
+import { PROTOCOL_ICON } from '@/modules/oneterm/views/assets/assets/protocol/constants'
+
 import LoginModal from '../assets/assets/loginModal.vue'
+
 export default {
   name: 'RecentSession',
   components: { LoginModal },
@@ -101,7 +104,7 @@ export default {
     ...mapState({
       rid: (state) => state.user.rid,
       roles: (state) => state.user.roles,
-    }),
+    })
   },
   methods: {
     moment,
@@ -121,21 +124,10 @@ export default {
         uid: this.uid,
       })
         .then((res) => {
-          const protocolIconMap = {
-            'ssh': 'a-oneterm-ssh2',
-            'rdp': 'a-oneterm-ssh1',
-            'vnc': 'oneterm-rdp',
-            'telnet': 'a-telnet1',
-            'redis': 'oneterm-redis',
-            'mysql': 'oneterm-mysql',
-            'mongodb': 'a-mongoDB1',
-            'postgresql': 'a-postgreSQL1',
-          }
-
           const tableData = res?.data?.list || []
           tableData.forEach((item) => {
             const protocolType = item.protocol.split?.(':')?.[0] || ''
-            item.protocolIcon = protocolIconMap?.[protocolType] || ''
+            item.protocolIcon = PROTOCOL_ICON?.[protocolType] || ''
             item.protocolType = protocolType
           })
 
@@ -192,6 +184,10 @@ export default {
     loginOpenTerminal(data) {
       this.$emit('openTerminal', data)
       this.handleCancel()
+    },
+
+    showSwitchAccount(row) {
+      return !['http', 'https'].includes(row?.protocolType)
     }
   },
 }

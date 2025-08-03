@@ -89,10 +89,19 @@
                 <span>{{ $t('selectRows', { rows: selectedRowKeys.length }) }}</span>
               </div>
               <a-button
-                v-if="selectedKeys && selectedKeys.length && showCreateNodeBtn"
+                :disabled="!openCreateAssetBtn"
                 type="primary"
                 @click="createAsset"
               >
+                <a-tooltip
+                  v-if="!openCreateAssetBtn"
+                  :title="$t('oneterm.assetList.createAssetTip')"
+                >
+                  <a-icon
+                    type="info-circle"
+                    class="create-asset-button-tip"
+                  />
+                </a-tooltip>
                 {{ $t(`create`) }}
               </a-button>
               <a-button
@@ -212,13 +221,15 @@
 <script>
 import _ from 'lodash'
 import { mapState } from 'vuex'
-import TwoColumnLayout from '@/components/TwoColumnLayout'
-import { getNodeList, deleteNodeById, getNodeById } from '../../../api/node'
-import { getAssetList, deleteAssetById } from '../../../api/asset'
-import { getAccountList } from '../../../api/account'
+import { getNodeList, deleteNodeById, getNodeById } from '@/modules/oneterm/api/node'
+import { getAssetList, deleteAssetById } from '@/modules/oneterm/api/asset'
+import { getAccountList } from '@/modules/oneterm/api/account'
+import { PROTOCOL_ICON } from './protocol/constants'
+
 import BatchUpdateModal from './batchUpdateModal.vue'
 import TempLinkModal from './tempLink/tempLinkModal.vue'
 import GrantModal from '@/modules/oneterm/components/grant/grantModal.vue'
+import TwoColumnLayout from '@/components/TwoColumnLayout'
 
 export default {
   name: 'AssetList',
@@ -252,13 +263,11 @@ export default {
       rid: (state) => state.user.rid,
       roles: (state) => state.user.roles,
     }),
-    isCreateRootNode() {
-      return true
-    },
-    showCreateNodeBtn() {
-      if (this.selectedKeys.length === 0) {
-        return this.isCreateRootNode
+    openCreateAssetBtn() {
+      if (!this.selectedKeys?.length) {
+        return false
       }
+
       let currentNode = null
       this.treeForeach(this.treeData, (node) => {
         if (node.id === this.selectedKeys[0]) {
@@ -379,17 +388,6 @@ export default {
         info: this.getRequestParams.info,
       })
         .then(async (res) => {
-          const protocolIconMap = {
-            'ssh': 'a-oneterm-ssh2',
-            'rdp': 'a-oneterm-ssh1',
-            'vnc': 'oneterm-rdp',
-            'telnet': 'a-telnet1',
-            'redis': 'oneterm-redis',
-            'mysql': 'oneterm-mysql',
-            'mongodb': 'a-mongoDB1',
-            'postgresql': 'a-postgreSQL1',
-          }
-
           const tableData = res?.data?.list || []
           tableData.forEach((row) => {
             row._protocols = row?.protocols?.map((item) => {
@@ -398,7 +396,7 @@ export default {
               return {
                 key,
                 value: item,
-                icon: protocolIconMap?.[key] || ''
+                icon: PROTOCOL_ICON?.[key] || ''
               }
             }) || []
 
@@ -707,6 +705,10 @@ export default {
   &:not(:first-child) {
     margin-left: 6px;
   }
+}
+
+.create-asset-button-tip {
+  pointer-events: auto;
 }
 </style>
 <style lang="less">

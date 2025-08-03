@@ -62,11 +62,18 @@
     <p>
       <strong>{{ $t(`oneterm.protocol`) }}</strong>
     </p>
-    <Protocol ref="protocol" />
+    <Protocol
+      ref="protocol"
+      @updateProtocols="(value) => protocolTypeList = value"
+    />
     <p>
       <strong>{{ $t(`oneterm.accountAuthorization`) }}</strong>
     </p>
-    <Account ref="account" />
+    <Account
+      ref="account"
+      resourceType="asset"
+      :protocolTypeList="protocolTypeList"
+    />
     <p>
       <strong>{{ $t(`oneterm.accessRestrictions`) }}</strong>
     </p>
@@ -87,11 +94,12 @@
 </template>
 
 <script>
-import Protocol from './protocol.vue'
-import Account from './account.vue'
-import AccessAuth from './accessAuth.vue'
 import { getNodeList } from '@/modules/oneterm/api/node'
 import { postAsset, putAssetById } from '@/modules/oneterm/api/asset'
+
+import Protocol from './protocol/index.vue'
+import Account from './account.vue'
+import AccessAuth from './accessAuth.vue'
 
 export default {
   name: 'CreateAsset',
@@ -114,6 +122,7 @@ export default {
         parent_id: [{ required: true, message: `${this.$t(`placeholder2`)}` }],
       },
       nodeList: [],
+      protocolTypeList: []
     }
   },
   computed: {
@@ -141,6 +150,7 @@ export default {
           parent_id,
           gateway_id = undefined,
           protocols = [],
+          web_config,
           authorization = {},
           access_time_control = {},
           asset_command_control = {}
@@ -152,7 +162,7 @@ export default {
           comment,
           parent_id: parent_id || undefined,
         }
-        this.$refs.protocol.setValues({ gateway_id, protocols })
+        this.$refs.protocol.setValues({ gateway_id, protocols, web_config })
         this.$refs.account.setValues({ authorization })
         this.$refs.accessAuth.setValues({
           access_time_control,
@@ -184,7 +194,7 @@ export default {
       this.$refs.baseForm.validate((valid) => {
         if (valid) {
           const { name, ip, parent_id, comment } = this.baseForm
-          const { gateway_id, protocols } = this.$refs.protocol.getValues()
+          const { gateway_id, protocols, web_config } = this.$refs.protocol.getValues()
           const { authorization } = this.$refs.account.getValues()
           const { cmd_ids, template_ids, time_ranges, timezone } = this.$refs.accessAuth.getValues()
           const params = {
@@ -193,6 +203,7 @@ export default {
             comment,
             parent_id: parent_id ?? 0,
             protocols,
+            web_config,
             gateway_id,
             authorization,
             access_time_control: {

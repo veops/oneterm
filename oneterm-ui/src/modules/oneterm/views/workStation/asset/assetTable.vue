@@ -119,6 +119,7 @@
 <script>
 import { mapState } from 'vuex'
 import { getAssetList } from '@/modules/oneterm/api/asset'
+import { PROTOCOL_ICON } from '@/modules/oneterm/views/assets/assets/protocol/constants'
 
 import LoginModal from '@/modules/oneterm/views/assets/assets/loginModal.vue'
 
@@ -176,17 +177,6 @@ export default {
         info: this.getRequestParams.info,
       })
         .then(async (res) => {
-          const protocolIconMap = {
-            'ssh': 'a-oneterm-ssh2',
-            'rdp': 'a-oneterm-ssh1',
-            'vnc': 'oneterm-rdp',
-            'telnet': 'a-telnet1',
-            'redis': 'oneterm-redis',
-            'mysql': 'oneterm-mysql',
-            'mongodb': 'a-mongoDB1',
-            'postgresql': 'a-postgreSQL1',
-          }
-
           const tableData = res?.data?.list || []
 
           tableData.forEach((row) => {
@@ -196,14 +186,23 @@ export default {
               return {
                 key,
                 value: item,
-                icon: protocolIconMap?.[key] || ''
+                icon: PROTOCOL_ICON?.[key] || ''
               }
             }) || []
 
             const accountList = []
             row._protocols.forEach((protocol) => {
               Object.keys(row.authorization || {}).forEach((acc_id) => {
-                const _find = this.accountList?.find((item) => Number(item.id) === Number(acc_id))
+                let _find = null
+                if (['https', 'http'].includes(protocol.key)) {
+                  _find = {
+                    id: -1,
+                    name: this.$t('oneterm.assetList.virtualAccount')
+                  }
+                } else {
+                  _find = this.accountList?.find((item) => Number(item.id) === Number(acc_id))
+                }
+
                 if (_find) {
                   accountList.push({
                     account_id: _find.id,
@@ -238,26 +237,13 @@ export default {
     },
 
     clickProtocol(protocol, row) {
-      const accountList = []
-
-      Object.keys(row.authorization).forEach((acc_id) => {
-        const _find = this.accountList?.find((item) => Number(item.id) === Number(acc_id))
-
-        if (_find) {
-          accountList.push({
-            account_id: _find.id,
-            account_name: _find.name,
-          })
-        }
-      })
-
-      if (accountList.length > 1) {
+      if (row?.accountList?.length > 1) {
         this.$refs.loginModalRef.open(row.id, row.name, row.authorization, [protocol.value])
-      } else if (accountList.length === 1) {
+      } else if (row?.accountList?.length === 1) {
         this.$emit('openTerminal', {
           assetId: row.id,
           assetName: row.name,
-          accountId: accountList[0].account_id,
+          accountId: row?.accountList?.[0]?.account_id,
           protocol: protocol.value,
           protocolType: protocol.key
         })

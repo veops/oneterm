@@ -161,6 +161,7 @@ import { getPreference } from '@/modules/oneterm/api/preference.js'
 import { getAccountList } from '@/modules/oneterm/api/account'
 import { getConfig } from '@/modules/oneterm/api/config'
 import { getAssetPermissions } from '@/modules/oneterm/api/asset'
+import { startWebProxy } from '@/modules/oneterm/api/webProxy'
 import { defaultPreferenceSetting } from '../systemSettings/terminalDisplay/constants.js'
 import { WORKSTATION_TAB_TYPE, SOCKET_STATUS } from './constants.js'
 import FullScreenMixin from '@/modules/oneterm/mixins/fullScreenMixin'
@@ -298,6 +299,12 @@ export default {
     },
 
     async openTerminal(data) {
+      const type = this.getConnectType(data.protocolType)
+      if (type === WORKSTATION_TAB_TYPE.WEB) {
+        this.openWebClient(data)
+        return
+      }
+
       const id = uuidv4()
       const accountName = this.getAccountName(data.accountId)
       const name = accountName ? `${accountName}@${data.assetName}` : data.assetName
@@ -308,7 +315,7 @@ export default {
         socketStatus: SOCKET_STATUS.LOADING,
         id,
         name,
-        type: this.getConnectType(data.protocolType),
+        type,
         permissions: permissions?.[data.accountId] || {}
       })
 
@@ -381,8 +388,10 @@ export default {
     getConnectType(protocolType) {
       if (['ssh', 'telnet', 'mysql', 'redis', 'postgresql', 'mongodb'].includes(protocolType)) {
         return WORKSTATION_TAB_TYPE.TERMINAL
-      } else {
+      } else if (['rdp', 'vnc'].includes(protocolType)) {
         return WORKSTATION_TAB_TYPE.GUACAMOLE
+      } else if (['http', 'https'].includes(protocolType)) {
+        return WORKSTATION_TAB_TYPE.WEB
       }
     },
 
@@ -467,6 +476,24 @@ export default {
       }
 
       return this.accountList.find((account) => account.id === id)?.name || ''
+    },
+
+    async openWebClient(data) {
+      startWebProxy(
+        {
+          account_id: -1,
+          asset_id: data.assetId,
+        },
+        false
+      ).then((res) => {
+        if (res?.proxy_url) {
+          window.open(res?.proxy_url, '_blank')
+        } else {
+          return Promise.error()
+        }
+      }).catch((error) => {
+        this.$message.error(error?.response?.data?.error || this.$t('requestError'))
+      })
     }
   },
 }

@@ -36,6 +36,30 @@ func (c *WebProxyController) renderSessionExpiredPage(ctx *gin.Context, reason s
 	ctx.String(http.StatusUnauthorized, html)
 }
 
+func (c *WebProxyController) renderErrorPage(ctx *gin.Context, errorType, title, reason, details string) {
+	html := web_proxy.RenderErrorPage(errorType, title, reason, details)
+	ctx.Header("Content-Type", "text/html; charset=utf-8")
+
+	// Set appropriate HTTP status code based on error type
+	var statusCode int
+	switch errorType {
+	case "access_denied":
+		statusCode = http.StatusForbidden
+	case "session_expired":
+		statusCode = http.StatusUnauthorized
+	case "connection_error":
+		statusCode = http.StatusBadGateway
+	case "concurrent_limit":
+		statusCode = http.StatusTooManyRequests
+	case "server_error":
+		statusCode = http.StatusInternalServerError
+	default:
+		statusCode = http.StatusInternalServerError
+	}
+
+	ctx.String(statusCode, html)
+}
+
 // GetWebAssetConfig get web asset configuration
 // @Summary Get web asset configuration
 // @Description Get web asset configuration by asset ID
@@ -82,7 +106,7 @@ func (c *WebProxyController) StartWebSession(ctx *gin.Context) {
 
 	resp, err := web_proxy.StartWebSession(ctx, req)
 	if err != nil {
-		// Return appropriate HTTP status code based on error type
+		// Return appropriate HTTP status code and JSON error for API
 		if strings.Contains(err.Error(), "not found") {
 			ctx.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		} else if strings.Contains(err.Error(), "not a web asset") {
@@ -126,7 +150,7 @@ func (c *WebProxyController) ProxyWebRequest(ctx *gin.Context) {
 		if strings.Contains(err.Error(), "invalid or expired session") || strings.Contains(err.Error(), "session expired") {
 			c.renderSessionExpiredPage(ctx, err.Error())
 		} else {
-			ctx.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+			c.renderErrorPage(ctx, "access_denied", "Access Denied", err.Error(), "Your request was blocked by the security policy.")
 		}
 		return
 	}
@@ -134,7 +158,7 @@ func (c *WebProxyController) ProxyWebRequest(ctx *gin.Context) {
 	// Setup reverse proxy
 	proxy, err := web_proxy.SetupReverseProxy(ctx, proxyCtx, c.buildTargetURLWithHost, c.processHTMLResponse, c.recordWebActivity, c.isSameDomainOrSubdomain)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.renderErrorPage(ctx, "server_error", "Proxy Setup Failed", err.Error(), "Failed to establish connection to the target server.")
 		return
 	}
 

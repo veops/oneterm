@@ -597,16 +597,18 @@ func SetupReverseProxy(ctx *gin.Context, proxyCtx *ProxyRequestContext, buildTar
 			strings.Contains(contentType, "application/zip")
 
 		if isDownload && proxyCtx.Session.Permissions != nil && !proxyCtx.Session.Permissions.FileDownload {
-			// Replace the response with a 403 error
+			// Replace the response with a 403 error page
 			resp.StatusCode = http.StatusForbidden
 			resp.Status = "403 Forbidden"
-			resp.Header.Set("Content-Type", "application/json")
+			resp.Header.Set("Content-Type", "text/html; charset=utf-8")
 			resp.Header.Del("Content-Disposition")
 
-			errorMsg := `{"error":"File download not permitted"}`
-			resp.Body = io.NopCloser(strings.NewReader(errorMsg))
-			resp.ContentLength = int64(len(errorMsg))
-			resp.Header.Set("Content-Length", fmt.Sprintf("%d", len(errorMsg)))
+			errorPage := RenderAccessDeniedPage(
+				"File download not permitted", 
+				"Your user permissions do not allow file downloads through the web proxy.")
+			resp.Body = io.NopCloser(strings.NewReader(errorPage))
+			resp.ContentLength = int64(len(errorPage))
+			resp.Header.Set("Content-Length", fmt.Sprintf("%d", len(errorPage)))
 
 			return nil
 		}

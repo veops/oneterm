@@ -241,18 +241,18 @@ func ProcessHTMLResponse(resp *http.Response, assetID int, scheme, proxyHost str
 	// Add session management JavaScript (always inject)
 	sessionJS := fmt.Sprintf(`
 		<script>
-		(function() {
-			var sessionId = '%s';
-			var heartbeatInterval;
-			
-			// Send heartbeat every 15 seconds
-			function sendHeartbeat() {
-				fetch('/api/oneterm/v1/web_proxy/heartbeat', {
+		(function() {tbeat', {
 					method: 'POST',
 					headers: {'Content-Type': 'application/json'},
 					body: JSON.stringify({session_id: sessionId})
 				}).catch(function() {});
 			}
+			var sessionId = '%s';
+			var heartbeatInterval;
+			
+			// Send heartbeat every 15 seconds
+			function sendHeartbeat() {
+				fetch('/api/oneterm/v1/web_proxy/hear
 			
 			// Universal heartbeat mechanism - no complex event handling
 			// The server will handle session cleanup based on heartbeat timeout
@@ -504,8 +504,147 @@ func RenderExternalRedirectPage(targetURL string) string {
 </html>`, targetURL)
 }
 
+// RenderErrorPage renders a general error page for web proxy errors
+func RenderErrorPage(errorType, title, reason, details string) string {
+	var bgColor, iconEmoji string
+
+	switch errorType {
+	case "access_denied":
+		bgColor = "#ff6b6b 0%, #ee5a52 100%"
+		iconEmoji = "🚫"
+	case "session_expired":
+		bgColor = "#f39c12 0%, #e67e22 100%"
+		iconEmoji = "⏰"
+	case "connection_error":
+		bgColor = "#95a5a6 0%, #7f8c8d 100%"
+		iconEmoji = "🔌"
+	case "server_error":
+		bgColor = "#8e44ad 0%, #9b59b6 100%"
+		iconEmoji = "⚠️"
+	case "concurrent_limit":
+		bgColor = "#e74c3c 0%, #c0392b 100%"
+		iconEmoji = "🚦"
+	default:
+		bgColor = "#34495e 0%, #2c3e50 100%"
+		iconEmoji = "❌"
+	}
+
+	detailsHtml := ""
+	if details != "" {
+		detailsHtml = fmt.Sprintf(`
+		<div class="info"><strong>Details:</strong></div>
+		<div class="details">%s</div>`, details)
+	}
+
+	return fmt.Sprintf(`<!DOCTYPE html>
+<html>
+<head>
+    <title>%s - OneTerm</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, %s);
+            min-height: 100vh;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            max-width: 600px;
+            text-align: center;
+        }
+        .error-title { color: #e74c3c; font-size: 2em; margin-bottom: 20px; }
+        .info { color: #666; margin: 20px 0; text-align: left; }
+        .details { 
+            background: #f8f9fa; 
+            padding: 15px; 
+            border-radius: 4px; 
+            border-left: 4px solid #e74c3c;
+            font-family: monospace;
+            font-size: 14px;
+            text-align: left;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .action { 
+            background: #e8f5e8; 
+            padding: 15px; 
+            border-radius: 4px; 
+            border-left: 4px solid #27ae60;
+            margin-top: 20px;
+            text-align: center;
+        }
+        .back-link {
+            color: #3498db;
+            text-decoration: none;
+            font-weight: 500;
+            margin: 0 10px;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        .reason {
+            background: #fff3cd;
+            color: #856404;
+            padding: 15px;
+            border-radius: 4px;
+            border-left: 4px solid #ffc107;
+            margin: 20px 0;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="error-title">%s %s</h1>
+        <div class="reason">%s</div>
+        %s
+        <div class="action">
+            <a href="javascript:history.back()" class="back-link">← Go Back</a>
+            <a href="javascript:location.reload()" class="back-link">🔄 Refresh</a>
+            <a href="/" class="back-link">🏠 Home</a>
+        </div>
+    </div>
+</body>
+</html>`, title, bgColor, iconEmoji, title, reason, detailsHtml)
+}
+
+// RenderAccessDeniedPage renders the page shown when access is denied (download, read-only, etc.)
+func RenderAccessDeniedPage(reason, details string) string {
+	return RenderErrorPage("access_denied", "Access Denied", reason, details)
+}
+
 // RenderSessionExpiredPage renders the page shown when session has expired
 func RenderSessionExpiredPage(reason string) string {
+	return RenderErrorPage("session_expired", "Session Expired", reason, "")
+}
+
+// RenderConcurrentLimitPage renders the page when concurrent limit is exceeded
+func RenderConcurrentLimitPage(maxConcurrent int) string {
+	reason := fmt.Sprintf("Maximum concurrent connections (%d) exceeded", maxConcurrent)
+	details := "Please wait for an existing session to end, or contact your administrator to increase the limit."
+	return RenderErrorPage("concurrent_limit", "Connection Limit Exceeded", reason, details)
+}
+
+// RenderServerErrorPage renders the page for server errors
+func RenderServerErrorPage(reason, details string) string {
+	return RenderErrorPage("server_error", "Server Error", reason, details)
+}
+
+// RenderConnectionErrorPage renders the page for connection errors
+func RenderConnectionErrorPage(reason, details string) string {
+	return RenderErrorPage("connection_error", "Connection Error", reason, details)
+}
+
+// Legacy function - keeping the original style for compatibility
+func RenderSessionExpiredPageOld(reason string) string {
 	return fmt.Sprintf(`<!DOCTYPE html>
 <html>
 <head>

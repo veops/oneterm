@@ -202,6 +202,8 @@ export default {
     },
 
     handleWebConfigData(data) {
+      // auth_mode temporarily fixed
+      data.auth_mode = AUTH_MODE.NONE
       if (data.auth_mode !== AUTH_MODE.SMART) {
         data.login_accounts = []
       }

@@ -15,7 +15,7 @@
     </a-divider>
 
     <div class="form-container" v-show="showForm">
-      <div class="form-title">{{ $t('oneterm.web.authConfig') }}</div>
+      <!-- <div class="form-title">{{ $t('oneterm.web.authConfig') }}</div>
 
       <a-form-model-item
         prop="web_config.auth_mode"
@@ -87,7 +87,7 @@
             </a>
           </div>
         </vxe-table>
-      </a-form-model-item>
+      </a-form-model-item> -->
 
       <div class="form-title">{{ $t('oneterm.web.accessPolicy') }}</div>
       <a-form-model-item
@@ -213,18 +213,18 @@ export default {
     }
   },
   computed: {
-    authModeExtra() {
-      switch (this.config.auth_mode) {
-        case AUTH_MODE.NONE:
-          return 'oneterm.web.noAuthenticationRequiredTip'
-        case AUTH_MODE.SMART:
-          return 'oneterm.web.autoLoginTip'
-        case AUTH_MODE.MANUAL:
-          return 'oneterm.web.manualLoginTip'
-        default:
-          return ''
-      }
-    },
+    // authModeExtra() {
+    //   switch (this.config.auth_mode) {
+    //     case AUTH_MODE.NONE:
+    //       return 'oneterm.web.noAuthenticationRequiredTip'
+    //     case AUTH_MODE.SMART:
+    //       return 'oneterm.web.autoLoginTip'
+    //     case AUTH_MODE.MANUAL:
+    //       return 'oneterm.web.manualLoginTip'
+    //     default:
+    //       return ''
+    //   }
+    // },
   },
   methods: {
     handlePathsChange(value) {

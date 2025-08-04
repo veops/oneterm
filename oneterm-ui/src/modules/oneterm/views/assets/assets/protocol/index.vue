@@ -96,7 +96,13 @@
 import _ from 'lodash'
 import { v4 as uuidv4 } from 'uuid'
 import { getGatewayList } from '@/modules/oneterm/api/gateway'
-import { protocolSelectOption, protocolMap, DEFAULT_WEB_CONFIG } from './constants.js'
+import {
+  protocolSelectOption,
+  protocolMap,
+  DEFAULT_WEB_CONFIG,
+  AUTH_MODE,
+  ACCESS_POLICY
+} from './constants.js'
 
 import WebConfigForm from './webConfigForm.vue'
 
@@ -153,9 +159,24 @@ export default {
     getValues() {
       const { gateway_id, web_config } = this.form
       const _protocols = this.protocols.map((pro) => `${pro.value}:${pro.port}`)
+
+      const cloneWebConfig = this.hasWebProtocol ? _.cloneDeep(web_config) : undefined
+      if (cloneWebConfig) {
+        this.handleWebConfigData(cloneWebConfig)
+
+        if (cloneWebConfig?.login_accounts?.length) {
+          cloneWebConfig.login_accounts = cloneWebConfig.login_accounts.map((account, index) => ({
+            username: account.username,
+            password: account.password,
+            is_default: index === 0,
+            status: 'active'
+          }))
+        }
+      }
+
       return {
         gateway_id: gateway_id || undefined,
-        web_config: this.hasWebProtocol ? _.cloneDeep(web_config) : undefined,
+        web_config: cloneWebConfig,
         protocols: _protocols
       }
     },
@@ -164,9 +185,12 @@ export default {
       protocols,
       web_config
     }) {
+      const cloneWebConfig = _.cloneDeep(web_config || DEFAULT_WEB_CONFIG)
+      this.handleWebConfigData(cloneWebConfig)
+
       this.form = {
         gateway_id: gateway_id || undefined,
-        web_config: web_config || _.cloneDeep(DEFAULT_WEB_CONFIG)
+        web_config: cloneWebConfig
       }
       this.protocols = protocols?.length
         ? protocols.map((p) => ({
@@ -176,6 +200,16 @@ export default {
           }))
         : [{ id: uuidv4(), value: 'ssh', port: 22 }]
     },
+
+    handleWebConfigData(data) {
+      if (data.auth_mode !== AUTH_MODE.SMART) {
+        data.login_accounts = []
+      }
+      if (data.access_policy !== ACCESS_POLICY.READ_ONLY) {
+        data.proxy_settings.allowed_methods = []
+      }
+    },
+
     changeProValue(value, index) {
       if (Object.keys(protocolMap).includes(value)) {
         this.protocols[index].port = protocolMap[value]

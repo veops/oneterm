@@ -35,7 +35,7 @@
       </a-form-model-item>
 
       <a-form-model-item
-        v-if="config.auth_mode === 'smart'"
+        v-if="config.auth_mode === AUTH_MODE.SMART"
         prop="web_config.login_accounts"
         :label="$t('oneterm.web.autoLoginAccount')"
         v-bind="formItemCol"
@@ -107,7 +107,7 @@
       </a-form-model-item>
 
       <a-form-model-item
-        v-if="config.access_policy === 'read_only'"
+        v-if="config.access_policy === ACCESS_POLICY.READ_ONLY"
         prop="web_config.proxy_settings.allowed_methods"
         :label="$t('oneterm.web.allowedMethods')"
         v-bind="formItemCol"
@@ -173,7 +173,12 @@
 
 <script>
 import _ from 'lodash'
-import { ACCESS_POLICY_NAME, AUTH_MODE_NAME } from './constants.js'
+import {
+  ACCESS_POLICY_NAME,
+  AUTH_MODE,
+  AUTH_MODE_NAME,
+  ACCESS_POLICY
+} from './constants.js'
 
 export default {
   name: 'WebConfigForm',
@@ -185,21 +190,21 @@ export default {
   },
   data() {
     return {
+      AUTH_MODE,
+      ACCESS_POLICY,
       showForm: true,
-      accessPolicyOptions: [
-        { label: ACCESS_POLICY_NAME['full_access'], value: 'full_access' },
-        { label: ACCESS_POLICY_NAME['read_only'], value: 'read_only' }
-      ],
-      allowedMethodsOptions: [
-        { label: 'GET', value: 'GET' },
-        { label: 'HEAD', value: 'HEAD' },
-        { label: 'OPTIONS', value: 'OPTIONS' }
-      ],
-      authModeOptions: [
-        { label: AUTH_MODE_NAME['none'], value: 'none' },
-        { label: AUTH_MODE_NAME['smart'], value: 'smart' },
-        { label: AUTH_MODE_NAME['manual'], value: 'manual' }
-      ],
+      accessPolicyOptions: [ACCESS_POLICY.FULL_ACCESS, ACCESS_POLICY.READ_ONLY].map((value) => ({
+        label: ACCESS_POLICY_NAME[value],
+        value: value
+      })),
+      allowedMethodsOptions: ['GET', 'HEAD', 'OPTIONS'].map((value) => ({
+        label: value,
+        value: value
+      })),
+      authModeOptions: [AUTH_MODE.NONE, AUTH_MODE.SMART, AUTH_MODE.MANUAL].map((value) => ({
+        label: AUTH_MODE_NAME[value],
+        value
+      })),
       blockedPathOptions: [],
       formItemCol: {
         labelCol: { span: 6 },
@@ -210,11 +215,11 @@ export default {
   computed: {
     authModeExtra() {
       switch (this.config.auth_mode) {
-        case 'none':
+        case AUTH_MODE.NONE:
           return 'oneterm.web.noAuthenticationRequiredTip'
-        case 'smart':
+        case AUTH_MODE.SMART:
           return 'oneterm.web.autoLoginTip'
-        case 'manual':
+        case AUTH_MODE.MANUAL:
           return 'oneterm.web.manualLoginTip'
         default:
           return ''
@@ -232,14 +237,13 @@ export default {
     },
     addAccount() {
       this.config.login_accounts.push({
-        is_default: false,
         password: '',
         username: ''
       })
     },
     deleteAccount(index) {
       this.config.login_accounts.splice(index, 1)
-    },
+    }
   }
 }
 </script>

@@ -92,9 +92,31 @@ export const protocolMap = {
   'http': 80
 }
 
+export const ACCESS_POLICY = {
+  FULL_ACCESS: 'full_access',
+  READ_ONLY: 'read_only'
+}
+
+export const ACCESS_POLICY_NAME = {
+  [ACCESS_POLICY.FULL_ACCESS]: 'oneterm.web.fullAccess',
+  [ACCESS_POLICY.READ_ONLY]: 'oneterm.web.readOnly',
+}
+
+export const AUTH_MODE = {
+  NONE: 'none',
+  SMART: 'smart',
+  MANUAL: 'manual'
+}
+
+export const AUTH_MODE_NAME = {
+  [AUTH_MODE.NONE]: 'oneterm.web.noAuthenticationRequired',
+  [AUTH_MODE.SMART]: 'oneterm.web.autoLogin',
+  [AUTH_MODE.MANUAL]: 'oneterm.web.manualLogin',
+}
+
 export const DEFAULT_WEB_CONFIG = {
-  access_policy: 'full_access',
-  auth_mode: 'none',
+  access_policy: ACCESS_POLICY.FULL_ACCESS,
+  auth_mode: AUTH_MODE.NONE,
   login_accounts: [],
   proxy_settings: {
     allowed_methods: [],
@@ -103,15 +125,4 @@ export const DEFAULT_WEB_CONFIG = {
     recording_enabled: true,
     watermark_enabled: true
   }
-}
-
-export const ACCESS_POLICY_NAME = {
-  full_access: 'oneterm.web.fullAccess',
-  read_only: 'oneterm.web.readOnly',
-}
-
-export const AUTH_MODE_NAME = {
-  none: 'oneterm.web.noAuthenticationRequired',
-  smart: 'oneterm.web.autoLogin',
-  manual: 'oneterm.web.manualLogin',
 }

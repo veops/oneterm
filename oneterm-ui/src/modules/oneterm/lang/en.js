@@ -195,7 +195,7 @@ const oneterm_en = {
     blockedPaths: 'Blocked Paths',
     enableRecording: 'Enable Recording',
     enableWatermark: 'Enable Watermark',
-    authConfig: 'AuthConfig',
+    authConfig: 'Auth Config',
     authMode: 'Auth Mode',
     noAuthenticationRequired: 'No Authentication Required',
     noAuthenticationRequiredTip: 'Direct proxy access, suitable for intranet without authentication system',

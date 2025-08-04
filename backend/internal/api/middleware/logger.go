@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -16,10 +17,18 @@ func LoggerMiddleware() gin.HandlerFunc {
 		ctx.Next()
 
 		cost := time.Since(start)
+
+		// Skip logging for web proxy requests to reduce noise
+		url := ctx.Request.URL.String()
+		host := ctx.Request.Host
+		if strings.HasPrefix(host, "asset-") {
+			return
+		}
+
 		// Only log errors and slow requests
 		status := ctx.Writer.Status()
 		if status >= 400 || cost > 1*time.Second {
-			logger.L().Info(ctx.Request.URL.String(),
+			logger.L().Info(url,
 				zap.String("method", ctx.Request.Method),
 				zap.Int("status", status),
 				zap.String("ip", ctx.ClientIP()),
@@ -27,7 +36,7 @@ func LoggerMiddleware() gin.HandlerFunc {
 			)
 		} else {
 			// Normal requests use debug level to reduce log noise
-			logger.L().Debug(ctx.Request.URL.String(),
+			logger.L().Debug(url,
 				zap.String("method", ctx.Request.Method),
 				zap.Int("status", status),
 				zap.String("ip", ctx.ClientIP()),

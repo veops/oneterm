@@ -24,6 +24,8 @@
 </template>
 
 <script>
+import { mapState } from 'vuex'
+
 import AccessControl from './accessControl/index.vue'
 import PublicKey from './publicKey/index.vue'
 import QuickCommand from './quickCommand/index.vue'
@@ -47,6 +49,14 @@ export default {
     }
   },
   computed: {
+    ...mapState({
+      roles: (state) => state.user.roles
+    }),
+    isAdmin() {
+      const permissions = this?.roles?.permissions || []
+      const isAdmin = permissions?.includes?.('oneterm_admin') || permissions?.includes?.('acl_admin')
+      return isAdmin
+    },
     menuList() {
       const menuList = [
         {
@@ -66,20 +76,25 @@ export default {
           icon: 'terminal_settings',
           key: 'terminalDisplay',
           component: 'TerminalDisplay'
-        },
-        {
-          label: 'oneterm.systemSettings.accessControl',
-          icon: 'basic_settings',
-          key: 'accessControl',
-          component: 'AccessControl',
-        },
-        {
-          label: 'oneterm.systemSettings.storageConfig',
-          icon: 'itsm-default_line',
-          key: 'storageConfig',
-          component: 'StorageConfig'
         }
       ]
+
+      if (this.isAdmin) {
+        menuList.push(
+          {
+            label: 'oneterm.systemSettings.accessControl',
+            icon: 'basic_settings',
+            key: 'accessControl',
+            component: 'AccessControl',
+          },
+          {
+            label: 'oneterm.systemSettings.storageConfig',
+            icon: 'itsm-default_line',
+            key: 'storageConfig',
+            component: 'StorageConfig'
+          }
+        )
+      }
 
       return menuList
     }

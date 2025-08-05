@@ -146,6 +146,12 @@ func GetReplay(sessionID string) (io.ReadCloser, error) {
 		return file, nil
 	}
 
+	// Try RDP format (no extension) - guacd saves RDP recordings without .cast extension
+	rdpFilePath := filepath.Join(replayDir, sessionID)
+	if file, err := os.Open(rdpFilePath); err == nil {
+		return file, nil
+	}
+
 	// Search in date hierarchy directories (directly under base_path)
 	entries, err := os.ReadDir(replayDir)
 	if err != nil {
@@ -158,8 +164,15 @@ func GetReplay(sessionID string) (io.ReadCloser, error) {
 		if entry.IsDir() {
 			// Check if directory name looks like a date (YYYY-MM-DD)
 			if len(entry.Name()) == 10 && entry.Name()[4] == '-' && entry.Name()[7] == '-' {
+				// Try SSH format (.cast extension)
 				filePath := filepath.Join(replayDir, entry.Name(), fmt.Sprintf("%s.cast", sessionID))
 				if file, err := os.Open(filePath); err == nil {
+					return file, nil
+				}
+
+				// Try RDP format (no extension) in date directories
+				rdpFilePath := filepath.Join(replayDir, entry.Name(), sessionID)
+				if file, err := os.Open(rdpFilePath); err == nil {
 					return file, nil
 				}
 			}

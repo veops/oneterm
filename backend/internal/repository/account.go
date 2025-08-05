@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -70,23 +71,69 @@ func (r *accountRepository) FilterByAssetIds(db *gorm.DB, assetIds []int) *gorm.
 	return db.Where("id IN (?)", subQuery)
 }
 
-// AttachAssetCount attaches asset count to accounts
+// AttachAssetCount attaches asset count to accounts using V2 authorization system
 func (r *accountRepository) AttachAssetCount(ctx context.Context, accounts []*model.Account) error {
-	acs := make([]*model.AccountCount, 0)
-	if err := dbpkg.DB.
-		Model(&model.Authorization{}).
-		Select("account_id AS id, COUNT(*) as count").
-		Group("account_id").
-		Where("account_id IN ?", lo.Map(accounts, func(d *model.Account, _ int) int { return d.Id })).
-		Find(&acs).
-		Error; err != nil {
+	// Get account IDs to filter
+	accountIds := lo.Map(accounts, func(account *model.Account, _ int) int { return account.Id })
+
+	// Get all V2 authorization rules where both account and asset selectors are 'ids' type
+	// and account selector contains any of the target account IDs
+	var rules []*model.AuthorizationV2
+	if err := dbpkg.DB.Model(&model.AuthorizationV2{}).
+		Where("enabled = ? AND JSON_EXTRACT(account_selector, '$.type') = ? AND JSON_EXTRACT(asset_selector, '$.type') = ?",
+			true, "ids", "ids").
+		Find(&rules).Error; err != nil {
 		return err
 	}
 
-	m := lo.SliceToMap(acs, func(ac *model.AccountCount) (int, int64) { return ac.Id, ac.Count })
-	for _, d := range accounts {
-		d.AssetCount = m[d.Id]
+	// Count assets for each account
+	accountAssetCounts := make(map[int]int64)
+
+	// Filter rules that contain any of the target account IDs
+	filteredRules := lo.Filter(rules, func(rule *model.AuthorizationV2, _ int) bool {
+		ruleAccountIds := lo.Map(rule.AccountSelector.Values, func(value string, _ int) int {
+			if id, err := strconv.Atoi(value); err == nil {
+				return id
+			}
+			return -1
+		})
+		// Check if any account ID in the rule matches our target account IDs
+		for _, ruleAccountId := range ruleAccountIds {
+			if lo.Contains(accountIds, ruleAccountId) {
+				return true
+			}
+		}
+		return false
+	})
+
+	for _, rule := range filteredRules {
+		// Extract account IDs from account selector
+		ruleAccountIds := lo.FilterMap(rule.AccountSelector.Values, func(value string, _ int) (int, bool) {
+			if id, err := strconv.Atoi(value); err == nil {
+				return id, true
+			}
+			return 0, false
+		})
+
+		// Extract asset IDs from asset selector
+		ruleAssetIds := lo.FilterMap(rule.AssetSelector.Values, func(value string, _ int) (int, bool) {
+			if id, err := strconv.Atoi(value); err == nil {
+				return id, true
+			}
+			return 0, false
+		})
+
+		// Count assets for each account in this rule
+		for _, accountId := range ruleAccountIds {
+			accountAssetCounts[accountId] += int64(len(ruleAssetIds))
+		}
 	}
+
+	// Apply counts to accounts
+	for _, account := range accounts {
+		account.AssetCount = accountAssetCounts[account.Id]
+	}
+
 	return nil
 }
 

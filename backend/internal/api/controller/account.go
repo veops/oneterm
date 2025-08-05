@@ -116,7 +116,7 @@ func (c *Controller) GetAccounts(ctx *gin.Context) {
 		db = db.Select("id", "name", "account")
 	}
 
-	doGet(ctx, !info, db, config.RESOURCE_ACCOUNT, accountPostHooks...)
+	doGet(ctx, false, db, config.RESOURCE_ACCOUNT, accountPostHooks...)
 }
 
 // GetAccountIdsByAuthorization gets account IDs by authorization

@@ -23,7 +23,6 @@ type AccountRepository interface {
 	AttachAssetCount(ctx context.Context, accounts []*model.Account) error
 	CheckAssetDependencies(ctx context.Context, id int) (string, error)
 	BuildQuery(ctx *gin.Context) *gorm.DB
-	FilterByAssetIds(db *gorm.DB, assetIds []int) *gorm.DB
 	GetAccountIdsByAuthorization(ctx context.Context, assetIds []int, authorizationIds []int) ([]int, error)
 }
 
@@ -54,21 +53,6 @@ func (r *accountRepository) BuildQuery(ctx *gin.Context) *gorm.DB {
 	db = db.Order("name")
 
 	return db
-}
-
-// FilterByAssetIds filters accounts by related asset IDs
-func (r *accountRepository) FilterByAssetIds(db *gorm.DB, assetIds []int) *gorm.DB {
-	if len(assetIds) == 0 {
-		return db.Where("0 = 1") // Return empty result if no asset IDs
-	}
-
-	// Query account IDs associated with specified assets
-	subQuery := dbpkg.DB.Model(&model.Authorization{}).
-		Select("account_id").
-		Where("asset_id IN ?", assetIds).
-		Group("account_id")
-
-	return db.Where("id IN (?)", subQuery)
 }
 
 // AttachAssetCount attaches asset count to accounts using V2 authorization system

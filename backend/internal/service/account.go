@@ -70,11 +70,6 @@ func (s *AccountService) BuildQuery(ctx *gin.Context) *gorm.DB {
 	return s.repo.BuildQuery(ctx)
 }
 
-// FilterByAssetIds filters accounts by related asset IDs
-func (s *AccountService) FilterByAssetIds(db *gorm.DB, assetIds []int) *gorm.DB {
-	return s.repo.FilterByAssetIds(db, assetIds)
-}
-
 // GetAccountIdsByAuthorization gets account IDs by authorization
 func (s *AccountService) GetAccountIdsByAuthorization(ctx context.Context, assetIds []int, authorizationIds []int) ([]int, error) {
 	return s.repo.GetAccountIdsByAuthorization(ctx, assetIds, authorizationIds)
@@ -92,14 +87,20 @@ func (s *AccountService) BuildQueryWithAuthorization(ctx *gin.Context) (*gorm.DB
 		return db, nil
 	}
 
-	// Apply V2 authorization filter: get authorized asset IDs using V2 system
+	// Apply V2 authorization filter: get authorized account IDs using V2 system
 	authV2Service := NewAuthorizationV2Service()
-	_, assetIds, _, err := authV2Service.GetAuthorizationScopeByACL(ctx)
+	_, _, accountIds, err := authV2Service.GetAuthorizationScopeByACL(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	// Use the same filtering logic as before, but with V2 authorized assets
-	// This maintains the original logic: find accounts that can access the authorized assets
-	return s.FilterByAssetIds(db, assetIds), nil
+	// Filter by authorized account IDs at database level (much more efficient)
+	if len(accountIds) == 0 {
+		// No access to any accounts
+		db = db.Where("1 = 0") // Returns empty result set efficiently
+	} else {
+		db = db.Where("id IN ?", accountIds)
+	}
+
+	return db, nil
 }

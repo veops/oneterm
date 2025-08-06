@@ -121,25 +121,55 @@ func (r *accountRepository) AttachAssetCount(ctx context.Context, accounts []*mo
 	return nil
 }
 
-// CheckAssetDependencies checks if account has dependent assets
+// CheckAssetDependencies checks if account has dependent assets using V2 authorization system
 func (r *accountRepository) CheckAssetDependencies(ctx context.Context, id int) (string, error) {
-	var assetName string
-	err := dbpkg.DB.
-		Model(model.DefaultAsset).
-		Select("name").
-		Where("id = (?)", dbpkg.DB.Model(&model.Authorization{}).Select("asset_id").Where("account_id = ?", id).Limit(1)).
-		First(&assetName).
-		Error
-
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return "", nil
-	}
-
-	if err != nil {
+	// Get all V2 authorization rules where both account and asset selectors are 'ids' type
+	var rules []*model.AuthorizationV2
+	if err := dbpkg.DB.Model(&model.AuthorizationV2{}).
+		Where("enabled = ? AND JSON_EXTRACT(account_selector, '$.type') = ? AND JSON_EXTRACT(asset_selector, '$.type') = ?",
+			true, "ids", "ids").
+		Find(&rules).Error; err != nil {
 		return "", err
 	}
 
-	return assetName, errors.New("account has dependent assets")
+	// Check if any rule contains this account ID
+	for _, rule := range rules {
+		// Extract account IDs from account selector
+		ruleAccountIds := lo.FilterMap(rule.AccountSelector.Values, func(value string, _ int) (int, bool) {
+			if accountId, err := strconv.Atoi(value); err == nil {
+				return accountId, true
+			}
+			return 0, false
+		})
+
+		// Check if this account ID is in the rule
+		if lo.Contains(ruleAccountIds, id) {
+			// Extract asset IDs from asset selector
+			ruleAssetIds := lo.FilterMap(rule.AssetSelector.Values, func(value string, _ int) (int, bool) {
+				if assetId, err := strconv.Atoi(value); err == nil {
+					return assetId, true
+				}
+				return 0, false
+			})
+
+			// If there are assets in this rule, return the first asset name
+			if len(ruleAssetIds) > 0 {
+				var assetName string
+				err := dbpkg.DB.
+					Model(model.DefaultAsset).
+					Select("name").
+					Where("id = ?", ruleAssetIds[0]).
+					First(&assetName).
+					Error
+
+				if err == nil {
+					return assetName, errors.New("account has dependent assets")
+				}
+			}
+		}
+	}
+
+	return "", nil
 }
 
 // GetAccountIdsByAuthorization gets account IDs by authorization and asset IDs

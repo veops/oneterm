@@ -153,12 +153,14 @@ export default {
       const tunnel = new Guacamole.WebSocketTunnel(socketLink)
       const client = new Guacamole.Client(tunnel)
 
-      // clipboard contents received by remote desktop
-      client.onclipboard = this.handleClipboardReceived
-
       if (this?.assetPermissions?.[PERMISSION_TYPE.COPY]) {
         // handle the clipboard content received from the remote desktop.
         client.onclipboard = this.handleClipboardReceived
+      }
+
+      // fired whenever the state of this Guacamole.Client changes.
+      client.onstatechange = (state) => {
+        this.onClientStateChange(state)
       }
 
       client.onerror = this.onError

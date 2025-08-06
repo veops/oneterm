@@ -7,6 +7,7 @@ import (
 	"github.com/samber/lo"
 	"github.com/spf13/cast"
 
+	"github.com/veops/oneterm/internal/acl"
 	"github.com/veops/oneterm/internal/model"
 	"github.com/veops/oneterm/internal/service"
 	"github.com/veops/oneterm/pkg/config"
@@ -40,6 +41,20 @@ var (
 		// Decrypt sensitive data
 		func(ctx *gin.Context, data []*model.Account) {
 			accountService.DecryptSensitiveData(data)
+		},
+		// Filter sensitive fields for non-admin users
+		func(ctx *gin.Context, data []*model.Account) {
+			info := cast.ToBool(ctx.Query("info"))
+			if !info {
+				currentUser, _ := acl.GetSessionFromCtx(ctx)
+				if !acl.IsAdmin(currentUser) {
+					for _, account := range data {
+						account.Password = ""
+						account.Pk = ""
+						account.Phrase = ""
+					}
+				}
+			}
 		},
 	}
 
@@ -116,7 +131,7 @@ func (c *Controller) GetAccounts(ctx *gin.Context) {
 		db = db.Select("id", "name", "account")
 	}
 
-	doGet(ctx, !info, db, config.RESOURCE_ACCOUNT, accountPostHooks...)
+	doGet(ctx, false, db, config.RESOURCE_ACCOUNT, accountPostHooks...)
 }
 
 // GetAccountIdsByAuthorization gets account IDs by authorization

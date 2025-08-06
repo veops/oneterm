@@ -106,7 +106,7 @@ func (c *Controller) GetCommands(ctx *gin.Context) {
 	}
 
 	if info && !acl.IsAdmin(currentUser) {
-		commandIds, err := commandService.GetAuthorizedCommandIds(ctx, currentUser)
+		commandIds, err := commandService.GetAuthorizedCommandIds(ctx)
 		if err != nil {
 			handleRemoteErr(ctx, err)
 			return

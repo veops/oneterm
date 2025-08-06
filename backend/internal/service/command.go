@@ -8,10 +8,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/samber/lo"
 	"github.com/spf13/cast"
-	"github.com/veops/oneterm/internal/acl"
 	"github.com/veops/oneterm/internal/model"
 	"github.com/veops/oneterm/internal/repository"
-	"github.com/veops/oneterm/pkg/config"
 	dbpkg "github.com/veops/oneterm/pkg/db"
 	"gorm.io/gorm"
 )
@@ -69,30 +67,26 @@ func (s *CommandService) BuildQuery(ctx *gin.Context) (*gorm.DB, error) {
 	return db, nil
 }
 
-// GetAuthorizedCommandIds gets command IDs that the user is authorized to access
-func (s *CommandService) GetAuthorizedCommandIds(ctx context.Context, currentUser interface{}) ([]int, error) {
-	user, ok := currentUser.(acl.Session)
-	if !ok {
-		return nil, fmt.Errorf("invalid user type")
-	}
-
-	rs, err := acl.GetRoleResources(ctx, user.GetRid(), config.RESOURCE_AUTHORIZATION)
+// GetAuthorizedCommandIds gets command IDs that the user is authorized to access using V2 authorization system
+func (s *CommandService) GetAuthorizedCommandIds(ctx *gin.Context) ([]int, error) {
+	// Use V2 authorization system to get authorized asset IDs
+	authV2Service := NewAuthorizationV2Service()
+	_, assetIds, _, err := authV2Service.GetAuthorizationScopeByACL(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	// Get asset IDs from authorization
-	sub := dbpkg.DB.
-		Model(&model.Authorization{}).
-		Select("DISTINCT asset_id").
-		Where("resource_id IN ?", lo.Map(rs, func(r *acl.Resource, _ int) int { return r.ResourceId }))
+	// No authorized assets means no authorized commands
+	if len(assetIds) == 0 {
+		return []int{}, nil
+	}
 
-	// Get command IDs from assets
+	// Get command IDs from authorized assets
 	cmdIds := make([]model.Slice[int], 0)
 	if err = dbpkg.DB.
 		Model(model.DefaultAsset).
 		Select("cmd_ids").
-		Where("id IN (?)", sub).
+		Where("id IN ?", assetIds).
 		Find(&cmdIds).
 		Error; err != nil {
 		return nil, err

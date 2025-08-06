@@ -2,6 +2,7 @@ package protocols
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -51,7 +52,13 @@ func ConnectGuacd(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, 
 		permissions.AllowFileDownload = batchResult.IsAllowed(model.ActionFileDownload)
 	}
 
-	t, err := guacd.NewTunnel("", sess.SessionId, w, h, dpi, sess.Protocol, asset, account, gateway, permissions)
+	// Clean protocol parameter - remove port number if present for guacd compatibility
+	cleanProtocol := sess.Protocol
+	if strings.Contains(sess.Protocol, ":") {
+		cleanProtocol = strings.Split(sess.Protocol, ":")[0]
+	}
+
+	t, err := guacd.NewTunnel("", sess.SessionId, w, h, dpi, cleanProtocol, asset, account, gateway, permissions)
 	if err != nil {
 		logger.L().Error("guacd tunnel failed", zap.Error(err))
 		return

@@ -124,7 +124,9 @@ func (c *Controller) GetAssets(ctx *gin.Context) {
 
 	// Apply info mode settings
 	if info {
-		db = db.Select("id", "parent_id", "name", "ip", "protocols", "connectable", "authorization", "resource_id", "access_time_control", "asset_command_control", "web_config")
+		db = db.Select("id", "parent_id", "name", "ip", "protocols",
+			"connectable", "authorization", "resource_id", "access_time_control",
+			"asset_command_control", "web_config", "gateway_id")
 	}
 
 	doGet(ctx, false, db, config.RESOURCE_ASSET, assetPostHooks...)

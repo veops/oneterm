@@ -166,7 +166,9 @@ export default {
           DEFAULT_PERMISSIONS[key] = default_permissions?.[key] ?? DEFAULT_PERMISSIONS[key]
         })
         this.authList.forEach((item) => {
-          item.permissions = { ...DEFAULT_PERMISSIONS }
+          if (!item.rule_id) {
+            item.permissions = { ...DEFAULT_PERMISSIONS }
+          }
         })
       })
     },

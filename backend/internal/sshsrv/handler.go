@@ -5,10 +5,10 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/fatih/color"
-	"github.com/getwe/figlet4go"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/gin-gonic/gin"
 	"github.com/gliderlabs/ssh"
 	"go.uber.org/zap"
@@ -72,22 +72,56 @@ func signer() ssh.Signer {
 }
 
 func banner() string {
-	str := "ONETERM"
-	ascii := figlet4go.NewAsciiRender()
-	colors := [...]color.Attribute{
-		color.FgMagenta,
-		color.FgYellow,
-		color.FgBlue,
-		color.FgCyan,
-		color.FgRed,
-		color.FgWhite,
-		color.FgGreen,
+	// Professional blue theme gradient
+	gradient1 := lipgloss.NewStyle().Foreground(lipgloss.Color("#3F75FF")) // Bright primary
+	gradient2 := lipgloss.NewStyle().Foreground(lipgloss.Color("#2f54eb")) // Primary color
+	gradient3 := lipgloss.NewStyle().Foreground(lipgloss.Color("#7f97fa")) // Light primary
+	versionStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#8c8c8c")).Italic(true)
+	bannerText := `
+    ██████╗ ███╗   ██╗███████╗████████╗███████╗██████╗ ███╗   ███╗
+   ██╔═══██╗████╗  ██║██╔════╝╚══██╔══╝██╔════╝██╔══██╗████╗ ████║
+   ██║   ██║██╔██╗ ██║█████╗     ██║   █████╗  ██████╔╝██╔████╔██║
+   ██║   ██║██║╚██╗██║██╔══╝     ██║   ██╔══╝  ██╔══██╗██║╚██╔╝██║
+   ╚██████╔╝██║ ╚████║███████╗   ██║   ███████╗██║  ██║██║ ╚═╝ ██║
+    ╚═════╝ ╚═╝  ╚═══╝╚══════╝   ╚═╝   ╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝`
+	
+	lines := strings.Split(bannerText, "\n")
+	var result strings.Builder
+	
+	for i, line := range lines {
+		if line == "" {
+			result.WriteString("\n")
+			continue
+		}
+		
+		var style lipgloss.Style
+		switch {
+		case i <= 2:
+			style = gradient1
+		case i <= 4:
+			style = gradient2
+		default:
+			style = gradient3
+		}
+		result.WriteString(style.Render(line))
+		result.WriteString("\n")
 	}
-	options := figlet4go.NewRenderOptions()
-	options.FontColor = make([]color.Attribute, len(str))
-	for i := range options.FontColor {
-		options.FontColor[i] = colors[i%len(colors)]
-	}
-	renderStr, _ := ascii.RenderOpts(str, options)
-	return renderStr
+	
+	tagline := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#2f54eb")).
+		Bold(true).
+		PaddingLeft(15).
+		Render("✨ Enterprise Bastion Host Solution")
+	
+	version := versionStyle.
+		PaddingLeft(25).
+		Render("v2.0.0")
+	
+	result.WriteString("\n")
+	result.WriteString(tagline)
+	result.WriteString("  ")
+	result.WriteString(version)
+	result.WriteString("\n")
+	
+	return result.String()
 }

@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 	"time"
 
@@ -12,7 +13,6 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/lipgloss/table"
 	"github.com/gin-gonic/gin"
 	"github.com/gliderlabs/ssh"
 	"github.com/samber/lo"
@@ -27,6 +27,9 @@ import (
 	"github.com/veops/oneterm/internal/repository"
 	"github.com/veops/oneterm/internal/service"
 	"github.com/veops/oneterm/internal/session"
+	"github.com/veops/oneterm/internal/sshsrv/assetlist"
+	"github.com/veops/oneterm/internal/sshsrv/colors"
+	"github.com/veops/oneterm/internal/sshsrv/icons"
 	"github.com/veops/oneterm/internal/sshsrv/textinput"
 	"github.com/veops/oneterm/pkg/cache"
 	"github.com/veops/oneterm/pkg/errors"
@@ -35,20 +38,22 @@ import (
 
 const (
 	prompt     = "> "
-	hotPink    = lipgloss.Color("#FF06B7")
-	darkGray   = lipgloss.Color("#767676")
 	hisCmdsFmt = "hiscmds-%d"
 )
 
 var (
-	errStyle     = lipgloss.NewStyle().Foreground(hotPink)
-	hintStyle    = lipgloss.NewStyle().Foreground(darkGray)
+	errStyle     = colors.ErrorStyle
+	hintStyle    = colors.HintStyle
+	warningStyle = colors.WarningStyle
 	hiddenBorder = lipgloss.HiddenBorder()
 
 	p2p = map[string]int{
-		"ssh":   22,
-		"redis": 6379,
-		"mysql": 3306,
+		"ssh":        22,
+		"redis":      6379,
+		"mysql":      3306,
+		"mongodb":    27017,
+		"postgresql": 5432,
+		"telnet":     23,
 	}
 )
 
@@ -62,53 +67,68 @@ type keymap struct{}
 
 func (k keymap) ShortHelp() []key.Binding {
 	return []key.Binding{
-		key.NewBinding(key.WithKeys("up"), key.WithHelp("↑", "up")),
-		key.NewBinding(key.WithKeys("down"), key.WithHelp("↓", "down")),
-		key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "complete")),
+		key.NewBinding(key.WithKeys("up/down"), key.WithHelp("↑/↓", "navigate suggestions")),
+		key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "auto-complete")),
 		key.NewBinding(key.WithKeys("f5"), key.WithHelp("F5", "refresh")),
-		key.NewBinding(key.WithKeys("esc", "ctrl+c"), key.WithHelp("esc/ctrl+c", "quit")),
+		key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "connect")),
+		key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "quit")),
 	}
 }
 func (k keymap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{k.ShortHelp()}
 }
 
+type viewMode int
+
+const (
+	modeCLI viewMode = iota
+	modeTable
+)
+
 type view struct {
-	Ctx         *gin.Context
-	Sess        ssh.Session
-	currentUser *acl.Session
-	textinput   textinput.Model
-	cmds        []string
-	cmdsIdx     int
-	combines    map[string][3]int
-	connecting  bool
-	help        help.Model
-	keys        keymap
-	r           io.ReadCloser
-	w           io.WriteCloser
-	gctx        context.Context
+	Ctx           *gin.Context
+	Sess          ssh.Session
+	currentUser   *acl.Session
+	textinput     textinput.Model
+	assetTable    assetlist.Model
+	cmds          []string
+	cmdsIdx       int
+	combines      map[string][3]int
+	connecting    bool
+	help          help.Model
+	keys          keymap
+	r             io.ReadCloser
+	w             io.WriteCloser
+	gctx          context.Context
+	mode          viewMode
+	suggestionIdx int    // Track current suggestion selection
+	selectedSugg  string // Store the selected suggestion text
 }
 
 func initialView(ctx *gin.Context, sess ssh.Session, r io.ReadCloser, w io.WriteCloser, gctx context.Context) *view {
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
 
 	ti := textinput.New()
-	ti.Placeholder = "ssh"
+	ti.Placeholder = "Type 'help' or start with 'ssh user@host'..."
 	ti.Focus()
 	ti.Prompt = prompt
 	ti.ShowSuggestions = true
-	ti.PromptStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("63"))
-	ti.Cursor.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("63"))
+	ti.PromptStyle = colors.PrimaryStyle
+	ti.Cursor.Style = colors.AccentStyle
+	// Disable Tab for AcceptSuggestion to handle it ourselves
+	ti.KeyMap.AcceptSuggestion = key.NewBinding(key.WithKeys("ctrl+x")) // Use a key that won't be pressed
 	v := view{
-		Ctx:         ctx,
-		Sess:        sess,
-		currentUser: currentUser,
-		textinput:   ti,
-		cmds:        []string{},
-		help:        help.New(),
-		r:           r,
-		w:           w,
-		gctx:        gctx,
+		Ctx:           ctx,
+		Sess:          sess,
+		currentUser:   currentUser,
+		textinput:     ti,
+		cmds:          []string{},
+		help:          help.New(),
+		r:             r,
+		w:             w,
+		gctx:          gctx,
+		mode:          modeCLI,
+		suggestionIdx: 0,
 	}
 	v.refresh()
 
@@ -116,60 +136,157 @@ func initialView(ctx *gin.Context, sess ssh.Session, r io.ReadCloser, w io.Write
 }
 
 func (m *view) Init() tea.Cmd {
-	return tea.Println(banner())
+	welcomeStyle := colors.AccentStyle
+	exampleStyle := colors.HintStyle
+
+	return tea.Batch(
+		tea.Println(banner()),
+		tea.Printf("\n  %s\n\n", welcomeStyle.Render("→ Welcome to OneTerm! Start typing or use 'table' to browse assets")),
+		tea.Printf("  %s\n", exampleStyle.Render("Examples: ssh admin@server1, mysql db@prod, redis cache@redis")),
+	)
 }
 
 func (m *view) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var (
-		hisCmd tea.Cmd
-		tiCmd  tea.Cmd
+		hisCmd   tea.Cmd
+		tiCmd    tea.Cmd
+		tableCmd tea.Cmd
 	)
 
+	// Handle table mode
+	if m.mode == modeTable {
+		switch msg := msg.(type) {
+		case tea.KeyMsg:
+			if msg.Type == tea.KeyEsc || msg.String() == "q" {
+				// Exit table mode
+				m.mode = modeCLI
+				return m, nil
+			}
+		case assetlist.ConnectMsg:
+			// Handle connection from table
+			m.mode = modeCLI
+			cmd := msg.Asset.Command
+			return m, m.handleConnectionCommand(cmd)
+		case tea.WindowSizeMsg:
+			// Handle window resize in table mode
+			m.assetTable, tableCmd = m.assetTable.Update(msg)
+			return m, tableCmd
+		}
+
+		m.assetTable, tableCmd = m.assetTable.Update(msg)
+		return m, tableCmd
+	}
+
+	// Handle CLI mode
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.Type {
-		case tea.KeyCtrlC, tea.KeyEsc:
+		case tea.KeyCtrlC:
+			// Clear current input like in terminal, don't quit
+			m.textinput.Reset()
+			m.suggestionIdx = 0
+			m.selectedSugg = ""
+			return m, tea.Printf("\n%s", prompt)
+		case tea.KeyEsc:
 			return m, tea.Quit
 		case tea.KeyEnter:
+			// Use selected suggestion if one is selected, otherwise use typed value
 			cmd := m.textinput.Value()
+			if m.selectedSugg != "" {
+				cmd = m.selectedSugg
+			}
 			m.textinput.Reset()
+			m.selectedSugg = ""
+			m.suggestionIdx = 0
 			if cmd == "" {
 				return m, tea.Batch(tea.Printf(prompt))
 			}
-			hisCmd = tea.Printf("> %s", cmd)
+			hisCmd = tea.Printf("🚀 %s", cmd)
 			m.cmds = append(m.cmds, cmd)
 			ln := len(m.cmds)
 			if ln > 100 {
 				m.cmds = m.cmds[ln-100 : ln]
 			}
 			m.cmdsIdx = len(m.cmds)
-			if cmd == "exit" {
-				return m, tea.Sequence(hisCmd, tea.Quit)
-			} else if p, ok := lo.Find(lo.Keys(p2p), func(item string) bool { return strings.HasPrefix(cmd, item) }); ok {
+
+			switch {
+			case cmd == "exit" || cmd == "quit" || cmd == `\q`:
+				return m, tea.Sequence(tea.Printf("👋 Goodbye!"), tea.Quit)
+			case cmd == "help" || cmd == `\h` || cmd == `\?`:
+				return m, tea.Sequence(hisCmd, tea.Printf(m.helpText()), tea.Printf("%s", prompt))
+			case cmd == "clear" || cmd == `\c`:
+				return m, tea.ClearScreen
+			case cmd == "list" || cmd == "ls" || cmd == "table":
 				pty, _, _ := m.Sess.Pty()
-				m.Ctx.Request.URL.RawQuery = fmt.Sprintf("w=%d&h=%d", pty.Window.Width, pty.Window.Height)
-				m.Ctx.Params = nil
-				m.Ctx.Params = append(m.Ctx.Params, gin.Param{Key: "account_id", Value: cast.ToString(m.combines[cmd][0])})
-				m.Ctx.Params = append(m.Ctx.Params, gin.Param{Key: "asset_id", Value: cast.ToString(m.combines[cmd][1])})
-				m.Ctx.Params = append(m.Ctx.Params, gin.Param{Key: "protocol", Value: fmt.Sprintf("%s:%d", p, m.combines[cmd][2])})
-				m.Ctx = m.Ctx.Copy()
-				m.connecting = true
-				return m, tea.Sequence(hisCmd, tea.Exec(&connector{Ctx: m.Ctx, Sess: m.Sess, Vw: m, gctx: m.gctx}, func(err error) tea.Msg {
-					m.connecting = false
-					return err
-				}), tea.Printf("%s", prompt), func() tea.Msg {
-					m.textinput.ClearMatched()
-					return nil
-				}, m.magicn)
+				m.assetTable = assetlist.New(m.combines, pty.Window.Width, pty.Window.Height)
+				m.mode = modeTable
+				return m, tea.ClearScreen
+			}
+
+			// Try to handle as connection command
+			if connectionCmd := m.handleConnectionCommand(cmd); connectionCmd != nil {
+				return m, tea.Sequence(
+					hisCmd,
+					connectionCmd,
+				)
+			} else {
+				var suggestion string
+				if strings.Contains(cmd, "@") {
+					suggestion = "\n💪 Try: ssh " + cmd + " (if connecting via SSH)"
+				} else {
+					suggestion = "\n💪 Available commands: ssh, mysql, redis, mongodb, postgresql, telnet, help, list, exit"
+				}
+				return m, tea.Sequence(
+					hisCmd,
+					tea.Printf("  %s %s%s\n\n",
+						errStyle.Render("⚠️ Unknown command:"),
+						cmd,
+						hintStyle.Render(suggestion),
+					),
+					tea.Printf("%s", prompt),
+				)
 			}
 		case tea.KeyUp:
+			// If we have suggestions and input is not empty, navigate suggestions
+			input := m.textinput.Value()
+			if len(input) > 0 {
+				suggestions := m.getFilteredSuggestions(input)
+				if len(suggestions) > 0 {
+					if m.suggestionIdx > 0 {
+						m.suggestionIdx--
+						if m.suggestionIdx < len(suggestions) {
+							m.selectedSugg = suggestions[m.suggestionIdx]
+						}
+					}
+					return m, nil
+				}
+			}
+			// Otherwise navigate command history
 			ln := len(m.cmds)
 			if ln <= 0 {
 				return m, nil
 			}
 			m.cmdsIdx = max(0, m.cmdsIdx-1)
 			m.textinput.SetValue(m.cmds[m.cmdsIdx])
+			m.suggestionIdx = 0
+			m.selectedSugg = ""
 		case tea.KeyDown:
+			// If we have suggestions and input is not empty, navigate suggestions
+			input := m.textinput.Value()
+			if len(input) > 0 {
+				suggestions := m.getFilteredSuggestions(input)
+				if len(suggestions) > 0 {
+					limit := min(8, len(suggestions))
+					if m.suggestionIdx < limit-1 {
+						m.suggestionIdx++
+						if m.suggestionIdx < len(suggestions) {
+							m.selectedSugg = suggestions[m.suggestionIdx]
+						}
+					}
+					return m, nil
+				}
+			}
+			// Otherwise navigate command history
 			ln := len(m.cmds)
 			m.cmdsIdx++
 			if m.cmdsIdx >= ln {
@@ -178,8 +295,38 @@ func (m *view) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				m.textinput.SetValue(m.cmds[m.cmdsIdx])
 			}
+			m.suggestionIdx = 0
+			m.selectedSugg = ""
 		case tea.KeyF5:
 			m.refresh()
+		case tea.KeyTab:
+			// Auto-complete with common prefix or selected suggestion
+			input := m.textinput.Value()
+			if input == "" {
+				return m, nil
+			}
+
+			suggestions := m.getFilteredSuggestions(input)
+			if len(suggestions) == 0 {
+				return m, nil
+			}
+
+			if len(suggestions) == 1 {
+				// Single match - complete fully
+				m.textinput.SetValue(suggestions[0])
+				m.textinput.CursorEnd() // Move cursor to end
+				m.selectedSugg = ""
+				m.suggestionIdx = 0
+			} else {
+				// Multiple matches - complete to common prefix
+				commonPrefix := m.findCommonPrefix(suggestions)
+				if len(commonPrefix) > len(input) {
+					m.textinput.SetValue(commonPrefix)
+					m.textinput.CursorEnd() // Move cursor to end
+					m.selectedSugg = ""
+					m.suggestionIdx = 0
+				}
+			}
 		}
 	case errMsg:
 		if msg != nil {
@@ -190,6 +337,14 @@ func (m *view) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Printf("  [ERROR] %s\n\n", errStyle.Render(str))
 		}
 	}
+
+	// Reset suggestion index and selected when typing
+	if msg, ok := msg.(tea.KeyMsg); ok && msg.Type == tea.KeyRunes {
+		m.suggestionIdx = 0
+		m.selectedSugg = ""
+
+	}
+
 	m.textinput, tiCmd = m.textinput.Update(msg)
 
 	return m, tea.Batch(hisCmd, tiCmd)
@@ -197,37 +352,196 @@ func (m *view) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m *view) View() string {
 	if m.connecting {
-		return "\n\n"
+		return "\n  🔄 Connecting...\n\n"
 	}
+
+	if m.mode == modeTable {
+		return m.assetTable.View()
+	}
+
+	suggestionView := m.smartSuggestionView()
+
 	return fmt.Sprintf(
-		"%s\n  %s\n%s",
+		"%s\n  %s\n%s%s",
 		m.textinput.View(),
 		m.help.View(m.keys),
-		hintStyle.Render(m.possible()),
+		suggestionView,
+		m.assetOverview(),
 	) + "\n\n"
 }
 
-func (m *view) possible() string {
-	ss := m.textinput.MatchedSuggestions()
-	ln := len(ss)
+func (m *view) smartSuggestionView() string {
+	// Get all suggestions and filter them ourselves for better matching
+	input := strings.ToLower(m.textinput.Value())
+	if input == "" {
+		return ""
+	}
+
+	// Use our consistent filtered suggestions function
+	matches := m.getFilteredSuggestions(input)
+	ln := len(matches)
 	if ln <= 0 {
 		return ""
 	}
-	ss = append(ss[:min(ln, 15)], lo.Ternary(ln > 15, fmt.Sprintf("%d more...", ln-15), ""))
-	mw := 0
-	for _, s := range ss {
-		mw = max(mw, lipgloss.Width(s))
+
+	if ln > 20 {
+		countStyle := lipgloss.NewStyle().
+			Foreground(colors.TextSecondary).
+			Italic(true)
+		return "\n  " + countStyle.Render(fmt.Sprintf("%d matches found. Keep typing to filter...", ln)) + "\n"
 	}
+
+	// Clean and validate matches before displaying
+	cleanMatches := make([]string, 0, len(matches))
+	for _, match := range matches {
+		match = strings.TrimSpace(match)
+		// Only filter out truly empty matches
+		if match != "" {
+			cleanMatches = append(cleanMatches, match)
+		}
+	}
+
+	if len(cleanMatches) == 0 {
+		return ""
+	}
+
+	limit := min(8, len(cleanMatches))
+	displaySuggestions := cleanMatches[:limit]
+
+	// Ensure suggestion index is within bounds
+	if m.suggestionIdx >= limit {
+		m.suggestionIdx = limit - 1
+	}
+
+	var result strings.Builder
+	suggestTitle := colors.SubtitleStyle
+	result.WriteString("\n  " + suggestTitle.Render("Suggestions:") + "\n")
+
+	// Render each suggestion
+	for i, suggestion := range displaySuggestions {
+		// Get protocol for icon
+		parts := strings.Fields(suggestion)
+		protocol := "unknown"
+		if len(parts) > 0 {
+			protocol = parts[0]
+		}
+		icon := icons.GetStyledProtocolIcon(protocol)
+
+		// Render with appropriate style
+		if i == m.suggestionIdx {
+			selectedStyle := colors.HighlightStyle
+			result.WriteString(fmt.Sprintf("  → %s %s\n", icon, selectedStyle.Render(suggestion)))
+		} else {
+			// Use a lighter color for non-selected suggestions on dark background
+			normalStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#CCCCCC"))
+			result.WriteString(fmt.Sprintf("    %s %s\n", icon, normalStyle.Render(suggestion)))
+		}
+	}
+
+	// Show count if there are more suggestions
+	if len(cleanMatches) > limit {
+		moreStyle := lipgloss.NewStyle().
+			Foreground(colors.TextSecondary).
+			Italic(true)
+		result.WriteString("  " + moreStyle.Render(fmt.Sprintf("... +%d more", len(cleanMatches)-limit)) + "\n")
+	}
+
+	return result.String()
+}
+
+func (m *view) helpText() string {
+	return fmt.Sprintf(`%s
+
+%s
+  • ssh user@host        - Connect via SSH
+  • mysql user@host      - Connect to MySQL database  
+  • redis user@host      - Connect to Redis server
+  • mongodb user@host    - Connect to MongoDB database
+  • postgresql user@host - Connect to PostgreSQL database
+  • telnet user@host     - Connect via Telnet
+  • list/ls/table        - Show assets in interactive table
+  • help or \h or \?     - Show this help message
+  • clear or \c          - Clear screen
+  • exit/quit or \q      - Exit OneTerm
+
+%s
+  • Use ↑/↓ arrows to browse command history
+  • Press Tab to autocomplete connection names
+  • Press Ctrl+C to clear current input
+  • Press F5 to refresh asset list
+
+`,
+		colors.TitleStyle.Render("🌟 OneTerm Help"),
+		hintStyle.Render("📝 Available Commands:"),
+		hintStyle.Render("⌨️ Keyboard Shortcuts:"),
+	)
+}
+
+func (m *view) handleConnectionCommand(cmd string) tea.Cmd {
+	// Check if this is a valid connection command
+	if _, exists := m.combines[cmd]; !exists {
+		return nil
+	}
+
+	// Extract protocol from command
+	p, ok := lo.Find(lo.Keys(p2p), func(item string) bool { return strings.HasPrefix(cmd, item) })
+	if !ok {
+		return nil
+	}
+
+	// Setup connection parameters
 	pty, _, _ := m.Sess.Pty()
-	n := 1
-	for i := 2; i*mw+(i+1)*1 < pty.Window.Width; i++ {
-		n = i
+	m.Ctx.Request.URL.RawQuery = fmt.Sprintf("w=%d&h=%d", pty.Window.Width, pty.Window.Height)
+	m.Ctx.Params = nil
+	m.Ctx.Params = append(m.Ctx.Params, gin.Param{Key: "account_id", Value: cast.ToString(m.combines[cmd][0])})
+	m.Ctx.Params = append(m.Ctx.Params, gin.Param{Key: "asset_id", Value: cast.ToString(m.combines[cmd][1])})
+	m.Ctx.Params = append(m.Ctx.Params, gin.Param{Key: "protocol", Value: fmt.Sprintf("%s:%d", p, m.combines[cmd][2])})
+	m.Ctx = m.Ctx.Copy()
+	m.connecting = true
+
+	return tea.Sequence(
+		tea.Printf("🔌 Establishing connection to %s...\n", cmd),
+		tea.Exec(&connector{Ctx: m.Ctx, Sess: m.Sess, Vw: m, gctx: m.gctx}, func(err error) tea.Msg {
+			m.connecting = false
+			if err != nil {
+				return errMsg(fmt.Errorf("❌ Connection failed: %v", err))
+			}
+			return nil
+		}),
+		tea.Printf("%s", prompt),
+		func() tea.Msg {
+			m.textinput.ClearMatched()
+			return nil
+		},
+		m.magicn,
+	)
+}
+
+func (m *view) assetOverview() string {
+	if len(m.textinput.Value()) > 0 {
+		return "" // Hide overview when user is typing
 	}
-	tb := table.New().
-		Border(hiddenBorder).
-		StyleFunc(func(row, col int) lipgloss.Style { return hintStyle }).
-		Rows(lo.Chunk(ss, n)...)
-	return tb.Render()
+
+	if len(m.combines) == 0 {
+		return warningStyle.Render("\n  ⚠ No accessible assets found. Check your permissions.")
+	}
+
+	// Group assets by protocol for better organization
+	protocolGroups := make(map[string][]string)
+	for cmd := range m.combines {
+		parts := strings.Split(cmd, " ")
+		if len(parts) > 0 {
+			protocol := parts[0]
+			protocolGroups[protocol] = append(protocolGroups[protocol], cmd)
+		}
+	}
+
+	// Provide a better tip with modern styling
+	tipStyle := lipgloss.NewStyle().
+		Foreground(colors.PrimaryColor2).
+		PaddingTop(1)
+
+	return tipStyle.Render("→ Type 'table' for interactive mode or start typing to connect")
 }
 
 func (m *view) refresh() {
@@ -284,7 +598,10 @@ func (m *view) refresh() {
 					}
 					k := fmt.Sprintf("%s %s@%s", protocol, account.Name, asset.Name)
 					port := cast.ToInt(ss[1])
-					m.combines[lo.Ternary(port == defaultPort, k, fmt.Sprintf("%s:%s", k, ss[1]))] = [3]int{account.Id, asset.Id, port}
+					// Ensure we're not creating empty or malformed keys
+					if k != "" && len(k) > 3 {
+						m.combines[lo.Ternary(port == defaultPort, k, fmt.Sprintf("%s:%s", k, ss[1]))] = [3]int{account.Id, asset.Id, port}
+					}
 				}
 			}
 		}
@@ -320,6 +637,78 @@ func (m *view) RecordHisCmd() {
 	cache.RC.RPush(m.Ctx, k, m.cmds)
 	cache.RC.LTrim(m.Ctx, k, -100, -1)
 	cache.RC.Expire(m.Ctx, k, time.Hour*24*30)
+}
+
+// getFilteredSuggestions returns suggestions that match the input
+func (m *view) getFilteredSuggestions(input string) []string {
+	if input == "" {
+		return nil
+	}
+
+	inputLower := strings.ToLower(input)
+	var matches []string
+	for cmd := range m.combines {
+		// Clean any potential issues with the command string
+		cmd = strings.TrimSpace(cmd)
+		if cmd == "" {
+			continue
+		}
+
+		if strings.HasPrefix(strings.ToLower(cmd), inputLower) {
+			// Ensure we're not adding empty or malformed entries
+			if len(cmd) > len(inputLower) {
+				matches = append(matches, cmd)
+			}
+		}
+	}
+
+	// Sort matches for consistent ordering
+	sort.Strings(matches)
+
+	// Remove any duplicates (shouldn't happen but just in case)
+	if len(matches) > 1 {
+		unique := make([]string, 0, len(matches))
+		prev := ""
+		for _, m := range matches {
+			if m != prev {
+				unique = append(unique, m)
+				prev = m
+			}
+		}
+		matches = unique
+	}
+
+	return matches
+}
+
+// findCommonPrefix finds the longest common prefix among suggestions
+func (m *view) findCommonPrefix(suggestions []string) string {
+	if len(suggestions) == 0 {
+		return ""
+	}
+	if len(suggestions) == 1 {
+		return suggestions[0]
+	}
+
+	// Start with the first suggestion
+	prefix := suggestions[0]
+
+	// Compare with each other suggestion
+	for _, s := range suggestions[1:] {
+		// Find common prefix between current prefix and this suggestion
+		i := 0
+		minLen := min(len(prefix), len(s))
+		for i < minLen && strings.EqualFold(string(prefix[i:i+1]), string(s[i:i+1])) {
+			i++
+		}
+		prefix = prefix[:i]
+
+		if len(prefix) == 0 {
+			return ""
+		}
+	}
+
+	return prefix
 }
 
 type connector struct {

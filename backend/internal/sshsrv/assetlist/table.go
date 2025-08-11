@@ -9,7 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/samber/lo"
-	
+
 	"github.com/veops/oneterm/internal/sshsrv/icons"
 )
 
@@ -94,15 +94,16 @@ type Asset struct {
 
 // Model represents the asset list table model
 type Model struct {
-	table         table.Model
-	assets        []Asset
+	table          table.Model
+	assets         []Asset
 	filteredAssets []Asset
-	filter        string
-	width         int
-	height        int
-	focused       bool
-	keyMap        TableKeyMap
-	showHelp      bool
+	filter         string
+	filterModel    FilterModel
+	width          int
+	height         int
+	focused        bool
+	keyMap         TableKeyMap
+	showHelp       bool
 }
 
 // New creates a new asset list table
@@ -114,7 +115,7 @@ func New(assets map[string][3]int, width, height int) Model {
 		if len(parts) >= 2 {
 			protocol := parts[0]
 			userHost := parts[1]
-			
+
 			// Parse user@host format
 			var user, host string
 			if idx := strings.Index(userHost, "@"); idx > 0 {
@@ -124,7 +125,7 @@ func New(assets map[string][3]int, width, height int) Model {
 				user = "unknown"
 				host = userHost
 			}
-			
+
 			// Extract port if present
 			port := ""
 			if len(parts) > 2 {
@@ -134,7 +135,7 @@ func New(assets map[string][3]int, width, height int) Model {
 					host = strings.TrimSuffix(host, ":"+port)
 				}
 			}
-			
+
 			assetList = append(assetList, Asset{
 				Protocol: protocol,
 				Command:  cmd,
@@ -145,18 +146,18 @@ func New(assets map[string][3]int, width, height int) Model {
 			})
 		}
 	}
-	
+
 	// Assets are stored in the order they were found
-	
+
 	// Create table columns
 	columns := []table.Column{
-		{Title: "Protocol", Width: 12},  // Increased for emoji + text
+		{Title: "Protocol", Width: 12}, // Increased for emoji + text
 		{Title: "User", Width: 15},
 		{Title: "Host", Width: 25},
 		{Title: "Port", Width: 8},
 		{Title: "Command", Width: 40},
 	}
-	
+
 	// Create table rows
 	rows := make([]table.Row, len(assetList))
 	for i, asset := range assetList {
@@ -169,28 +170,32 @@ func New(assets map[string][3]int, width, height int) Model {
 			asset.Command,
 		}
 	}
-	
-	// Create table
-	// Calculate viewport height based on terminal size
-	// We need to account for:
-	// - Title: 1 line
-	// - Table header: 3 lines (with borders)
-	// - Help text: 2 lines
-	// - Borders and padding: 4 lines
-	// Total overhead: ~10 lines
-	viewportHeight := len(assetList) // Show all rows if possible
+
+	// Table height includes header (1) + separator (1) + data rows
+	viewportHeight := len(assetList) + 2
+	if viewportHeight < 3 {
+		viewportHeight = 3 // At least header + separator + 1 data row
+	}
+
+	// Calculate max available height (account for UI overhead)
+	// Overhead: title(1) + header(2) + borders(2) + help(2) = 7 lines
 	maxViewportHeight := height - 10
-	if maxViewportHeight > 5 && viewportHeight > maxViewportHeight {
+	if maxViewportHeight < 5 {
+		maxViewportHeight = 5 // Minimum usable height
+	}
+
+	// Use actual row count for small sets, cap for large sets
+	if viewportHeight > maxViewportHeight {
 		viewportHeight = maxViewportHeight
 	}
-	
+
 	t := table.New(
 		table.WithColumns(columns),
 		table.WithRows(rows),
 		table.WithFocused(true),
 		table.WithHeight(viewportHeight),
 	)
-	
+
 	// Style the table with primary colors
 	s := table.DefaultStyles()
 	s.Header = s.Header.
@@ -201,11 +206,12 @@ func New(assets map[string][3]int, width, height int) Model {
 		Foreground(lipgloss.Color("#2f54eb")) // Primary color
 	s.Selected = selectedStyle
 	t.SetStyles(s)
-	
+
 	return Model{
 		table:          t,
 		assets:         assetList,
 		filteredAssets: assetList,
+		filterModel:    NewFilter(),
 		width:          width,
 		height:         height,
 		focused:        false,
@@ -222,16 +228,73 @@ func (m Model) Init() tea.Cmd {
 // Update handles messages
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	var cmd tea.Cmd
-	
+	var cmds []tea.Cmd
+
+	// Handle filter input first if active
+	if m.filterModel.Active() {
+		switch msg := msg.(type) {
+		case tea.KeyMsg:
+			switch msg.Type {
+			case tea.KeyEscape:
+				// Exit filter mode
+				m.filterModel.SetActive(false)
+				m.filter = ""
+				m.updateFilter()
+				return m, nil
+			case tea.KeyEnter:
+				// Connect to selected asset if available
+				if m.table.SelectedRow() != nil && m.table.Cursor() < len(m.filteredAssets) {
+					selected := m.filteredAssets[m.table.Cursor()]
+					m.filterModel.SetActive(false)
+					return m, connectCmd(selected)
+				}
+				// Otherwise just apply filter and exit filter mode
+				m.filter = m.filterModel.Value()
+				m.updateFilter()
+				m.filterModel.SetActive(false)
+				return m, nil
+			case tea.KeyUp, tea.KeyDown, tea.KeyPgUp, tea.KeyPgDown:
+				// Allow navigation keys to pass through to table
+				m.table, cmd = m.table.Update(msg)
+				if cmd != nil {
+					cmds = append(cmds, cmd)
+				}
+				return m, tea.Batch(cmds...)
+			}
+
+			// For all other keys (including 'q'), update filter input
+			prevFilter := m.filter
+			m.filterModel, cmd = m.filterModel.Update(msg)
+			if cmd != nil {
+				cmds = append(cmds, cmd)
+			}
+
+			// Live filter update only if changed
+			newFilter := m.filterModel.Value()
+			if newFilter != prevFilter {
+				m.filter = newFilter
+				m.updateFilter()
+				// Only reset cursor on first character or significant change
+				if prevFilter == "" && newFilter != "" {
+					// First character typed - reset to top
+					m.table.GotoTop()
+				}
+			}
+			return m, tea.Batch(cmds...)
+
+		default:
+			// Let filter handle other messages
+			m.filterModel, cmd = m.filterModel.Update(msg)
+			if cmd != nil {
+				cmds = append(cmds, cmd)
+			}
+			return m, tea.Batch(cmds...)
+		}
+	}
+
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		if m.filter != "" && msg.Type == tea.KeyEscape {
-			// Clear filter
-			m.filter = ""
-			m.updateFilter()
-			return m, nil
-		}
-		
+
 		switch {
 		case key.Matches(msg, m.keyMap.Enter):
 			// Return selected asset for connection
@@ -239,14 +302,25 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				selected := m.filteredAssets[m.table.Cursor()]
 				return m, connectCmd(selected)
 			}
-			
+
 		case key.Matches(msg, m.keyMap.Back):
 			return m, backCmd()
-			
+
 		case key.Matches(msg, m.keyMap.Filter):
-			// Start filtering mode
-			return m, startFilterCmd()
-			
+			if m.filter != "" {
+				// Clear existing filter
+				m.filter = ""
+				m.updateFilter()
+				// Reset cursor to top after clearing filter
+				m.table.GotoTop()
+			} else {
+				// Start filtering mode
+				m.filterModel.SetActive(true)
+				// Initialize filter to empty to prepare for input
+				m.filter = ""
+			}
+			return m, nil
+
 		case key.Matches(msg, m.keyMap.Up),
 			key.Matches(msg, m.keyMap.Down),
 			key.Matches(msg, m.keyMap.PageUp),
@@ -257,15 +331,25 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			m.table, cmd = m.table.Update(msg)
 			return m, cmd
 		}
-		
+
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
 		// Update table height based on new window size
-		// Account for overhead (title, help, borders, etc.)
-		newHeight := len(m.filteredAssets)
+		// Table height includes header + separator + data rows
+		newHeight := len(m.filteredAssets) + 2
+		if newHeight < 3 {
+			newHeight = 3 // At least header + separator + 1 data row
+		}
+
+		// Calculate max available height
 		maxHeight := msg.Height - 10
-		if maxHeight > 5 && newHeight > maxHeight {
+		if maxHeight < 5 {
+			maxHeight = 5 // Minimum usable height
+		}
+
+		// Use actual row count for small sets, cap for large sets
+		if newHeight > maxHeight {
 			newHeight = maxHeight
 		}
 		m.table.SetHeight(newHeight)
@@ -273,23 +357,27 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		// Update table for other messages
 		m.table, cmd = m.table.Update(msg)
 	}
-	
+
 	return m, cmd
 }
 
 // View renders the table
 func (m Model) View() string {
-	// Title
+	resetCursor := "\r\033[0G"
 	title := titleStyle.Render("🗂️  Available Assets")
-	
-	// Filter indicator
+
+	// Filter indicator or input
 	filterInfo := ""
-	if m.filter != "" {
+	if m.filterModel.Active() {
+		// Show filter input
+		filterInfo = " " + m.filterModel.View()
+	} else if m.filter != "" {
+		// Show active filter
 		filterInfo = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#8c8c8c")). // Secondary text
 			Render(fmt.Sprintf(" (filtered: %s)", m.filter))
 	}
-	
+
 	// Asset count
 	count := fmt.Sprintf("%d assets", len(m.filteredAssets))
 	if m.filter != "" && len(m.filteredAssets) != len(m.assets) {
@@ -298,31 +386,24 @@ func (m Model) View() string {
 	countStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#8c8c8c")). // Secondary text
 		Render(count)
-	
+
 	// Help text
 	help := m.renderHelp()
-	
+
 	// Combine all elements
 	header := lipgloss.JoinHorizontal(lipgloss.Left, title, filterInfo, " ", countStyle)
-	
+
 	// Use the table component's view directly
 	tableView := m.table.View()
-	
+
 	// Apply base style with proper width
 	// Don't apply height constraint, let the table manage its own viewport
 	tableBox := baseStyle.
 		Width(m.width - 2).
 		Render(tableView)
-	
-	// Build the final view with proper spacing
-	var output strings.Builder
-	output.WriteString(header)
-	output.WriteString("\n")
-	output.WriteString(tableBox)
-	output.WriteString("\n")
-	output.WriteString(help)
-	
-	return output.String()
+
+	result := resetCursor + header + "\n" + tableBox + "\n" + help
+	return result
 }
 
 // Helper functions
@@ -339,8 +420,9 @@ func (m *Model) updateFilter() {
 				strings.Contains(strings.ToLower(a.Protocol), filter)
 		})
 	}
-	
+
 	// Update table rows
+
 	rows := make([]table.Row, len(m.filteredAssets))
 	for i, asset := range m.filteredAssets {
 		icon := icons.GetProtocolIcon(asset.Protocol)
@@ -353,11 +435,22 @@ func (m *Model) updateFilter() {
 		}
 	}
 	m.table.SetRows(rows)
-	
-	// Update table height if needed after filtering
-	newHeight := len(m.filteredAssets)
+
+	// Update table height to show all filtered results when possible
+	// Table height includes header + separator + data rows
+	newHeight := len(m.filteredAssets) + 2
+	if newHeight < 3 {
+		newHeight = 3 // At least header + separator + 1 data row
+	}
+
+	// Calculate max available height
 	maxHeight := m.height - 10
-	if maxHeight > 5 && newHeight > maxHeight {
+	if maxHeight < 5 {
+		maxHeight = 5 // Minimum usable height
+	}
+
+	// Use actual row count for small sets, cap for large sets
+	if newHeight > maxHeight {
 		newHeight = maxHeight
 	}
 	m.table.SetHeight(newHeight)
@@ -367,16 +460,31 @@ func (m Model) renderHelp() string {
 	if !m.showHelp {
 		return ""
 	}
-	
-	helpItems := []string{
-		"↑/↓ navigate",
-		"enter connect",
-		"/ filter",
-		"esc back",
-		"pgup/pgdn scroll",
-		"g/G top/bottom",
+
+	var helpItems []string
+	if m.filterModel.Active() {
+		// Show filter-specific help
+		helpItems = []string{
+			"type to filter",
+			"↑/↓ navigate",
+			"enter connect",
+			"esc cancel",
+		}
+	} else {
+		// Show normal help
+		helpItems = []string{
+			"↑/↓ navigate",
+			"enter connect",
+			"/ filter",
+			"esc back",
+			"pgup/pgdn scroll",
+			"g/G top/bottom",
+		}
+		if m.filter != "" {
+			helpItems[2] = "/ clear filter"
+		}
 	}
-	
+
 	return lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#8c8c8c")). // Secondary text
 		Padding(1, 0, 0, 0).
@@ -395,19 +503,11 @@ func connectCmd(asset Asset) tea.Cmd {
 	}
 }
 
-type backMsg struct{}
+type BackMsg struct{}
 
 func backCmd() tea.Cmd {
 	return func() tea.Msg {
-		return backMsg{}
-	}
-}
-
-type startFilterMsg struct{}
-
-func startFilterCmd() tea.Cmd {
-	return func() tea.Msg {
-		return startFilterMsg{}
+		return BackMsg{}
 	}
 }
 
@@ -423,4 +523,9 @@ func (m Model) GetSelectedAsset() *Asset {
 func (m *Model) SetFocus(focused bool) {
 	m.focused = focused
 	m.table.SetCursor(0)
+}
+
+// IsFilterActive returns whether the filter is active
+func (m Model) IsFilterActive() bool {
+	return m.filterModel.Active()
 }

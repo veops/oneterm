@@ -32,7 +32,6 @@ import (
 	"github.com/veops/oneterm/internal/sshsrv/icons"
 	"github.com/veops/oneterm/internal/sshsrv/textinput"
 	"github.com/veops/oneterm/pkg/cache"
-	"github.com/veops/oneterm/pkg/errors"
 	"github.com/veops/oneterm/pkg/logger"
 )
 
@@ -155,25 +154,29 @@ func (m *view) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// Handle table mode
 	if m.mode == modeTable {
+		// Let table handle the message first
+		m.assetTable, tableCmd = m.assetTable.Update(msg)
+		
+		// Check for special messages after table has processed them
 		switch msg := msg.(type) {
-		case tea.KeyMsg:
-			if msg.Type == tea.KeyEsc || msg.String() == "q" {
-				// Exit table mode
-				m.mode = modeCLI
-				return m, nil
-			}
 		case assetlist.ConnectMsg:
 			// Handle connection from table
 			m.mode = modeCLI
 			cmd := msg.Asset.Command
 			return m, m.handleConnectionCommand(cmd)
-		case tea.WindowSizeMsg:
-			// Handle window resize in table mode
-			m.assetTable, tableCmd = m.assetTable.Update(msg)
-			return m, tableCmd
+		case assetlist.BackMsg:
+			// Exit table mode when Back is triggered
+			m.mode = modeCLI
+			return m, tea.Printf("\r%s", prompt)
+		case tea.KeyMsg:
+			// Only exit on Esc/q if filter is NOT active
+			if !m.assetTable.IsFilterActive() && (msg.Type == tea.KeyEsc || msg.String() == "q") {
+				// Exit table mode
+				m.mode = modeCLI
+				return m, tea.Printf("\r%s", prompt)
+			}
 		}
-
-		m.assetTable, tableCmd = m.assetTable.Update(msg)
+		
 		return m, tableCmd
 	}
 
@@ -218,8 +221,20 @@ func (m *view) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.ClearScreen
 			case cmd == "list" || cmd == "ls" || cmd == "table":
 				pty, _, _ := m.Sess.Pty()
-				m.assetTable = assetlist.New(m.combines, pty.Window.Width, pty.Window.Height)
+				// Ensure we have reasonable default dimensions if pty size is not available
+				width := pty.Window.Width
+				height := pty.Window.Height
+				if width <= 0 {
+					width = 80 // Standard terminal width
+				}
+				if height <= 0 {
+					height = 24 // Standard terminal height
+				}
+				m.assetTable = assetlist.New(m.combines, width, height)
 				m.mode = modeTable
+				// Send a window size message to ensure consistent initial state
+				sizeMsg := tea.WindowSizeMsg{Width: width, Height: height}
+				m.assetTable, _ = m.assetTable.Update(sizeMsg)
 				return m, tea.ClearScreen
 			}
 
@@ -330,11 +345,7 @@ func (m *view) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case errMsg:
 		if msg != nil {
-			str := msg.Error()
-			if ae, ok := msg.(*errors.ApiError); ok {
-				str = errors.Err2Msg[ae.Code].One
-			}
-			return m, tea.Printf("  [ERROR] %s\n\n", errStyle.Render(str))
+			return m, tea.Printf("  [ERROR] %s\n\n%s", errStyle.Render(msg.Error()), prompt)
 		}
 	}
 
@@ -342,7 +353,6 @@ func (m *view) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if msg, ok := msg.(tea.KeyMsg); ok && msg.Type == tea.KeyRunes {
 		m.suggestionIdx = 0
 		m.selectedSugg = ""
-
 	}
 
 	m.textinput, tiCmd = m.textinput.Update(msg)
@@ -356,7 +366,12 @@ func (m *view) View() string {
 	}
 
 	if m.mode == modeTable {
-		return m.assetTable.View()
+		tableOutput := m.assetTable.View()
+		lines := strings.Split(tableOutput, "\n")
+		for i := range lines {
+			lines[i] = strings.TrimPrefix(lines[i], " ")
+		}
+		return strings.Join(lines, "\n")
 	}
 
 	suggestionView := m.smartSuggestionView()
@@ -541,7 +556,7 @@ func (m *view) assetOverview() string {
 		Foreground(colors.PrimaryColor2).
 		PaddingTop(1)
 
-	return tipStyle.Render("→ Type 'table' for interactive mode or start typing to connect")
+	return tipStyle.Render("→ Type 'ls' for interactive mode or start typing to connect")
 }
 
 func (m *view) refresh() {

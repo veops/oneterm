@@ -68,7 +68,6 @@ func ConnectTelnet(ctx *gin.Context, sess *gsession.Session, asset *model.Asset,
 		logger.L().Error("telnet dial failed", zap.Error(err))
 		return
 	}
-	defer conn.Close()
 
 	// Setup authentication control mechanisms
 	authDone := make(chan bool, 1)
@@ -205,6 +204,7 @@ func ConnectTelnet(ctx *gin.Context, sess *gsession.Session, asset *model.Asset,
 	// Data flow from client to server
 	// Reads from input pipe and writes to telnet connection
 	sess.G.Go(func() error {
+
 		buf := make([]byte, 1024)
 		for {
 			select {
@@ -214,10 +214,11 @@ func ConnectTelnet(ctx *gin.Context, sess *gsession.Session, asset *model.Asset,
 				n, err := chs.Rin.Read(buf)
 				if err != nil {
 					if err == io.EOF {
-						continue
+						conn.Close()
+						return nil
 					}
 					if err.Error() == "io: read/write on closed pipe" {
-						return nil // Normal exit condition, not an error
+						return nil
 					}
 					logger.L().Error("read from input pipe failed", zap.Error(err))
 					return err
@@ -226,7 +227,7 @@ func ConnectTelnet(ctx *gin.Context, sess *gsession.Session, asset *model.Asset,
 				if n > 0 {
 					_, err = conn.Write(buf[:n])
 					if err != nil {
-						logger.L().Error("write to telnet failed", zap.Error(err))
+						logger.L().Info("write to telnet failed, connection likely closed", zap.Error(err))
 						return err
 					}
 				}
@@ -237,6 +238,17 @@ func ConnectTelnet(ctx *gin.Context, sess *gsession.Session, asset *model.Asset,
 	// Data flow from server to client
 	// Reads from telnet connection, processes telnet protocol, and sends to output channel
 	sess.G.Go(func() error {
+		defer func() {
+			conn.Close()
+			if chs.Rin != nil {
+				chs.Rin.Close()
+			}
+			// Close AwayChan to signal connection end
+			sess.Once.Do(func() {
+				close(chs.AwayChan)
+			})
+		}()
+
 		buf := make([]byte, 8192)
 		for {
 			select {
@@ -253,11 +265,10 @@ func ConnectTelnet(ctx *gin.Context, sess *gsession.Session, asset *model.Asset,
 						continue
 					}
 					if err == io.EOF {
-						logger.L().Info("telnet connection closed by server")
 						return fmt.Errorf("telnet connection closed")
 					}
 					if strings.Contains(err.Error(), "use of closed network connection") {
-						return nil // Normal connection close, not an error
+						return nil
 					}
 					logger.L().Error("read from telnet failed", zap.Error(err))
 					return err
@@ -275,8 +286,6 @@ func ConnectTelnet(ctx *gin.Context, sess *gsession.Session, asset *model.Asset,
 
 	// Signal successful connection
 	chs.ErrChan <- nil
-	// Wait for all goroutines to complete
-	err = sess.G.Wait()
 
 	return nil
 }

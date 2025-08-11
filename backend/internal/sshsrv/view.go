@@ -512,6 +512,7 @@ func (m *view) handleConnectionCommand(cmd string) tea.Cmd {
 	m.Ctx.Params = append(m.Ctx.Params, gin.Param{Key: "asset_id", Value: cast.ToString(m.combines[cmd][1])})
 	m.Ctx.Params = append(m.Ctx.Params, gin.Param{Key: "protocol", Value: fmt.Sprintf("%s:%d", p, m.combines[cmd][2])})
 	m.Ctx = m.Ctx.Copy()
+	m.Ctx.Set("sessionType", model.SESSIONTYPE_CLIENT)
 	m.connecting = true
 
 	return tea.Sequence(
@@ -758,8 +759,14 @@ func (conn *connector) Run() error {
 
 	r, w := io.Pipe()
 	go func() {
+		defer w.Close()
 		_, err := io.Copy(w, conn.stdin)
-		gsess.Chans.ErrChan <- err
+		// Don't block on sending error - HandleTerm may have already returned
+		select {
+		case gsess.Chans.ErrChan <- err:
+		default:
+			// Channel is closed or no one is listening, just return
+		}
 	}()
 
 	gsess.CliRw = &session.CliRW{
@@ -784,7 +791,13 @@ func (conn *connector) Run() error {
 			case <-gsess.Gctx.Done():
 				return
 			case w := <-ch:
-				gsess.Chans.WindowChan <- w
+				// Non-blocking send to WindowChan
+				// Some protocols (like telnet) don't handle window changes
+				select {
+				case gsess.Chans.WindowChan <- w:
+				default:
+					// If no one is listening, just ignore
+				}
 			}
 		}
 	})

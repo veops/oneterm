@@ -158,6 +158,39 @@ func Write(sess *gsession.Session, skipRecording ...bool) (err error) {
 // Read reads data from the session input
 func Read(sess *gsession.Session) error {
 	chs := sess.Chans
+	
+	// Handle CLIENT type with non-blocking reads
+	if sess.SessionType == model.SESSIONTYPE_CLIENT {
+		readChan := make(chan []byte)
+		errChan := make(chan error)
+		
+		go func() {
+			for {
+				p, err := sess.CliRw.Read()
+				if err != nil {
+					errChan <- err
+					return
+				}
+				readChan <- p
+			}
+		}()
+		
+		for {
+			select {
+			case <-sess.Gctx.Done():
+				return nil
+			case <-sess.Chans.AwayChan:
+				return nil
+			case err := <-errChan:
+				return err
+			case p := <-readChan:
+				chs.InChan <- p
+				sess.SetIdle()
+			}
+		}
+	}
+	
+	// Original logic for WEB type
 	for {
 		select {
 		case <-sess.Gctx.Done():
@@ -180,13 +213,6 @@ func Read(sess *gsession.Session) error {
 						sess.SetIdle() // TODO: performance issue
 					}
 				}
-			} else if sess.SessionType == model.SESSIONTYPE_CLIENT {
-				p, err := sess.CliRw.Read()
-				if err != nil {
-					return err
-				}
-				chs.InChan <- p
-				sess.SetIdle() // TODO: performance issue
 			}
 		}
 	}

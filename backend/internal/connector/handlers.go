@@ -399,9 +399,6 @@ func HandleTerm(sess *gsession.Session, ctx *gin.Context) (err error) {
 				protocols.WriteErrMsg(sess, msg)
 				logger.L().Info("closed by", zap.String("admin", closeBy))
 				return &myErrors.ApiError{Code: myErrors.ErrAdminClose, Data: map[string]any{"admin": closeBy}}
-			case err = <-chs.ErrChan:
-				protocols.WriteErrMsg(sess, err.Error())
-				return
 			case in := <-chs.InChan:
 				if sess.SessionType == model.SESSIONTYPE_WEB {
 					rt := in[0]
@@ -455,6 +452,5 @@ func HandleTerm(sess *gsession.Session, ctx *gin.Context) (err error) {
 	if err = sess.G.Wait(); err != nil {
 		logger.L().Debug("handle term wait end", zap.String("id", sess.SessionId), zap.Error(err))
 	}
-
 	return
 }

@@ -17,6 +17,7 @@ import (
 
 	"github.com/veops/oneterm/internal/acl"
 	"github.com/veops/oneterm/internal/model"
+	"github.com/veops/oneterm/internal/version"
 	"github.com/veops/oneterm/pkg/config"
 	"github.com/veops/oneterm/pkg/logger"
 )
@@ -84,16 +85,16 @@ func banner() string {
    ██║   ██║██║╚██╗██║██╔══╝     ██║   ██╔══╝  ██╔══██╗██║╚██╔╝██║
    ╚██████╔╝██║ ╚████║███████╗   ██║   ███████╗██║  ██║██║ ╚═╝ ██║
     ╚═════╝ ╚═╝  ╚═══╝╚══════╝   ╚═╝   ╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝`
-	
+
 	lines := strings.Split(bannerText, "\n")
 	var result strings.Builder
-	
+
 	for i, line := range lines {
 		if line == "" {
 			result.WriteString("\n")
 			continue
 		}
-		
+
 		var style lipgloss.Style
 		switch {
 		case i <= 2:
@@ -106,22 +107,22 @@ func banner() string {
 		result.WriteString(style.Render(line))
 		result.WriteString("\n")
 	}
-	
+
 	tagline := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#2f54eb")).
 		Bold(true).
 		PaddingLeft(15).
 		Render("✨ Enterprise Bastion Host Solution")
-	
-	version := versionStyle.
+
+	versionText := versionStyle.
 		PaddingLeft(25).
-		Render("v2.0.0")
-	
+		Render(version.Version)
+
 	result.WriteString("\n")
 	result.WriteString(tagline)
 	result.WriteString("  ")
-	result.WriteString(version)
+	result.WriteString(versionText)
 	result.WriteString("\n")
-	
+
 	return result.String()
 }

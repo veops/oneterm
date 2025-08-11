@@ -22,6 +22,8 @@ type SessionRepository interface {
 	GetSessionCmdCounts(ctx context.Context, sessionIds []string) (map[string]int64, error)
 	GetOnlineSessionByID(ctx context.Context, sessionID string) (*gsession.Session, error)
 	GetSshParserCommands(ctx context.Context, cmdIDs []int) ([]*model.Command, error)
+	// GetRecentSessionsByUser retrieves recent sessions deduplicated by asset_id and account_id combination
+	GetRecentSessionsByUser(ctx context.Context, uid int, limit int) ([]*model.Session, error)
 }
 
 type sessionRepository struct{}
@@ -172,4 +174,53 @@ func (r *sessionRepository) GetSshParserCommands(ctx context.Context, cmdIDs []i
 		Find(&commands).
 		Error
 	return commands, err
+}
+
+// GetRecentSessionsByUser retrieves recent sessions for a user, deduplicated by asset_id and account_id
+func (r *sessionRepository) GetRecentSessionsByUser(ctx context.Context, uid int, limit int) ([]*model.Session, error) {
+	var sessions []*model.Session
+
+	// First, get the MAX session ID for each asset+account combination
+	// This approach avoids LIMIT in subquery which MySQL doesn't support
+	type MaxSession struct {
+		AssetId   int
+		AccountId int
+		MaxId     int
+	}
+	
+	var maxSessions []MaxSession
+	err := dbpkg.DB.Model(&model.Session{}).
+		Select("asset_id, account_id, MAX(id) as max_id").
+		Where("uid = ?", uid).
+		Where("asset_id > 0").
+		Where("account_id > 0").
+		Group("asset_id, account_id").
+		Find(&maxSessions).Error
+	
+	if err != nil {
+		return nil, err
+	}
+	
+	// Extract the IDs
+	var sessionIds []int
+	for _, ms := range maxSessions {
+		sessionIds = append(sessionIds, ms.MaxId)
+	}
+	
+	if len(sessionIds) == 0 {
+		return sessions, nil
+	}
+
+	// Get the full session records for those IDs
+	err = dbpkg.DB.Model(&model.Session{}).
+		Where("id IN ?", sessionIds).
+		Order("created_at DESC").
+		Limit(limit).
+		Find(&sessions).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return sessions, nil
 }

@@ -236,6 +236,42 @@ func (m *view) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				sizeMsg := tea.WindowSizeMsg{Width: width, Height: height}
 				m.assetTable, _ = m.assetTable.Update(sizeMsg)
 				return m, tea.ClearScreen
+			case cmd == "recent" || cmd == "r" || cmd == `\r`:
+				// Show recent sessions in table mode
+				pty, _, _ := m.Sess.Pty()
+				width := pty.Window.Width
+				height := pty.Window.Height
+				if width <= 0 {
+					width = 80
+				}
+				if height <= 0 {
+					height = 24
+				}
+				
+				// Get recent sessions
+				sessions, err := m.getRecentSessions()
+				if err != nil {
+					return m, tea.Sequence(
+						hisCmd,
+						tea.Printf("\n  %s Failed to fetch recent sessions: %v\n\n", errStyle.Render("⚠️"), err),
+						tea.Printf("%s", prompt),
+					)
+				}
+				
+				if len(sessions) == 0 {
+					return m, tea.Sequence(
+						hisCmd,
+						tea.Printf("\n  %s\n\n", hintStyle.Render("📋 No recent sessions found")),
+						tea.Printf("%s", prompt),
+					)
+				}
+				
+				// Create recent sessions table
+				m.assetTable = assetlist.NewRecentSessions(sessions, m.combines, width, height)
+				m.mode = modeTable
+				sizeMsg := tea.WindowSizeMsg{Width: width, Height: height}
+				m.assetTable, _ = m.assetTable.Update(sizeMsg)
+				return m, tea.ClearScreen
 			}
 
 			// Try to handle as connection command
@@ -475,6 +511,7 @@ func (m *view) helpText() string {
   • postgresql user@host - Connect to PostgreSQL database
   • telnet user@host     - Connect via Telnet
   • list/ls/table        - Show assets in interactive table
+  • recent or r or \r    - Show recent sessions with last login time
   • help or \h or \?     - Show this help message
   • clear or \c          - Clear screen
   • exit/quit or \q      - Exit OneTerm
@@ -553,11 +590,28 @@ func (m *view) assetOverview() string {
 	}
 
 	// Provide a better tip with modern styling
-	tipStyle := lipgloss.NewStyle().
-		Foreground(colors.PrimaryColor2).
-		PaddingTop(1)
-
-	return tipStyle.Render("→ Type 'ls' for interactive mode or start typing to connect")
+	textStyle := lipgloss.NewStyle().
+		Foreground(colors.TextSecondary)
+	
+	cmdStyle := lipgloss.NewStyle().
+		Foreground(colors.PrimaryColor9).
+		Bold(true)
+	
+	arrowStyle := lipgloss.NewStyle().
+		Foreground(colors.PrimaryColor2)
+	
+	// Build the tip text with each part styled correctly
+	parts := []string{
+		arrowStyle.Render("→"),
+		textStyle.Render("Type"),
+		cmdStyle.Render("'ls'"),
+		textStyle.Render("for interactive mode,"),
+		cmdStyle.Render("'recent'"),
+		textStyle.Render("for recent sessions, or start typing to connect"),
+	}
+	
+	fullTip := strings.Join(parts, " ")
+	return lipgloss.NewStyle().PaddingTop(1).Render(fullTip)
 }
 
 func (m *view) refresh() {
@@ -646,6 +700,12 @@ func (m *view) refresh() {
 func (m *view) magicn() tea.Msg {
 	m.w.Write([]byte("\n"))
 	return nil
+}
+
+func (m *view) getRecentSessions() ([]*model.Session, error) {
+	// Use repository to get recent sessions, deduplicated by asset_id and account_id
+	sessionRepo := repository.NewSessionRepository()
+	return sessionRepo.GetRecentSessionsByUser(m.gctx, m.currentUser.GetUid(), 20)
 }
 
 func (m *view) RecordHisCmd() {

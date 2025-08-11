@@ -2,7 +2,9 @@ package assetlist
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/table"
@@ -10,6 +12,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/samber/lo"
 
+	"github.com/veops/oneterm/internal/model"
 	"github.com/veops/oneterm/internal/sshsrv/icons"
 )
 
@@ -84,12 +87,13 @@ var DefaultTableKeyMap = TableKeyMap{
 
 // Asset represents a connection asset
 type Asset struct {
-	Protocol string
-	Command  string
-	User     string
-	Host     string
-	Port     string
-	Info     [3]int // [accountId, assetId, port]
+	Protocol  string
+	Command   string
+	User      string
+	Host      string
+	Port      string
+	Info      [3]int // [accountId, assetId, port]
+	LastLogin *time.Time // Optional: last login time for recent sessions
 }
 
 // Model represents the asset list table model
@@ -104,6 +108,7 @@ type Model struct {
 	focused        bool
 	keyMap         TableKeyMap
 	showHelp       bool
+	isRecent       bool // Whether this is a recent sessions table
 }
 
 // New creates a new asset list table
@@ -364,7 +369,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 // View renders the table
 func (m Model) View() string {
 	resetCursor := "\r\033[0G"
-	title := titleStyle.Render("🗂️  Available Assets")
+	title := titleStyle.Render(lo.Ternary(m.isRecent, "📊  Recent Sessions", "🗂️  Available Assets"))
 
 	// Filter indicator or input
 	filterInfo := ""
@@ -379,9 +384,10 @@ func (m Model) View() string {
 	}
 
 	// Asset count
-	count := fmt.Sprintf("%d assets", len(m.filteredAssets))
+	countText := lo.Ternary(m.isRecent, "sessions", "assets")
+	count := fmt.Sprintf("%d %s", len(m.filteredAssets), countText)
 	if m.filter != "" && len(m.filteredAssets) != len(m.assets) {
-		count = fmt.Sprintf("%d of %d assets", len(m.filteredAssets), len(m.assets))
+		count = fmt.Sprintf("%d of %d %s", len(m.filteredAssets), len(m.assets), countText)
 	}
 	countStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#8c8c8c")). // Secondary text
@@ -528,4 +534,144 @@ func (m *Model) SetFocus(focused bool) {
 // IsFilterActive returns whether the filter is active
 func (m Model) IsFilterActive() bool {
 	return m.filterModel.Active()
+}
+
+// NewRecentSessions creates a new asset list table from recent sessions
+func NewRecentSessions(sessions []*model.Session, combines map[string][3]int, width, height int) Model {
+	// Convert sessions to asset list with last login time
+	assetList := make([]Asset, 0, len(sessions))
+	for _, session := range sessions {
+		// Parse protocol
+		protocolParts := strings.Split(session.Protocol, ":")
+		protocol := protocolParts[0]
+		port := ""
+		if len(protocolParts) > 1 {
+			port = protocolParts[1]
+		}
+
+		// Parse asset name
+		assetName := session.AssetInfo
+		if parts := strings.Split(assetName, "("); len(parts) > 0 {
+			assetName = strings.TrimSpace(parts[0])
+		}
+
+		// Parse account name
+		userName := session.AccountInfo
+		if parts := strings.Split(userName, "("); len(parts) > 0 {
+			userName = strings.TrimSpace(parts[0])
+		}
+
+		// Build command string
+		cmd := fmt.Sprintf("%s %s@%s", protocol, userName, assetName)
+		if port != "" && port != lo.Ternary(protocol == "ssh", "22", lo.Ternary(protocol == "telnet", "23", lo.Ternary(protocol == "redis", "6379", lo.Ternary(protocol == "mysql", "3306", lo.Ternary(protocol == "postgresql", "5432", lo.Ternary(protocol == "mongodb", "27017", port)))))) {
+			cmd = fmt.Sprintf("%s:%s", cmd, port)
+		}
+
+		// Look up the asset info from combines map if available
+		info := [3]int{session.AccountId, session.AssetId, lo.Ternary(port != "", lo.Must(strconv.Atoi(port)), 0)}
+		if val, ok := combines[cmd]; ok {
+			info = val
+		}
+
+		assetList = append(assetList, Asset{
+			Protocol:  protocol,
+			Command:   cmd,
+			User:      userName,
+			Host:      assetName,
+			Port:      port,
+			Info:      info,
+			LastLogin: &session.CreatedAt, // Store last login time
+		})
+	}
+
+	// Create table columns with Last Login column
+	columns := []table.Column{
+		{Title: "Protocol", Width: 12},
+		{Title: "User", Width: 15},
+		{Title: "Host", Width: 25},
+		{Title: "Port", Width: 8},
+		{Title: "Last Login", Width: 18},
+		{Title: "Command", Width: 35},
+	}
+
+	// Create table rows
+	rows := make([]table.Row, len(assetList))
+	for i, asset := range assetList {
+		icon := icons.GetProtocolIcon(asset.Protocol)
+		timeAgo := formatTimeAgo(*asset.LastLogin)
+		rows[i] = table.Row{
+			fmt.Sprintf("%s %s", icon, strings.ToUpper(asset.Protocol)),
+			asset.User,
+			asset.Host,
+			lo.Ternary(asset.Port != "", asset.Port, icons.GetDefaultPort(asset.Protocol)),
+			timeAgo,
+			asset.Command,
+		}
+	}
+
+	// Calculate viewport height
+	viewportHeight := len(assetList) + 2
+	if viewportHeight < 3 {
+		viewportHeight = 3
+	}
+
+	maxViewportHeight := height - 10
+	if maxViewportHeight < 5 {
+		maxViewportHeight = 5
+	}
+
+	if viewportHeight > maxViewportHeight {
+		viewportHeight = maxViewportHeight
+	}
+
+	t := table.New(
+		table.WithColumns(columns),
+		table.WithRows(rows),
+		table.WithFocused(true),
+		table.WithHeight(viewportHeight),
+	)
+
+	// Style the table
+	s := table.DefaultStyles()
+	s.Header = s.Header.
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(lipgloss.Color("#b1c9ff")).
+		BorderBottom(true).
+		Bold(true).
+		Foreground(lipgloss.Color("#2f54eb"))
+	s.Selected = selectedStyle
+	t.SetStyles(s)
+
+	return Model{
+		table:          t,
+		assets:         assetList,
+		filteredAssets: assetList,
+		filterModel:    NewFilter(),
+		width:          width,
+		height:         height,
+		focused:        false,
+		keyMap:         DefaultTableKeyMap,
+		showHelp:       true,
+		isRecent:       true, // Mark as recent sessions table
+	}
+}
+
+// formatTimeAgo formats time as relative time
+func formatTimeAgo(t time.Time) string {
+	duration := time.Since(t)
+
+	if duration < time.Minute {
+		return "just now"
+	} else if duration < time.Hour {
+		minutes := int(duration.Minutes())
+		return fmt.Sprintf("%d min%s ago", minutes, lo.Ternary(minutes > 1, "s", ""))
+	} else if duration < 24*time.Hour {
+		hours := int(duration.Hours())
+		return fmt.Sprintf("%d hour%s ago", hours, lo.Ternary(hours > 1, "s", ""))
+	} else if duration < 7*24*time.Hour {
+		days := int(duration.Hours() / 24)
+		return fmt.Sprintf("%d day%s ago", days, lo.Ternary(days > 1, "s", ""))
+	} else {
+		return t.Format("2006-01-02 15:04")
+	}
 }

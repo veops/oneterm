@@ -5,6 +5,8 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
+	"net/url"
 	"sort"
 	"strings"
 	"time"
@@ -543,18 +545,32 @@ func (m *view) handleConnectionCommand(cmd string) tea.Cmd {
 
 	// Setup connection parameters
 	pty, _, _ := m.Sess.Pty()
-	m.Ctx.Request.URL.RawQuery = fmt.Sprintf("w=%d&h=%d", pty.Window.Width, pty.Window.Height)
-	m.Ctx.Params = nil
-	m.Ctx.Params = append(m.Ctx.Params, gin.Param{Key: "account_id", Value: cast.ToString(m.combines[cmd][0])})
-	m.Ctx.Params = append(m.Ctx.Params, gin.Param{Key: "asset_id", Value: cast.ToString(m.combines[cmd][1])})
-	m.Ctx.Params = append(m.Ctx.Params, gin.Param{Key: "protocol", Value: fmt.Sprintf("%s:%d", p, m.combines[cmd][2])})
-	m.Ctx = m.Ctx.Copy()
-	m.Ctx.Set("sessionType", model.SESSIONTYPE_CLIENT)
+	
+	// Create a copy of the context first to avoid modifying the original
+	newCtx := m.Ctx.Copy()
+	
+	// Ensure Request and URL are properly initialized
+	if newCtx.Request == nil {
+		newCtx.Request = &http.Request{
+			RemoteAddr: m.Sess.RemoteAddr().String(),
+			URL:        &url.URL{},
+		}
+	}
+	if newCtx.Request.URL == nil {
+		newCtx.Request.URL = &url.URL{}
+	}
+	
+	newCtx.Request.URL.RawQuery = fmt.Sprintf("w=%d&h=%d", pty.Window.Width, pty.Window.Height)
+	newCtx.Params = nil
+	newCtx.Params = append(newCtx.Params, gin.Param{Key: "account_id", Value: cast.ToString(m.combines[cmd][0])})
+	newCtx.Params = append(newCtx.Params, gin.Param{Key: "asset_id", Value: cast.ToString(m.combines[cmd][1])})
+	newCtx.Params = append(newCtx.Params, gin.Param{Key: "protocol", Value: fmt.Sprintf("%s:%d", p, m.combines[cmd][2])})
+	newCtx.Set("sessionType", model.SESSIONTYPE_CLIENT)
 	m.connecting = true
 
 	return tea.Sequence(
 		tea.Printf("🔌 Establishing connection to %s...\n", cmd),
-		tea.Exec(&connector{Ctx: m.Ctx, Sess: m.Sess, Vw: m, gctx: m.gctx}, func(err error) tea.Msg {
+		tea.Exec(&connector{Ctx: newCtx, Sess: m.Sess, Vw: m, gctx: m.gctx}, func(err error) tea.Msg {
 			m.connecting = false
 			if err != nil {
 				return errMsg(fmt.Errorf("❌ Connection failed: %v", err))
@@ -864,7 +880,12 @@ func (conn *connector) Run() error {
 	myConnector.HandleTerm(gsess, nil)
 
 	if err = gsess.G.Wait(); err != nil {
-		logger.L().Error("sshsrv run stopped", zap.String("sessionId", gsess.SessionId), zap.Error(err))
+		// Check if this is the normal termination sentinel error
+		if err.Error() == "session closed normally" {
+			logger.L().Debug("sshsrv session ended normally", zap.String("sessionId", gsess.SessionId))
+		} else {
+			logger.L().Debug("sshsrv run stopped", zap.String("sessionId", gsess.SessionId), zap.Error(err))
+		}
 	}
 
 	conn.stdout.Write([]byte("\n\n"))

@@ -93,7 +93,8 @@ func ConnectGuacd(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, 
 			case <-sess.Gctx.Done():
 				return nil
 			case <-chs.AwayChan:
-				return fmt.Errorf("away")
+				// Normal termination - return sentinel error  
+				return ErrSessionClosed
 			case in := <-chs.InChan:
 				t.Write(in)
 			}

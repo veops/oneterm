@@ -1,6 +1,7 @@
 package protocols
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -23,6 +24,10 @@ import (
 )
 
 var (
+	// ErrSessionClosed is a sentinel error for normal session termination
+	// This is returned when a session is closed normally (e.g., user exits)
+	ErrSessionClosed = errors.New("session closed normally")
+	
 	Upgrader = websocket.Upgrader{
 		HandshakeTimeout: time.Minute,
 		ReadBufferSize:   4096,

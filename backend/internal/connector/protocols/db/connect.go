@@ -13,6 +13,7 @@ import (
 	"github.com/creack/pty"
 	"go.uber.org/zap"
 
+	"github.com/veops/oneterm/internal/connector/protocols"
 	"github.com/veops/oneterm/internal/model"
 	gsession "github.com/veops/oneterm/internal/session"
 	"github.com/veops/oneterm/internal/tunneling"
@@ -55,12 +56,6 @@ func connectDB(sess *gsession.Session, asset *model.Asset, account *model.Accoun
 		return fmt.Errorf("unsupported protocol: %s", sess.Protocol)
 	}
 
-	logger.L().Info("Starting database client",
-		zap.String("command", clientConfig.Command),
-		zap.Strings("args", clientConfig.Args),
-		zap.String("host", ip),
-		zap.Int("port", port))
-
 	// Create command and pseudo-terminal
 	cmd := exec.CommandContext(sess.Gctx, clientConfig.Command, clientConfig.Args...)
 	cmd.Env = append(os.Environ(), "TERM=xterm-256color")
@@ -88,7 +83,13 @@ func connectDB(sess *gsession.Session, asset *model.Asset, account *model.Accoun
 	// Monitor process exit
 	sess.G.Go(func() error {
 		err := cmd.Wait()
-		logger.L().Info("Database client process exited", zap.Error(err), zap.String("protocol", protocol))
+
+		// Log process exit - only log as error if there was an actual error
+		if err != nil {
+			logger.L().Error("Database client process exited with error", zap.Error(err), zap.String("protocol", protocol))
+		} else {
+			logger.L().Info("Database client process exited normally", zap.String("protocol", protocol))
+		}
 
 		// Only send termination message if not already sent
 		if atomic.CompareAndSwapInt32(&exitMessageSent, 0, 1) {
@@ -98,10 +99,16 @@ func connectDB(sess *gsession.Session, asset *model.Asset, account *model.Accoun
 		}
 
 		sess.Once.Do(func() {
-			logger.L().Info("Closing AwayChan from database client monitor")
+			logger.L().Debug("Closing AwayChan from database client monitor")
 			close(chs.AwayChan)
 		})
-		return fmt.Errorf("database client process terminated: %w", err)
+
+		// Return appropriate error
+		if err != nil {
+			return fmt.Errorf("database client process terminated with error: %w", err)
+		}
+		// Return nil for normal exit - this is not an error condition
+		return nil
 	})
 
 	// Goroutine 1: Process input, detect exit command
@@ -213,7 +220,8 @@ func connectDB(sess *gsession.Session, asset *model.Asset, account *model.Accoun
 			case <-sess.Gctx.Done():
 				return nil
 			case <-chs.AwayChan:
-				return fmt.Errorf("away")
+				// Normal termination - return sentinel error
+				return protocols.ErrSessionClosed
 			case window := <-chs.WindowChan:
 				// Adjust terminal size
 				_ = pty.Setsize(ptmx, &pty.Winsize{

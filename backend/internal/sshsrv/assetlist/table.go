@@ -335,6 +335,10 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			// Let the table handle all navigation keys
 			m.table, cmd = m.table.Update(msg)
 			return m, cmd
+		default:
+			// For any other key messages, let the table handle them
+			m.table, cmd = m.table.Update(msg)
+			return m, cmd
 		}
 
 	case tea.WindowSizeMsg:
@@ -358,8 +362,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			newHeight = maxHeight
 		}
 		m.table.SetHeight(newHeight)
-	default:
-		// Update table for other messages
+		// Let table also handle the window size message
 		m.table, cmd = m.table.Update(msg)
 	}
 

@@ -80,7 +80,12 @@ func ConnectSsh(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, ac
 
 	sess.G.Go(func() error {
 		err = sshSess.Wait()
-		return fmt.Errorf("ssh session wait end %w", err)
+		// Always close AwayChan when SSH session ends
+		sess.Once.Do(func() { close(chs.AwayChan) })
+		if err != nil {
+			return fmt.Errorf("ssh session wait end with error: %w", err)
+		}
+		return nil
 	})
 
 	chs.ErrChan <- err
@@ -114,7 +119,8 @@ func ConnectSsh(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, ac
 			case <-sess.Gctx.Done():
 				return nil
 			case <-chs.AwayChan:
-				return fmt.Errorf("away")
+				// Normal termination - return sentinel error
+				return ErrSessionClosed
 			case window := <-chs.WindowChan:
 				if err := sshSess.WindowChange(window.Height, window.Width); err != nil {
 					logger.L().Warn("reset window size failed", zap.Error(err))

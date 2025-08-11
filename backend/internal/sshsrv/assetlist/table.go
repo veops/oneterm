@@ -430,17 +430,31 @@ func (m *Model) updateFilter() {
 		})
 	}
 
-	// Update table rows
-
+	// Update table rows - handle different formats for recent sessions vs assets
 	rows := make([]table.Row, len(m.filteredAssets))
 	for i, asset := range m.filteredAssets {
 		icon := icons.GetProtocolIcon(asset.Protocol)
-		rows[i] = table.Row{
-			fmt.Sprintf("%s %s", icon, strings.ToUpper(asset.Protocol)),
-			asset.User,
-			asset.Host,
-			lo.Ternary(asset.Port != "", asset.Port, icons.GetDefaultPort(asset.Protocol)),
-			asset.Command,
+		
+		if m.isRecent && asset.LastLogin != nil {
+			// Recent sessions format with Last Login column
+			timeAgo := formatTimeAgo(*asset.LastLogin)
+			rows[i] = table.Row{
+				fmt.Sprintf("%s %s", icon, strings.ToUpper(asset.Protocol)),
+				asset.User,
+				asset.Host,
+				lo.Ternary(asset.Port != "", asset.Port, icons.GetDefaultPort(asset.Protocol)),
+				timeAgo,
+				asset.Command,
+			}
+		} else {
+			// Regular assets format
+			rows[i] = table.Row{
+				fmt.Sprintf("%s %s", icon, strings.ToUpper(asset.Protocol)),
+				asset.User,
+				asset.Host,
+				lo.Ternary(asset.Port != "", asset.Port, icons.GetDefaultPort(asset.Protocol)),
+				asset.Command,
+			}
 		}
 	}
 	m.table.SetRows(rows)

@@ -22,6 +22,29 @@ import (
 	"github.com/veops/oneterm/pkg/logger"
 )
 
+// testResponseWriter implements http.ResponseWriter for gin.CreateTestContext
+type testResponseWriter struct {
+	headers http.Header
+	body    []byte
+	status  int
+}
+
+func (w *testResponseWriter) Write(b []byte) (int, error) {
+	w.body = append(w.body, b...)
+	return len(b), nil
+}
+
+func (w *testResponseWriter) WriteHeader(status int) {
+	w.status = status
+}
+
+func (w *testResponseWriter) Header() http.Header {
+	if w.headers == nil {
+		w.headers = make(http.Header)
+	}
+	return w.headers
+}
+
 func handler(sess ssh.Session) {
 	defer acl.Logout(sess.Context().Value("session").(*acl.Session))
 	pty, _, isPty := sess.Pty()
@@ -30,14 +53,21 @@ func handler(sess ssh.Session) {
 		return
 	}
 
-	ctx := &gin.Context{
-		Request: &http.Request{
-			RemoteAddr: sess.RemoteAddr().String(),
-			URL: &url.URL{
-				RawQuery: fmt.Sprintf("info=true&w=%d&h=%d", pty.Window.Width, pty.Window.Height),
-			},
+	// Create a properly initialized gin.Context
+	req := &http.Request{
+		RemoteAddr: sess.RemoteAddr().String(),
+		URL: &url.URL{
+			RawQuery: fmt.Sprintf("info=true&w=%d&h=%d", pty.Window.Width, pty.Window.Height),
 		},
+		Header: make(http.Header),
+		Method: "GET",
+		Host:   "localhost",
 	}
+	
+	// Use gin.CreateTestContext to create a properly initialized context
+	rec := &testResponseWriter{}
+	ctx, _ := gin.CreateTestContext(rec)
+	ctx.Request = req
 	ctx.Set("sessionType", model.SESSIONTYPE_CLIENT)
 	ctx.Set("session", sess.Context().Value("session"))
 

@@ -13,6 +13,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/gin-gonic/gin"
@@ -92,6 +93,7 @@ type view struct {
 	currentUser   *acl.Session
 	textinput     textinput.Model
 	assetTable    assetlist.Model
+	spinner       spinner.Model
 	cmds          []string
 	cmdsIdx       int
 	combines      map[string][3]int
@@ -118,11 +120,18 @@ func initialView(ctx *gin.Context, sess ssh.Session, r io.ReadCloser, w io.Write
 	ti.Cursor.Style = colors.AccentStyle
 	// Disable Tab for AcceptSuggestion to handle it ourselves
 	ti.KeyMap.AcceptSuggestion = key.NewBinding(key.WithKeys("ctrl+x")) // Use a key that won't be pressed
+	
+	// Initialize spinner
+	s := spinner.New()
+	s.Spinner = spinner.Dot
+	s.Style = colors.PrimaryStyle
+	
 	v := view{
 		Ctx:           ctx,
 		Sess:          sess,
 		currentUser:   currentUser,
 		textinput:     ti,
+		spinner:       s,
 		cmds:          []string{},
 		help:          help.New(),
 		r:             r,
@@ -142,23 +151,29 @@ func (m *view) Init() tea.Cmd {
 
 	return tea.Batch(
 		tea.Println(banner()),
-		tea.Printf("\n  %s\n\n", welcomeStyle.Render("→ Welcome to OneTerm! Start typing or use 'table' to browse assets")),
+		tea.Printf("\n  %s\n\n", welcomeStyle.Render("→ Welcome to OneTerm! Start typing or use 'ls' to browse assets")),
 		tea.Printf("  %s\n", exampleStyle.Render("Examples: ssh admin@server1, mysql db@prod, redis cache@redis")),
 	)
 }
 
 func (m *view) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var (
-		hisCmd   tea.Cmd
-		tiCmd    tea.Cmd
-		tableCmd tea.Cmd
+		hisCmd     tea.Cmd
+		tiCmd      tea.Cmd
+		tableCmd   tea.Cmd
+		spinnerCmd tea.Cmd
 	)
+	
+	// Update spinner if connecting
+	if m.connecting {
+		m.spinner, spinnerCmd = m.spinner.Update(msg)
+	}
 
 	// Handle table mode
 	if m.mode == modeTable {
 		// Let table handle the message first
 		m.assetTable, tableCmd = m.assetTable.Update(msg)
-		
+
 		// Check for special messages after table has processed them
 		switch msg := msg.(type) {
 		case assetlist.ConnectMsg:
@@ -178,7 +193,7 @@ func (m *view) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Printf("\r%s", prompt)
 			}
 		}
-		
+
 		return m, tableCmd
 	}
 
@@ -249,7 +264,7 @@ func (m *view) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if height <= 0 {
 					height = 24
 				}
-				
+
 				// Get recent sessions
 				sessions, err := m.getRecentSessions()
 				if err != nil {
@@ -259,7 +274,7 @@ func (m *view) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						tea.Printf("%s", prompt),
 					)
 				}
-				
+
 				if len(sessions) == 0 {
 					return m, tea.Sequence(
 						hisCmd,
@@ -267,7 +282,7 @@ func (m *view) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						tea.Printf("%s", prompt),
 					)
 				}
-				
+
 				// Create recent sessions table
 				m.assetTable = assetlist.NewRecentSessions(sessions, m.combines, width, height)
 				m.mode = modeTable
@@ -395,12 +410,12 @@ func (m *view) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	m.textinput, tiCmd = m.textinput.Update(msg)
 
-	return m, tea.Batch(hisCmd, tiCmd)
+	return m, tea.Batch(hisCmd, tiCmd, spinnerCmd)
 }
 
 func (m *view) View() string {
 	if m.connecting {
-		return "\n  🔄 Connecting...\n\n"
+		return m.renderConnectingStatus()
 	}
 
 	if m.mode == modeTable {
@@ -502,6 +517,11 @@ func (m *view) smartSuggestionView() string {
 	return result.String()
 }
 
+// renderConnectingStatus displays animated connecting status
+func (m *view) renderConnectingStatus() string {
+	return fmt.Sprintf("\n  %s Connecting...\n\n", m.spinner.View())
+}
+
 func (m *view) helpText() string {
 	return fmt.Sprintf(`%s
 
@@ -545,10 +565,10 @@ func (m *view) handleConnectionCommand(cmd string) tea.Cmd {
 
 	// Setup connection parameters
 	pty, _, _ := m.Sess.Pty()
-	
+
 	// Create a copy of the context first to avoid modifying the original
 	newCtx := m.Ctx.Copy()
-	
+
 	// Ensure Request and URL are properly initialized
 	if newCtx.Request == nil {
 		newCtx.Request = &http.Request{
@@ -559,7 +579,7 @@ func (m *view) handleConnectionCommand(cmd string) tea.Cmd {
 	if newCtx.Request.URL == nil {
 		newCtx.Request.URL = &url.URL{}
 	}
-	
+
 	newCtx.Request.URL.RawQuery = fmt.Sprintf("w=%d&h=%d", pty.Window.Width, pty.Window.Height)
 	newCtx.Params = nil
 	newCtx.Params = append(newCtx.Params, gin.Param{Key: "account_id", Value: cast.ToString(m.combines[cmd][0])})
@@ -569,11 +589,16 @@ func (m *view) handleConnectionCommand(cmd string) tea.Cmd {
 	m.connecting = true
 
 	return tea.Sequence(
-		tea.Printf("🔌 Establishing connection to %s...\n", cmd),
+		tea.Printf("\n  %s %s\n", 
+			colors.PrimaryStyle.Render("⚡"), 
+			colors.AccentStyle.Render(fmt.Sprintf("Initiating secure connection to %s", cmd))),
+		// Start spinner and connection in background
+		m.spinner.Tick,
 		tea.Exec(&connector{Ctx: newCtx, Sess: m.Sess, Vw: m, gctx: m.gctx}, func(err error) tea.Msg {
 			m.connecting = false
 			if err != nil {
-				return errMsg(fmt.Errorf("❌ Connection failed: %v", err))
+				return errMsg(fmt.Errorf("%s Connection failed: %v", 
+					colors.ErrorStyle.Render("✗"), err))
 			}
 			return nil
 		}),
@@ -608,14 +633,14 @@ func (m *view) assetOverview() string {
 	// Provide a better tip with modern styling
 	textStyle := lipgloss.NewStyle().
 		Foreground(colors.TextSecondary)
-	
+
 	cmdStyle := lipgloss.NewStyle().
 		Foreground(colors.PrimaryColor9).
 		Bold(true)
-	
+
 	arrowStyle := lipgloss.NewStyle().
 		Foreground(colors.PrimaryColor2)
-	
+
 	// Build the tip text with each part styled correctly
 	parts := []string{
 		arrowStyle.Render("→"),
@@ -625,7 +650,7 @@ func (m *view) assetOverview() string {
 		cmdStyle.Render("'recent'"),
 		textStyle.Render("for recent sessions, or start typing to connect"),
 	}
-	
+
 	fullTip := strings.Join(parts, " ")
 	return lipgloss.NewStyle().PaddingTop(1).Render(fullTip)
 }

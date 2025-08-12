@@ -43,16 +43,32 @@
           <vxe-column type="checkbox" width="60px"></vxe-column>
           <vxe-column :title="$t(`oneterm.name`)" field="name"> </vxe-column>
           <vxe-column :title="$t(`oneterm.account`)" field="account"> </vxe-column>
-          <vxe-column :title="$t(`oneterm.accountType`)" field="account_type">
+          <vxe-column :title="$t(`oneterm.password`) + ' | ' + $t('oneterm.secretkey')" field="account_type">
             <template #default="{row}">
-              <a-space
-                v-if="row.account_type === 1"
-              ><ops-icon type="oneterm-password" /><span>{{ $t('oneterm.password') }}</span></a-space
-              >
-              <a-space
-                v-else
-              ><ops-icon type="oneterm-secret_key" /><span>{{ $t('oneterm.secretkey') }}</span></a-space
-              >
+              <div class="table-password">
+                <template v-if="getPasswordText(row) && row.showPassword">
+                  <a @click="row.showPassword = false"><a-icon type="eye" /></a>
+                  <a @click="copyPassword(getPasswordText(row))"><a-icon type="copy" /></a>
+                  <a-tooltip
+                    :title="getPasswordText(row)"
+                    :overlayStyle="{
+                      overflow: 'auto',
+                      maxHeight: '400px'
+                    }"
+                  >
+                    <span>{{ getPasswordText(row) }}</span>
+                  </a-tooltip>
+                </template>
+                <template v-else>
+                  <a
+                    v-if="getAccountPermission(row, 'read')"
+                    @click="showTablePassword(row)"
+                  >
+                    <a-icon type="eye-invisible" />
+                  </a>
+                  <span>******</span>
+                </template>
+              </div>
             </template>
           </vxe-column>
           <vxe-column :title="$t(`oneterm.assetCount`)" field="asset_count"> </vxe-column>
@@ -64,8 +80,8 @@
           <vxe-column :title="$t(`operation`)" width="100">
             <template #default="{row}">
               <a-space>
-                <a @click="openModal(row)" v-if="showAccountOperation(row, 'write')" ><ops-icon type="icon-xianxing-edit"/></a>
-                <a-popconfirm :title="$t('confirmDelete')" v-if="showAccountOperation(row, 'delete')" @confirm="deleteGateway(row)">
+                <a @click="clickEditButton(row)" v-if="getAccountPermission(row, 'write')" ><ops-icon type="icon-xianxing-edit"/></a>
+                <a-popconfirm :title="$t('confirmDelete')" v-if="getAccountPermission(row, 'delete')" @confirm="deleteGateway(row)">
                   <a style="color:red"><ops-icon type="icon-xianxing-delete"/></a>
                 </a-popconfirm>
               </a-space>
@@ -102,7 +118,7 @@
 <script>
 import moment from 'moment'
 import { mapState } from 'vuex'
-import { getAccountList, deleteAccountById } from '@/modules/oneterm/api/account'
+import { getAccountList, deleteAccountById, getAccountByCredentials } from '@/modules/oneterm/api/account'
 import { getAllDepAndEmployee } from '@/api/company'
 
 import GrantModal from '@/modules/oneterm/components/grant/grantModal.vue'
@@ -133,7 +149,7 @@ export default {
       selectedRowKeys: [],
       loading: false,
       loadTip: '',
-      allTreeDepAndEmp: [],
+      allTreeDepAndEmp: []
     }
   },
   computed: {
@@ -161,7 +177,11 @@ export default {
         search: this.filterName,
       })
         .then((res) => {
-          this.tableData = res?.data?.list || []
+          const tableData = res?.data?.list || []
+          tableData.forEach((item) => {
+            item.showPassword = false
+          })
+          this.tableData = tableData
           this.tablePage = {
             ...this.tablePage,
             currentPage,
@@ -184,8 +204,8 @@ export default {
     pageOrSizeChange(currentPage, pageSize) {
       this.updateTableData(currentPage, pageSize)
     },
-    openModal(data) {
-      this.$refs.accountModal.open(data)
+    openModal() {
+      this.$refs.accountModal.open()
     },
     deleteGateway(row) {
       this.loading = true
@@ -242,10 +262,66 @@ export default {
       })
     },
 
-    showAccountOperation(account, operation) {
+    getAccountPermission(account, operation) {
       const permissions = this?.roles?.permissions || []
       const isAdmin = permissions?.includes?.('oneterm_admin') || permissions?.includes?.('acl_admin')
       return account?.permissions?.some((perm) => perm === operation) || isAdmin
+    },
+
+    getPasswordText(data) {
+      return data.account_type === 1 ? data.password : data.pk
+    },
+
+    async showTablePassword(data) {
+      if (this.getPasswordText(data)) {
+        data.showPassword = true
+      } else {
+        const res = await getAccountByCredentials(data.id)
+        if (res?.data) {
+          const accountData = this.handleTablePassword(res.data)
+          this.$set(accountData, 'showPassword', true)
+        }
+      }
+    },
+
+    async clickEditButton(data) {
+      if (this.getPasswordText(data)) {
+        this.$refs.accountModal.open(data)
+      } else {
+        const res = await getAccountByCredentials(data.id)
+        if (res?.data) {
+          const accountData = this.handleTablePassword(res.data)
+          this.$refs.accountModal.open(accountData)
+        }
+      }
+    },
+
+    handleTablePassword(data) {
+      let newData = data
+      const tableDataIndex = this.tableData.findIndex((item) => item.id === data.id)
+
+      if (tableDataIndex !== -1) {
+        const rowData = this.tableData[tableDataIndex]
+        const { pk, password, phrase, account_type } = data
+        if (account_type === 1) {
+          rowData.password = password
+        } else {
+          rowData.pk = pk
+          rowData.phrase = phrase
+        }
+
+        this.$set(this.tableData, tableDataIndex, rowData)
+        newData = rowData
+      }
+
+      return newData
+    },
+
+    copyPassword(text) {
+      this.$copyText(text)
+        .then(() => {
+          this.$message.success(this.$t('copySuccess'))
+        })
     }
   },
 }
@@ -253,4 +329,22 @@ export default {
 
 <style lang="less" scoped>
 @import '../../../style/index.less';
+
+.table-password {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+
+  a {
+    margin-right: 8px;
+    flex-shrink: 0;
+  }
+
+  span {
+    width: 100%;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    text-wrap: nowrap;
+  }
+}
 </style>

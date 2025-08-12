@@ -30,3 +30,10 @@ export function deleteAccountById(id) {
     method: 'delete',
   })
 }
+
+export function getAccountByCredentials(id) {
+  return axios({
+    url: `/oneterm/v1/account/${id}/credentials2`,
+    method: 'get',
+  })
+}

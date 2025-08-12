@@ -2,7 +2,7 @@
   <a-modal :title="title" :visible="visible" @cancel="handleCancel" @ok="handleOk" :confirmLoading="loading">
     <a-form-model ref="accountForm" :model="form" :rules="rules" :label-col="{ span: 7 }" :wrapper-col="{ span: 14 }">
       <a-form-model-item :label="$t(`oneterm.name`)" prop="name">
-        <a-input v-model="form.name" :placeholder="`${$t(`placeholder1`)}`" />
+        <a-input v-model="form.name" :placeholder="$t('placeholder1')" />
       </a-form-model-item>
       <a-form-model-item :label="$t(`oneterm.accountType`)" prop="account_type">
         <a-radio-group v-model="form.account_type">
@@ -20,16 +20,25 @@
         :label-col="{ span: 7 }"
         :wrapper-col="{ span: 14 }"
       >
-        <a-input v-model="form.account" :placeholder="`${$t(`placeholder1`)}`" />
+        <a-input v-model="form.account" :placeholder="$t('placeholder1')" />
       </a-form-model-item>
       <a-form-model-item
-        :label="form.account_type === 1 ? $t('oneterm.password') : $t('oneterm.secretkey')"
+        v-if="form.account_type === 1"
+        :label="$t('oneterm.password')"
         prop="password"
         :label-col="{ span: 7 }"
         :wrapper-col="{ span: 14 }"
       >
-        <a-input-password v-if="form.account_type === 1" v-model="form.password" :placeholder="`${$t(`placeholder1`)}`" />
-        <a-textarea v-else v-model="form.pk" :placeholder="`${$t(`placeholder1`)}`" />
+        <a-input-password v-model="form.password" :placeholder="$t('placeholder1')" />
+      </a-form-model-item>
+      <a-form-model-item
+        v-else
+        :label="$t('oneterm.secretkey')"
+        prop="pk"
+        :label-col="{ span: 7 }"
+        :wrapper-col="{ span: 14 }"
+      >
+        <a-textarea v-model="form.pk" :placeholder="$t('placeholder1')" />
       </a-form-model-item>
       <a-form-model-item
         :label="$t('oneterm.phrase')"
@@ -38,7 +47,7 @@
         :wrapper-col="{ span: 14 }"
         v-if="form.account_type === 2"
       >
-        <a-input-password v-model="form.phrase" :placeholder="`${$t(`placeholder1`)}`" />
+        <a-input-password v-model="form.phrase" :placeholder="$t('placeholder1')" />
       </a-form-model-item>
     </a-form-model>
   </a-modal>
@@ -61,7 +70,10 @@ export default {
         phrase: '',
       },
       rules: {
-        name: [{ required: true, message: `${this.$t(`placeholder1`)}` }],
+        name: [{ required: true, message: this.$t('placeholder1') }],
+        account: [{ required: true, message: this.$t('placeholder1') }],
+        password: [{ required: true, message: this.$t('placeholder1') }],
+        pk: [{ required: true, message: this.$t('placeholder1') }],
       },
       loading: false,
     }

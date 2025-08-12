@@ -1,6 +1,6 @@
 services:
   oneterm-api:
-    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-api:v25.8.1
+    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-api:v25.8.2
     container_name: oneterm-api
     environment:
       ONETERM_RDP_DRIVE_PATH: /rdp
@@ -95,7 +95,7 @@ services:
           - redis
 
   oneterm-ui:
-    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-ui:v25.8.1
+    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-ui:v25.8.2
     container_name: oneterm-ui
     depends_on:
       oneterm-api:

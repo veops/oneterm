@@ -63,7 +63,7 @@ func handler(sess ssh.Session) {
 		Method: "GET",
 		Host:   "localhost",
 	}
-	
+
 	// Use gin.CreateTestContext to create a properly initialized context
 	rec := &testResponseWriter{}
 	ctx, _ := gin.CreateTestContext(rec)
@@ -146,7 +146,7 @@ func banner() string {
 
 	versionText := versionStyle.
 		PaddingLeft(25).
-		Render(version.Version)
+		Render(version.GetVersion())
 
 	result.WriteString("\n")
 	result.WriteString(tagline)

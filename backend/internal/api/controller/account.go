@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -36,24 +37,6 @@ var (
 		func(ctx *gin.Context, data []*model.Account) {
 			if err := accountService.AttachAssetCount(ctx, data); err != nil {
 				return
-			}
-		},
-		// Decrypt sensitive data
-		func(ctx *gin.Context, data []*model.Account) {
-			accountService.DecryptSensitiveData(data)
-		},
-		// Filter sensitive fields for non-admin users
-		func(ctx *gin.Context, data []*model.Account) {
-			info := cast.ToBool(ctx.Query("info"))
-			if !info {
-				currentUser, _ := acl.GetSessionFromCtx(ctx)
-				if !acl.IsAdmin(currentUser) {
-					for _, account := range data {
-						account.Password = ""
-						account.Pk = ""
-						account.Phrase = ""
-					}
-				}
 			}
 		},
 	}
@@ -126,12 +109,76 @@ func (c *Controller) GetAccounts(ctx *gin.Context) {
 		return
 	}
 
-	// Apply info mode settings
+	// Always exclude sensitive fields (password, pk, phrase) for security
+	// These fields require separate MFA-protected API calls to access
 	if info {
 		db = db.Select("id", "name", "account")
+	} else {
+		// Exclude sensitive fields but include other metadata
+		db = db.Select("id", "name", "account", "account_type", "resource_id",
+			"creator_id", "updater_id", "created_at", "updated_at", "deleted_at")
 	}
 
 	doGet(ctx, false, db, config.RESOURCE_ACCOUNT, accountPostHooks...)
+}
+
+// GetAccountCredentials godoc
+//
+//	@Tags		account
+//	@Summary	Get account credentials with MFA verification
+//	@Param		id			path		int		true	"Account ID"
+//	@Param		X-MFA-Token	header		string	true	"MFA verification token"
+//	@Success	200			{object}	HttpResponse{data=model.Account}
+//	@Router		/account/{id}/credentials [post]
+func (c *Controller) GetAccountCredentials(ctx *gin.Context) {
+	// Get account ID from path parameter
+	accountId := cast.ToInt(ctx.Param("id"))
+	if accountId == 0 {
+		ctx.AbortWithError(http.StatusBadRequest, &myErrors.ApiError{
+			Code: myErrors.ErrInvalidArgument,
+			Data: map[string]any{"err": "Invalid account ID"},
+		})
+		return
+	}
+
+	// Get MFA token from header
+	mfaToken := ctx.GetHeader("X-Mfa-Token")
+	if mfaToken == "" {
+		ctx.AbortWithError(http.StatusUnauthorized, errors.New("MFA token required in X-MFA-Token header"))
+		return
+	}
+
+	// Verify MFA token using ACL service
+	if !acl.VerifyMFAToken(mfaToken) {
+		ctx.AbortWithError(http.StatusUnauthorized, errors.New("MFA token verification failed"))
+		return
+	}
+
+	// Build query with authorization check
+	db, err := accountService.BuildQueryWithAuthorization(ctx)
+	if err != nil {
+		ctx.AbortWithError(http.StatusInternalServerError, &myErrors.ApiError{
+			Code: myErrors.ErrInternal,
+			Data: map[string]any{"err": err},
+		})
+		return
+	}
+
+	// Query for the specific account with all fields (including sensitive ones)
+	var account model.Account
+	if err := db.Where("id = ?", accountId).First(&account).Error; err != nil {
+		ctx.AbortWithError(http.StatusNotFound, &myErrors.ApiError{
+			Data: map[string]any{"err": "Account not found or access denied"},
+		})
+		return
+	}
+
+	// Decrypt sensitive data before returning
+	accountService.DecryptSensitiveData([]*model.Account{&account})
+
+	ctx.JSON(http.StatusOK, HttpResponse{
+		Data: account,
+	})
 }
 
 // GetAccountIdsByAuthorization gets account IDs by authorization

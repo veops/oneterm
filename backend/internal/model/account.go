@@ -9,21 +9,21 @@ import (
 type Account struct {
 	Id          int    `json:"id" gorm:"column:id;primarykey;autoIncrement"`
 	Name        string `json:"name" gorm:"column:name;uniqueIndex:name_del;size:128"`
-	AccountType int    `json:"account_type" gorm:"column:account_type"`
+	AccountType int    `json:"account_type,omitempty" gorm:"column:account_type"`
 	Account     string `json:"account" gorm:"column:account"`
-	Password    string `json:"password" gorm:"column:password"`
-	Pk          string `json:"pk" gorm:"column:pk"`
-	Phrase      string `json:"phrase" gorm:"column:phrase"`
+	Password    string `json:"password,omitempty" gorm:"column:password"`
+	Pk          string `json:"pk,omitempty" gorm:"column:pk"`
+	Phrase      string `json:"phrase,omitempty" gorm:"column:phrase"`
 
-	Permissions []string              `json:"permissions" gorm:"-"`
-	ResourceId  int                   `json:"resource_id" gorm:"column:resource_id"`
-	CreatorId   int                   `json:"creator_id" gorm:"column:creator_id"`
-	UpdaterId   int                   `json:"updater_id" gorm:"column:updater_id"`
-	CreatedAt   time.Time             `json:"created_at" gorm:"column:created_at"`
-	UpdatedAt   time.Time             `json:"updated_at" gorm:"column:updated_at"`
+	Permissions []string              `json:"permissions,omitempty" gorm:"-"`
+	ResourceId  int                   `json:"resource_id,omitempty" gorm:"column:resource_id"`
+	CreatorId   int                   `json:"creator_id,omitempty" gorm:"column:creator_id"`
+	UpdaterId   int                   `json:"updater_id,omitempty" gorm:"column:updater_id"`
+	CreatedAt   time.Time             `json:"created_at,omitempty" gorm:"column:created_at"`
+	UpdatedAt   time.Time             `json:"updated_at,omitempty" gorm:"column:updated_at"`
 	DeletedAt   soft_delete.DeletedAt `json:"-" gorm:"column:deleted_at;uniqueIndex:name_del"`
 
-	AssetCount int64 `json:"asset_count" gorm:"-"`
+	AssetCount int64 `json:"asset_count,omitempty" gorm:"-"`
 }
 
 func (m *Account) TableName() string {

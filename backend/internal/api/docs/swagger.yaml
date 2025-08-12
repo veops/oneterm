@@ -1219,6 +1219,32 @@ paths:
             $ref: '#/definitions/controller.HttpResponse'
       tags:
       - account
+  /account/{id}/credentials:
+    post:
+      parameters:
+      - description: Account ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: MFA verification token
+        in: header
+        name: X-MFA-Token
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/controller.HttpResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Account'
+              type: object
+      summary: Get account credentials with MFA verification
+      tags:
+      - account
   /asset:
     get:
       parameters:
@@ -2532,8 +2558,6 @@ paths:
       - Preference
   /proxy:
     get:
-      consumes:
-      - '*/*'
       description: Handle web proxy requests for subdomain-based assets
       parameters:
       - description: Asset subdomain (asset-123.domain.com)
@@ -2545,23 +2569,9 @@ paths:
         in: query
         name: session_id
         type: string
-      produces:
-      - '*/*'
       responses:
         "200":
           description: Proxied content
-        "400":
-          description: Invalid subdomain format
-          schema:
-            additionalProperties: true
-            type: object
-        "401":
-          description: Session expired page
-        "403":
-          description: Access denied
-          schema:
-            additionalProperties: true
-            type: object
       summary: Proxy web requests
       tags:
       - WebProxy
@@ -3681,8 +3691,6 @@ paths:
       - time_template
   /web_proxy/cleanup:
     post:
-      consumes:
-      - application/json
       description: Clean up web session when browser tab is closed
       parameters:
       - description: Cleanup request
@@ -3693,8 +3701,6 @@ paths:
           additionalProperties:
             type: string
           type: object
-      produces:
-      - application/json
       responses:
         "200":
           description: Session cleaned up
@@ -3707,8 +3713,6 @@ paths:
       - WebProxy
   /web_proxy/close:
     post:
-      consumes:
-      - application/json
       description: Close an active web session and clean up resources
       parameters:
       - description: Session close request
@@ -3719,8 +3723,6 @@ paths:
           additionalProperties:
             type: string
           type: object
-      produces:
-      - application/json
       responses:
         "200":
           description: Session closed successfully
@@ -3728,23 +3730,11 @@ paths:
             additionalProperties:
               type: string
             type: object
-        "400":
-          description: Invalid request
-          schema:
-            additionalProperties: true
-            type: object
-        "404":
-          description: Session not found
-          schema:
-            additionalProperties: true
-            type: object
       summary: Close web session
       tags:
       - WebProxy
   /web_proxy/config/{asset_id}:
     get:
-      consumes:
-      - application/json
       description: Get web asset configuration by asset ID
       parameters:
       - description: Asset ID
@@ -3752,30 +3742,16 @@ paths:
         name: asset_id
         required: true
         type: integer
-      produces:
-      - application/json
       responses:
         "200":
           description: OK
           schema:
             $ref: '#/definitions/model.WebConfig'
-        "400":
-          description: Invalid asset ID
-          schema:
-            additionalProperties: true
-            type: object
-        "404":
-          description: Asset not found
-          schema:
-            additionalProperties: true
-            type: object
       summary: Get web asset configuration
       tags:
       - WebProxy
   /web_proxy/external_redirect:
     get:
-      consumes:
-      - text/html
       description: Show a page when an external redirect is blocked by the proxy
       parameters:
       - description: Target URL that was blocked
@@ -3783,8 +3759,6 @@ paths:
         name: url
         required: true
         type: string
-      produces:
-      - text/html
       responses:
         "200":
           description: External redirect blocked page
@@ -3793,8 +3767,6 @@ paths:
       - WebProxy
   /web_proxy/heartbeat:
     post:
-      consumes:
-      - application/json
       description: Update the last activity time for a web session (heartbeat)
       parameters:
       - description: Heartbeat request
@@ -3805,8 +3777,6 @@ paths:
           additionalProperties:
             type: string
           type: object
-      produces:
-      - application/json
       responses:
         "200":
           description: Heartbeat updated
@@ -3814,23 +3784,11 @@ paths:
             additionalProperties:
               type: string
             type: object
-        "400":
-          description: Invalid request
-          schema:
-            additionalProperties: true
-            type: object
-        "404":
-          description: Session not found
-          schema:
-            additionalProperties: true
-            type: object
       summary: Update session heartbeat
       tags:
       - WebProxy
   /web_proxy/sessions/{asset_id}:
     get:
-      consumes:
-      - application/json
       description: Get list of active web sessions for a specific asset
       parameters:
       - description: Asset ID
@@ -3838,8 +3796,6 @@ paths:
         name: asset_id
         required: true
         type: integer
-      produces:
-      - application/json
       responses:
         "200":
           description: List of active sessions
@@ -3848,18 +3804,11 @@ paths:
               additionalProperties: true
               type: object
             type: array
-        "400":
-          description: Invalid asset ID
-          schema:
-            additionalProperties: true
-            type: object
       summary: Get active web sessions
       tags:
       - WebProxy
   /web_proxy/start:
     post:
-      consumes:
-      - application/json
       description: Start a new web session for the specified asset
       parameters:
       - description: Start session request
@@ -3868,38 +3817,11 @@ paths:
         required: true
         schema:
           $ref: '#/definitions/web_proxy.StartWebSessionRequest'
-      produces:
-      - application/json
       responses:
         "200":
           description: OK
           schema:
             $ref: '#/definitions/web_proxy.StartWebSessionResponse'
-        "400":
-          description: Invalid request
-          schema:
-            additionalProperties: true
-            type: object
-        "403":
-          description: No permission
-          schema:
-            additionalProperties: true
-            type: object
-        "404":
-          description: Asset not found
-          schema:
-            additionalProperties: true
-            type: object
-        "429":
-          description: Maximum concurrent connections exceeded
-          schema:
-            additionalProperties: true
-            type: object
-        "500":
-          description: Internal server error
-          schema:
-            additionalProperties: true
-            type: object
       summary: Start web session
       tags:
       - WebProxy

@@ -188,6 +188,50 @@ const docTemplate = `{
                 }
             }
         },
+        "/account/{id}/credentials": {
+            "post": {
+                "tags": [
+                    "account"
+                ],
+                "summary": "Get account credentials with MFA verification",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "MFA verification token",
+                        "name": "X-MFA-Token",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/controller.HttpResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.Account"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/asset": {
             "get": {
                 "tags": [
@@ -2340,12 +2384,6 @@ const docTemplate = `{
         "/proxy": {
             "get": {
                 "description": "Handle web proxy requests for subdomain-based assets",
-                "consumes": [
-                    "*/*"
-                ],
-                "produces": [
-                    "*/*"
-                ],
                 "tags": [
                     "WebProxy"
                 ],
@@ -2368,23 +2406,6 @@ const docTemplate = `{
                 "responses": {
                     "200": {
                         "description": "Proxied content"
-                    },
-                    "400": {
-                        "description": "Invalid subdomain format",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "401": {
-                        "description": "Session expired page"
-                    },
-                    "403": {
-                        "description": "Access denied",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
                     }
                 }
             }
@@ -4261,12 +4282,6 @@ const docTemplate = `{
         "/web_proxy/cleanup": {
             "post": {
                 "description": "Clean up web session when browser tab is closed",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
                 "tags": [
                     "WebProxy"
                 ],
@@ -4301,12 +4316,6 @@ const docTemplate = `{
         "/web_proxy/close": {
             "post": {
                 "description": "Close an active web session and clean up resources",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
                 "tags": [
                     "WebProxy"
                 ],
@@ -4334,20 +4343,6 @@ const docTemplate = `{
                                 "type": "string"
                             }
                         }
-                    },
-                    "400": {
-                        "description": "Invalid request",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "404": {
-                        "description": "Session not found",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
                     }
                 }
             }
@@ -4355,12 +4350,6 @@ const docTemplate = `{
         "/web_proxy/config/{asset_id}": {
             "get": {
                 "description": "Get web asset configuration by asset ID",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
                 "tags": [
                     "WebProxy"
                 ],
@@ -4380,20 +4369,6 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/model.WebConfig"
                         }
-                    },
-                    "400": {
-                        "description": "Invalid asset ID",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "404": {
-                        "description": "Asset not found",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
                     }
                 }
             }
@@ -4401,12 +4376,6 @@ const docTemplate = `{
         "/web_proxy/external_redirect": {
             "get": {
                 "description": "Show a page when an external redirect is blocked by the proxy",
-                "consumes": [
-                    "text/html"
-                ],
-                "produces": [
-                    "text/html"
-                ],
                 "tags": [
                     "WebProxy"
                 ],
@@ -4430,12 +4399,6 @@ const docTemplate = `{
         "/web_proxy/heartbeat": {
             "post": {
                 "description": "Update the last activity time for a web session (heartbeat)",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
                 "tags": [
                     "WebProxy"
                 ],
@@ -4463,20 +4426,6 @@ const docTemplate = `{
                                 "type": "string"
                             }
                         }
-                    },
-                    "400": {
-                        "description": "Invalid request",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "404": {
-                        "description": "Session not found",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
                     }
                 }
             }
@@ -4484,12 +4433,6 @@ const docTemplate = `{
         "/web_proxy/sessions/{asset_id}": {
             "get": {
                 "description": "Get list of active web sessions for a specific asset",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
                 "tags": [
                     "WebProxy"
                 ],
@@ -4513,13 +4456,6 @@ const docTemplate = `{
                                 "additionalProperties": true
                             }
                         }
-                    },
-                    "400": {
-                        "description": "Invalid asset ID",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
                     }
                 }
             }
@@ -4527,12 +4463,6 @@ const docTemplate = `{
         "/web_proxy/start": {
             "post": {
                 "description": "Start a new web session for the specified asset",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
                 "tags": [
                     "WebProxy"
                 ],
@@ -4553,41 +4483,6 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/web_proxy.StartWebSessionResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid request",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "403": {
-                        "description": "No permission",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "404": {
-                        "description": "Asset not found",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "429": {
-                        "description": "Maximum concurrent connections exceeded",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
                         }
                     }
                 }

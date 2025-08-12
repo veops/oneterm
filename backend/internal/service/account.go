@@ -2,11 +2,13 @@ package service
 
 import (
 	"context"
+	"errors"
 
 	"github.com/gin-gonic/gin"
 	"github.com/veops/oneterm/internal/acl"
 	"github.com/veops/oneterm/internal/model"
 	"github.com/veops/oneterm/internal/repository"
+	"github.com/veops/oneterm/pkg/config"
 	"github.com/veops/oneterm/pkg/utils"
 	"golang.org/x/crypto/ssh"
 	"gorm.io/gorm"
@@ -103,4 +105,41 @@ func (s *AccountService) BuildQueryWithAuthorization(ctx *gin.Context) (*gorm.DB
 	}
 
 	return db, nil
+}
+
+// GetAccountCredentials gets account credentials with ACL permission check
+func (s *AccountService) GetAccountCredentials(ctx *gin.Context, accountId int) (*model.Account, error) {
+	// Get current user info
+	currentUser, err := acl.GetSessionFromCtx(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// First get the account to check if it exists
+	var account model.Account
+	baseRepo := repository.NewBaseRepository()
+	if err := baseRepo.GetById(ctx, accountId, &account); err != nil {
+		return nil, errors.New("account not found")
+	}
+
+	if acl.IsAdmin(currentUser) {
+		// Decrypt sensitive data before returning
+		s.DecryptSensitiveData([]*model.Account{&account})
+		return &account, nil
+	}
+
+	// Check if user has read permission for this account resource
+	hasPermission, err := acl.HasPermission(ctx, currentUser.GetRid(), config.RESOURCE_ACCOUNT, account.ResourceId, acl.READ)
+	if err != nil {
+		return nil, err
+	}
+
+	if !hasPermission {
+		return nil, errors.New("permission denied")
+	}
+
+	// Decrypt sensitive data before returning
+	s.DecryptSensitiveData([]*model.Account{&account})
+
+	return &account, nil
 }

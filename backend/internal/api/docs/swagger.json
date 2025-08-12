@@ -221,6 +221,43 @@
                 }
             }
         },
+        "/account/{id}/credentials2": {
+            "get": {
+                "tags": [
+                    "account"
+                ],
+                "summary": "Get account credentials with authorization check only",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/controller.HttpResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.Account"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/asset": {
             "get": {
                 "tags": [

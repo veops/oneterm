@@ -1245,6 +1245,27 @@ paths:
       summary: Get account credentials with MFA verification
       tags:
       - account
+  /account/{id}/credentials2:
+    get:
+      parameters:
+      - description: Account ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/controller.HttpResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Account'
+              type: object
+      summary: Get account credentials with authorization check only
+      tags:
+      - account
   /asset:
     get:
       parameters:

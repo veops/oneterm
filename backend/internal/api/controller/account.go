@@ -154,27 +154,68 @@ func (c *Controller) GetAccountCredentials(ctx *gin.Context) {
 		return
 	}
 
-	// Build query with authorization check
-	db, err := accountService.BuildQueryWithAuthorization(ctx)
+	account, err := accountService.GetAccountCredentials(ctx, accountId)
 	if err != nil {
-		ctx.AbortWithError(http.StatusInternalServerError, &myErrors.ApiError{
-			Code: myErrors.ErrInternal,
-			Data: map[string]any{"err": err},
+		if err.Error() == "account not found" {
+			ctx.AbortWithError(http.StatusNotFound, &myErrors.ApiError{
+				Data: map[string]any{"err": "Account not found"},
+			})
+		} else if err.Error() == "permission denied" {
+			ctx.AbortWithError(http.StatusForbidden, &myErrors.ApiError{
+				Code: myErrors.ErrNoPerm,
+				Data: map[string]any{"perm": acl.READ},
+			})
+		} else {
+			ctx.AbortWithError(http.StatusInternalServerError, &myErrors.ApiError{
+				Code: myErrors.ErrInternal,
+				Data: map[string]any{"err": err.Error()},
+			})
+		}
+		return
+	}
+
+	ctx.JSON(http.StatusOK, HttpResponse{
+		Data: account,
+	})
+}
+
+// GetAccountCredentials2 godoc
+//
+//	@Tags		account
+//	@Summary	Get account credentials with authorization check only
+//	@Param		id		path		int		true	"Account ID"
+//	@Success	200		{object}	HttpResponse{data=model.Account}
+//	@Router		/account/{id}/credentials2 [get]
+func (c *Controller) GetAccountCredentials2(ctx *gin.Context) {
+	// Get account ID from path parameter
+	accountId := cast.ToInt(ctx.Param("id"))
+	if accountId == 0 {
+		ctx.AbortWithError(http.StatusBadRequest, &myErrors.ApiError{
+			Code: myErrors.ErrInvalidArgument,
+			Data: map[string]any{"err": "Invalid account ID"},
 		})
 		return
 	}
 
-	// Query for the specific account with all fields (including sensitive ones)
-	var account model.Account
-	if err := db.Where("id = ?", accountId).First(&account).Error; err != nil {
-		ctx.AbortWithError(http.StatusNotFound, &myErrors.ApiError{
-			Data: map[string]any{"err": "Account not found or access denied"},
-		})
+	account, err := accountService.GetAccountCredentials(ctx, accountId)
+	if err != nil {
+		if err.Error() == "account not found" {
+			ctx.AbortWithError(http.StatusNotFound, &myErrors.ApiError{
+				Data: map[string]any{"err": "Account not found"},
+			})
+		} else if err.Error() == "permission denied" {
+			ctx.AbortWithError(http.StatusForbidden, &myErrors.ApiError{
+				Code: myErrors.ErrNoPerm,
+				Data: map[string]any{"perm": acl.READ},
+			})
+		} else {
+			ctx.AbortWithError(http.StatusInternalServerError, &myErrors.ApiError{
+				Code: myErrors.ErrInternal,
+				Data: map[string]any{"err": err.Error()},
+			})
+		}
 		return
 	}
-
-	// Decrypt sensitive data before returning
-	accountService.DecryptSensitiveData([]*model.Account{&account})
 
 	ctx.JSON(http.StatusOK, HttpResponse{
 		Data: account,

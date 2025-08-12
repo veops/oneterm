@@ -30,7 +30,7 @@ var (
 	// Protocol-specific colors (using primary palette)
 	SSHColor        = PrimaryColor9  // Bright blue for SSH
 	MySQLColor      = PrimaryColor   // Deep blue for MySQL
-	RedisColor      = lipgloss.Color("#DC382D") // Keep Redis brand red
+	RedisColor      = lipgloss.Color("#9C27B0") // Purple for Redis
 	MongoDBColor    = lipgloss.Color("#4DB33D") // Keep MongoDB brand green
 	PostgreSQLColor = PrimaryColor2  // Light blue for PostgreSQL
 	TelnetColor     = PrimaryColor8  // Soft blue for Telnet

@@ -13,7 +13,7 @@ func GetProtocolIcon(protocol string) string {
 	case "mysql":
 		return "◆"
 	case "redis":
-		return "⚡"
+		return "●"
 	case "mongodb":
 		return "◉"
 	case "postgresql":

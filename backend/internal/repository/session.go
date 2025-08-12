@@ -194,6 +194,8 @@ func (r *sessionRepository) GetRecentSessionsByUser(ctx context.Context, uid int
 		Where("uid = ?", uid).
 		Where("asset_id > 0").
 		Where("account_id > 0").
+		Where("protocol NOT LIKE ?", "rdp%").
+		Where("protocol NOT LIKE ?", "vnc%").
 		Group("asset_id, account_id").
 		Find(&maxSessions).Error
 	
@@ -214,6 +216,8 @@ func (r *sessionRepository) GetRecentSessionsByUser(ctx context.Context, uid int
 	// Get the full session records for those IDs
 	err = dbpkg.DB.Model(&model.Session{}).
 		Where("id IN ?", sessionIds).
+		Where("protocol NOT LIKE ?", "rdp%").
+		Where("protocol NOT LIKE ?", "vnc%").
 		Order("created_at DESC").
 		Limit(limit).
 		Find(&sessions).Error

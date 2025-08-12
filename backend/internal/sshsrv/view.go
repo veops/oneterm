@@ -120,12 +120,12 @@ func initialView(ctx *gin.Context, sess ssh.Session, r io.ReadCloser, w io.Write
 	ti.Cursor.Style = colors.AccentStyle
 	// Disable Tab for AcceptSuggestion to handle it ourselves
 	ti.KeyMap.AcceptSuggestion = key.NewBinding(key.WithKeys("ctrl+x")) // Use a key that won't be pressed
-	
+
 	// Initialize spinner
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = colors.PrimaryStyle
-	
+
 	v := view{
 		Ctx:           ctx,
 		Sess:          sess,
@@ -163,7 +163,7 @@ func (m *view) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		tableCmd   tea.Cmd
 		spinnerCmd tea.Cmd
 	)
-	
+
 	// Update spinner if connecting
 	if m.connecting {
 		m.spinner, spinnerCmd = m.spinner.Update(msg)
@@ -265,7 +265,7 @@ func (m *view) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					height = 24
 				}
 
-				// Get recent sessions
+				// Get recent sessions (filtered at database level)
 				sessions, err := m.getRecentSessions()
 				if err != nil {
 					return m, tea.Sequence(
@@ -589,15 +589,15 @@ func (m *view) handleConnectionCommand(cmd string) tea.Cmd {
 	m.connecting = true
 
 	return tea.Sequence(
-		tea.Printf("\n  %s %s\n", 
-			colors.PrimaryStyle.Render("⚡"), 
+		tea.Printf("\n  %s %s\n",
+			colors.PrimaryStyle.Render("⚡"),
 			colors.AccentStyle.Render(fmt.Sprintf("Initiating secure connection to %s", cmd))),
 		// Start spinner and connection in background
 		m.spinner.Tick,
 		tea.Exec(&connector{Ctx: newCtx, Sess: m.Sess, Vw: m, gctx: m.gctx}, func(err error) tea.Msg {
 			m.connecting = false
 			if err != nil {
-				return errMsg(fmt.Errorf("%s Connection failed: %v", 
+				return errMsg(fmt.Errorf("%s Connection failed: %v",
 					colors.ErrorStyle.Render("✗"), err))
 			}
 			return nil
@@ -744,7 +744,6 @@ func (m *view) magicn() tea.Msg {
 }
 
 func (m *view) getRecentSessions() ([]*model.Session, error) {
-	// Use repository to get recent sessions, deduplicated by asset_id and account_id
 	sessionRepo := repository.NewSessionRepository()
 	return sessionRepo.GetRecentSessionsByUser(m.gctx, m.currentUser.GetUid(), 20)
 }

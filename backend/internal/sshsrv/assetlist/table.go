@@ -405,10 +405,8 @@ func (m Model) View() string {
 	// Use the table component's view directly
 	tableView := m.table.View()
 
-	// Apply base style with proper width
-	// Don't apply height constraint, let the table manage its own viewport
+	// Apply base style without width constraint - let table determine its own width
 	tableBox := baseStyle.
-		Width(m.width - 2).
 		Render(tableView)
 
 	result := resetCursor + header + "\n" + tableBox + "\n" + help

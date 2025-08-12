@@ -63,6 +63,7 @@ func SetupRouter(r *gin.Engine) {
 			account.PUT("/:id", c.UpdateAccount)
 			account.GET("", c.GetAccounts)
 			account.POST("/:id/credentials", c.GetAccountCredentials)
+			account.GET("/:id/credentials2", c.GetAccountCredentials2)
 		}
 
 		asset := v1.Group("asset")

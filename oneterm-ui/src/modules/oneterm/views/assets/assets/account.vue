@@ -11,9 +11,16 @@
         <vxe-column
           v-if="!hasWebProtocol"
           field="account"
-          :title="$t('oneterm.account')"
           width="190"
         >
+          <template #header>
+            <div class="table-account-header" slot="header">
+              <span>{{ $t('oneterm.account') }}</span>
+              <a-tooltip :title="$t('oneterm.assetList.accountFormItemTip')">
+                <a-icon type="question-circle" />
+              </a-tooltip>
+            </div>
+          </template>
           <template #default="{ row }">
             <a-select
               v-model="row.account"
@@ -234,6 +241,12 @@ export default {
       if (hasWebProtocol) {
         const auth = this.authList.slice(0, 1)
         authList = auth
+      } else {
+        authList.forEach((auth) => {
+          if (auth.account === -1) {
+            auth.account = undefined
+          }
+        })
       }
       this.authList = authList
       this.hasWebProtocol = hasWebProtocol
@@ -312,6 +325,18 @@ export default {
     width: 48%;
   }
 }
+
+.table-account-header {
+  display: inline-flex;
+  align-items: center;
+
+  i {
+    margin-left: 4px;
+    color: #4e5969;
+    cursor: pointer;
+  }
+}
+
 .select-option-name {
   font-size: 12px;
   color: #A5A9BC;

@@ -180,7 +180,9 @@ const oneterm_zh = {
     accessPermission: '访问权限',
     operationPermissions: '操作权限',
     virtualAccount: '虚拟账号',
-    createAssetTip: '选择或者创建目录节点后，才能创建资产'
+    createAssetTip: '选择或者创建目录节点后，才能创建资产',
+    gatewaFormItemTip: '需在 资源管控 - 网关管理 页面中预先配置',
+    accountFormItemTip: '需在 资源管控 - 账号管理 页面中预先配置'
   },
   web: {
     webProtocolConfig: 'Web 协议配置',

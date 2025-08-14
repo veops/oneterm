@@ -181,7 +181,9 @@ const oneterm_en = {
     accessPermission: 'Access Permission',
     operationPermissions: 'Operation Permissions',
     virtualAccount: 'Virtual Account',
-    createAssetTip: 'Assets can only be created after selecting or creating a folder'
+    createAssetTip: 'Assets can only be created after selecting or creating a folder',
+    gatewaFormItemTip: 'Must be preconfigured on the Resource Control - Gateway Management page.',
+    accountFormItemTip: 'Must be preconfigured on the Resource Control - Account Management page.',
   },
   web: {
     webProtocolConfig: 'Web Protocol Config',

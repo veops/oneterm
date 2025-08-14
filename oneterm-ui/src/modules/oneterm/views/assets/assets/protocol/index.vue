@@ -54,10 +54,15 @@
     </a-form-model-item>
 
     <a-form-model-item
-      :label="$t('oneterm.gateway')"
       prop="gateway_id"
-      :style="{ display: 'flex', alignItems: 'center' }"
+      class="form-gateway"
     >
+      <div class="form-gateway-label" slot="label">
+        <span>{{ $t('oneterm.gateway') }}</span>
+        <a-tooltip :title="$t('oneterm.assetList.gatewaFormItemTip')">
+          <a-icon type="question-circle" />
+        </a-tooltip>
+      </div>
       <treeselect
         class="custom-treeselect custom-treeselect-white"
         :style="{
@@ -231,6 +236,22 @@ export default {
   .ant-space {
     position: absolute;
     right: -45px;
+  }
+}
+
+.form-gateway {
+  display: flex;
+  align-items: center;
+
+  &-label {
+    display: inline-flex;
+    align-items: center;
+
+    i {
+      margin-left: 4px;
+      color: #4e5969;
+      cursor: pointer;
+    }
   }
 }
 

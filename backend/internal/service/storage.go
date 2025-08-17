@@ -590,6 +590,9 @@ func InitStorageService() {
 		zap.Int("total_configs", len(configs)),
 		zap.Int("successful_providers", successCount),
 		zap.String("primary_provider", storageImpl.primary))
+
+	// Start background health monitoring after successful initialization
+	startHealthMonitoring()
 }
 
 // loadOrCreateStorageConfigs loads existing configurations or creates default configuration
@@ -718,7 +721,10 @@ func verifyPrimaryProvider(ctx context.Context, s *storageService) error {
 
 func init() {
 	DefaultStorageService = NewStorageService()
+}
 
+// startHealthMonitoring starts the background health monitoring routine
+func startHealthMonitoring() {
 	// Initialize health monitoring context
 	healthMonitoringCtx, healthMonitoringCancel = context.WithCancel(context.Background())
 
@@ -741,26 +747,6 @@ func init() {
 			}
 		}
 	}()
-
-	// Start background storage metrics calculation
-	// go func() {
-	// 	// Update storage metrics every 30 minutes to avoid high resource consumption
-	// 	ticker := time.NewTicker(30 * time.Minute)
-	// 	defer ticker.Stop()
-
-	// 	// Initial update after 5 minutes
-	// 	time.Sleep(5 * time.Minute)
-	// 	if DefaultStorageService != nil {
-	// 		performMetricsUpdate()
-	// 	}
-
-	// 	for {
-	// 		<-ticker.C
-	// 		if DefaultStorageService != nil {
-	// 			performMetricsUpdate()
-	// 		}
-	// 	}
-	// }()
 }
 
 // StopStorageService stops all background tasks for storage service

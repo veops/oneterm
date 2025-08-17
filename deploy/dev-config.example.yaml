@@ -1,0 +1,70 @@
+# OneTerm Development Environment Configuration Example
+# Copy this file to your backend/cmd/server/ directory as config.yaml and modify as needed
+
+# Debug mode for development
+mode: debug
+
+# HTTP API server configuration
+http:
+  host: 0.0.0.0
+  port: 8888
+
+# SSH server configuration
+ssh:
+  host: 0.0.0.0
+  port: 2222
+  # SSH private key for the server (generate your own for production)
+  privateKey: |
+    -----BEGIN OPENSSH PRIVATE KEY-----
+    b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
+    QyNTUxOQAAACBg490b4zqumtizCyM4RWtzJnPEsPIInBFugk8+UCb8XgAAAKCc1yKrnNci
+    qwAAAAtzc2gtZWQyNTUxOQAAACBg490b4zqumtizCyM4RWtzJnPEsPIInBFugk8+UCb8Xg
+    AAAECvd1Yj+bQxyxJtU3PirLK68CD3MWqBv0/shlFKS6wmbWDj3RvjOq6a2LMLIzhFa3Mm
+    c8Sw8gicEW6CTz5QJvxeAAAAGnJvb3RAbG9jYWxob3N0LmxvY2FsZG9tYWluAQID
+    -----END OPENSSH PRIVATE KEY-----
+
+# Guacamole daemon configuration (for RDP/VNC support)
+# Point to containerized guacd or localhost for development
+guacd:
+  host: localhost  # Change to 'localhost' for development environment
+  port: 14822      # Mapped port for development (container port 4822 -> host 14822)
+
+# MySQL database configuration
+# Point to containerized MySQL or localhost for development
+mysql:
+  host: localhost  # Change to 'localhost' for development environment
+  port: 13306      # Mapped port for development (container port 3306 -> host 13306)
+  user: root
+  password: 123456
+
+# Redis configuration
+# Point to containerized Redis or localhost for development
+redis:
+  host: localhost  # Change to 'localhost' for development environment
+  port: 16379      # Mapped port for development (container port 6379 -> host 16379)
+  password: ""
+
+# Logging configuration
+log:
+  level: debug     # Use debug level for development
+  format: json     # json or text
+  maxSize: 1       # Log file max size in MB
+  consoleEnable: true  # Enable console output
+
+# Authentication and ACL configuration
+auth:
+  acl:
+    appId: 5867e079dfd1437e9ae07576ab24b391
+    secretKey: 2qlTA4z@#KyigJLYHGrev?0WD6hjX*8E
+    url: http://localhost:15000/api/v1  # Point to development ACL API port
+  aes:
+    key: thisis32bitlongpassphraseimusing  # 32-character AES key
+    iv: 0123456789abcdef                   # 16-character AES IV
+
+# Secret key for JWT and other security features
+# IMPORTANT: Change this in production!
+secretKey: xW2FAUfgffjmerTEBXADmURDOQ43ojLN
+
+# Session configuration
+session:
+  replayDir: /replay/  # Directory for session recordings

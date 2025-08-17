@@ -1,0 +1,156 @@
+# Docker Compose Configuration - Frontend Development Environment
+# Start necessary backend containers, run frontend locally
+
+services:
+  # MySQL Database
+  mysql:
+    image: registry.cn-hangzhou.aliyuncs.com/veops/mysql:8.2.0
+    container_name: oneterm-mysql-dev
+    environment:
+      TZ: Asia/Shanghai
+      MYSQL_ROOT_PASSWORD: '123456'
+      MYSQL_DATABASE: 'oneterm'
+    volumes:
+      - ./volume/mysql:/var/lib/mysql
+      - ./mysqld.cnf:/etc/mysql/conf.d/mysqld.cnf
+      - ./acl.sql:/docker-entrypoint-initdb.d/2-acl.sql
+      - ./create-users.sql:/docker-entrypoint-initdb.d/1-create-users.sql
+    ports:
+      - "13306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-P", "3306", "-u", "root", "-p123456"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    restart: always
+    networks:
+      new:
+        aliases:
+          - mysql
+
+  # Redis Cache
+  redis:
+    image: registry.cn-hangzhou.aliyuncs.com/veops/redis:7.2.3
+    container_name: oneterm-redis-dev
+    restart: always
+    environment:
+      TZ: Asia/Shanghai
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "16379:6379"
+    networks:
+      new:
+        aliases:
+          - redis
+
+  # Guacamole Daemon (RDP/VNC Support)
+  oneterm-guacd:
+    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-guacd:1.5.4
+    container_name: oneterm-guacd-dev
+    user: root
+    restart: always
+    volumes:
+      - ./volume/replay:/replay
+      - ./volume/rdp:/rdp
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "4822"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "14822:4822"
+    networks:
+      new:
+        aliases:
+          - oneterm-guacd
+
+  # ACL API Service
+  acl-api:
+    image: registry.cn-hangzhou.aliyuncs.com/veops/acl-api:2.2
+    container_name: oneterm-acl-api-dev
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      TZ: Asia/Shanghai
+      WAIT_HOSTS: mysql:3306, redis:6379
+      SYSTEM_DEFAULT_LANGUAGE:  # en-US, zh-CN
+    volumes:
+      - ./.env:/data/apps/acl/.env
+    restart: always
+    command:
+      - /bin/sh
+      - -c
+      - |
+        if [ ! -f /var/run/.initialized ]; then
+          flask db-setup
+          flask common-check-new-columns
+          flask init-acl
+          flask init-department
+          touch /var/run/.initialized
+        fi
+
+        nohup bash -c 'flask db-setup && flask common-check-new-columns' >/dev/null 2>&1 &
+
+        gunicorn --workers=3 autoapp:app -b 0.0.0.0:5000 -D --access-logfile logs/access.log --error-logfile logs/error.log
+
+        celery -A celery_worker.celery worker -E -Q acl_async --logfile=one_acl_async.log --autoscale=2,1 
+    healthcheck:
+      test: ["CMD", "nc", "-z", "127.0.0.1", "5000"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "15000:5000"  # Expose port for local backend access
+    networks:
+      new:
+        aliases:
+          - acl-api
+
+  # OneTerm API Service (optional, for complete backend environment)
+  oneterm-api:
+    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-api:v25.8.2
+    container_name: oneterm-api-dev
+    environment:
+      ONETERM_RDP_DRIVE_PATH: /rdp
+    volumes:
+      - ./volume/replay:/replay
+      - ./volume/rdp:/rdp
+      - ./config.yaml:/oneterm/config.yaml
+    depends_on:
+      oneterm-guacd:
+        condition: service_healthy
+      acl-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8888"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command:
+      - "./server"
+      - "config.yaml"
+    restart: always
+    networks:
+      new:
+        aliases:
+          - oneterm-api
+    tty: true
+    ports:
+      - "2222:2222"  # SSH Port
+      - "18888:8888" # API Port
+
+networks:
+  new:
+    driver: bridge
+    name: oneterm_dev_network
+    ipam:
+      config:
+        - subnet: 172.31.0.0/24

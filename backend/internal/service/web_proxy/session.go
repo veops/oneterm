@@ -2,6 +2,7 @@ package web_proxy
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -14,6 +15,13 @@ import (
 
 // Global session storage
 var webProxySessions = make(map[string]*WebProxySession)
+
+// Global cleanup context
+var (
+	cleanupCtx    context.Context
+	cleanupCancel context.CancelFunc
+	cleanupWg     sync.WaitGroup
+)
 
 // WebProxySession represents an active web proxy session
 type WebProxySession struct {
@@ -73,15 +81,37 @@ func cleanupExpiredSessions(maxInactiveTime time.Duration) {
 
 // StartSessionCleanupRoutine starts background cleanup routine for web sessions
 func StartSessionCleanupRoutine() {
+	// Initialize cleanup context
+	cleanupCtx, cleanupCancel = context.WithCancel(context.Background())
+	
 	// More frequent cleanup - every 30 seconds to catch closed browser tabs quickly
 	ticker := time.NewTicker(30 * time.Second)
+	cleanupWg.Add(1)
 	go func() {
-		for range ticker.C {
-			// Use system configured timeout (same as other protocols)
-			systemTimeout := time.Duration(model.GlobalConfig.Load().Timeout) * time.Second
-			cleanupExpiredSessions(systemTimeout)
+		defer cleanupWg.Done()
+		defer ticker.Stop()
+		
+		for {
+			select {
+			case <-cleanupCtx.Done():
+				logger.L().Info("Web proxy session cleanup stopped")
+				return
+			case <-ticker.C:
+				// Use system configured timeout (same as other protocols)
+				systemTimeout := time.Duration(model.GlobalConfig.Load().Timeout) * time.Second
+				cleanupExpiredSessions(systemTimeout)
+			}
 		}
 	}()
+}
+
+// StopSessionCleanupRoutine stops the background cleanup routine
+func StopSessionCleanupRoutine() {
+	if cleanupCancel != nil {
+		cleanupCancel()
+		cleanupWg.Wait()
+		logger.L().Info("Web proxy session cleanup routine stopped")
+	}
 }
 
 // GetSession retrieves a session by ID

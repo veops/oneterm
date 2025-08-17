@@ -3,6 +3,7 @@ package sshsrv
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/gliderlabs/ssh"
 	gossh "golang.org/x/crypto/ssh"
@@ -40,5 +41,15 @@ func RunSsh() error {
 }
 
 func StopSsh() {
-	defer cancel()
+	if server != nil {
+		// Use a fresh context for shutdown with timeout
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer shutdownCancel()
+		
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			// If graceful shutdown fails, force close
+			server.Close()
+		}
+	}
+	cancel()
 }

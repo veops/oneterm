@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -542,6 +543,13 @@ func (s *storageService) GetAvailableProvider(ctx context.Context) (storage.Prov
 // Global storage service instance
 var DefaultStorageService StorageService
 
+// Global context for health monitoring
+var (
+	healthMonitoringCtx    context.Context
+	healthMonitoringCancel context.CancelFunc
+	healthMonitoringWg     sync.WaitGroup
+)
+
 // InitStorageService initializes the global storage service with database configurations
 func InitStorageService() {
 	if DefaultStorageService == nil {
@@ -711,15 +719,25 @@ func verifyPrimaryProvider(ctx context.Context, s *storageService) error {
 func init() {
 	DefaultStorageService = NewStorageService()
 
+	// Initialize health monitoring context
+	healthMonitoringCtx, healthMonitoringCancel = context.WithCancel(context.Background())
+
 	// Start background storage health monitoring
+	healthMonitoringWg.Add(1)
 	go func() {
+		defer healthMonitoringWg.Done()
 		ticker := time.NewTicker(5 * time.Minute)
 		defer ticker.Stop()
 
 		for {
-			<-ticker.C
-			if DefaultStorageService != nil {
-				performHealthMonitoring()
+			select {
+			case <-healthMonitoringCtx.Done():
+				logger.L().Info("Storage health monitoring stopped")
+				return
+			case <-ticker.C:
+				if DefaultStorageService != nil {
+					performHealthMonitoring()
+				}
 			}
 		}
 	}()
@@ -743,6 +761,15 @@ func init() {
 	// 		}
 	// 	}
 	// }()
+}
+
+// StopStorageService stops all background tasks for storage service
+func StopStorageService() {
+	if healthMonitoringCancel != nil {
+		healthMonitoringCancel()
+		healthMonitoringWg.Wait()
+		logger.L().Info("Storage service background tasks stopped")
+	}
 }
 
 // performHealthMonitoring performs periodic health checks on all storage providers

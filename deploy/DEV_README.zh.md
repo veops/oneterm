@@ -49,14 +49,14 @@ docker compose -f docker-compose.frontend-dev.yaml ps
 cd oneterm-ui
 
 # 安装依赖
-npm install
+yarn install
 
 # 启动开发服务器
 npm run serve
 ```
 
 3. **访问应用**
-- 前端开发服务器: http://localhost:8080
+- 前端开发服务器: http://localhost:8000
 - OneTerm API: http://localhost:18888
 - ACL API: http://localhost:15000
 
@@ -105,7 +105,6 @@ cd oneterm-ui
 npm run serve          # 启动开发服务器
 npm run lint           # 代码检查
 npm run lint:nofix     # 仅检查不修复
-npm test:unit          # 运行单元测试
 
 # 构建
 npm run build          # 生产构建
@@ -261,11 +260,7 @@ cp ../../deploy/dev-config.example.yaml config.yaml
 
 ## 贡献指南
 
-1. Fork 项目
-2. 创建特性分支: `git checkout -b feature/new-feature`
-3. 提交更改: `git commit -am 'Add new feature'`
-4. 推送分支: `git push origin feature/new-feature`
-5. 创建 Pull Request
++ [CONTRIBUTING_cn.md](../CONTRIBUTING_cn.md)
 
 ## 技术支持
 

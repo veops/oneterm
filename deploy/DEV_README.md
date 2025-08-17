@@ -49,14 +49,14 @@ docker compose -f docker-compose.frontend-dev.yaml ps
 cd oneterm-ui
 
 # Install dependencies
-npm install
+yarn install
 
 # Start development server
 npm run serve
 ```
 
 3. **Access the Application**
-- Frontend dev server: http://localhost:8080
+- Frontend dev server: http://localhost:8000
 - OneTerm API: http://localhost:18888
 - ACL API: http://localhost:15000
 
@@ -105,7 +105,6 @@ cd oneterm-ui
 npm run serve          # Start development server
 npm run lint           # Code linting
 npm run lint:nofix     # Check only without fixing
-npm test:unit          # Run unit tests
 
 # Build
 npm run build          # Production build
@@ -261,11 +260,7 @@ The frontend automatically proxies to the backend. For custom proxy settings, ed
 
 ## Contributing
 
-1. Fork the project
-2. Create a feature branch: `git checkout -b feature/new-feature`
-3. Commit changes: `git commit -am 'Add new feature'`
-4. Push branch: `git push origin feature/new-feature`
-5. Create Pull Request
++ [CONTRIBUTING.md](../CONTRIBUTING.md)
 
 ## Support
 

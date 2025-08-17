@@ -1,0 +1,30 @@
+# OneTerm Deploy Directory - Sensitive Files
+# Do not commit passwords or backup files
+
+# Password reference files
+.passwords
+*.passwords
+
+# Backup files created by migration scripts
+*.backup.*
+*.original.*
+backup_*.sql
+
+# Environment files with sensitive data
+.env.local
+.env.production
+
+# Temporary files
+*.tmp
+*.temp
+
+# Log files
+*.log
+logs/
+
+# Database volumes (if mounted locally)
+volume/
+
+# Docker override files (may contain local passwords)
+docker-compose.override.yml
+docker-compose.override.yaml

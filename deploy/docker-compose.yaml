@@ -121,7 +121,7 @@ services:
       - "8666:80"
 
   acl-api:
-    image: registry.cn-hangzhou.aliyuncs.com/veops/acl-api:2.1
+    image: registry.cn-hangzhou.aliyuncs.com/veops/acl-api:2.2
     container_name: oneterm-acl-api
     depends_on:
       mysql:

@@ -87,15 +87,17 @@ func connectDB(sess *gsession.Session, asset *model.Asset, account *model.Accoun
 		// Log process exit - only log as error if there was an actual error
 		if err != nil {
 			logger.L().Error("Database client process exited with error", zap.Error(err), zap.String("protocol", protocol))
+			// Only send termination message for error exits
+			if atomic.CompareAndSwapInt32(&exitMessageSent, 0, 1) {
+				terminationMsg := "\r\n\033[31mThe connection is closed!\033[0m\r\n"
+				chs.OutBuf.WriteString(terminationMsg)
+			}
 		} else {
 			logger.L().Info("Database client process exited normally", zap.String("protocol", protocol))
-		}
-
-		// Only send termination message if not already sent
-		if atomic.CompareAndSwapInt32(&exitMessageSent, 0, 1) {
-			// Send termination message
-			terminationMsg := "\r\n\033[31mThe connection is closed!\033[0m\r\n"
-			chs.OutBuf.WriteString(terminationMsg)
+			// For normal exit, don't send any additional message
+			// The client (redis, mysql, etc.) will have already shown its own exit message
+			// Mark that exit message has been "sent" to prevent any error message
+			atomic.StoreInt32(&exitMessageSent, 1)
 		}
 
 		sess.Once.Do(func() {
@@ -166,9 +168,8 @@ func connectDB(sess *gsession.Session, asset *model.Asset, account *model.Accoun
 								return err
 							}
 
-							// Mark exit message as sent, but don't send it here
-							atomic.StoreInt32(&exitMessageSent, 1)
-
+							// Let the client process the exit command naturally
+							// The client will display its own exit message (e.g., "Goodbye!" for redis)
 							inputBuffer = ""
 							continue
 						}

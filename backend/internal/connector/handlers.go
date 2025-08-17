@@ -380,6 +380,8 @@ func HandleTerm(sess *gsession.Session, ctx *gin.Context) (err error) {
 				protocols.Write(sess)
 				return
 			case <-chs.AwayChan:
+				// Flush any remaining output before terminating
+				protocols.Write(sess)
 				return
 			case <-sess.IdleTk.C:
 				msg := (&myErrors.ApiError{Code: myErrors.ErrIdleTimeout, Data: map[string]any{"second": model.GlobalConfig.Load().Timeout}}).MessageWithCtx(ctx)

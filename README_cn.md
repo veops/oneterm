@@ -97,16 +97,31 @@ OneTerm 是一款简单、轻量、灵活的企业级堡垒机产品，基于4A�
 
 ## 开箱即用
 
+### 方式一：快速部署（默认密码）
 + docker-compose 安装
   ```bash
   git clone https://github.com/veops/oneterm.git
   cd oneterm/deploy
   docker compose up -d
   ```
-+ 访问
+
+### 方式二：安全部署（自定义密码）
++ 生产环境建议使用安装脚本配置安全密码：
+  ```bash
+  git clone https://github.com/veops/oneterm.git
+  cd oneterm/deploy
+  ./setup.sh
+  docker compose up -d
+  ```
+  安装脚本将会：
+  - 生成安全的随机密码或允许你设置自定义密码
+  - 使用你的密码更新所有配置文件
+  - 为安全起见创建备份文件
+
++ **访问**
   - 浏览器: [http://127.0.0.1:8666](http://127.0.0.1:8666)
   - 账号: admin
-  - 密码: 123456
+  - 密码: 123456（默认）或使用setup.sh时设置的自定义密码
 
 ## 代码贡献
 我们欢迎所有开发者贡献代码，改善和扩展这个项目。请先阅读我们的[贡献指南](CONTRIBUTING_cn.md)。此外，您还可以通过社交媒体、活动和分享来支持 Veops 的开源。

@@ -93,16 +93,31 @@ Star us, and you will receive all releases notifications from GitHub without any
 
 ## Quick Start
 
+### Option 1: Quick Deploy (Default Passwords)
 + docker-compose install
   ```bash
   git clone https://github.com/veops/oneterm.git
   cd oneterm/deploy
   docker compose up -d
   ```
-+ visit
+
+### Option 2: Secure Deploy (Custom Passwords)
++ For production environments, use the setup script to configure secure passwords:
+  ```bash
+  git clone https://github.com/veops/oneterm.git
+  cd oneterm/deploy
+  ./setup.sh
+  docker compose up -d
+  ```
+  The setup script will:
+  - Generate secure random passwords or let you set custom ones
+  - Update all configuration files with your passwords
+  - Create backup files for safety
+
++ **Access**
   - Open your browser and visit: [http://127.0.0.1:8666](http://127.0.0.1:8666)
   - Username: admin
-  - Password: 123456
+  - Password: 123456 (default) or your custom password if using setup.sh
 
 ## Contributing
 

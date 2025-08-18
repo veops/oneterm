@@ -95,7 +95,7 @@ start_frontend_dev() {
     echo ""
     print_info "Next steps:"
     echo "1. cd ../oneterm-ui"
-    echo "2. npm install  (first time setup)"
+    echo "2. yarn install"
     echo "3. npm run serve"
     echo ""
     print_info "Service access URLs:"
@@ -133,7 +133,7 @@ start_backend_dev() {
     echo "4. go run main.go config.yaml"
     echo ""
     print_info "Service access URLs:"
-    echo "- Frontend UI: http://localhost:8666 (admin/123456))
+    echo "- Frontend UI: http://localhost:8666 (admin/123456)"
     echo "- MySQL: localhost:13306 (root/123456)"
     echo "- Redis: localhost:16379"
     echo "- ACL API: http://localhost:15000"

@@ -112,7 +112,7 @@ import { getTimeTemplateList, deleteTimeTemplateById, putTimeTemplateById } from
 import { TIME_TEMPLATE_CATEGORY, TIME_TEMPLATE_CATEGORY_NAME } from './constants.js'
 
 import TimeTemplateModal from './timeTemplateModal.vue'
-import EnabledStatus from '@/modules/oneterm/components/enabledStatus/index.vue'
+import EnabledStatus from '@/components/EnabledStatus/index.vue'
 
 export default {
   name: 'TimeTemplate',

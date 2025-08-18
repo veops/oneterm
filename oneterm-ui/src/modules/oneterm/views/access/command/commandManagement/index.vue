@@ -122,7 +122,7 @@ import { COMMAND_CATEGORY, COMMAND_CATEGORY_NAME, COMMAND_RISK_NAME } from '../c
 
 import CommandModal from './commandModal.vue'
 import RiskDisplay from './riskDisplay.vue'
-import EnabledStatus from '@/modules/oneterm/components/enabledStatus/index.vue'
+import EnabledStatus from '@/components/EnabledStatus/index.vue'
 
 export default {
   name: 'CommandManagement',

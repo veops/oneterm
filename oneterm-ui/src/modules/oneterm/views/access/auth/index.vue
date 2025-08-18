@@ -149,7 +149,7 @@ import { TARGET_SELECT_TYPE } from './constants.js'
 import { PERMISSION_TYPE_NAME, PERMISSION_TYPE } from '@/modules/oneterm/views/systemSettings/accessControl/constants.js'
 
 import AuthDrawer from './authDrawer/index.vue'
-import EnabledStatus from '@/modules/oneterm/components/enabledStatus/index.vue'
+import EnabledStatus from '@/components/EnabledStatus/index.vue'
 
 export default {
   name: 'AccessAuth',

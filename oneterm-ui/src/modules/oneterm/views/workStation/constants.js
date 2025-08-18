@@ -3,6 +3,7 @@ export const WORKSTATION_TAB_TYPE = {
   TERMINAL: 'terminal',
   GUACAMOLE: 'guacamole',
   WEB: 'web',
+  WEB_SSH: 'webSSH',
   DISPLAY_SETTING: 'displaySetting',
   THEME_SETTING: 'themeSetting',
   BATCH_EXECUTION: 'batchExecution'

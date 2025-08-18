@@ -2,7 +2,7 @@
   <div
     :class="[
       'oneterm-terminal-container',
-      isFullScreen ? 'oneterm-terminal-full' : 'oneterm-terminal-panel'
+      mode === 'FullScreen' ? 'oneterm-terminal-full' : 'oneterm-terminal-panel'
     ]"
     :style="{
       backgroundColor: terminalBackground
@@ -49,6 +49,10 @@ export default {
     FileManagementDrawer
   },
   props: {
+    mode: {
+      type: String,
+      default: 'FullScreen' // FullScreen | Asset | WebSSH
+    },
     assetId: {
       type: [String, Number],
       default: ''
@@ -60,10 +64,6 @@ export default {
     protocol: {
       type: String,
       default: ''
-    },
-    isFullScreen: {
-      type: Boolean,
-      default: true,
     },
     shareId: {
       type: String,
@@ -192,7 +192,9 @@ export default {
       this.term.loadAddon(this.fitAddon)
       this.term.open(this.$refs.onetermTerminalRef)
 
-      this.term.writeln('\x1b[1;1;32mwelcome to oneterm!\x1b[0m')
+      if (this.mode !== 'WebSSH') {
+        this.term.writeln('\x1b[1;1;32mwelcome to oneterm!\x1b[0m')
+      }
 
       if (this?.initMessage?.length) {
         this.initMessage.map((msg) => {
@@ -252,8 +254,10 @@ export default {
       const protocol = document.location.protocol.startsWith('https') ? 'wss' : 'ws'
 
       let socketLink = ''
+      if (this.mode === 'WebSSH') {
+        socketLink = `${protocol}://${document.location.host}/api/oneterm/v1/connect/webssh`
       // audit page (online session, offline session)
-      if (isMonitor) {
+      } else if (isMonitor) {
         socketLink = `${protocol}://${document.location.host}/api/oneterm/v1/connect/monitor/${sessionId}?w=${this.term.cols}&h=${this.term.rows}`
       // share page (temporary link)
       } else if (this.shareId) {

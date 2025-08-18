@@ -13,6 +13,10 @@
             <div class="asset-list-sidebar-title-text">
               {{ $t('oneterm.assetList.assetTree') }}
             </div>
+
+            <a @click="openWebSSH">
+              <ops-icon class="asset-list-sidebar-ssh" type="a-oneterm-ssh2"/>
+            </a>
           </div>
 
           <a-input
@@ -228,6 +232,10 @@ export default {
 
     openRecentSession() {
       this.$emit('openRecentSession')
+    },
+
+    openWebSSH() {
+      this.$emit('openWebSSH')
     }
   },
 }
@@ -260,6 +268,10 @@ export default {
       color: #000000;
       flex-shrink: 0;
     }
+  }
+
+  &-ssh {
+    font-size: 16px;
   }
 
   &-search {

@@ -4,6 +4,7 @@
       :userStat="userStat"
       :selectedKeys="selectedKeys"
       @updateSelectedKeys="updateSelectedKeys"
+      @openWebSSH="openWebSSH"
     >
       <div
         :class="[
@@ -91,16 +92,15 @@
               <TerminalPanel
                 v-else-if="item.type === WORKSTATION_TAB_TYPE.TERMINAL"
                 class="oneterm-workstation-panel"
+                mode="asset"
                 :ref="'workStationPanelRef' + item.id"
                 :assetId="item.assetId"
                 :accountId="item.accountId"
                 :protocol="item.protocol"
                 :assetPermissions="item.permissions"
-                :isFullScreen="false"
                 :preferenceSetting="preferenceSetting"
                 @close="handleTerminalSocketStatus(item, SOCKET_STATUS.ERROR)"
                 @open="handleTerminalSocketStatus(item, SOCKET_STATUS.SUCCESS)"
-                @openSystemSetting="openSystemSetting"
               />
 
               <GuacamolePanel
@@ -116,6 +116,16 @@
                 @close="handleTerminalSocketStatus(item, SOCKET_STATUS.ERROR)"
                 @open="handleTerminalSocketStatus(item, SOCKET_STATUS.SUCCESS)"
                 @updatePreferenceSetting="getPreference"
+              />
+
+              <TerminalPanel
+                v-else-if="item.type === WORKSTATION_TAB_TYPE.WEB_SSH"
+                class="oneterm-workstation-panel"
+                mode="WebSSH"
+                :ref="'workStationPanelRef' + item.id"
+                :preferenceSetting="preferenceSetting"
+                @close="handleTerminalSocketStatus(item, SOCKET_STATUS.ERROR)"
+                @open="handleTerminalSocketStatus(item, SOCKET_STATUS.SUCCESS)"
               />
             </a-tab-pane>
           </template>
@@ -494,6 +504,18 @@ export default {
       }).catch((error) => {
         this.$message.error(error?.response?.data?.error || this.$t('requestError'))
       })
+    },
+
+    openWebSSH() {
+      const id = uuidv4()
+
+      this.terminalList.push({
+        socketStatus: SOCKET_STATUS.LOADING,
+        id,
+        name: 'WebSSH',
+        type: WORKSTATION_TAB_TYPE.WEB_SSH
+      })
+      this.tabActiveKey = id
     }
   },
 }

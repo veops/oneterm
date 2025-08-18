@@ -25,6 +25,17 @@ func LoggerMiddleware() gin.HandlerFunc {
 			return
 		}
 
+		// Skip logging WebSocket connections to avoid hijacked connection issues
+		if _, isWebSocket := ctx.Get("websocket_connection"); isWebSocket {
+			logger.L().Debug(url,
+				zap.String("method", ctx.Request.Method),
+				zap.Int("status", 200),
+				zap.String("ip", ctx.ClientIP()),
+				zap.Duration("cost", cost),
+			)
+			return
+		}
+
 		// Only log errors and slow requests
 		status := ctx.Writer.Status()
 		if status >= 400 || cost > 1*time.Second {

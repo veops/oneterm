@@ -10,6 +10,7 @@ import (
 	"github.com/veops/oneterm/internal/api/controller"
 	"github.com/veops/oneterm/internal/api/docs"
 	"github.com/veops/oneterm/internal/api/middleware"
+	"github.com/veops/oneterm/internal/sshsrv"
 )
 
 func SetupRouter(r *gin.Engine) {
@@ -131,6 +132,8 @@ func SetupRouter(r *gin.Engine) {
 			connect.GET("/:asset_id/:account_id/:protocol", c.Connect)
 			connect.GET("/monitor/:session_id", c.ConnectMonitor)
 			connect.POST("/close/:session_id", c.ConnectClose)
+			// WebSSH route - direct access to SSH server interface
+			connect.GET("/webssh", sshsrv.HandleWebSSH)
 		}
 
 		file := v1.Group("file")

@@ -600,7 +600,9 @@ func (m *view) handleConnectionCommand(cmd string) tea.Cmd {
 				return errMsg(fmt.Errorf("%s Connection failed: %v",
 					colors.ErrorStyle.Render("✗"), err))
 			}
-			return nil
+			// Return a success message to update the UI
+			return tea.Printf("\r\n%s Connection established successfully.\r\n%s",
+				colors.PrimaryStyle.Render("✓"), prompt)
 		}),
 		tea.Printf("%s", prompt),
 		func() tea.Msg {

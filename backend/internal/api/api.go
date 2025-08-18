@@ -115,10 +115,10 @@ func StopApi() {
 	if err := srv.Shutdown(ctx); err != nil {
 		logger.L().Error("Stop HTTP server failed", zap.Error(err))
 	}
-	
+
 	// Stop storage service background tasks
 	service.StopStorageService()
-	
+
 	// Stop web proxy session cleanup routine
 	webproxy.StopSessionCleanupRoutine()
 }

@@ -70,6 +70,32 @@ validate_password() {
     return 0
 }
 
+# Cross-platform sed function
+cross_platform_sed() {
+    local pattern="$1"
+    local file="$2"
+    
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        sed -i '' "$pattern" "$file"
+    else
+        sed -i "$pattern" "$file"
+    fi
+}
+
+
+# Cross-platform sed function with backup
+cross_platform_sed_backup() {
+    local pattern="$1"
+    local file="$2"
+    local backup_suffix="$3"
+    
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        sed -i ".${backup_suffix}" "$pattern" "$file"
+    else
+        sed -i".${backup_suffix}" "$pattern" "$file"
+    fi
+}
+
 # Check prerequisites
 check_files
 
@@ -163,12 +189,12 @@ cp docker-compose.yaml docker-compose.yaml.tmp
 ESCAPED_ROOT_PASS=$(printf '%s\n' "$ROOT_PASS" | sed 's/[[\.*^$()+?{|]/\\&/g')
 
 # Update MySQL root password patterns - handle various formats
-sed -i '' "s|MYSQL_ROOT_PASSWORD: '[^']*'|MYSQL_ROOT_PASSWORD: '${ESCAPED_ROOT_PASS}'|g" docker-compose.yaml.tmp
-sed -i '' "s|MYSQL_ROOT_PASSWORD: \"[^\"]*\"|MYSQL_ROOT_PASSWORD: \"${ESCAPED_ROOT_PASS}\"|g" docker-compose.yaml.tmp
-sed -i '' "s|MYSQL_ROOT_PASSWORD: [^'\"[:space:]]*$|MYSQL_ROOT_PASSWORD: '${ESCAPED_ROOT_PASS}'|g" docker-compose.yaml.tmp
+cross_platform_sed "s|MYSQL_ROOT_PASSWORD: '[^']*'|MYSQL_ROOT_PASSWORD: '${ESCAPED_ROOT_PASS}'|g" docker-compose.yaml.tmp
+cross_platform_sed "s|MYSQL_ROOT_PASSWORD: \"[^\"]*\"|MYSQL_ROOT_PASSWORD: \"${ESCAPED_ROOT_PASS}\"|g" docker-compose.yaml.tmp
+cross_platform_sed "s|MYSQL_ROOT_PASSWORD: [^'\"[:space:]]*$|MYSQL_ROOT_PASSWORD: '${ESCAPED_ROOT_PASS}'|g" docker-compose.yaml.tmp
 
 # Update healthcheck password
-sed -i '' "s|\"-p[0-9][0-9]*\"|\"-p${ESCAPED_ROOT_PASS}\"|g" docker-compose.yaml.tmp
+cross_platform_sed "s|\"-p[0-9][0-9]*\"|\"-p${ESCAPED_ROOT_PASS}\"|g" docker-compose.yaml.tmp
 
 # Move updated file back
 mv docker-compose.yaml.tmp docker-compose.yaml
@@ -178,7 +204,7 @@ echo "Updating config.yaml..."
 # config.yaml uses root user, so use root password
 ESCAPED_ROOT_PASS_FOR_CONFIG=$(printf '%s\n' "$ROOT_PASS" | sed 's/[[\.*^$()+?{|]/\\&/g')
 # Only update MySQL password section, not Redis
-sed -i .tmp '/^mysql:/,/^[a-z]/s|password: [^#]*|password: '"${ESCAPED_ROOT_PASS_FOR_CONFIG}"'|g' config.yaml
+cross_platform_sed_backup '/^mysql:/,/^[a-z]/s|password: [^#]*|password: '"${ESCAPED_ROOT_PASS_FOR_CONFIG}"'|g' config.yaml tmp
 rm -f config.yaml.tmp
 
 # Update create-users.sql
@@ -187,8 +213,8 @@ echo "Updating create-users.sql..."
 ESCAPED_ONETERM_PASS=$(printf '%s\n' "$ONETERM_PASS" | sed 's/[[\.*^$()+?{|]/\\&/g')
 ESCAPED_ACL_PASS=$(printf '%s\n' "$ACL_PASS" | sed 's/[[\.*^$()+?{|]/\\&/g')
 # Update passwords using | as delimiter
-sed -i .tmp "s|'oneterm'@'%' IDENTIFIED BY '[^']*'|'oneterm'@'%' IDENTIFIED BY '${ESCAPED_ONETERM_PASS}'|g" create-users.sql
-sed -i .tmp "s|'acl'@'%' IDENTIFIED BY '[^']*'|'acl'@'%' IDENTIFIED BY '${ESCAPED_ACL_PASS}'|g" create-users.sql
+cross_platform_sed_backup "s|'oneterm'@'%' IDENTIFIED BY '[^']*'|'oneterm'@'%' IDENTIFIED BY '${ESCAPED_ONETERM_PASS}'|g" create-users.sql tmp
+cross_platform_sed_backup "s|'acl'@'%' IDENTIFIED BY '[^']*'|'acl'@'%' IDENTIFIED BY '${ESCAPED_ACL_PASS}'|g" create-users.sql tmp
 rm -f create-users.sql.tmp
 
 # Create/update .env file for ACL

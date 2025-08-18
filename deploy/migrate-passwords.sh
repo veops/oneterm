@@ -29,6 +29,30 @@ check_docker_compose() {
     fi
 }
 
+# Cross-platform sed function
+cross_platform_sed() {
+    local pattern="$1"
+    local file="$2"
+    
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        sed -i "" "$pattern" "$file"
+    else
+        sed -i "$pattern" "$file"
+    fi
+}
+
+# Cross-platform sed function with backup
+cross_platform_sed_backup() {
+    local pattern="$1"
+    local file="$2"
+    local backup_suffix="$3"
+    
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        sed -i ".${backup_suffix}" "$pattern" "$file"
+    else
+        sed -i".${backup_suffix}" "$pattern" "$file"
+    fi
+}
 # Function to verify container is running
 check_container_running() {
     local container_name=$1
@@ -195,14 +219,14 @@ if [ -f docker-compose.yaml ]; then
     ESCAPED_NEW_ROOT=$(printf '%s\n' "$NEW_ROOT" | sed 's/[[\.*^$()+?{|]/\\&/g')
     
     # Update MySQL root password - use escaped password
-    sed -i '' "s|MYSQL_ROOT_PASSWORD: '[^']*'|MYSQL_ROOT_PASSWORD: '${ESCAPED_NEW_ROOT}'|g" docker-compose.yaml.tmp
-    sed -i '' "s|MYSQL_ROOT_PASSWORD: \"[^\"]*\"|MYSQL_ROOT_PASSWORD: \"${ESCAPED_NEW_ROOT}\"|g" docker-compose.yaml.tmp
+    cross_platform_sed "s|MYSQL_ROOT_PASSWORD: '[^']*'|MYSQL_ROOT_PASSWORD: '${ESCAPED_NEW_ROOT}'|g" docker-compose.yaml.tmp
+    cross_platform_sed "s|MYSQL_ROOT_PASSWORD: \"[^\"]*\"|MYSQL_ROOT_PASSWORD: \"${ESCAPED_NEW_ROOT}\"|g" docker-compose.yaml.tmp
     
     # Handle unquoted passwords
-    sed -i '' "s|MYSQL_ROOT_PASSWORD: [^'\"[:space:]]*$|MYSQL_ROOT_PASSWORD: '${ESCAPED_NEW_ROOT}'|g" docker-compose.yaml.tmp
+    cross_platform_sed "s|MYSQL_ROOT_PASSWORD: [^'\"[:space:]]*$|MYSQL_ROOT_PASSWORD: '${ESCAPED_NEW_ROOT}'|g" docker-compose.yaml.tmp
     
     # Update healthcheck password for MySQL - handle current format
-    sed -i '' "s|\"-p[0-9][0-9]*\"|\"-p${ESCAPED_NEW_ROOT}\"|g" docker-compose.yaml.tmp
+    cross_platform_sed "s|\"-p[0-9][0-9]*\"|\"-p${ESCAPED_NEW_ROOT}\"|g" docker-compose.yaml.tmp
     
     # Move updated file back
     mv docker-compose.yaml.tmp docker-compose.yaml
@@ -216,7 +240,7 @@ if [ -f config.yaml ]; then
     # config.yaml uses root user, so use root password
     ESCAPED_NEW_ROOT_FOR_CONFIG=$(printf '%s\n' "$NEW_ROOT" | sed 's/[[\.*^$()+?{|]/\\&/g')
     # Update only MySQL password section, not Redis
-    sed -i .tmp '/^mysql:/,/^[a-z]/s|password: [^#]*|password: '"${ESCAPED_NEW_ROOT_FOR_CONFIG}"'|g' config.yaml
+    cross_platform_sed_backup '/^mysql:/,/^[a-z]/s|password: [^#]*|password: '"${ESCAPED_NEW_ROOT_FOR_CONFIG}"'|g' config.yaml tmp
     rm -f config.yaml.tmp
     echo -e "${GREEN}SUCCESS: config.yaml updated${NC}"
 fi

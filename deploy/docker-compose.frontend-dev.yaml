@@ -147,6 +147,33 @@ services:
       - "2222:2222"  # SSH Port
       - "18888:8888" # API Port
 
+  # Nginx Proxy for Frontend Development (using UI image)
+  nginx-frontend-dev:
+    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-ui:v25.8.2
+    container_name: oneterm-nginx-frontend-dev
+    environment:
+      TZ: Asia/Shanghai
+    volumes:
+      - ./nginx.frontend-dev.conf:/etc/nginx/conf.d/frontend-dev.conf
+      - ./volume/nginx-logs:/var/log/nginx
+    ports:
+      - "8080:8080"  # Nginx proxy port
+    depends_on:
+      - acl-api
+      - oneterm-api
+    restart: always
+    command:
+      - /bin/sh
+      - -c
+      - |
+        nginx -g 'daemon off;'
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # Allow container to access host
+    networks:
+      new:
+        aliases:
+          - nginx-frontend-dev
+
 networks:
   new:
     driver: bridge

@@ -419,12 +419,8 @@ func (m *view) View() string {
 	}
 
 	if m.mode == modeTable {
-		tableOutput := m.assetTable.View()
-		lines := strings.Split(tableOutput, "\n")
-		for i := range lines {
-			lines[i] = strings.TrimPrefix(lines[i], " ")
-		}
-		return strings.Join(lines, "\n")
+		// The table already handles clearing and formatting internally
+		return m.assetTable.View()
 	}
 
 	suggestionView := m.smartSuggestionView()

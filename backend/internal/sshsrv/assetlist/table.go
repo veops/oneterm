@@ -113,6 +113,9 @@ type Model struct {
 
 // New creates a new asset list table
 func New(assets map[string][3]int, width, height int) Model {
+	m := Model{}
+	m.width = width
+	m.height = height
 	// Convert assets map to structured list
 	assetList := make([]Asset, 0, len(assets))
 	for cmd, info := range assets {
@@ -152,26 +155,21 @@ func New(assets map[string][3]int, width, height int) Model {
 		}
 	}
 
-	// Assets are stored in the order they were found
+	// Assets are stored in the order they were found with responsive widths
+	columns := m.calculateColumnWidths(width, false)
 
-	// Create table columns
-	columns := []table.Column{
-		{Title: "Protocol", Width: 12}, // Increased for emoji + text
-		{Title: "User", Width: 15},
-		{Title: "Host", Width: 25},
-		{Title: "Port", Width: 8},
-		{Title: "Command", Width: 40},
-	}
-
-	// Create table rows
+	// Create table rows - let table handle truncation
 	rows := make([]table.Row, len(assetList))
 	for i, asset := range assetList {
 		icon := icons.GetProtocolIcon(asset.Protocol)
+		protocolText := fmt.Sprintf("%s %s", icon, strings.ToUpper(asset.Protocol))
+		port := lo.Ternary(asset.Port != "", asset.Port, icons.GetDefaultPort(asset.Protocol))
+		
 		rows[i] = table.Row{
-			fmt.Sprintf("%s %s", icon, strings.ToUpper(asset.Protocol)),
+			protocolText,
 			asset.User,
 			asset.Host,
-			lo.Ternary(asset.Port != "", asset.Port, icons.GetDefaultPort(asset.Protocol)),
+			port,
 			asset.Command,
 		}
 	}
@@ -212,17 +210,15 @@ func New(assets map[string][3]int, width, height int) Model {
 	s.Selected = selectedStyle
 	t.SetStyles(s)
 
-	return Model{
-		table:          t,
-		assets:         assetList,
-		filteredAssets: assetList,
-		filterModel:    NewFilter(),
-		width:          width,
-		height:         height,
-		focused:        false,
-		keyMap:         DefaultTableKeyMap,
-		showHelp:       true,
-	}
+	m.table = t
+	m.assets = assetList
+	m.filteredAssets = assetList
+	m.filterModel = NewFilter()
+	m.focused = false
+	m.keyMap = DefaultTableKeyMap
+	m.showHelp = true
+
+	return m
 }
 
 // Init initializes the model
@@ -344,6 +340,10 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		
+		// Update column widths based on new terminal size
+		m.updateColumnWidths()
+		
 		// Update table height based on new window size
 		// Table height includes header + separator + data rows
 		newHeight := len(m.filteredAssets) + 2
@@ -371,6 +371,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 // View renders the table
 func (m Model) View() string {
+	// ANSI escape to ensure cursor at column 1
 	resetCursor := "\r\033[0G"
 	title := titleStyle.Render(lo.Ternary(m.isRecent, "📊  Recent Sessions", "🗂️  Available Assets"))
 
@@ -402,13 +403,13 @@ func (m Model) View() string {
 	// Combine all elements
 	header := lipgloss.JoinHorizontal(lipgloss.Left, title, filterInfo, " ", countStyle)
 
-	// Use the table component's view directly
+	// Use the table component's view directly - let it handle its own width
 	tableView := m.table.View()
 
-	// Apply base style without width constraint - let table determine its own width
-	tableBox := baseStyle.
-		Render(tableView)
+	// Apply base style to restore the border and proper formatting
+	tableBox := baseStyle.Render(tableView)
 
+	// Combine all elements with cursor reset at start
 	result := resetCursor + header + "\n" + tableBox + "\n" + help
 	return result
 }
@@ -430,27 +431,30 @@ func (m *Model) updateFilter() {
 
 	// Update table rows - handle different formats for recent sessions vs assets
 	rows := make([]table.Row, len(m.filteredAssets))
+	
 	for i, asset := range m.filteredAssets {
 		icon := icons.GetProtocolIcon(asset.Protocol)
+		protocolText := fmt.Sprintf("%s %s", icon, strings.ToUpper(asset.Protocol))
+		port := lo.Ternary(asset.Port != "", asset.Port, icons.GetDefaultPort(asset.Protocol))
 		
 		if m.isRecent && asset.LastLogin != nil {
 			// Recent sessions format with Last Login column
 			timeAgo := formatTimeAgo(*asset.LastLogin)
 			rows[i] = table.Row{
-				fmt.Sprintf("%s %s", icon, strings.ToUpper(asset.Protocol)),
+				protocolText,
 				asset.User,
 				asset.Host,
-				lo.Ternary(asset.Port != "", asset.Port, icons.GetDefaultPort(asset.Protocol)),
+				port,
 				timeAgo,
 				asset.Command,
 			}
 		} else {
 			// Regular assets format
 			rows[i] = table.Row{
-				fmt.Sprintf("%s %s", icon, strings.ToUpper(asset.Protocol)),
+				protocolText,
 				asset.User,
 				asset.Host,
-				lo.Ternary(asset.Port != "", asset.Port, icons.GetDefaultPort(asset.Protocol)),
+				port,
 				asset.Command,
 			}
 		}
@@ -599,26 +603,23 @@ func NewRecentSessions(sessions []*model.Session, combines map[string][3]int, wi
 		})
 	}
 
-	// Create table columns with Last Login column
-	columns := []table.Column{
-		{Title: "Protocol", Width: 12},
-		{Title: "User", Width: 15},
-		{Title: "Host", Width: 25},
-		{Title: "Port", Width: 8},
-		{Title: "Last Login", Width: 18},
-		{Title: "Command", Width: 35},
-	}
+	// Create table columns with responsive widths for recent sessions
+	m := Model{width: width, height: height, isRecent: true}
+	columns := m.calculateColumnWidths(width, true)
 
-	// Create table rows
+	// Create table rows - let table handle truncation
 	rows := make([]table.Row, len(assetList))
 	for i, asset := range assetList {
 		icon := icons.GetProtocolIcon(asset.Protocol)
+		protocolText := fmt.Sprintf("%s %s", icon, strings.ToUpper(asset.Protocol))
+		port := lo.Ternary(asset.Port != "", asset.Port, icons.GetDefaultPort(asset.Protocol))
 		timeAgo := formatTimeAgo(*asset.LastLogin)
+		
 		rows[i] = table.Row{
-			fmt.Sprintf("%s %s", icon, strings.ToUpper(asset.Protocol)),
+			protocolText,
 			asset.User,
 			asset.Host,
-			lo.Ternary(asset.Port != "", asset.Port, icons.GetDefaultPort(asset.Protocol)),
+			port,
 			timeAgo,
 			asset.Command,
 		}
@@ -657,21 +658,75 @@ func NewRecentSessions(sessions []*model.Session, combines map[string][3]int, wi
 	s.Selected = selectedStyle
 	t.SetStyles(s)
 
-	return Model{
-		table:          t,
-		assets:         assetList,
-		filteredAssets: assetList,
-		filterModel:    NewFilter(),
-		width:          width,
-		height:         height,
-		focused:        false,
-		keyMap:         DefaultTableKeyMap,
-		showHelp:       true,
-		isRecent:       true, // Mark as recent sessions table
-	}
+	m.table = t
+	m.assets = assetList
+	m.filteredAssets = assetList
+	m.filterModel = NewFilter()
+	m.focused = false
+	m.keyMap = DefaultTableKeyMap
+	m.showHelp = true
+	// m.isRecent is already set to true above
+	
+	return m
 }
 
 // formatTimeAgo formats time as relative time
+// calculateColumnWidths calculates reasonable column widths
+func (m *Model) calculateColumnWidths(terminalWidth int, isRecent bool) []table.Column {
+	// Use compact layout for very narrow terminals
+	isNarrow := terminalWidth < 100
+	
+	if isRecent {
+		if isNarrow {
+			// Compact recent sessions layout for narrow terminals
+			return []table.Column{
+				{Title: "Protocol", Width: 12},
+				{Title: "User", Width: 12},
+				{Title: "Host", Width: 15},
+				{Title: "Port", Width: 5},
+				{Title: "Last Login", Width: 10},
+				{Title: "Command", Width: 25},
+			}
+		} else {
+			// Normal recent sessions layout
+			return []table.Column{
+				{Title: "Protocol", Width: 15},
+				{Title: "User", Width: 15},
+				{Title: "Host", Width: 20},
+				{Title: "Port", Width: 6},
+				{Title: "Last Login", Width: 12},
+				{Title: "Command", Width: 30},
+			}
+		}
+	} else {
+		if isNarrow {
+			// Compact assets layout for narrow terminals
+			return []table.Column{
+				{Title: "Protocol", Width: 12},
+				{Title: "User", Width: 12},
+				{Title: "Host", Width: 15},
+				{Title: "Port", Width: 5},
+				{Title: "Command", Width: 25},
+			}
+		} else {
+			// Normal assets layout
+			return []table.Column{
+				{Title: "Protocol", Width: 15},
+				{Title: "User", Width: 15},
+				{Title: "Host", Width: 20},
+				{Title: "Port", Width: 6},
+				{Title: "Command", Width: 30},
+			}
+		}
+	}
+}
+
+// updateColumnWidths updates table column widths based on current terminal size
+func (m *Model) updateColumnWidths() {
+	columns := m.calculateColumnWidths(m.width, m.isRecent)
+	m.table.SetColumns(columns)
+}
+
 func formatTimeAgo(t time.Time) string {
 	duration := time.Since(t)
 

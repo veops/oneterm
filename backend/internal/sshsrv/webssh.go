@@ -164,8 +164,9 @@ func runWebSSHTerminal(sess *gsession.Session, ctx *gin.Context) error {
 		// Set up bubbletea like HandleTerm does
 		currentUser, _ := acl.GetSessionFromCtx(ctx)
 		fakeSSHSession := &fakeWebSSHSession{
-			sess: sess,
-			user: currentUser,
+			sess:    sess,
+			user:    currentUser,
+			ptySize: ssh.Window{Width: 80, Height: 24}, // Default size
 		}
 
 		// Create pipes like terminal SSH
@@ -191,14 +192,19 @@ func runWebSSHTerminal(sess *gsession.Session, ctx *gin.Context) error {
 						case '9':
 							continue // Skip heartbeat messages
 						case 'w':
-							// Handle window resize - for WebSSH, we don't need to send to WindowChan
-							// since bubbletea handles its own resize events through tea.WindowSizeMsg
-							// Just log and continue to avoid blocking the input processing
+							// Handle window resize - bubbletea will handle this automatically
+							// through its built-in window size detection mechanisms
 							wh := strings.Split(string(msg), ",")
 							if len(wh) >= 2 {
+								width := cast.ToInt(wh[0])
+								height := cast.ToInt(wh[1])
 								logger.L().Debug("WebSSH window resize", 
-									zap.Int("width", cast.ToInt(wh[0])),
-									zap.Int("height", cast.ToInt(wh[1])))
+									zap.Int("width", width),
+									zap.Int("height", height))
+								
+								// The bubbletea program will automatically receive WindowSizeMsg
+								// events when the terminal is resized. We don't need to manually
+								// inject anything here.
 							}
 							continue
 						}
@@ -254,8 +260,9 @@ func runWebSSHTerminal(sess *gsession.Session, ctx *gin.Context) error {
 
 // fakeWebSSHSession implements ssh.Session interface for compatibility with initialView
 type fakeWebSSHSession struct {
-	sess *gsession.Session
-	user *acl.Session
+	sess    *gsession.Session
+	user    *acl.Session
+	ptySize ssh.Window
 }
 
 func (f *fakeWebSSHSession) User() string                 { return f.user.GetUserName() }
@@ -297,8 +304,20 @@ func (f *fakeWebSSHSession) Context() ssh.Context {
 func (f *fakeWebSSHSession) Pty() (ssh.Pty, <-chan ssh.Window, bool) {
 	ch := make(chan ssh.Window)
 	close(ch)
-	return ssh.Pty{Term: "xterm-256color", Window: ssh.Window{Width: 80, Height: 24}}, ch, true
+	
+	// Use current pty size if set, otherwise default
+	width := f.ptySize.Width
+	height := f.ptySize.Height
+	if width <= 0 {
+		width = 80
+	}
+	if height <= 0 {
+		height = 24
+	}
+	
+	return ssh.Pty{Term: "xterm-256color", Window: ssh.Window{Width: width, Height: height}}, ch, true
 }
+
 
 // fakeAddr implements net.Addr
 type fakeAddr struct {

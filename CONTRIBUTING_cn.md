@@ -37,7 +37,7 @@
 + 请遵循 [Angular](https://github.com/conventional-changelog/conventional-changelog/tree/master/packages/conventional-changelog-angular)
 
 + 提交时使用不同的范围
-  - API: `feat(api): xxx`
+  - API: `feat(backend): xxx`
   - UI: `feat(ui): xxx`
 
 + 为了确保所有开发者都能更好地理解，提交信息请使用英文。

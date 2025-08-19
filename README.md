@@ -119,6 +119,30 @@ Star us, and you will receive all releases notifications from GitHub without any
   - Username: admin
   - Password: 123456 (default) or your custom password if using setup.sh
 
+## Development
+
+For developers who want to contribute to OneTerm or set up a local development environment:
+
+### 🚀 Quick Development Setup
+```bash
+# Clone repository
+git clone https://github.com/veops/oneterm.git
+cd oneterm/deploy
+
+# Frontend development (live editing)
+./dev-start.sh frontend
+
+# Backend development (live editing)  
+./dev-start.sh backend
+
+```
+
+### 📖 Detailed Development Guide
+For complete setup instructions, troubleshooting, and development workflows:
+- **[Development Environment Setup Guide](deploy/dev_readme.md)**
+
+**Requirements**: Docker, Node.js 14.17.6+, Go 1.21.3+
+
 ## Contributing
 
 We welcome all developers to contribute code to improve and extend this project. Please read our [contribution guidelines](CONTRIBUTING.md) first. Additionally, you can support Veops open source through social media, events, and sharing.
@@ -131,9 +155,3 @@ We welcome all developers to contribute code to improve and extend this project.
 - [CMDB](https://github.com/veops/cmdb): Simple, lightweight, and versatile operational CMDB
 - [ACL](https://github.com/veops/acl): A general permission control management system.
 - [messenger](https://github.com/veops/messenger): A simple and lightweight message sending service.
-
-## Community
-
-+ Email: <a href="mailto:bd@veops.cn">bd@veops.cn</a>
-+ WeChat official account: Welcome to follow our WeChat official account and join our group channels
-  <img src="docs/images/wechat.png" alt="WeChat official account" />

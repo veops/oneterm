@@ -37,7 +37,7 @@ For new feature additions, please first contact us directly via the contact info
 + Please follow the [Angular](https://github.com/conventional-changelog/conventional-changelog/tree/master/packages/conventional-changelog-angular)
 
 + Commit with different scopes
-  - API: `feat(api): xxx`
+  - API: `feat(backend): xxx`
   - UI: `feat(ui): xxx`
 
 + Please keep the commit message in English for better understanding by all developers.

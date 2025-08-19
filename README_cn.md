@@ -123,6 +123,30 @@ OneTerm 是一款简单、轻量、灵活的企业级堡垒机产品，基于4A�
   - 账号: admin
   - 密码: 123456（默认）或使用setup.sh时设置的自定义密码
 
+## 开发环境
+
+为希望贡献代码或搭建本地开发环境的开发者提供：
+
+### 🚀 快速开发环境搭建
+```bash
+# 克隆代码库
+git clone https://github.com/veops/oneterm.git
+cd oneterm/deploy
+
+# 前端开发（实时编辑）
+./dev-start.sh frontend
+
+# 后端开发（实时编辑）  
+./dev-start.sh backend
+
+```
+
+### 📖 详细开发指南
+完整的环境搭建说明、故障排除和开发流程：
+- **[开发环境搭建指南](deploy/dev_readme.zh.md)**
+
+**环境要求**: Docker, Node.js 14.17.6+, Go 1.21.3+
+
 ## 代码贡献
 我们欢迎所有开发者贡献代码，改善和扩展这个项目。请先阅读我们的[贡献指南](CONTRIBUTING_cn.md)。此外，您还可以通过社交媒体、活动和分享来支持 Veops 的开源。
 

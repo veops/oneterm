@@ -92,3 +92,6 @@ backend/cmd/ssh/config.yaml
 backend/cmd/ssh/app.log
 backend/cmd/api/api
 backend/cmd/api/config.yaml
+backend/cmd/server/server
+backend/cmd/server/oneterm_server
+backend/cmd/server/test_server

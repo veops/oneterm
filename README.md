@@ -74,19 +74,28 @@ Star us, and you will receive all releases notifications from GitHub without any
 <table>
   <tr>
     <td style="padding: 5px;background-color:#fff;">
-      <img width="400" src="https://github.com/user-attachments/assets/abefbe07-13d6-44b0-8622-a0c7130d5b0d"/>
+      <img width="400" alt="dashboard" src="https://github.com/user-attachments/assets/cfbb7ae9-ddd3-4f0f-a37b-18b68bd8c7ac" />
     </td>
     <td style="padding: 5px;background-color:#fff;">
-      <img width="400" src="https://github.com/user-attachments/assets/3a69c779-3f37-4c5b-8ade-2dffa99a2efd"/>
+      <img width="400" alt="terminal" src="https://github.com/user-attachments/assets/e37f0ce8-d07c-42e0-a603-028b75c8e932" />
     </td>
   </tr>
 
   <tr>
     <td style="padding: 5px;background-color:#fff;">
-      <img width="400" src="https://github.com/user-attachments/assets/befcfae7-f24a-48a2-a730-8e8d02483ea9"/>
+      <img width="400" alt="work_station" src="https://github.com/user-attachments/assets/48a11f13-88be-4ec1-aa06-fbaade5721b1" />
     </td>
     <td style="padding: 5px;background-color:#fff;">
-      <img width="400" src="https://github.com/user-attachments/assets/75d33250-af61-4c22-b839-cd6ba9ecd551"/>
+      <img width="400" alt="access_auth" src="https://github.com/user-attachments/assets/d1db6c5f-3ac0-46a1-9464-34c4c59243ed" />
+    </td>
+  </tr>
+
+  <tr>
+    <td style="padding: 5px;background-color:#fff;">
+      <img width="400" alt="system_settings" src="https://github.com/user-attachments/assets/b9948d82-071a-427b-884f-a69fd37b27ae" />
+    </td>
+    <td style="padding: 5px;background-color:#fff;">
+      <img width="400" alt="access_time" src="https://github.com/user-attachments/assets/55298679-8ded-4948-9738-38e418c2d03d" />
     </td>
   </tr>
 </table>
@@ -139,7 +148,7 @@ cd oneterm/deploy
 
 ### 📖 Detailed Development Guide
 For complete setup instructions, troubleshooting, and development workflows:
-- **[Development Environment Setup Guide](deploy/dev_readme.md)**
+- **[Development Environment Setup Guide](deploy/DEV_README.md)**
 
 **Requirements**: Docker, Node.js 14.17.6+, Go 1.21.3+
 

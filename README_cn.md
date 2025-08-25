@@ -1,5 +1,7 @@
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/ab00344b-462b-44b9-9113-9fe735dfb096" />
+  <a href="https://veops.cn/oneterm">
+    <img src="https://github.com/user-attachments/assets/ab00344b-462b-44b9-9113-9fe735dfb096" />
+  </a>
 </p>
 
 <p align="center">
@@ -27,11 +29,12 @@
 
 OneTerm 是一款简单、轻量、灵活的企业级堡垒机产品，基于4A理念，即认证(Authen)、授权(Authorize)、账号(Account)、审计(Audit)设计开发，通过严格的访问控制和监控功能，确保系统的安全性和合规性。
 
-- 产品文档：https://veops.cn/docs/docs/oneterm/onterm_design
+- 官网: [veops.cn/oneterm](https://veops.cn/oneterm)
+- 产品文档：[veops.cn/docs/docs/oneterm/onterm_design](https://veops.cn/docs/docs/oneterm/onterm_design)
 - 在线体验：[OneTerm](https://term.veops.cn/oneterm/workstation)
   - 用户名: demo 或者 admin
   - 密码: 123456
-- **重要提示**：`main` 分支在开发过程中可能处于**不稳定的状态**。请通过 [releases](https://github.com/veops/oneterm/releases) 获取最新稳定版本。
+- **注意**：`main` 分支在开发过程中可能处于**不稳定的状态**。请通过 [releases](https://github.com/veops/oneterm/releases) 获取最新稳定版本。
 
 ## 核心功能
 

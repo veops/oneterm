@@ -1,5 +1,7 @@
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/ab00344b-462b-44b9-9113-9fe735dfb096" />
+  <a href="https://v1ops.com/">
+    <img alt="oneterm_banner" src="https://github.com/user-attachments/assets/6a96c210-3c85-4b8e-ad84-6cecd95e2066" />
+  </a>
 </p>
 
 <p align="center">
@@ -25,51 +27,56 @@
 
 ## What is OneTerm
 
-OneTerm is a simple, lightweight and flexible enterprise-class bastion host, designed and developed based on 4A compliant, i.e. Authen, Authorize, Account, and Audit, which ensures the security and compliance of the system through strict access control and monitoring features.
+OneTerm is a simple, lightweight, and flexible enterprise-level bastion host product. Based on the 4A concept: Authentication, Authorization, Account, and Audit, it ensures system security and compliance through strict access control and monitoring functions.
 
-- Product document：https://veops.cn/docs/docs/oneterm/onterm_design
-- Preview online：[OneTerm](https://term.veops.cn/oneterm/workstation)
-  - username: **demo** or **admin**
-  - password: 123456
-- **ATTENTION**: branch `main` may be unstable as the result of continued development, Please use [releases](https://github.com/veops/oneterm/releases) to get the latest stable version
+- Official Website: [v1ops.com](https://v1ops.com/)
+- Product Documentation: [veops.cn/docs/en/docs/oneterm/Onterm_design](https://veops.cn/docs/en/docs/oneterm/Onterm_design)
+- Online Demo: [oneterm.v1ops.com](https://oneterm.v1ops.com/)
+  - Username: demo or admin
+  - Password: 123456
+- **Note**: The `main` branch may be in an **unstable state** during development. Please obtain the latest stable version through [releases](https://github.com/veops/oneterm/releases).
 
-## Core Feature
+## Core Features
 
-+ **Access control**: Acting as an intermediary, OneTerm restricts direct access to critical systems. Users must authenticate through OneTerm before accessing other servers or systems.
++ **Access Control**: OneTerm acts as an intermediary site, restricting direct access to critical systems. Users must first authenticate through OneTerm before accessing other servers or systems.
 
-+ **Security audit**: OneTerm can record user logins and activities, providing audit logs for investigation in case of security incidents. This ensures that every user's actions are traceable and auditable.
++ **Security Audit**: OneTerm can record user logins and activities, providing audit logs for investigation when security incidents occur. This helps ensure that every user's behavior is traceable and auditable.
 
-+ **Jump access to**: OneTerm offers a jump host mechanism, allowing users to connect to other internal servers through OneTerm. This helps reduce the risk of exposing internal servers directly to the outside, as only OneTerm needs to be accessible externally.
++ **Jump Server Access**: OneTerm provides a jump server approach where users can connect to other internal servers through OneTerm. This approach helps reduce the risk of directly exposing internal servers, as only OneTerm needs to be externally accessible.
 
-+ **Password management**: OneTerm can enforce robust password policies and centrally manage passwords through a single entry point. This helps improve the overall system's password security.
++ **Password Management**: OneTerm can implement enhanced password policies and centrally manage passwords through a single entry point. This helps improve the password security of the entire system.
 
-+ **Session recording**: OneTerm can record user sessions with servers, which is valuable for monitoring and investigating privileged user activities. In case of security incidents, session recordings can be replayed to understand detailed operations.
++ **Session Recording**: OneTerm can record user sessions with servers, which is very useful for monitoring and investigating privileged user activities. If security incidents occur, session recordings can be replayed to understand detailed operations.
 
-+ **Prevent direct attacks**: Since OneTerm is the sole entry point for systems and resources, it can serve as a primary obstacle for attackers. This helps reduce the risk of direct attacks on internal systems.
++ **Prevent Direct Attacks**: Since OneTerm is the only entry point to systems and resources, it can become the main barrier for attackers. This helps reduce the risk of direct attacks on internal systems.
 
-+ **Unified access**: OneTerm provides a single entry point through which users can access different systems without needing to remember multiple login credentials. This enhances user convenience and work efficiency.
++ **Unified Access**: OneTerm provides a single entry point through which users can access different systems without having to remember multiple login credentials. This improves user convenience and work efficiency.
 
-## Product Advantage
+## Product Advantages
 
-+ **Authentication and Authorization**: Authentication and Authorization: OneTerm should have a robust and flexible identity authentication and authorization mechanism. This includes supporting multi-factor authentication to ensure that only authorized users can access internal network resources and enabling fine-grained management of user permissions. 
-+ **Secure communication**: OneTerm supports secure communication protocols and encryption technologies to protect data transmission between users and internal servers. This helps prevent man-in-the-middle attacks and data leakage. 
-+ **Audit and monitoring**: OneTerm features powerful audit and monitoring capabilities, recording user activities and generating audit logs. This helps trace security incidents, identify potential threats, and meet compliance requirements. 
-+ **Remote Management and Session Isolation**: OneTerm supports remote management, allowing administrators to securely manage internal servers. Additionally, it should have session isolation functionality to ensure that access between users is isolated from each other, preventing lateral movement attacks. 
-+ **Combination with open source CMDB**: Oneterm is combined with [VE CMDB](https://github.com/veops/cmdb) (which has been open source), users can import assets in CMDB with one click, ensuring easy operation and smooth process.
++ **Authentication and Authorization**: OneTerm features powerful and flexible authentication and authorization mechanisms. This includes support for multi-factor authentication, ensuring that only authorized users can access internal network resources, and providing fine-grained user permission management.
 
-## Tech Stack
++ **Secure Communication**: OneTerm supports secure communication protocols and encryption technologies to protect data transmission between users and internal servers. This helps prevent man-in-the-middle attacks and data leaks.
 
-+ Back-end: Go
-+ Front-end: Vue.js
-+ UI component library: Ant Design Vue
++ **Audit and Monitoring**: OneTerm has powerful audit and monitoring capabilities, recording user activities and generating audit logs. This helps track security events, identify potential threats, and meet compliance requirements.
 
-## Getting started & staying tuned with us
++ **Remote Management and Session Isolation**: OneTerm supports remote management, enabling administrators to securely manage internal servers. At the same time, it features session isolation to ensure that access between users is mutually isolated, preventing lateral escalation attacks.
 
-Star us, and you will receive all releases notifications from GitHub without any delay!
++ **Tight Integration with Open Source CMDB**: OneTerm is tightly integrated with [Veops CMDB](https://github.com/veops/cmdb) (open source), allowing users to import assets from CMDB with one click, ensuring convenient operation and smooth processes.
+
+## Technology Stack
+
++ Backend: Go
++ Frontend: Vue.js
++ UI Component Library: Ant Design Vue
+
+## Follow Us
+
+Welcome to Star and follow us to get the latest updates!
 
 ![star us](https://github.com/user-attachments/assets/75c03659-4200-469e-b210-087a4d4473b6)
 
-## Overview
+## Project Overview
 
 <table>
   <tr>
@@ -102,15 +109,15 @@ Star us, and you will receive all releases notifications from GitHub without any
 
 ## Quick Start
 
-### Option 1: Quick Deploy (Default Passwords)
-+ docker-compose install
+### Method 1: Quick Deploy (Default Password)
++ Docker Compose Installation
   ```bash
   git clone https://github.com/veops/oneterm.git
   cd oneterm/deploy
   docker compose up -d
   ```
 
-### Option 2: Secure Deploy (Custom Passwords)
+### Method 2: Secure Deploy (Custom Passwords)
 + For production environments, use the setup script to configure secure passwords:
   ```bash
   git clone https://github.com/veops/oneterm.git
@@ -153,8 +160,7 @@ For complete setup instructions, troubleshooting, and development workflows:
 **Requirements**: Docker, Node.js 14.17.6+, Go 1.21.3+
 
 ## Contributing
-
-We welcome all developers to contribute code to improve and extend this project. Please read our [contribution guidelines](CONTRIBUTING.md) first. Additionally, you can support Veops open source through social media, events, and sharing.
+We welcome all developers to contribute code and improve and extend this project. Please read our [Contribution Guide](CONTRIBUTING.md) first. Additionally, you can support Veops open source through social media, events, and sharing.
 
 <a href="https://github.com/veops/oneterm/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=veops/oneterm" />
@@ -164,3 +170,6 @@ We welcome all developers to contribute code to improve and extend this project.
 - [CMDB](https://github.com/veops/cmdb): Simple, lightweight, and versatile operational CMDB
 - [ACL](https://github.com/veops/acl): A general permission control management system.
 - [messenger](https://github.com/veops/messenger): A simple and lightweight message sending service.
+
+## Contact Us
++ Email: <a href="mailto:bd@veops.cn">bd@veops.cn</a>

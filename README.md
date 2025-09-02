@@ -30,7 +30,7 @@
 OneTerm is a simple, lightweight, and flexible enterprise-level bastion host product. Based on the 4A concept: Authentication, Authorization, Account, and Audit, it ensures system security and compliance through strict access control and monitoring functions.
 
 - Official Website: [v1ops.com](https://v1ops.com/)
-- Product Documentation: [veops.cn/docs/en/docs/oneterm/Onterm_design](https://veops.cn/docs/en/docs/oneterm/Onterm_design)
+- Product Documentation: [v1ops.com/docs/design](https://v1ops.com/docs/design/)
 - Online Demo: [oneterm.v1ops.com](https://oneterm.v1ops.com/)
   - Username: demo or admin
   - Password: 123456

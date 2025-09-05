@@ -32,11 +32,13 @@ func init() {
 			ctx.SetValue("session", sess)
 			return err == nil
 		},
-		HostSigners: []ssh.Signer{signer()},
+		HostSigners: []ssh.Signer{},
 	}
 }
 
 func RunSsh() error {
+	// Initialize host signer after database is ready
+	server.HostSigners = []ssh.Signer{signer()}
 	return server.ListenAndServe()
 }
 

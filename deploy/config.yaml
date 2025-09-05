@@ -7,15 +7,6 @@ http:
 ssh:
   host: 0.0.0.0
   port: 2222
-  privateKey: |
-    -----BEGIN OPENSSH PRIVATE KEY-----
-    b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
-    QyNTUxOQAAACBg490b4zqumtizCyM4RWtzJnPEsPIInBFugk8+UCb8XgAAAKCc1yKrnNci
-    qwAAAAtzc2gtZWQyNTUxOQAAACBg490b4zqumtizCyM4RWtzJnPEsPIInBFugk8+UCb8Xg
-    AAAECvd1Yj+bQxyxJtU3PirLK68CD3MWqBv0/shlFKS6wmbWDj3RvjOq6a2LMLIzhFa3Mm
-    c8Sw8gicEW6CTz5QJvxeAAAAGnJvb3RAbG9jYWxob3N0LmxvY2FsZG9tYWluAQID
-    -----END OPENSSH PRIVATE KEY-----
-
 
 guacd:
   host: oneterm-guacd

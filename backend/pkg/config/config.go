@@ -134,7 +134,7 @@ type Auth struct {
 type SshConfig struct {
 	Host       string `yaml:"host"`
 	Port       int    `yaml:"port"`
-	PrivateKey string `yaml:"privateKey"`
+	PrivateKey string `yaml:"privateKey,omitempty"` // Deprecated: now stored encrypted in database SystemConfig table
 }
 
 type GuacdConfig struct {

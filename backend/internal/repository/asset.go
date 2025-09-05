@@ -17,7 +17,6 @@ import (
 )
 
 const (
-	kFmtAssetIds      = "assetIds-%d"
 	kAuthorizationIds = "authorizationIds"
 	kNodeIds          = "nodeIds"
 	kAccountIds       = "accountIds"

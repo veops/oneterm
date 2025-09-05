@@ -20,4 +20,5 @@ var (
 	DefaultStorageConfig   = &StorageConfig{}
 	DefaultStorageMetrics  = &StorageMetrics{}
 	DefaultMigrationRecord = &MigrationRecord{}
+	DefaultSystemConfig    = &SystemConfig{}
 )

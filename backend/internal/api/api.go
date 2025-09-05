@@ -34,7 +34,7 @@ func initDB() {
 		model.DefaultGateway, model.DefaultHistory, model.DefaultNode, model.DefaultPublicKey,
 		model.DefaultSession, model.DefaultSessionCmd, model.DefaultShare, model.DefaultQuickCommand,
 		model.DefaultUserPreference, model.DefaultStorageConfig, model.DefaultStorageMetrics,
-		model.DefaultTimeTemplate, model.DefaultMigrationRecord,
+		model.DefaultTimeTemplate, model.DefaultMigrationRecord, model.DefaultSystemConfig,
 	); err != nil {
 		logger.L().Fatal("Failed to init database", zap.Error(err))
 	}

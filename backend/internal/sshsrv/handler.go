@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -17,8 +18,8 @@ import (
 
 	"github.com/veops/oneterm/internal/acl"
 	"github.com/veops/oneterm/internal/model"
+	"github.com/veops/oneterm/internal/service"
 	"github.com/veops/oneterm/internal/version"
-	"github.com/veops/oneterm/pkg/config"
 	"github.com/veops/oneterm/pkg/logger"
 )
 
@@ -95,7 +96,34 @@ func handler(sess ssh.Session) {
 }
 
 func signer() ssh.Signer {
-	s, err := gossh.ParsePrivateKey([]byte(config.Cfg.Ssh.PrivateKey))
+	sysConfigService := service.NewSystemConfigService()
+	
+	// Retry logic to wait for database table creation
+	var privateKey string
+	var err error
+	
+	for i := 0; i < 10; i++ {
+		privateKey, err = sysConfigService.EnsureSSHPrivateKey()
+		if err == nil {
+			break
+		}
+		
+		// If table doesn't exist, wait and retry
+		if strings.Contains(err.Error(), "doesn't exist") {
+			logger.L().Info("Waiting for database initialization...", zap.Int("attempt", i+1))
+			time.Sleep(time.Second)
+			continue
+		}
+		
+		// Other errors are fatal
+		logger.L().Fatal("failed to ensure SSH private key", zap.Error(err))
+	}
+	
+	if err != nil {
+		logger.L().Fatal("failed to ensure SSH private key after retries", zap.Error(err))
+	}
+
+	s, err := gossh.ParsePrivateKey([]byte(privateKey))
 	if err != nil {
 		logger.L().Fatal("failed parse signer", zap.Error(err))
 	}

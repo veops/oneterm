@@ -337,7 +337,7 @@ func (c *WebProxyController) recordWebActivity(session *WebProxySession, req *ht
 	web_proxy.RecordWebActivity(session.SessionId, &gin.Context{Request: req})
 }
 
-// extractAssetIDFromHost extracts asset ID from subdomain host
+// extractAssetIDFromHost is kept for compatibility but deprecated in fixed subdomain approach
 func (c *WebProxyController) extractAssetIDFromHost(host string) (int, error) {
 	return web_proxy.ExtractAssetIDFromHost(host)
 }

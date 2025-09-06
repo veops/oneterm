@@ -130,26 +130,20 @@ func StartWebSession(ctx *gin.Context, req StartWebSessionRequest) (*StartWebSes
 	}
 	StoreSession(sessionId, webSession)
 
-	// Generate subdomain-based proxy URL
+	// Generate fixed webproxy subdomain URL
+	// Use the complete domain for webproxy subdomain
 	baseDomain := strings.Split(ctx.Request.Host, ":")[0]
-	if strings.Contains(baseDomain, ".") {
-		parts := strings.Split(baseDomain, ".")
-		if len(parts) > 2 {
-			baseDomain = strings.Join(parts[1:], ".")
-		}
-	}
 
-	// Determine proxy scheme based on current request only (not asset protocol)
-	scheme := lo.Ternary(ctx.Request.TLS != nil, "https", "http")
+	scheme := lo.Ternary(ctx.GetHeader("X-Forwarded-Proto") == "https", "https", "http")
 
 	portSuffix := ""
 	if strings.Contains(ctx.Request.Host, ":") {
 		portSuffix = ":" + strings.Split(ctx.Request.Host, ":")[1]
 	}
 
-	// Create subdomain URL with session_id for first access (cookie will handle subsequent requests)
-	subdomainHost := fmt.Sprintf("asset-%d.%s%s", req.AssetId, baseDomain, portSuffix)
-	proxyURL := fmt.Sprintf("%s://%s/?session_id=%s", scheme, subdomainHost, sessionId)
+	// Create fixed webproxy URL with asset_id and session_id for first access
+	webproxyHost := fmt.Sprintf("webproxy.%s%s", baseDomain, portSuffix)
+	proxyURL := fmt.Sprintf("%s://%s/?asset_id=%d&session_id=%s", scheme, webproxyHost, req.AssetId, sessionId)
 
 	// Create database session record for history (same as other protocols)
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
@@ -257,35 +251,11 @@ func BuildTargetURLWithHost(asset *model.Asset, host string) string {
 	return fmt.Sprintf("%s://%s:%d", protocol, host, port)
 }
 
-// ExtractAssetIDFromHost extracts asset ID from subdomain host
+// ExtractAssetIDFromHost extracts asset ID from query parameter (fixed webproxy subdomain)
 func ExtractAssetIDFromHost(host string) (int, error) {
-	// Remove port if present
-	hostParts := strings.Split(host, ":")
-	hostname := hostParts[0]
-
-	// Check for asset- prefix
-	if !strings.HasPrefix(hostname, "asset-") {
-		return 0, fmt.Errorf("host does not start with asset- prefix: %s", hostname)
-	}
-
-	// Extract asset ID: asset-123.domain.com -> 123
-	parts := strings.Split(hostname, ".")
-	if len(parts) == 0 {
-		return 0, fmt.Errorf("invalid hostname format: %s", hostname)
-	}
-
-	assetPart := parts[0] // asset-123
-	assetIDStr := strings.TrimPrefix(assetPart, "asset-")
-	if assetIDStr == assetPart {
-		return 0, fmt.Errorf("failed to extract asset ID from: %s", assetPart)
-	}
-
-	assetID, err := strconv.Atoi(assetIDStr)
-	if err != nil {
-		return 0, fmt.Errorf("invalid asset ID format: %s", assetIDStr)
-	}
-
-	return assetID, nil
+	// This is now handled by ExtractAssetIDFromRequest in the controller
+	// but kept for interface compatibility
+	return 0, fmt.Errorf("asset ID should be extracted from query parameter in fixed subdomain approach")
 }
 
 // IsSameDomainOrSubdomain checks if two hosts belong to the same domain or subdomain
@@ -412,6 +382,30 @@ func ExtractSessionAndAssetInfo(ctx *gin.Context, extractAssetIDFromHost func(st
 			sessionID = cookie
 		}
 	}
+	
+
+	// Try to get asset_id from existing session first
+	var assetID int
+	var err error
+
+	if sessionID != "" {
+		if session, exists := GetSession(sessionID); exists {
+			assetID = session.AssetId
+		}
+	}
+
+	// If no session or no asset_id from session, get from query parameter
+	if assetID == 0 {
+		assetIDStr := ctx.Query("asset_id")
+		if assetIDStr == "" {
+			return nil, fmt.Errorf("asset_id parameter required")
+		}
+
+		assetID, err = strconv.Atoi(assetIDStr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid asset_id format")
+		}
+	}
 
 	// 2. Try from redirect parameter (for login redirects)
 	if sessionID == "" {
@@ -424,13 +418,7 @@ func ExtractSessionAndAssetInfo(ctx *gin.Context, extractAssetIDFromHost func(st
 		}
 	}
 
-	// Extract asset ID from Host header: asset-11.oneterm.com -> 11
-	assetID, err := extractAssetIDFromHost(host)
-	if err != nil {
-		return nil, fmt.Errorf("invalid subdomain format: %w", err)
-	}
-
-	// Try to get session_id from Referer header as fallback
+	// 3. Try to get session_id from Referer header as fallback
 	if sessionID == "" {
 		referer := ctx.GetHeader("Referer")
 		if referer != "" {
@@ -451,7 +439,7 @@ func ExtractSessionAndAssetInfo(ctx *gin.Context, extractAssetIDFromHost func(st
 		}
 	}
 
-	// For static resources, try harder to find session_id
+	// 4. For static resources, try harder to find session_id
 	if sessionID == "" {
 		// Check if this looks like a static resource
 		isStaticResource := strings.Contains(ctx.Request.URL.Path, "/img/") ||
@@ -527,7 +515,15 @@ func ValidateSessionAndPermissions(ctx *gin.Context, proxyCtx *ProxyRequestConte
 
 		// Auto-renew cookie for user operations
 		cookieMaxAge := int(model.GlobalConfig.Load().Timeout)
-		ctx.SetCookie("oneterm_session_id", proxyCtx.SessionID, cookieMaxAge, "/", "", false, true)
+		// Set cookie domain for webproxy subdomain
+		cookieDomain := ""
+		if strings.HasPrefix(ctx.Request.Host, "webproxy.") {
+			parts := strings.SplitN(ctx.Request.Host, ".", 2)
+			if len(parts) > 1 {
+				cookieDomain = "." + parts[1] // .domain.com
+			}
+		}
+		ctx.SetCookie("oneterm_session_id", proxyCtx.SessionID, cookieMaxAge, "/", cookieDomain, false, true)
 	}
 
 	// Check Web-specific access controls
@@ -552,7 +548,14 @@ func SetupReverseProxy(ctx *gin.Context, proxyCtx *ProxyRequestContext, buildTar
 		return nil, fmt.Errorf("invalid target URL")
 	}
 
-	currentScheme := lo.Ternary(ctx.Request.TLS != nil, "https", "http")
+	// Determine scheme with multiple fallback methods
+	currentScheme := "http"
+	if ctx.GetHeader("X-Forwarded-Proto") == "https" ||
+		ctx.GetHeader("X-Forwarded-Ssl") == "on" ||
+		ctx.GetHeader("X-Url-Scheme") == "https" ||
+		ctx.Request.TLS != nil {
+		currentScheme = "https"
+	}
 
 	// Create transparent reverse proxy
 	proxy := httputil.NewSingleHostReverseProxy(target)
@@ -577,9 +580,15 @@ func SetupReverseProxy(ctx *gin.Context, proxyCtx *ProxyRequestContext, buildTar
 			}
 		}
 
-		q := req.URL.Query()
-		q.Del("session_id")
-		req.URL.RawQuery = q.Encode()
+		// Remove session_id from query parameters without re-encoding
+		if req.URL.RawQuery != "" {
+			q := req.URL.Query()
+			if q.Has("session_id") {
+				q.Del("session_id")
+				req.URL.RawQuery = q.Encode()
+			}
+			// Keep original RawQuery if no session_id to remove
+		}
 	}
 
 	// Redirect interception for bastion control
@@ -634,7 +643,7 @@ func SetupReverseProxy(ctx *gin.Context, proxyCtx *ProxyRequestContext, buildTar
 				shouldIntercept := redirectURL.IsAbs()
 
 				if shouldIntercept {
-					baseDomain := lo.Ternary(strings.HasPrefix(proxyCtx.Host, "asset-"),
+					baseDomain := lo.Ternary(strings.HasPrefix(proxyCtx.Host, "webproxy."),
 						func() string {
 							parts := strings.SplitN(proxyCtx.Host, ".", 2)
 							return lo.Ternary(len(parts) > 1, parts[1], proxyCtx.Host)
@@ -643,14 +652,14 @@ func SetupReverseProxy(ctx *gin.Context, proxyCtx *ProxyRequestContext, buildTar
 
 					if isSameDomainOrSubdomain(target.Host, redirectURL.Host) {
 						UpdateSessionHost(proxyCtx.SessionID, redirectURL.Host)
-						newProxyURL := fmt.Sprintf("%s://asset-%d.%s%s", currentScheme, proxyCtx.AssetID, baseDomain, redirectURL.Path)
+						newProxyURL := fmt.Sprintf("%s://webproxy.%s%s", currentScheme, baseDomain, redirectURL.Path)
 						if redirectURL.RawQuery != "" {
 							newProxyURL += "?" + redirectURL.RawQuery
 						}
 						resp.Header.Set("Location", newProxyURL)
 					} else {
-						newLocation := fmt.Sprintf("%s://asset-%d.%s/external?url=%s",
-							currentScheme, proxyCtx.AssetID, baseDomain, url.QueryEscape(redirectURL.String()))
+						newLocation := fmt.Sprintf("%s://webproxy.%s/external?url=%s",
+							currentScheme, baseDomain, url.QueryEscape(redirectURL.String()))
 						resp.Header.Set("Location", newLocation)
 					}
 				} else {
@@ -673,6 +682,7 @@ func SetupReverseProxy(ctx *gin.Context, proxyCtx *ProxyRequestContext, buildTar
 
 		return nil
 	}
+	
 
 	return proxy, nil
 }

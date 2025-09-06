@@ -1,11 +1,11 @@
 package router
 
 import (
+	"strings"
+
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
-
-	"strings"
 
 	"github.com/veops/oneterm/internal/api/controller"
 	"github.com/veops/oneterm/internal/api/docs"
@@ -21,13 +21,13 @@ func SetupRouter(r *gin.Engine) {
 	// Start web session cleanup routine
 	controller.StartSessionCleanupRoutine()
 
-	// Subdomain proxy middleware for asset- subdomains
+	// Fixed webproxy subdomain middleware
 	webProxy := controller.NewWebProxyController()
 	r.Use(func(c *gin.Context) {
 		host := c.Request.Host
 
-		// Check if this is an asset subdomain request
-		if strings.HasPrefix(host, "asset-") {
+		// Check if this is the webproxy subdomain request
+		if strings.HasPrefix(host, "webproxy.") {
 			// Allow API requests to pass through to normal routing
 			if strings.HasPrefix(c.Request.URL.Path, "/api/oneterm/v1/") {
 				c.Next()

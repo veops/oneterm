@@ -10,7 +10,6 @@ RUN apk add tzdata
 ENV TZ=Asia/Shanghai
 ENV TERM=xterm-256color
 WORKDIR /oneterm
-COPY --from=0 /oneterm/configs/config.example.yaml ./config.yaml
 COPY --from=0 /oneterm/internal/i18n/locales ./locales
 COPY --from=0 /oneterm/build/oneterm .
 CMD [ "./oneterm","run","-c","./config.yaml"]

@@ -21,7 +21,7 @@ func LoggerMiddleware() gin.HandlerFunc {
 		// Skip logging for web proxy requests to reduce noise
 		url := ctx.Request.URL.String()
 		host := ctx.Request.Host
-		if strings.HasPrefix(host, "asset-") {
+		if strings.HasPrefix(host, "webproxy.") {
 			return
 		}
 

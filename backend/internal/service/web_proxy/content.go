@@ -12,86 +12,6 @@ import (
 	"github.com/samber/lo"
 )
 
-// RewriteHTMLContent rewrites HTML content to redirect external links through proxy
-func RewriteHTMLContent(resp *http.Response, assetID int, scheme, proxyHost string) {
-	if resp.Body == nil {
-		return
-	}
-
-	// Remove Content-Encoding to avoid decoding issues
-	resp.Header.Del("Content-Encoding")
-	resp.Header.Del("Content-Length")
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return
-	}
-	resp.Body.Close()
-
-	baseDomain := lo.Ternary(strings.HasPrefix(proxyHost, "asset-"),
-		func() string {
-			parts := strings.SplitN(proxyHost, ".", 2)
-			return lo.Ternary(len(parts) > 1, parts[1], proxyHost)
-		}(),
-		proxyHost)
-
-	content := string(body)
-
-	// Universal URL rewriting patterns - catch ALL external URLs
-	patterns := []struct {
-		pattern string
-		rewrite func(matches []string) string
-	}{
-		// JavaScript location assignments: window.location = "http://example.com/path"
-		{
-			`(window\.location(?:\.href)?\s*=\s*["'])https?://([^/'"]+)(/[^"']*)?["']`,
-			func(matches []string) string {
-				path := lo.Ternary(len(matches) > 3 && matches[3] != "", matches[3], "")
-				return fmt.Sprintf(`%s%s://asset-%d.%s%s"`, matches[1], scheme, assetID, baseDomain, path)
-			},
-		},
-		// Form actions: <form action="http://example.com/path"
-		{
-			`(action\s*=\s*["'])https?://([^/'"]+)(/[^"']*)?["']`,
-			func(matches []string) string {
-				path := lo.Ternary(len(matches) > 3 && matches[3] != "", matches[3], "")
-				return fmt.Sprintf(`%s%s://asset-%d.%s%s"`, matches[1], scheme, assetID, baseDomain, path)
-			},
-		},
-		// Link hrefs: <a href="http://example.com/path"
-		{
-			`(href\s*=\s*["'])https?://([^/'"]+)(/[^"']*)?["']`,
-			func(matches []string) string {
-				path := lo.Ternary(len(matches) > 3 && matches[3] != "", matches[3], "")
-				return fmt.Sprintf(`%s%s://asset-%d.%s%s"`, matches[1], scheme, assetID, baseDomain, path)
-			},
-		},
-		// Static resources: <img src=""> <script src=""> <link href="">
-		{
-			`(src\s*=\s*["'])https?://([^/'"]+)(/[^"']*)?["']`,
-			func(matches []string) string {
-				path := lo.Ternary(len(matches) > 3 && matches[3] != "", matches[3], "")
-				return fmt.Sprintf(`%s%s://asset-%d.%s%s"`, matches[1], scheme, assetID, baseDomain, path)
-			},
-		},
-	}
-
-	for _, p := range patterns {
-		re := regexp.MustCompile(p.pattern)
-		content = re.ReplaceAllStringFunc(content, func(match string) string {
-			matches := re.FindStringSubmatch(match)
-			if len(matches) >= 4 {
-				return p.rewrite(matches)
-			}
-			return match
-		})
-	}
-
-	newBody := bytes.NewReader([]byte(content))
-	resp.Body = io.NopCloser(newBody)
-	resp.ContentLength = int64(len(content))
-	resp.Header.Set("Content-Length", fmt.Sprintf("%d", len(content)))
-}
 
 // ProcessHTMLResponse processes HTML response for content rewriting and injection
 func ProcessHTMLResponse(resp *http.Response, assetID int, scheme, proxyHost string, session *WebProxySession) {
@@ -99,8 +19,15 @@ func ProcessHTMLResponse(resp *http.Response, assetID int, scheme, proxyHost str
 		return
 	}
 
-	// Check if content is compressed
+	// Check if content is compressed BEFORE removing headers
 	contentEncoding := resp.Header.Get("Content-Encoding")
+	
+	// Only log search-related requests for debugging login issue
+	isSearchRequest := strings.Contains(resp.Request.URL.String(), "/s?") || strings.Contains(resp.Request.URL.String(), "search")
+	if isSearchRequest {
+		fmt.Printf("[SEARCH] URL: %s, Status: %d, Content-Type: %s, Content-Encoding: %s\n", 
+			resp.Request.URL.String(), resp.StatusCode, resp.Header.Get("Content-Type"), contentEncoding)
+	}
 
 	// Remove Content-Encoding to avoid decoding issues
 	resp.Header.Del("Content-Encoding")
@@ -118,6 +45,21 @@ func ProcessHTMLResponse(resp *http.Response, assetID int, scheme, proxyHost str
 		}
 		defer gzipReader.Close()
 		body, err = io.ReadAll(gzipReader)
+	} else if contentEncoding == "br" || contentEncoding == "deflate" {
+		// For br/deflate, we need to decompress but don't have the library
+		// For now, keep the headers and let the browser handle decompression
+		resp.Header.Set("Content-Encoding", contentEncoding)
+		body, err = io.ReadAll(resp.Body)
+		// Skip HTML processing for compressed content we can't decompress
+		if isSearchRequest {
+			fmt.Printf("[SEARCH] Skipping HTML processing due to %s encoding\n", contentEncoding)
+		}
+		// Set response without HTML processing
+		newBody := bytes.NewReader(body)
+		resp.Body = io.NopCloser(newBody)
+		resp.ContentLength = int64(len(body))
+		resp.Header.Set("Content-Length", fmt.Sprintf("%d", len(body)))
+		return
 	} else {
 		body, err = io.ReadAll(resp.Body)
 	}
@@ -128,10 +70,17 @@ func ProcessHTMLResponse(resp *http.Response, assetID int, scheme, proxyHost str
 	}
 	resp.Body.Close()
 
+	// Preserve original encoding - convert bytes to string properly
 	content := string(body)
+	
+	// Log search content processing for debugging garbled text
+	if isSearchRequest {
+		fmt.Printf("[SEARCH] Body length: %d, Content preview: %.100s...\n", 
+			len(body), strings.ReplaceAll(string(body[:min(100, len(body))]), "\n", "\\n"))
+	}
 
 	// URL rewriting for external links
-	baseDomain := lo.Ternary(strings.HasPrefix(proxyHost, "asset-"),
+	baseDomain := lo.Ternary(strings.HasPrefix(proxyHost, "webproxy."),
 		func() string {
 			parts := strings.SplitN(proxyHost, ".", 2)
 			return lo.Ternary(len(parts) > 1, parts[1], proxyHost)
@@ -146,28 +95,39 @@ func ProcessHTMLResponse(resp *http.Response, assetID int, scheme, proxyHost str
 			`(window\.location(?:\.href)?\s*=\s*["'])https?://([^/'"]+)(/[^"']*)?["']`,
 			func(matches []string) string {
 				path := lo.Ternary(len(matches) > 3 && matches[3] != "", matches[3], "")
-				return fmt.Sprintf(`%s%s://asset-%d.%s%s"`, matches[1], scheme, assetID, baseDomain, path)
+				return fmt.Sprintf(`%s%s://webproxy.%s%s"`, matches[1], scheme, baseDomain, path)
 			},
 		},
 		{
 			`(action\s*=\s*["'])https?://([^/'"]+)(/[^"']*)?["']`,
 			func(matches []string) string {
 				path := lo.Ternary(len(matches) > 3 && matches[3] != "", matches[3], "")
-				return fmt.Sprintf(`%s%s://asset-%d.%s%s"`, matches[1], scheme, assetID, baseDomain, path)
+				return fmt.Sprintf(`%s%s://webproxy.%s%s"`, matches[1], scheme, baseDomain, path)
 			},
 		},
 		{
 			`(href\s*=\s*["'])https?://([^/'"]+)(/[^"']*)?["']`,
 			func(matches []string) string {
+				hostname := matches[2]
 				path := lo.Ternary(len(matches) > 3 && matches[3] != "", matches[3], "")
-				return fmt.Sprintf(`%s%s://asset-%d.%s%s"`, matches[1], scheme, assetID, baseDomain, path)
-			},
-		},
-		{
-			`(src\s*=\s*["'])https?://([^/'"]+)(/[^"']*)?["']`,
-			func(matches []string) string {
-				path := lo.Ternary(len(matches) > 3 && matches[3] != "", matches[3], "")
-				return fmt.Sprintf(`%s%s://asset-%d.%s%s"`, matches[1], scheme, assetID, baseDomain, path)
+				
+				// Check if hostname belongs to the same domain family (e.g., *.baidu.com)
+				sessionHostParts := strings.Split(session.CurrentHost, ".")
+				hostnameParts := strings.Split(hostname, ".")
+				
+				// Compare the last 2 parts for domain matching (e.g., baidu.com)
+				isSameDomain := false
+				if len(sessionHostParts) >= 2 && len(hostnameParts) >= 2 {
+					sessionDomain := strings.Join(sessionHostParts[len(sessionHostParts)-2:], ".")
+					hostDomain := strings.Join(hostnameParts[len(hostnameParts)-2:], ".")
+					isSameDomain = sessionDomain == hostDomain
+				}
+				
+				if isSameDomain {
+					return fmt.Sprintf(`%s%s://webproxy.%s%s"`, matches[1], scheme, baseDomain, path)
+				}
+				// Keep external URLs unchanged
+				return matches[0]
 			},
 		},
 	}
@@ -241,18 +201,18 @@ func ProcessHTMLResponse(resp *http.Response, assetID int, scheme, proxyHost str
 	// Add session management JavaScript (always inject)
 	sessionJS := fmt.Sprintf(`
 		<script>
-		(function() {tbeat', {
-					method: 'POST',
-					headers: {'Content-Type': 'application/json'},
-					body: JSON.stringify({session_id: sessionId})
-				}).catch(function() {});
-			}
+		(function() {
 			var sessionId = '%s';
 			var heartbeatInterval;
 			
 			// Send heartbeat every 15 seconds
 			function sendHeartbeat() {
-				fetch('/api/oneterm/v1/web_proxy/hear
+				fetch('/api/oneterm/v1/web_proxy/heartbeat', {
+					method: 'POST',
+					headers: {'Content-Type': 'application/json'},
+					body: JSON.stringify({session_id: sessionId})
+				}).catch(function() {});
+			}
 			
 			// Universal heartbeat mechanism - no complex event handling
 			// The server will handle session cleanup based on heartbeat timeout
@@ -260,6 +220,7 @@ func ProcessHTMLResponse(resp *http.Response, assetID int, scheme, proxyHost str
 			
 			// Send initial heartbeat immediately
 			sendHeartbeat();
+			
 		})();
 		</script>`, session.SessionId)
 
@@ -269,7 +230,7 @@ func ProcessHTMLResponse(resp *http.Response, assetID int, scheme, proxyHost str
 	<script>
 	(function() {
 		var originalHost = '%s';
-		var proxyHost = 'asset-%d.%s';
+		var proxyHost = 'webproxy.%s';
 		var proxyScheme = '%s';
 		
 		function rewriteUrl(url) {
@@ -277,21 +238,38 @@ func ProcessHTMLResponse(resp *http.Response, assetID int, scheme, proxyHost str
 				// Handle absolute URLs
 				if (url.startsWith('http://') || url.startsWith('https://')) {
 					var urlObj = new URL(url);
-					// Only rewrite external domains, not our proxy domain
-					if (urlObj.hostname !== window.location.hostname && 
-						urlObj.hostname !== 'localhost' && 
-						urlObj.hostname !== '127.0.0.1') {
-						// Preserve the original path and query, but use proxy hostname
-						var newUrl = proxyScheme + '://' + proxyHost + urlObj.pathname + urlObj.search + urlObj.hash;
-						console.log('Rewriting URL:', url, '->', newUrl);
-						return newUrl;
+					
+					// Check if this URL belongs to the same domain we're proxying
+					var isSameDomain = false;
+					
+					// Exact match
+					if (urlObj.hostname === originalHost) {
+						isSameDomain = true;
 					}
-				}
-				// Handle relative URLs starting with /
-				else if (url.startsWith('/')) {
-					// Keep relative URLs as-is, they will be relative to current proxy domain
+					// Check if they share the same root domain (e.g., www.baidu.com and baidu.com)
+					else {
+						var getBaseDomain = function(hostname) {
+							var parts = hostname.split('.');
+							if (parts.length >= 2) {
+								return parts.slice(-2).join('.');
+							}
+							return hostname;
+						};
+						
+						if (getBaseDomain(urlObj.hostname) === getBaseDomain(originalHost)) {
+							isSameDomain = true;
+						}
+					}
+					
+					if (isSameDomain) {
+						// Convert to relative URL so it goes through proxy
+						return urlObj.pathname + urlObj.search + urlObj.hash;
+					}
+					
+					// For external CDN URLs, let them access directly (most secure for bastion host)
 					return url;
 				}
+				// Handle relative URLs - keep as is
 				return url;
 			} catch (e) {
 				console.warn('URL rewrite error:', e, 'for URL:', url);
@@ -426,7 +404,7 @@ func ProcessHTMLResponse(resp *http.Response, assetID int, scheme, proxyHost str
 			}, 1000);
 		}
 	})();
-	</script>`, session.CurrentHost, assetID, baseDomain, scheme, session.Permissions.FileDownload)
+	</script>`, session.CurrentHost, baseDomain, scheme, session.Permissions.FileDownload)
 
 	// Always inject session management and URL interceptor
 

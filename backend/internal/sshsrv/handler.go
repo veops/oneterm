@@ -97,28 +97,28 @@ func handler(sess ssh.Session) {
 
 func signer() ssh.Signer {
 	sysConfigService := service.NewSystemConfigService()
-	
+
 	// Retry logic to wait for database table creation
 	var privateKey string
 	var err error
-	
-	for i := 0; i < 10; i++ {
+
+	for i := range 10 {
 		privateKey, err = sysConfigService.EnsureSSHPrivateKey()
 		if err == nil {
 			break
 		}
-		
+
 		// If table doesn't exist, wait and retry
 		if strings.Contains(err.Error(), "doesn't exist") {
 			logger.L().Info("Waiting for database initialization...", zap.Int("attempt", i+1))
 			time.Sleep(time.Second)
 			continue
 		}
-		
+
 		// Other errors are fatal
 		logger.L().Fatal("failed to ensure SSH private key", zap.Error(err))
 	}
-	
+
 	if err != nil {
 		logger.L().Fatal("failed to ensure SSH private key after retries", zap.Error(err))
 	}

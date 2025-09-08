@@ -39,8 +39,8 @@ export default {
   },
   methods: {
     jumpTo() {
-      if (this.$route.path !== '/cmdb/dashboard') {
-        this.$router.push('/cmdb/dashboard')
+      if (this.$route.path !== '/oneterm/workstation') {
+        this.$router.push('/oneterm/workstation')
       }
     },
   },

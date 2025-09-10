@@ -53,6 +53,7 @@ require github.com/PuerkitoBio/goquery v1.10.3
 
 require (
 	github.com/Azure/azure-pipeline-go v0.2.3 // indirect
+	github.com/andybalholm/brotli v1.2.0 // indirect
 	github.com/andybalholm/cascadia v1.3.3 // indirect
 	github.com/anmitsu/go-shlex v0.0.0-20200514113438-38f4b401e2be // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect

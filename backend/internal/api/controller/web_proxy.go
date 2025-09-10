@@ -31,7 +31,6 @@ func StartSessionCleanupRoutine() {
 
 func (c *WebProxyController) renderSessionExpiredPage(ctx *gin.Context, reason string) {
 	html := web_proxy.RenderSessionExpiredPage(reason)
-	ctx.SetCookie("oneterm_session_id", "", -1, "/", "", false, true)
 	ctx.Header("Content-Type", "text/html; charset=utf-8")
 	ctx.String(http.StatusUnauthorized, html)
 }
@@ -146,19 +145,25 @@ func (c *WebProxyController) ProxyWebRequest(ctx *gin.Context) {
 	}
 
 	// Validate session and check permissions
-	if err := web_proxy.ValidateSessionAndPermissions(ctx, proxyCtx, c.checkWebAccessControls); err != nil {
-		if strings.Contains(err.Error(), "invalid or expired session") || strings.Contains(err.Error(), "session expired") {
-			c.renderSessionExpiredPage(ctx, err.Error())
-		} else {
-			c.renderErrorPage(ctx, "access_denied", "Access Denied", err.Error(), "Your request was blocked by the security policy.")
+	if !proxyCtx.IsStaticResource {
+		if err := web_proxy.ValidateSessionAndPermissions(ctx, proxyCtx, c.checkWebAccessControls); err != nil {
+			if strings.Contains(err.Error(), "invalid or expired session") || strings.Contains(err.Error(), "session expired") {
+				c.renderSessionExpiredPage(ctx, err.Error())
+			} else {
+				c.renderErrorPage(ctx, "access_denied", "Access Denied", err.Error(), "Your request was blocked by the security policy.")
+			}
+			return
 		}
-		return
 	}
 
 	// Setup reverse proxy
 	proxy, err := web_proxy.SetupReverseProxy(ctx, proxyCtx, c.buildTargetURLWithHost, c.processHTMLResponse, c.recordWebActivity, c.isSameDomainOrSubdomain)
 	if err != nil {
 		c.renderErrorPage(ctx, "server_error", "Proxy Setup Failed", err.Error(), "Failed to establish connection to the target server.")
+		return
+	}
+
+	if proxy == nil {
 		return
 	}
 

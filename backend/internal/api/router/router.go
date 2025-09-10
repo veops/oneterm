@@ -21,26 +21,22 @@ func SetupRouter(r *gin.Engine) {
 	// Start web session cleanup routine
 	controller.StartSessionCleanupRoutine()
 
-	// Fixed webproxy subdomain middleware
 	webProxy := controller.NewWebProxyController()
 	r.Use(func(c *gin.Context) {
 		host := c.Request.Host
 
 		// Check if this is the webproxy subdomain request
 		if strings.HasPrefix(host, "webproxy.") {
-			// Allow API requests to pass through to normal routing
 			if strings.HasPrefix(c.Request.URL.Path, "/api/oneterm/v1/") {
 				c.Next()
 				return
 			}
 
-			// Handle external redirect requests
 			if c.Request.URL.Path == "/external" {
 				webProxy.HandleExternalRedirect(c)
 				return
 			}
 
-			// Handle normal proxy requests
 			webProxy.ProxyWebRequest(c)
 			return
 		}

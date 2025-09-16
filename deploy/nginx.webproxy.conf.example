@@ -1,0 +1,421 @@
+# OneTerm WebProxy Nginx Configuration
+# This configuration supports both OneTermUI and WebProxy domains
+#
+# DEPLOYMENT OPTIONS:
+# 1. HTTP Only: Use as-is (default, HTTPS sections are commented out)
+# 2. HTTPS Only: Uncomment HTTPS sections, comment out HTTP sections
+# 3. HTTP + HTTPS: Uncomment HTTPS sections, keep HTTP sections
+# 4. HTTP to HTTPS Redirect: Uncomment HTTPS sections and redirect rules at bottom
+#
+# Required Environment Variables:
+# - ONETERM_DOMAIN: Domain for OneTermUI (e.g., oneterm.example.com)
+# - ONETERM_API_HOST: OneTermAPI backend (e.g., oneterm-api:8888)
+# - ACL_API_HOST: ACL API backend (e.g., acl-api:5000)
+#
+# WebProxy automatically uses: webproxy.${ONETERM_DOMAIN}
+#
+# For HTTPS deployment, also set these variables and uncomment HTTPS sections:
+# - ONETERM_SSL_CERT_PATH: SSL certificate path for OneTermUI
+# - ONETERM_SSL_KEY_PATH: SSL private key path for OneTermUI
+# - WEBPROXY_SSL_CERT_PATH: SSL certificate path for WebProxy (for webproxy.${ONETERM_DOMAIN})
+# - WEBPROXY_SSL_KEY_PATH: SSL private key path for WebProxy (for webproxy.${ONETERM_DOMAIN})
+
+# ============================================================================
+# HTTP Configuration (Active by default)
+# ============================================================================
+
+# HTTP Configuration for OneTermUI
+server {
+    listen 80;
+    server_name ${ONETERM_DOMAIN};
+    access_log /var/log/nginx/access.oneterm.log;
+    error_log /var/log/nginx/error.oneterm.log;
+
+    # CORS Headers
+    add_header 'Access-Control-Allow-Origin' "$http_origin";
+    add_header 'Access-Control-Allow-Credentials' 'true';
+    add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS';
+    add_header 'Access-Control-Allow-Headers' 'Accept,Authorization,Cache-Control,Content-Type,DNT,If-Modified-Since,Keep-Alive,Origin,User-Agent,X-Requested-With';
+
+    # Gzip Compression
+    gzip on;
+    gzip_comp_level 6;
+    gzip_buffers 16 8k;
+    gzip_http_version 1.1;
+    gzip_min_length 256;
+    gzip_types
+        text/plain
+        text/css
+        text/js
+        text/xml
+        text/javascript
+        application/javascript
+        application/x-javascript
+        application/json
+        application/xml
+        application/rss+xml
+        image/svg+xml;
+
+    # OneTermUI Frontend
+    root /etc/nginx/html;
+    location / {
+        root /etc/nginx/html;
+        index index.html;
+        try_files $uri $uri/ /index.html;
+    }
+
+    # WebSocket connections
+    location ^~ /api/oneterm/v1/connect {
+        proxy_pass http://${ONETERM_API_HOST};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Scheme $scheme;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_redirect off;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_read_timeout 7200s;
+        proxy_connect_timeout 7200s;
+        proxy_send_timeout 7200s;
+    }
+
+    # File upload endpoints
+    location ~ ^/api/oneterm/v1/(rdp/sessions/.+/files/upload|file/(session/.+/upload|upload/.+/.+)) {
+        proxy_pass http://${ONETERM_API_HOST};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Scheme $scheme;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_redirect off;
+        proxy_http_version 1.1;
+
+        # File upload optimization
+        proxy_request_buffering off;
+        proxy_buffering off;
+        proxy_read_timeout 1800s;
+        proxy_send_timeout 1800s;
+        proxy_connect_timeout 60s;
+
+        # Large file upload settings
+        client_max_body_size 10240m;
+        client_body_buffer_size 32m;
+        client_body_timeout 1800s;
+    }
+
+    # OneTermAPI
+    location ^~ /api/oneterm {
+        proxy_pass http://${ONETERM_API_HOST};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Scheme $scheme;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_redirect off;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+
+    # ACL API
+    location /api {
+        proxy_pass http://${ACL_API_HOST};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Scheme $scheme;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_redirect off;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+
+    # Static assets cache
+    location ~* \.(css|js)$ {
+        access_log off;
+        add_header Pragma public;
+        add_header Cache-Control "public, max-age=7776000";
+        add_header X-Asset "yes";
+    }
+}
+
+# HTTP Configuration for WebProxy
+server {
+    listen 80;
+    server_name webproxy.${ONETERM_DOMAIN};
+    access_log /var/log/nginx/access.webproxy.log;
+    error_log /var/log/nginx/error.webproxy.log;
+
+    # Security headers for web proxy
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    # Disable caching for proxied content to ensure fresh data
+    add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+    add_header Pragma "no-cache" always;
+    add_header Expires "0" always;
+
+    # Large request body support for web content
+    client_max_body_size 100m;
+    client_body_buffer_size 8m;
+    client_body_timeout 300s;
+
+    # Proxy buffer settings for web content
+    proxy_buffering on;
+    proxy_buffer_size 64k;
+    proxy_buffers 8 64k;
+    proxy_busy_buffers_size 128k;
+    proxy_temp_file_write_size 128k;
+
+    # Timeout settings for web requests
+    proxy_connect_timeout 30s;
+    proxy_send_timeout 300s;
+    proxy_read_timeout 300s;
+
+    # All requests go to webproxy handler (includes API, external, and proxy requests)
+    location / {
+        proxy_pass http://${ONETERM_API_HOST};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Scheme $scheme;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_redirect off;
+        proxy_http_version 1.1;
+
+        # Preserve original request headers for proper web proxy functionality
+        proxy_set_header Accept $http_accept;
+        proxy_set_header Accept-Encoding $http_accept_encoding;
+        proxy_set_header Accept-Language $http_accept_language;
+        proxy_set_header User-Agent $http_user_agent;
+        proxy_set_header Cookie $http_cookie;
+        proxy_set_header Referer $http_referer;
+    }
+}
+
+# ============================================================================
+# HTTPS Configuration (Commented out by default - Uncomment if needed)
+# ============================================================================
+#
+# To enable HTTPS support:
+# 1. Set SSL certificate environment variables (see top of file)
+# 2. Uncomment all lines below by removing the leading '#'
+# 3. Optionally comment out HTTP sections above or enable HTTP redirect at bottom
+#
+# # HTTPS Configuration for OneTermUI
+# server {
+#     listen 443 ssl http2;
+#     server_name ${ONETERM_DOMAIN};
+#     access_log /var/log/nginx/access.oneterm.ssl.log;
+#     error_log /var/log/nginx/error.oneterm.ssl.log;
+#
+#     # SSL Configuration
+#     ssl_certificate ${ONETERM_SSL_CERT_PATH};
+#     ssl_certificate_key ${ONETERM_SSL_KEY_PATH};
+#     ssl_session_cache shared:SSL:1m;
+#     ssl_session_timeout 10m;
+#     ssl_protocols TLSv1.2 TLSv1.3;
+#     ssl_ciphers ECDHE-RSA-AES128-GCM-SHA256:ECDHE:ECDH:AES:HIGH:!NULL:!aNULL:!MD5:!ADH:!RC4;
+#     ssl_prefer_server_ciphers on;
+#
+#     # HSTS (optional, uncomment if needed)
+#     # add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+#
+#     # CORS Headers
+#     add_header 'Access-Control-Allow-Origin' "$http_origin";
+#     add_header 'Access-Control-Allow-Credentials' 'true';
+#     add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS';
+#     add_header 'Access-Control-Allow-Headers' 'Accept,Authorization,Cache-Control,Content-Type,DNT,If-Modified-Since,Keep-Alive,Origin,User-Agent,X-Requested-With';
+#
+#     # Gzip Compression
+#     gzip on;
+#     gzip_comp_level 6;
+#     gzip_buffers 16 8k;
+#     gzip_http_version 1.1;
+#     gzip_min_length 256;
+#     gzip_types
+#         text/plain
+#         text/css
+#         text/js
+#         text/xml
+#         text/javascript
+#         application/javascript
+#         application/x-javascript
+#         application/json
+#         application/xml
+#         application/rss+xml
+#         image/svg+xml;
+#
+#     # OneTermUI Frontend
+#     root /etc/nginx/html;
+#     location / {
+#         root /etc/nginx/html;
+#         index index.html;
+#         try_files $uri $uri/ /index.html;
+#     }
+#
+#     # WebSocket connections
+#     location ^~ /api/oneterm/v1/connect {
+#         proxy_pass http://${ONETERM_API_HOST};
+#         proxy_set_header Host $host;
+#         proxy_set_header X-Real-IP $remote_addr;
+#         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+#         proxy_set_header X-Scheme $scheme;
+#         proxy_set_header X-Forwarded-Proto $scheme;
+#         proxy_redirect off;
+#         proxy_http_version 1.1;
+#         proxy_set_header Upgrade $http_upgrade;
+#         proxy_set_header Connection "upgrade";
+#         proxy_read_timeout 7200s;
+#         proxy_connect_timeout 7200s;
+#         proxy_send_timeout 7200s;
+#     }
+#
+#     # File upload endpoints
+#     location ~ ^/api/oneterm/v1/(rdp/sessions/.+/files/upload|file/(session/.+/upload|upload/.+/.+)) {
+#         proxy_pass http://${ONETERM_API_HOST};
+#         proxy_set_header Host $host;
+#         proxy_set_header X-Real-IP $remote_addr;
+#         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+#         proxy_set_header X-Scheme $scheme;
+#         proxy_set_header X-Forwarded-Proto $scheme;
+#         proxy_redirect off;
+#         proxy_http_version 1.1;
+#
+#         # File upload optimization
+#         proxy_request_buffering off;
+#         proxy_buffering off;
+#         proxy_read_timeout 1800s;
+#         proxy_send_timeout 1800s;
+#         proxy_connect_timeout 60s;
+#
+#         # Large file upload settings
+#         client_max_body_size 10240m;
+#         client_body_buffer_size 32m;
+#         client_body_timeout 1800s;
+#     }
+#
+#     # OneTermAPI
+#     location ^~ /api/oneterm {
+#         proxy_pass http://${ONETERM_API_HOST};
+#         proxy_set_header Host $host;
+#         proxy_set_header X-Real-IP $remote_addr;
+#         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+#         proxy_set_header X-Scheme $scheme;
+#         proxy_set_header X-Forwarded-Proto $scheme;
+#         proxy_redirect off;
+#         proxy_http_version 1.1;
+#         proxy_set_header Upgrade $http_upgrade;
+#         proxy_set_header Connection "upgrade";
+#     }
+#
+#     # ACL API
+#     location /api {
+#         proxy_pass http://${ACL_API_HOST};
+#         proxy_set_header Host $host;
+#         proxy_set_header X-Real-IP $remote_addr;
+#         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+#         proxy_set_header X-Scheme $scheme;
+#         proxy_set_header X-Forwarded-Proto $scheme;
+#         proxy_redirect off;
+#         proxy_http_version 1.1;
+#         proxy_set_header Upgrade $http_upgrade;
+#         proxy_set_header Connection "upgrade";
+#     }
+#
+#     # Static assets cache
+#     location ~* \.(css|js)$ {
+#         access_log off;
+#         add_header Pragma public;
+#         add_header Cache-Control "public, max-age=7776000";
+#         add_header X-Asset "yes";
+#     }
+# }
+#
+# # HTTPS Configuration for WebProxy
+# server {
+#     listen 443 ssl http2;
+#     server_name webproxy.${ONETERM_DOMAIN};
+#     access_log /var/log/nginx/access.webproxy.ssl.log;
+#     error_log /var/log/nginx/error.webproxy.ssl.log;
+#
+#     # SSL Configuration
+#     ssl_certificate ${WEBPROXY_SSL_CERT_PATH};
+#     ssl_certificate_key ${WEBPROXY_SSL_KEY_PATH};
+#     ssl_session_cache shared:SSL:1m;
+#     ssl_session_timeout 10m;
+#     ssl_protocols TLSv1.2 TLSv1.3;
+#     ssl_ciphers ECDHE-RSA-AES128-GCM-SHA256:ECDHE:ECDH:AES:HIGH:!NULL:!aNULL:!MD5:!ADH:!RC4;
+#     ssl_prefer_server_ciphers on;
+#
+#     # Security headers for web proxy
+#     add_header X-Frame-Options "SAMEORIGIN" always;
+#     add_header X-Content-Type-Options "nosniff" always;
+#     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+#
+#     # Disable caching for proxied content to ensure fresh data
+#     add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+#     add_header Pragma "no-cache" always;
+#     add_header Expires "0" always;
+#
+#     # Large request body support for web content
+#     client_max_body_size 100m;
+#     client_body_buffer_size 8m;
+#     client_body_timeout 300s;
+#
+#     # Proxy buffer settings for web content
+#     proxy_buffering on;
+#     proxy_buffer_size 64k;
+#     proxy_buffers 8 64k;
+#     proxy_busy_buffers_size 128k;
+#     proxy_temp_file_write_size 128k;
+#
+#     # Timeout settings for web requests
+#     proxy_connect_timeout 30s;
+#     proxy_send_timeout 300s;
+#     proxy_read_timeout 300s;
+#
+#     # All requests go to webproxy handler (includes API, external, and proxy requests)
+#     location / {
+#         proxy_pass http://${ONETERM_API_HOST};
+#         proxy_set_header Host $host;
+#         proxy_set_header X-Real-IP $remote_addr;
+#         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+#         proxy_set_header X-Scheme $scheme;
+#         proxy_set_header X-Forwarded-Proto $scheme;
+#         proxy_redirect off;
+#         proxy_http_version 1.1;
+#
+#         # Preserve original request headers for proper web proxy functionality
+#         proxy_set_header Accept $http_accept;
+#         proxy_set_header Accept-Encoding $http_accept_encoding;
+#         proxy_set_header Accept-Language $http_accept_language;
+#         proxy_set_header User-Agent $http_user_agent;
+#         proxy_set_header Cookie $http_cookie;
+#         proxy_set_header Referer $http_referer;
+#     }
+# }
+
+# ============================================================================
+# HTTP to HTTPS Redirect (Optional - Uncomment if needed)
+# ============================================================================
+#
+# Uncomment these sections to force HTTPS redirects:
+#
+# # Redirect OneTermUI HTTP to HTTPS
+# server {
+#     listen 80;
+#     server_name ${ONETERM_DOMAIN};
+#     return 301 https://$server_name$request_uri;
+# }
+#
+# # Redirect WebProxy HTTP to HTTPS
+# server {
+#     listen 80;
+#     server_name webproxy.${ONETERM_DOMAIN};
+#     return 301 https://$server_name$request_uri;
+# }

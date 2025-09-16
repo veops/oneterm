@@ -116,7 +116,7 @@ services:
 
   # Frontend UI Service
   oneterm-ui:
-    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-ui:v25.8.2
+    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-ui:v25.9.1
     container_name: oneterm-ui-dev
     environment:
       TZ: Asia/Shanghai

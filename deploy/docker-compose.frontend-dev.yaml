@@ -116,7 +116,7 @@ services:
 
   # OneTerm API Service (optional, for complete backend environment)
   oneterm-api:
-    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-api:v25.8.2
+    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-api:v25.9.1
     container_name: oneterm-api-dev
     environment:
       ONETERM_RDP_DRIVE_PATH: /rdp
@@ -149,7 +149,7 @@ services:
 
   # Nginx Proxy for Frontend Development (using UI image)
   nginx-frontend-dev:
-    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-ui:v25.8.2
+    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-ui:v25.9.1
     container_name: oneterm-nginx-frontend-dev
     environment:
       TZ: Asia/Shanghai

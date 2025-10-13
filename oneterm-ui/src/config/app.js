@@ -3,7 +3,7 @@ const appConfig = {
   redirectTo: '/oneterm', // Redirect path for the home page
   buildAclToModules: true, // Inline permission management in each app
   showDocs: false,
-  useEncryption: false,
+  useEncryption: true,
 }
 
 export default appConfig

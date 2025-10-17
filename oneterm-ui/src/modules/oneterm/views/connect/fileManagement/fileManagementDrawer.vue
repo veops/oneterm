@@ -319,10 +319,11 @@ export default {
       const a = document.createElement('a')
       a.target = '_blank'
 
+      const baseUrl = process.env.VUE_APP_API_BASE_URL || '/api'
       const names = this.selectedRows.map((row) => row.name).join(',')
-      let href = `${document.location.origin}/api/oneterm/v1/file/session/${this.sessionId}/download?dir=${this.pathStr}&names=${names}`
+      let href = `${baseUrl}/oneterm/v1/file/session/${this.sessionId}/download?dir=${this.pathStr}&names=${names}`
       if (this.connectType === 'rdp') {
-        href = `${document.location.origin}/api/oneterm/v1/rdp/sessions/${this.sessionId}/files/download?dir=${this.pathStr}&names=${names}`
+        href = `${baseUrl}/oneterm/v1/rdp/sessions/${this.sessionId}/files/download?dir=${this.pathStr}&names=${names}`
       }
       a.href = href
 

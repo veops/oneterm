@@ -94,7 +94,8 @@ export default {
   methods: {
     init() {
       const { session_id } = this.$route.params
-      const RECORDING_URL = `/api/oneterm/v1/session/replay/${session_id}`
+      const baseUrl = process.env.VUE_APP_API_BASE_URL || '/api'
+      const RECORDING_URL = `${baseUrl}/oneterm/v1/session/replay/${session_id}`
       const tunnel = new Guacamole.StaticHTTPTunnel(RECORDING_URL)
       tunnel.onstatechange = this.onTunnelStateChange
       const recording = new Guacamole.SessionRecording(tunnel)

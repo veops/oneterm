@@ -85,7 +85,7 @@
                     <a @click="openReplay(row)"><ops-icon type="oneterm-playback"/></a>
                   </a-tooltip>
                   <a-tooltip :title="$t('download')">
-                    <a :href="`/api/oneterm/v1/session/replay/${row.session_id}`"><a-icon type="download"/></a>
+                    <a :href="`${baseUrl}/oneterm/v1/session/replay/${row.session_id}`"><a-icon type="download"/></a>
                   </a-tooltip>
                   <a-tooltip v-if="!['rdp', 'vnc'].includes(row.protocolType)" :title="$t('oneterm.menu.commandRecord')">
                     <a @click="openDetail(row)"><ops-icon type="oneterm-command_record"/></a>
@@ -161,6 +161,7 @@ export default {
       loading: false,
       isDetail: false,
       session_id: null,
+      baseUrl: process.env.VUE_APP_API_BASE_URL || '/api',
     }
   },
   computed: {

@@ -10,6 +10,7 @@ import (
 	"github.com/veops/oneterm/internal/model"
 	"github.com/veops/oneterm/internal/repository"
 	"github.com/veops/oneterm/internal/schedule"
+	"github.com/veops/oneterm/internal/sshsrv/icons"
 	"gorm.io/gorm"
 )
 
@@ -33,7 +34,22 @@ func (s *AssetService) GetById(ctx context.Context, id int) (*model.Asset, error
 // PreprocessAssetData preprocesses asset data before saving
 func (s *AssetService) PreprocessAssetData(asset *model.Asset) {
 	asset.Ip = strings.TrimSpace(asset.Ip)
-	asset.Protocols = lo.Map(asset.Protocols, func(s string, _ int) string { return strings.TrimSpace(s) })
+
+	// Normalize protocols: add default ports if not specified
+	asset.Protocols = lo.Map(asset.Protocols, func(p string, _ int) string {
+		p = strings.TrimSpace(p)
+		// If protocol already has port (contains ':'), keep as-is
+		if strings.Contains(p, ":") {
+			return p
+		}
+		// Otherwise, add default port
+		if defaultPort := icons.GetDefaultPort(p); defaultPort != "" {
+			return p + ":" + defaultPort
+		}
+		// If no default port available, keep as-is
+		return p
+	})
+
 	if asset.Authorization == nil {
 		asset.Authorization = make(model.AuthorizationMap)
 	}

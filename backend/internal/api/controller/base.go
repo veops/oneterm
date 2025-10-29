@@ -1,8 +1,11 @@
 package controller
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"reflect"
 	"time"
@@ -245,10 +248,26 @@ func doUpdate[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType 
 		return
 	}
 
+	// Read request body for partial update field detection
+	bodyBytes, err := io.ReadAll(ctx.Request.Body)
+	if err != nil {
+		ctx.AbortWithError(http.StatusBadRequest, &myErrors.ApiError{Code: myErrors.ErrInvalidArgument, Data: map[string]any{"err": err}})
+		return
+	}
+	// Restore body for binding
+	ctx.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+
+	// Parse body to extract field keys for partial update
+	var bodyFields map[string]any
+	if len(bodyBytes) > 0 {
+		json.Unmarshal(bodyBytes, &bodyFields)
+	}
+
 	if err = ctx.ShouldBindBodyWithJSON(md); err != nil {
 		ctx.AbortWithError(http.StatusBadRequest, &myErrors.ApiError{Code: myErrors.ErrInvalidArgument, Data: map[string]any{"err": err}})
 		return
 	}
+
 	md.SetUpdaterId(currentUser.Uid)
 
 	for _, hook := range preHooks {
@@ -289,25 +308,53 @@ func doUpdate[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType 
 
 	if err = baseService.ExecuteInTransaction(ctx, func(tx *gorm.DB) (err error) {
 		omits := []string{"resource_id", "created_at", "deleted_at"}
-		selects := []string{"*"}
-		switch t := any(md).(type) {
-		case *model.Asset:
-			if err = service.DefaultAuthService.HandleAuthorization(ctx, tx, model.ACTION_UPDATE, t, nil); err != nil {
-				handleRemoteErr(ctx, err)
-				return
+		var selects []string
+
+		// Build dynamic selects based on fields present in request body
+		if len(bodyFields) > 0 {
+			// Define allowed fields per model type
+			var allowedFields []string
+
+			switch t := any(md).(type) {
+			case *model.Asset:
+				if err = service.DefaultAuthService.HandleAuthorization(ctx, tx, model.ACTION_UPDATE, t, nil); err != nil {
+					handleRemoteErr(ctx, err)
+					return
+				}
+				// Define allowed fields based on auth type
+				if cast.ToBool(ctx.Value("isAuthWithKey")) {
+					// API Key auth: Only sync-related fields
+					allowedFields = []string{"ip", "protocols", "authorization", "parent_id", "comment", "name", "ci_id", "ci_type_id"}
+				} else {
+					// Normal auth: All asset fields
+					allowedFields = []string{"name", "ip", "gateway_id", "protocols", "authorization", "parent_id",
+						"comment", "connectable", "access_time_control", "asset_command_control", "web_config", "ci_id", "ci_type_id"}
+				}
+			case *model.Node:
+				if err = handleNodeAuthorization(ctx, tx, model.ACTION_UPDATE, t); err != nil {
+					handleRemoteErr(ctx, err)
+					return
+				}
+			case *model.Account:
+				// For accounts, allow selective field updates for sensitive data
+				allowedFields = []string{"name", "account", "account_type", "password", "pk", "phrase"}
 			}
-			if cast.ToBool(ctx.Value("isAuthWithKey")) {
-				selects = []string{"ip", "protocols", "authorization"}
+
+			// Build selects list based on which fields are present in body
+			if len(allowedFields) > 0 {
+				for _, field := range allowedFields {
+					if _, present := bodyFields[field]; present {
+						selects = append(selects, field)
+					}
+				}
+				// Always update these fields
+				selects = append(selects, "updated_at", "updater_id")
 			}
-		case *model.Node:
-			if err = handleNodeAuthorization(ctx, tx, model.ACTION_UPDATE, t); err != nil {
-				handleRemoteErr(ctx, err)
-				return
-			}
-		case *model.Account:
-			if cast.ToBool(ctx.Value("isAuthWithKey")) {
-				selects = []string{"account", "password", "phrase", "pk", "account_type"}
-			}
+		}
+
+		// If no fields specified or no allowed fields matched, update all fields
+		if len(selects) == 0 {
+			selects = []string{"*"}
 		}
 
 		if err = tx.Select(selects).Omit(omits...).Save(md).Error; err != nil {

@@ -19,10 +19,7 @@ import (
 )
 
 const (
-	kFmtAssetIds      = "assetIds-%d"
 	kAuthorizationIds = "authorizationIds"
-	kNodeIds          = "nodeIds"
-	kAccountIds       = "accountIds"
 )
 
 var (
@@ -126,7 +123,7 @@ func (c *Controller) GetAssets(ctx *gin.Context) {
 	if info {
 		db = db.Select("id", "parent_id", "name", "ip", "protocols",
 			"connectable", "authorization", "resource_id", "access_time_control",
-			"asset_command_control", "web_config", "gateway_id")
+			"asset_command_control", "web_config", "gateway_id", "ci_id", "ci_type_id")
 	}
 
 	doGet(ctx, false, db, config.RESOURCE_ASSET, assetPostHooks...)

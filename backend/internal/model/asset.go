@@ -126,6 +126,8 @@ type Asset struct {
 	ParentId      int              `json:"parent_id" gorm:"column:parent_id"`
 	Ip            string           `json:"ip" gorm:"column:ip"`
 	Protocols     Slice[string]    `json:"protocols" gorm:"column:protocols;type:text"`
+	CIId          int              `json:"ci_id" gorm:"column:ci_id;index"`
+	CITypeId      int              `json:"ci_type_id" gorm:"column:ci_type_id"`
 	GatewayId     int              `json:"gateway_id" gorm:"column:gateway_id"`
 	Authorization AuthorizationMap `json:"authorization" gorm:"column:authorization;type:text"`
 	AccessAuth    AccessAuth       `json:"access_auth" gorm:"embedded;column:access_auth"` // Deprecated: Use V2 fields below

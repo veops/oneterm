@@ -63,6 +63,12 @@ func (r *assetRepository) BuildQuery(ctx *gin.Context) (*gorm.DB, error) {
 			func(s string, _ int) int { return cast.ToInt(s) }))
 	}
 
+	// Filter by CMDB CI ID
+	db = dbpkg.FilterEqual(ctx, db, "ci_id")
+
+	// Filter by CMDB CI Type ID
+	db = dbpkg.FilterEqual(ctx, db, "ci_type_id")
+
 	// Sort by name
 	db = db.Order("name")
 

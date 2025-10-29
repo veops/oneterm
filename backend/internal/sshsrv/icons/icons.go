@@ -51,6 +51,10 @@ func GetDefaultPort(protocol string) string {
 	switch protocol {
 	case "ssh":
 		return "22"
+	case "rdp":
+		return "3389"
+	case "vnc":
+		return "5900"
 	case "mysql":
 		return "3306"
 	case "redis":

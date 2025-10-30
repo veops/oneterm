@@ -30,6 +30,9 @@
               <span>{{ $t('selectRows', { rows: selectedRowKeys.length }) }}</span>
             </div>
             <a-button
+              type="primary"
+              class="ops-button-ghost"
+              ghost
               @click="
                 () => {
                   selectedRowKeys = []
@@ -38,8 +41,10 @@
                   updateTableData()
                 }
               "
-            >{{ $t(`refresh`) }}</a-button
             >
+              <ops-icon type="veops-refresh" />
+              {{ $t(`refresh`) }}
+            </a-button>
           </a-space>
         </div>
         <ops-table

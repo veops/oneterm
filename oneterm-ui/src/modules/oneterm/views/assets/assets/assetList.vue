@@ -572,17 +572,30 @@ export default {
 
   &-header {
     flex-shrink: 0;
-    margin-bottom: 7px;
+    margin-bottom: 12px;
 
     &-search {
-      margin-top: 18px;
-      height: 26px;
-      line-height: 26px;
+      margin-top: 16px;
+      height: 32px;
 
       /deep/ .ant-input {
-        height: 26px;
-        line-height: 26px;
-        box-shadow: none;
+        height: 32px;
+        border-radius: 4px;
+        border: 1px solid #e8eaed;
+        transition: all 0.2s ease;
+
+        &:hover {
+          border-color: #c3cdd7;
+        }
+
+        &:focus {
+          border-color: @primary-color;
+          box-shadow: 0 0 0 2px fade(@primary-color, 10%);
+        }
+      }
+
+      /deep/ .ant-input-prefix {
+        color: @text-color_3;
       }
     }
   }
@@ -591,66 +604,7 @@ export default {
     height: 100%;
     overflow-y: auto;
     overflow-x: hidden;
-  }
-
-  .user-stat {
-    width: 100%;
-    margin-top: 24px;
-    padding-left: 34px;
-    padding-right: 10px;
-    flex-shrink: 0;
-
-    &-item {
-      width: 100%;
-    }
-
-    &-header {
-      display: flex;
-      align-items: center;
-
-      &-icon {
-        font-size: 14px;
-      }
-
-      &-title {
-        margin-left: 7px;
-        font-size: 14px;
-        font-weight: 400;
-        color: #4E5969;
-      }
-    }
-
-    &-data {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-top: 6px;
-
-      &-progress {
-        width: 75%;
-        height: 5px;
-        border-radius: 5px;
-        background-color: #EBEFF8;
-
-        &-content {
-          height: 100%;
-          border-radius: 5px;
-          background-color: #7F97FA;
-        }
-      }
-
-      &-count {
-        margin-left: 9px;
-        font-size: 14px;
-        font-weight: 500;
-        color: #86909C;
-
-        &-bold {
-          font-weight: 500;
-          color: #2F54EB;
-        }
-      }
-    }
+    margin-top: 8px;
   }
 }
 
@@ -660,7 +614,7 @@ export default {
 
 .oneterm-table-account {
   padding: 8px 0px 8px 16px;
-  border-left: solid 3px @primary-color_9;
+  border-left: solid 3px fade(@primary-color, 60%);
   border-top: 1px solid #E4E7ED;
   background-color: #F9FBFF;
   box-shadow: 0px -2px 6px 0px rgba(98, 147, 192, 0.10) inset, 0px 2px 6px 0px rgba(98, 147, 192, 0.10) inset;
@@ -672,14 +626,14 @@ export default {
 
   &-protocol {
     font-size: 14px;
-    color: #2F54EB;
+    color: @primary-color;
     margin-right: 8px;
   }
 
   &-name {
     font-size: 14px;
     font-weight: 400;
-    color: #1D2129;
+    color: @text-color_1;
   }
 
   &-item {
@@ -691,9 +645,10 @@ export default {
     border-radius: 2px;
     border: 1px solid transparent;
     cursor: pointer;
+    transition: all 0.2s ease;
 
     &:hover {
-      border-color: #7F97FA;
+      border-color: fade(@primary-color, 50%);
       background-color: #E1EFFF;
     }
   }
@@ -716,13 +671,20 @@ export default {
   padding: 0;
 }
 .asset-list-sidebar-tree.ant-tree {
-  li .ant-tree-node-content-wrapper.ant-tree-node-selected {
-    background-color: #e1efff;
-  }
   li .ant-tree-node-content-wrapper {
     width: calc(100% - 24px);
     height: 30px;
     line-height: 30px;
+    transition: all 0.2s ease;
+
+    &:hover {
+      background-color: fade(@primary-color, 5%);
+    }
+
+    &.ant-tree-node-selected {
+      background-color: fade(@primary-color, 10%);
+    }
+
     .asset-list-sidebar-tree-title {
       display: flex;
       align-items: center;
@@ -749,9 +711,10 @@ export default {
       &-more {
         display: none;
         margin-left: 4px;
+        transition: all 0.2s ease;
 
         &:hover {
-          color: #2f54eb;
+          color: @primary-color;
         }
       }
 

@@ -20,7 +20,15 @@
         </a-space>
         <a-space>
           <a-button type="primary" @click="openModal(null)">{{ $t('create') }}</a-button>
-          <a-button @click="updateTableData()">{{ $t('refresh') }}</a-button>
+          <a-button
+            type="primary"
+            class="ops-button-ghost"
+            ghost
+            @click="updateTableData()"
+          >
+            <ops-icon type="veops-refresh" />
+            {{ $t('refresh') }}
+          </a-button>
         </a-space>
       </div>
       <ops-table
@@ -329,6 +337,12 @@ export default {
   height: 100%;
   border-radius: 6px;
   padding: 18px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: box-shadow 0.3s ease;
+
+  &:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  }
 
   &-header {
     display: flex;

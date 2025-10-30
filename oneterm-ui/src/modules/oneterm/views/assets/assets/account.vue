@@ -207,7 +207,7 @@ export default {
       const res = await getAccountList({ page_index: 1 })
       const accountList = res?.data?.list || []
       accountList.forEach((item) => {
-        item.toolTip = item.name + (item.account ? '(item.account)' : '')
+        item.toolTip = item.name + (item.account ? `(${item.account})` : '')
       })
       this.accountList = accountList
     },

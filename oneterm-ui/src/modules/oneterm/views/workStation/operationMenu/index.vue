@@ -256,19 +256,38 @@ export default {
 .workstation-operation-menu {
   display: flex;
   flex-direction: column;
-  row-gap: 18px;
-  background-color: #EBEBEB90;
-  padding: 14px 0px;
-  transition: width 0.1s;
+  align-items: center;
+  row-gap: 8px;
+  background: linear-gradient(180deg, #fafafa 0%, #f5f5f5 100%);
+  border-left: 1px solid #e8eaed;
+  padding: 16px 0px;
+  transition: width 0.2s ease;
   overflow: hidden;
   flex-shrink: 0;
 
-  & > i {
+  & > i,
+  & > span {
     font-size: 18px;
+    color: @text-color_2;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    padding: 5px;
+    border-radius: 4px;
+
+    &:hover {
+      color: @primary-color;
+      background-color: fade(@primary-color, 8%);
+      transform: scale(1.1);
+    }
+
+    &:active {
+      transform: scale(0.95);
+    }
   }
 
   &-divider {
-    margin: 0px;
+    margin: 4px 0;
+    width: 24px;
   }
 }
 </style>

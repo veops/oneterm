@@ -36,5 +36,25 @@ export default {
 <style lang="less" scoped>
 .terminal-settings-tab {
   height: 100%;
+
+  /deep/ .ant-tabs-card-bar {
+    border-bottom: 1px solid #e8eaed;
+
+    .ant-tabs-tab {
+      background-color: #fafafa;
+      border: 1px solid #e8eaed;
+      color: @text-color_2;
+
+      &:hover {
+        color: @primary-color;
+      }
+    }
+
+    .ant-tabs-tab-active {
+      background-color: #fff;
+      color: @primary-color;
+      font-weight: 600;
+    }
+  }
 }
 </style>

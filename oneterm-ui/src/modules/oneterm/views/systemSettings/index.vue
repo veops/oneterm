@@ -124,6 +124,8 @@ export default {
 </script>
 
 <style lang="less" scoped>
+@import '../../style/index.less';
+
 .system-settings {
   width: 100%;
   height: 100%;
@@ -134,6 +136,14 @@ export default {
     &-title {
       display: flex;
       align-items: center;
+      column-gap: 10px;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+
+      i {
+        font-size: 16px;
+      }
     }
   }
 
@@ -143,6 +153,55 @@ export default {
 
   /deep/ .ant-tabs-tabpane-active {
     height: 100%;
+  }
+}
+</style>
+<style lang="less">
+@import '../../style/index.less';
+
+.system-settings {
+  .system-settings-menu {
+    /deep/ .ant-tabs-bar {
+      border-right: 1px solid #e8eaed;
+    }
+
+    /deep/ .ant-tabs-nav-wrap {
+      background-color: #fafafa;
+      padding: 16px 0;
+    }
+
+    /deep/ .ant-tabs-tab {
+      padding: 12px 24px;
+      margin: 0;
+      transition: all 0.2s ease;
+
+      &:hover {
+        background-color: fade(@primary-color, 5%);
+        color: @primary-color;
+
+        i {
+          color: @primary-color;
+        }
+      }
+    }
+
+    /deep/ .ant-tabs-tab-active {
+      background-color: fade(@primary-color, 10%);
+      font-weight: 600;
+      color: @primary-color;
+
+      i {
+        color: @primary-color;
+      }
+    }
+
+    /deep/ .ant-tabs-ink-bar {
+      display: none !important;
+    }
+
+    /deep/ .ant-tabs-content {
+      padding-left: 20px;
+    }
   }
 }
 </style>

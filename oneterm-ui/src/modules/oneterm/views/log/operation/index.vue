@@ -33,7 +33,15 @@
             </div>
           </a-space>
           <a-space>
-            <a-button @click="getOperationLog()">{{ $t(`refresh`) }}</a-button>
+            <a-button
+              type="primary"
+              class="ops-button-ghost"
+              ghost
+              @click="getOperationLog()"
+            >
+              <ops-icon type="veops-refresh" />
+              {{ $t(`refresh`) }}
+            </a-button>
           </a-space>
         </div>
         <ops-table
@@ -48,51 +56,38 @@
           @checkbox-all="onSelectChange"
           @checkbox-range-end="onSelectRangeEnd"
           :checkbox-config="{ reserve: true, highlight: true, range: true }"
+          :expand-config="{ reserve: true }"
           :row-config="{ keyField: 'id' }"
+          :scroll-y="{ enabled: false }"
           :height="tableHeight"
           resizable
         >
           <vxe-column type="checkbox" width="60px" field="checkbox" ></vxe-column>
           <vxe-column type="expand" width="60px" field="expand">
             <template #content="{ row }">
-              <div style="padding: 30px;">
-                <a-row>
-                  <a-col
-                    :span="4"
-                  ><span
-                  ><strong>{{ $t('oneterm.log.param') }}</strong>
-                  </span></a-col
+              <div class="operation-log-expand">
+                <div class="operation-log-expand-header">
+                  <div class="operation-log-expand-header-item">{{ $t('oneterm.log.param') }}</div>
+                  <div class="operation-log-expand-header-item">{{ $t('oneterm.log.before') }}</div>
+                  <div class="operation-log-expand-header-item">{{ $t('oneterm.log.after') }}</div>
+                </div>
+                <template v-if="allOperationDetail[row.id]">
+                  <div
+                    class="operation-log-expand-row"
+                    v-for="item in allOperationDetail[row.id]"
+                    :key="item.key"
                   >
-                  <a-col
-                    :span="10"
-                  ><span
-                  ><strong>{{ $t('oneterm.log.before') }}</strong>
-                  </span></a-col
-                  >
-                  <a-col
-                    :span="10"
-                  ><span
-                  ><strong>{{ $t('oneterm.log.after') }}</strong>
-                  </span></a-col
-                  >
-                </a-row>
-                <a-row
-                  :gutter="[0, 6]"
-                  v-for="item in compareObjects(row.new, row.old, row.action_type)"
-                  :key="item.key"
-                >
-                  <a-col :span="4">
-                    <a-tag color="blue">
-                      <span>{{ item.key }}</span>
-                    </a-tag>
-                  </a-col>
-                  <a-col :span="10" :style="{ whiteSpace: 'normal', wordBreak: 'break-word' }">
-                    {{ item.old }}
-                  </a-col>
-                  <a-col :span="10" :style="{ whiteSpace: 'normal', wordBreak: 'break-word' }">
-                    {{ item.new }}
-                  </a-col>
-                </a-row>
+                    <div class="operation-log-expand-col operation-log-expand-col-key">
+                      <span class="operation-log-key-tag">{{ item.key }}</span>
+                    </div>
+                    <div class="operation-log-expand-col">
+                      <span class="operation-log-value">{{ item.old || '-' }}</span>
+                    </div>
+                    <div class="operation-log-expand-col">
+                      <span class="operation-log-value">{{ item.new || '-' }}</span>
+                    </div>
+                  </div>
+                </template>
               </div>
             </template>
           </vxe-column>
@@ -106,17 +101,14 @@
               {{ findNickname(row.creator_id) }}
             </template>
           </vxe-column>
-          <vxe-column :title="$t(`operation`)" field="action_type" cell-type="string">
+          <vxe-column :title="$t(`operation`)" field="action_type" cell-type="string" width="100">
             <template #default="{row}">
-              <a-tag color="green" v-if="row.action_type === 1">
-                {{ $t('new') }}
-              </a-tag>
-              <a-tag color="red" v-if="row.action_type === 2">
-                {{ $t('delete') }}
-              </a-tag>
-              <a-tag color="orange" v-if="row.action_type === 3">
-                {{ $t('update') }}
-              </a-tag>
+              <span class="operation-log-action" :class="`operation-log-action-${row.action_type}`">
+                <span class="operation-log-action-dot"></span>
+                <span v-if="row.action_type === 1">{{ $t('new') }}</span>
+                <span v-else-if="row.action_type === 2">{{ $t('delete') }}</span>
+                <span v-else-if="row.action_type === 3">{{ $t('update') }}</span>
+              </span>
             </template>
           </vxe-column>
           <vxe-column :title="$t('oneterm.log.type')" field="type">
@@ -200,6 +192,15 @@ export default {
     allEmployees() {
       return this.$store.state.user.allEmployees
     },
+    allOperationDetail() {
+      const detail = {}
+      const tableData = _.cloneDeep(this.tableData || [])
+      tableData.forEach((item) => {
+        const operationItem = this.compareObjects(item.new, item.old, item.action_type)
+        detail[item.id] = operationItem
+      })
+      return detail
+    }
   },
   mounted() {
     this.getResourceTypeMap()
@@ -256,7 +257,6 @@ export default {
         }
       }
       getDiff(n, o, type)
-      console.log(res, 'resresres')
       res.forEach((item) => {
         if (item.key === 'user_rids') {
           if (item.new) {
@@ -490,4 +490,118 @@ export default {
 
 <style lang="less">
 @import '../../../style/index.less';
+
+.operation-log-expand {
+  padding: 20px 30px;
+  background-color: #fafbfc;
+  border-left: 3px solid fade(@primary-color, 30%);
+
+  &-header {
+    display: grid;
+    grid-template-columns: 200px 1fr 1fr;
+    gap: 16px;
+    padding: 12px 16px;
+    background-color: #fff;
+    border-radius: 4px;
+    margin-bottom: 12px;
+    font-weight: 600;
+    color: @text-color_1;
+    font-size: 13px;
+
+    &-item {
+      display: flex;
+      align-items: center;
+    }
+  }
+
+  &-row {
+    display: grid;
+    grid-template-columns: 200px 1fr 1fr;
+    gap: 16px;
+    padding: 12px 16px;
+    background-color: #fff;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+
+    &:not(:last-child) {
+      margin-bottom: 8px;
+    }
+
+    &:hover {
+      background-color: fade(@primary-color, 3%);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+    }
+  }
+
+  &-col {
+    display: flex;
+    align-items: center;
+    font-size: 13px;
+    color: @text-color_2;
+    word-break: break-word;
+    white-space: normal;
+
+    &-key {
+      font-weight: 500;
+    }
+  }
+}
+
+.operation-log-key-tag {
+  display: inline-block;
+  padding: 2px 10px;
+  background-color: fade(@primary-color, 10%);
+  color: @primary-color;
+  border-radius: 3px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.operation-log-value {
+  color: @text-color_2;
+}
+
+.operation-log-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 3px;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+
+  &-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+  }
+
+  &-1 {
+    background-color: fade(#00B42A, 10%);
+    color: #00B42A;
+
+    .operation-log-action-dot {
+      background-color: #00B42A;
+    }
+  }
+
+  &-2 {
+    background-color: fade(#F53F3F, 10%);
+    color: #F53F3F;
+
+    .operation-log-action-dot {
+      background-color: #F53F3F;
+    }
+  }
+
+  &-3 {
+    background-color: fade(#FF7D00, 10%);
+    color: #FF7D00;
+
+    .operation-log-action-dot {
+      background-color: #FF7D00;
+    }
+  }
+}
 </style>

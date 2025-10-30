@@ -27,7 +27,15 @@
           </a-space>
           <a-space>
             <a-button type="primary" @click="openModal(null)">{{ $t(`create`) }}</a-button>
-            <a-button @click="updateTableData()">{{ $t(`refresh`) }}</a-button>
+            <a-button
+              type="primary"
+              class="ops-button-ghost"
+              ghost
+              @click="updateTableData()"
+            >
+              <ops-icon type="veops-refresh" />
+              {{ $t(`refresh`) }}
+            </a-button>
           </a-space>
         </div>
         <ops-table

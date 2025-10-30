@@ -105,8 +105,8 @@ export default {
 
   &-text {
     font-size: 15px;
-    font-weight: 700;
-    color: #000000;
+    font-weight: 600;
+    color: @text-color_1;
   }
 
   &-create {
@@ -114,25 +114,43 @@ export default {
     align-items: center;
     cursor: pointer;
     font-size: 12px;
+    color: @text-color_2;
+    transition: all 0.2s ease;
+    padding: 4px 8px;
+    border-radius: 3px;
 
     &-icon {
       border-radius: 50%;
-      width: 14px;
-      height: 14px;
-      margin-right: 2px;
-      background-color: @primary-color_4;
+      width: 16px;
+      height: 16px;
+      margin-right: 4px;
+      background-color: fade(@primary-color, 10%);
       display: flex;
       align-items: center;
       justify-content: center;
+      transition: all 0.2s ease;
 
       > i {
-        font-size: 12px;
+        font-size: 10px;
         color: @primary-color;
       }
     }
 
+    &-text {
+      font-weight: 500;
+    }
+
     &:hover {
       color: @primary-color;
+      background-color: fade(@primary-color, 5%);
+
+      .asset-list-title-create-icon {
+        background-color: @primary-color;
+
+        > i {
+          color: #fff;
+        }
+      }
     }
   }
 }

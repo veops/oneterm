@@ -33,7 +33,15 @@
             </div>
           </a-space>
           <a-space>
-            <a-button @click="refresh">{{ $t(`refresh`) }}</a-button>
+            <a-button
+              type="primary"
+              class="ops-button-ghost"
+              ghost
+              @click="refresh"
+            >
+              <ops-icon type="veops-refresh" />
+              {{ $t(`refresh`) }}
+            </a-button>
           </a-space>
         </div>
         <ops-table

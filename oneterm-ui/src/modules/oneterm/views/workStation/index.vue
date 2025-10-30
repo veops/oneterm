@@ -530,8 +530,10 @@ export default {
     width: 100%;
     height: 100%;
     background-color: #FFFFFF;
-    border-radius: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     display: flex;
+    transition: all 0.3s ease;
 
     /deep/ .ant-tabs {
       flex-grow: 1;
@@ -561,34 +563,20 @@ export default {
   .oneterm-workstation-tab-terminal {
     display: flex;
     align-items: center;
-    column-gap: 3px;
+    column-gap: 6px;
 
     &-status {
-      width: 12px;
-      height: 12px;
+      width: 8px;
+      height: 8px;
       border-radius: 50%;
-      background-color: #00B42A22;
+      background-color: #00B42A;
       position: relative;
-
-      &::before {
-        content: '';
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        width: 6px;
-        height: 6px;
-        border-radius: 50%;
-        margin-top: -3px;
-        margin-left: -3px;
-        background-color: #00B42A;
-      }
+      flex-shrink: 0;
+      box-shadow: 0 0 0 2px fade(#00B42A, 20%);
 
       &_error {
-        background-color: #F2637B22;
-
-        &::before {
-          background-color: #F2637B;
-        }
+        background-color: #F53F3F;
+        box-shadow: 0 0 0 2px fade(#F53F3F, 20%);
       }
     }
 
@@ -597,29 +585,53 @@ export default {
       overflow: hidden;
       text-overflow: ellipsis;
       text-wrap: nowrap;
+      flex: 1;
     }
 
     &-icon {
-      font-size: 12px;
-      color: #A5A9BC;
+      font-size: 14px;
+      color: @text-color_3;
       cursor: pointer;
       opacity: 0;
       margin: 0px;
+      flex-shrink: 0;
+      transition: all 0.2s ease;
+
+      &:hover {
+        color: @primary-color;
+        transform: scale(1.15);
+      }
     }
   }
 
   /deep/ .ant-tabs-tab {
-    padding: 12px 8px;
+    padding: 10px 12px;
+    transition: all 0.2s ease;
+    border-radius: 4px 4px 0 0;
 
     &:hover {
+      background-color: fade(@primary-color, 3%);
+
       .oneterm-workstation-tab-terminal-icon {
         opacity: 1;
       }
+    }
+
+    &-active {
+      font-weight: 600;
+      background-color: #fff;
     }
   }
 
   .operation-menu-icon {
     font-size: 18px;
+    color: @text-color_2;
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    &:hover {
+      color: @primary-color;
+    }
   }
 }
 </style>

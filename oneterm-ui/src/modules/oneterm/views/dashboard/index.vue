@@ -81,19 +81,21 @@ export default {
 
 <style lang="less">
 .dashbboard-layout {
-  padding: 18px;
+  padding: 20px;
   position: relative;
   display: flex;
   flex-direction: column;
+
   h4 {
-    color: black;
-    font-size: 1vw;
-    font-weight: 700;
+    color: @text-color_1;
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 16px;
   }
   .dashboard-timeradio {
     position: absolute;
-    right: 18px;
-    top: 18px;
+    right: 20px;
+    top: 20px;
   }
 }
 </style>
@@ -103,64 +105,103 @@ export default {
   width: 100%;
   height: calc(100vh - 88px);
   display: grid;
-  grid-gap: 22px 0;
+  gap: 20px;
   grid-template-columns: 100%;
   grid-template-rows: 15vh 1fr 33vh;
+
   .oneterm-dashboard-top {
     background-color: #fff;
     border-radius: 5px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
     display: flex;
+    transition: box-shadow 0.3s ease;
+
+    &:hover {
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    }
+
     > div {
       width: 20%;
       height: 100%;
       display: flex;
       position: relative;
+      transition: all 0.3s ease;
+
       &:not(:last-child)::after {
         content: '';
         position: absolute;
         width: 1px;
         height: 60%;
-        background-color: #f0f1f5;
+        background-color: #e8eaed;
         right: 0;
         top: 20%;
       }
+
+      &:hover {
+        background-color: #fafafa;
+
+        .oneterm-statistic-img img {
+          transform: scale(1.05);
+        }
+
+        .oneterm-statistic-container strong {
+          color: @primary-color;
+        }
+      }
+
       .oneterm-statistic-img {
         width: 40%;
         display: flex;
         align-items: center;
         justify-content: center;
+
         img {
           width: 65%;
           max-width: 80px;
+          transition: transform 0.3s ease;
         }
       }
+
       .oneterm-statistic-container {
         flex: 1;
         display: flex;
         flex-direction: column;
         justify-content: center;
+
         > div:first-child {
-          font-size: 16px;
-          color: #9094a6;
+          font-size: 14px;
+          color: @text-color_3;
           font-weight: 500;
+          margin-bottom: 8px;
         }
+
         strong {
           font-size: 28px;
-          color: #000;
+          color: @text-color_1;
           font-weight: 700;
+          transition: color 0.3s ease;
         }
       }
     }
   }
+
   .oneterm-dashboard-center,
   .oneterm-dashboard-bottom {
     display: grid;
-    grid-gap: 0 24px;
+    gap: 20px;
     grid-template-columns: 1fr 397px;
     grid-template-rows: 100%;
+
     > div {
       background-color: #fff;
       border-radius: 5px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+      transition: all 0.3s ease;
+
+      &:hover {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        transform: translateY(-2px);
+      }
     }
   }
 }

@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -73,8 +74,16 @@ func handler(sess ssh.Session) {
 	ctx.Set("session", sess.Context().Value("session"))
 
 	eg, gctx := errgroup.WithContext(sess.Context())
-	r, w := io.Pipe()
+	// Use a kernel-backed bounded pipe between the SSH session and Bubble Tea.
+	// Unlike io.Pipe, it can absorb input while connector.Run is waiting for
+	// the target connection without allocating an unbounded user-space buffer.
+	r, w, err := os.Pipe()
+	if err != nil {
+		logger.L().Error("create SSH input pipe failed", zap.Error(err))
+		return
+	}
 	eg.Go(func() error {
+		defer w.Close()
 		_, err := io.Copy(w, sess)
 		return err
 	})

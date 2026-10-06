@@ -97,6 +97,7 @@ type view struct {
 	cmds          []string
 	cmdsIdx       int
 	combines      map[string][3]int
+	directTargets map[string][3]int
 	connecting    bool
 	help          help.Model
 	keys          keymap
@@ -548,13 +549,7 @@ func (m *view) helpText() string {
 }
 
 func (m *view) handleConnectionCommand(cmd string) tea.Cmd {
-	// Check if this is a valid connection command
-	if _, exists := m.combines[cmd]; !exists {
-		return nil
-	}
-
-	// Extract protocol from command
-	p, ok := lo.Find(lo.Keys(p2p), func(item string) bool { return strings.HasPrefix(cmd, item) })
+	target, p, ok := m.resolveConnectionTarget(cmd)
 	if !ok {
 		return nil
 	}
@@ -578,9 +573,9 @@ func (m *view) handleConnectionCommand(cmd string) tea.Cmd {
 
 	newCtx.Request.URL.RawQuery = fmt.Sprintf("w=%d&h=%d", pty.Window.Width, pty.Window.Height)
 	newCtx.Params = nil
-	newCtx.Params = append(newCtx.Params, gin.Param{Key: "account_id", Value: cast.ToString(m.combines[cmd][0])})
-	newCtx.Params = append(newCtx.Params, gin.Param{Key: "asset_id", Value: cast.ToString(m.combines[cmd][1])})
-	newCtx.Params = append(newCtx.Params, gin.Param{Key: "protocol", Value: fmt.Sprintf("%s:%d", p, m.combines[cmd][2])})
+	newCtx.Params = append(newCtx.Params, gin.Param{Key: "account_id", Value: cast.ToString(target[0])})
+	newCtx.Params = append(newCtx.Params, gin.Param{Key: "asset_id", Value: cast.ToString(target[1])})
+	newCtx.Params = append(newCtx.Params, gin.Param{Key: "protocol", Value: fmt.Sprintf("%s:%d", p, target[2])})
 	newCtx.Set("sessionType", model.SESSIONTYPE_CLIENT)
 	m.connecting = true
 
@@ -590,7 +585,7 @@ func (m *view) handleConnectionCommand(cmd string) tea.Cmd {
 			colors.AccentStyle.Render(fmt.Sprintf("Initiating secure connection to %s", cmd))),
 		// Start spinner and connection in background
 		m.spinner.Tick,
-		tea.Exec(&connector{Ctx: newCtx, Sess: m.Sess, Vw: m, gctx: m.gctx}, func(err error) tea.Msg {
+		tea.Exec(&connector{Ctx: newCtx, Sess: m.Sess, gctx: m.gctx}, func(err error) tea.Msg {
 			m.connecting = false
 			if err != nil {
 				return errMsg(fmt.Errorf("%s Connection failed: %v",
@@ -607,6 +602,20 @@ func (m *view) handleConnectionCommand(cmd string) tea.Cmd {
 		},
 		m.magicn,
 	)
+}
+
+func (m *view) resolveConnectionTarget(cmd string) (target [3]int, protocol string, ok bool) {
+	if target, ok = m.combines[cmd]; ok {
+		protocol, ok = lo.Find(lo.Keys(p2p), func(item string) bool { return strings.HasPrefix(cmd, item) })
+		return target, protocol, ok
+	}
+
+	parts := strings.Fields(cmd)
+	if len(parts) != 2 || parts[0] != "ssh" || m.directTargets == nil {
+		return [3]int{}, "", false
+	}
+	target, ok = m.directTargets[parts[1]]
+	return target, "ssh", ok
 }
 
 func (m *view) assetOverview() string {
@@ -683,6 +692,7 @@ func (m *view) refresh() {
 		accountMap := lo.SliceToMap(accounts, func(a *model.Account) (int, *model.Account) { return a.Id, a })
 
 		m.combines = make(map[string][3]int)
+		directCandidates := make(map[string]map[[3]int]struct{})
 		for _, asset := range assets {
 			for accountId, authData := range asset.Authorization {
 				account, ok := accountMap[accountId]
@@ -711,7 +721,22 @@ func (m *view) refresh() {
 					if k != "" && len(k) > 3 {
 						m.combines[lo.Ternary(port == defaultPort, k, fmt.Sprintf("%s:%s", k, ss[1]))] = [3]int{account.Id, asset.Id, port}
 					}
+					if protocol == "ssh" && account.Account != "" {
+						if directCandidates[account.Account] == nil {
+							directCandidates[account.Account] = make(map[[3]int]struct{})
+						}
+						directCandidates[account.Account][[3]int{account.Id, asset.Id, port}] = struct{}{}
+					}
 				}
+			}
+		}
+		m.directTargets = make(map[string][3]int)
+		for account, candidates := range directCandidates {
+			if len(candidates) != 1 {
+				continue
+			}
+			for target := range candidates {
+				m.directTargets[account] = target
 			}
 		}
 		m.textinput.SetSuggestions(lo.Keys(m.combines))
@@ -828,7 +853,6 @@ func (m *view) findCommonPrefix(suggestions []string) string {
 type connector struct {
 	Ctx    *gin.Context
 	Sess   ssh.Session
-	Vw     *view
 	stdin  io.Reader
 	stdout io.Writer
 	stderr io.Writer
@@ -853,18 +877,19 @@ func (conn *connector) Run() error {
 		return err
 	}
 
-	conn.Vw.magicn()
-
 	r, w := io.Pipe()
+	input, err := duplicateInputReader(conn.stdin)
+	if err != nil {
+		gsess.Once.Do(func() { close(gsess.Chans.AwayChan) })
+		gsess.G.Wait()
+		return err
+	}
+	copyDone := make(chan struct{})
 	go func() {
+		defer close(copyDone)
+		defer input.Close()
 		defer w.Close()
-		_, err := io.Copy(w, conn.stdin)
-		// Don't block on sending error - HandleTerm may have already returned
-		select {
-		case gsess.Chans.ErrChan <- err:
-		default:
-			// Channel is closed or no one is listening, just return
-		}
+		_, _ = io.Copy(w, input)
 	}()
 
 	gsess.CliRw = &session.CliRW{
@@ -900,6 +925,10 @@ func (conn *connector) Run() error {
 		}
 	})
 	myConnector.HandleTerm(gsess, nil)
+	_ = input.Close()
+	_ = r.Close()
+	_ = w.Close()
+	<-copyDone
 
 	if err = gsess.G.Wait(); err != nil {
 		// Check if this is the normal termination sentinel error

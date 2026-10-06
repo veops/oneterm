@@ -27,7 +27,7 @@ var (
 	// ErrSessionClosed is a sentinel error for normal session termination
 	// This is returned when a session is closed normally (e.g., user exits)
 	ErrSessionClosed = errors.New("session closed normally")
-	
+
 	Upgrader = websocket.Upgrader{
 		HandshakeTimeout: time.Minute,
 		ReadBufferSize:   4096,
@@ -163,23 +163,33 @@ func Write(sess *gsession.Session, skipRecording ...bool) (err error) {
 // Read reads data from the session input
 func Read(sess *gsession.Session) error {
 	chs := sess.Chans
-	
+
 	// Handle CLIENT type with non-blocking reads
 	if sess.SessionType == model.SESSIONTYPE_CLIENT {
 		readChan := make(chan []byte)
 		errChan := make(chan error)
-		
+
 		go func() {
 			for {
 				p, err := sess.CliRw.Read()
 				if err != nil {
-					errChan <- err
+					select {
+					case errChan <- err:
+					case <-sess.Gctx.Done():
+					case <-chs.AwayChan:
+					}
 					return
 				}
-				readChan <- p
+				select {
+				case readChan <- p:
+				case <-sess.Gctx.Done():
+					return
+				case <-chs.AwayChan:
+					return
+				}
 			}
 		}()
-		
+
 		for {
 			select {
 			case <-sess.Gctx.Done():
@@ -189,12 +199,18 @@ func Read(sess *gsession.Session) error {
 			case err := <-errChan:
 				return err
 			case p := <-readChan:
-				chs.InChan <- p
-				sess.SetIdle()
+				select {
+				case chs.InChan <- p:
+					sess.SetIdle()
+				case <-sess.Gctx.Done():
+					return nil
+				case <-chs.AwayChan:
+					return nil
+				}
 			}
 		}
 	}
-	
+
 	// Original logic for WEB type
 	for {
 		select {

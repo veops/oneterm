@@ -25,3 +25,7 @@ func duplicateInputReader(input io.Reader) (*os.File, error) {
 	}
 	return os.NewFile(uintptr(handle), file.Name()), nil
 }
+
+func cancelDuplicateInputReader(file *os.File) {
+	_ = syscall.CancelIoEx(syscall.Handle(file.Fd()), nil)
+}

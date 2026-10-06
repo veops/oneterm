@@ -25,6 +25,7 @@ require (
 	github.com/huaweicloud/huaweicloud-sdk-go-obs v3.24.6+incompatible
 	github.com/mattn/go-runewidth v0.0.16
 	github.com/minio/minio-go/v7 v7.0.76
+	github.com/muesli/cancelreader v0.2.2
 	github.com/nicksnyder/go-i18n/v2 v2.4.0
 	github.com/oklog/run v1.1.0
 	github.com/pkg/sftp v1.13.6
@@ -79,7 +80,6 @@ require (
 	github.com/minio/md5-simd v1.1.2 // indirect
 	github.com/mozillazg/go-httpheader v0.2.1 // indirect
 	github.com/muesli/ansi v0.0.0-20230316100256-276c6243b2f6 // indirect
-	github.com/muesli/cancelreader v0.2.2 // indirect
 	github.com/muesli/termenv v0.15.2 // indirect
 	github.com/rs/xid v1.6.0 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect

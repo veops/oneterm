@@ -18,6 +18,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/gin-gonic/gin"
 	"github.com/gliderlabs/ssh"
+	"github.com/muesli/cancelreader"
 	"github.com/samber/lo"
 	"github.com/spf13/cast"
 	"go.uber.org/zap"
@@ -98,6 +99,7 @@ type view struct {
 	cmdsIdx       int
 	combines      map[string][3]int
 	directTargets map[string][3]int
+	suggestions   []connectionSuggestion
 	connecting    bool
 	help          help.Model
 	keys          keymap
@@ -107,6 +109,57 @@ type view struct {
 	mode          viewMode
 	suggestionIdx int    // Track current suggestion selection
 	selectedSugg  string // Store the selected suggestion text
+}
+
+type directCandidate struct {
+	target    [3]int
+	ambiguous bool
+}
+
+type connectionSuggestion struct {
+	command string
+	lower   string
+}
+
+func addDirectCandidate(candidates map[string]directCandidate, alias string, target [3]int) {
+	if alias == "" || strings.ContainsAny(alias, " \t\r\n") {
+		return
+	}
+	if candidate, ok := candidates[alias]; ok {
+		if candidate.target != target {
+			candidate.ambiguous = true
+			candidates[alias] = candidate
+		}
+		return
+	}
+	candidates[alias] = directCandidate{target: target}
+}
+
+func addAccountDirectCandidates(candidates map[string]directCandidate, account *model.Account, target [3]int) {
+	addDirectCandidate(candidates, account.Name, target)
+	addDirectCandidate(candidates, account.Account, target)
+}
+
+func uniqueDirectTargets(candidates map[string]directCandidate) map[string][3]int {
+	targets := make(map[string][3]int, len(candidates))
+	for alias, candidate := range candidates {
+		if !candidate.ambiguous {
+			targets[alias] = candidate.target
+		}
+	}
+	return targets
+}
+
+func (m *view) setConnectionSuggestions() {
+	m.suggestions = make([]connectionSuggestion, 0, len(m.combines)+len(m.directTargets))
+	for command := range m.combines {
+		m.suggestions = append(m.suggestions, connectionSuggestion{command, strings.ToLower(command)})
+	}
+	for alias := range m.directTargets {
+		command := "ssh " + alias
+		m.suggestions = append(m.suggestions, connectionSuggestion{command, strings.ToLower(command)})
+	}
+	sort.Slice(m.suggestions, func(i, j int) bool { return m.suggestions[i].lower < m.suggestions[j].lower })
 }
 
 func initialView(ctx *gin.Context, sess ssh.Session, r io.ReadCloser, w io.WriteCloser, gctx context.Context) *view {
@@ -692,7 +745,7 @@ func (m *view) refresh() {
 		accountMap := lo.SliceToMap(accounts, func(a *model.Account) (int, *model.Account) { return a.Id, a })
 
 		m.combines = make(map[string][3]int)
-		directCandidates := make(map[string]map[[3]int]struct{})
+		directCandidates := make(map[string]directCandidate)
 		for _, asset := range assets {
 			for accountId, authData := range asset.Authorization {
 				account, ok := accountMap[accountId]
@@ -721,25 +774,16 @@ func (m *view) refresh() {
 					if k != "" && len(k) > 3 {
 						m.combines[lo.Ternary(port == defaultPort, k, fmt.Sprintf("%s:%s", k, ss[1]))] = [3]int{account.Id, asset.Id, port}
 					}
-					if protocol == "ssh" && account.Account != "" {
-						if directCandidates[account.Account] == nil {
-							directCandidates[account.Account] = make(map[[3]int]struct{})
-						}
-						directCandidates[account.Account][[3]int{account.Id, asset.Id, port}] = struct{}{}
+					if protocol == "ssh" {
+						target := [3]int{account.Id, asset.Id, port}
+						addAccountDirectCandidates(directCandidates, account, target)
 					}
 				}
 			}
 		}
-		m.directTargets = make(map[string][3]int)
-		for account, candidates := range directCandidates {
-			if len(candidates) != 1 {
-				continue
-			}
-			for target := range candidates {
-				m.directTargets[account] = target
-			}
-		}
+		m.directTargets = uniqueDirectTargets(directCandidates)
 		m.textinput.SetSuggestions(lo.Keys(m.combines))
+		m.setConnectionSuggestions()
 
 		return
 	})
@@ -786,18 +830,13 @@ func (m *view) getFilteredSuggestions(input string) []string {
 
 	inputLower := strings.ToLower(input)
 	var matches []string
-	for cmd := range m.combines {
-		// Clean any potential issues with the command string
-		cmd = strings.TrimSpace(cmd)
-		if cmd == "" {
-			continue
+	start := sort.Search(len(m.suggestions), func(i int) bool { return m.suggestions[i].lower >= inputLower })
+	for _, suggestion := range m.suggestions[start:] {
+		if !strings.HasPrefix(suggestion.lower, inputLower) {
+			break
 		}
-
-		if strings.HasPrefix(strings.ToLower(cmd), inputLower) {
-			// Ensure we're not adding empty or malformed entries
-			if len(cmd) > len(inputLower) {
-				matches = append(matches, cmd)
-			}
+		if len(suggestion.command) > len(input) {
+			matches = append(matches, suggestion.command)
 		}
 	}
 
@@ -871,6 +910,33 @@ func (conn *connector) SetStderr(w io.Writer) {
 	conn.stderr = w
 }
 
+func startConnectorInputRelay(input io.Reader, output *io.PipeWriter) (func(), error) {
+	duplicate, err := duplicateInputReader(input)
+	if err != nil {
+		return nil, err
+	}
+	reader, err := cancelreader.NewReader(duplicate)
+	if err != nil {
+		_ = duplicate.Close()
+		return nil, err
+	}
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		defer output.Close()
+		_, _ = io.Copy(output, reader)
+	}()
+	return func() {
+		if !reader.Cancel() {
+			cancelDuplicateInputReader(duplicate)
+		}
+		_ = output.Close()
+		<-done
+		_ = reader.Close()
+		_ = duplicate.Close()
+	}, nil
+}
+
 func (conn *connector) Run() error {
 	gsess, err := myConnector.DoConnect(conn.Ctx, nil)
 	if err != nil {
@@ -878,19 +944,14 @@ func (conn *connector) Run() error {
 	}
 
 	r, w := io.Pipe()
-	input, err := duplicateInputReader(conn.stdin)
+	stopInput, err := startConnectorInputRelay(conn.stdin, w)
 	if err != nil {
+		_ = r.Close()
+		_ = w.Close()
 		gsess.Once.Do(func() { close(gsess.Chans.AwayChan) })
 		gsess.G.Wait()
 		return err
 	}
-	copyDone := make(chan struct{})
-	go func() {
-		defer close(copyDone)
-		defer input.Close()
-		defer w.Close()
-		_, _ = io.Copy(w, input)
-	}()
 
 	gsess.CliRw = &session.CliRW{
 		Reader: bufio.NewReader(r),
@@ -925,10 +986,8 @@ func (conn *connector) Run() error {
 		}
 	})
 	myConnector.HandleTerm(gsess, nil)
-	_ = input.Close()
 	_ = r.Close()
-	_ = w.Close()
-	<-copyDone
+	stopInput()
 
 	if err = gsess.G.Wait(); err != nil {
 		// Check if this is the normal termination sentinel error

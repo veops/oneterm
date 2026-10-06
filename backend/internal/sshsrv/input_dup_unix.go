@@ -23,3 +23,7 @@ func duplicateInputReader(input io.Reader) (*os.File, error) {
 	}
 	return os.NewFile(uintptr(fd), file.Name()), nil
 }
+
+func cancelDuplicateInputReader(file *os.File) {
+	_ = file.Close()
+}

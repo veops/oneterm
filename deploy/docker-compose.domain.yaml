@@ -170,7 +170,7 @@ services:
       # - "8443:443"                         # Example: External port 8443
 
   acl-api:
-    image: registry.cn-hangzhou.aliyuncs.com/acl-api:2.2
+    image: registry.cn-hangzhou.aliyuncs.com/veops/acl-api:2.2
     container_name: oneterm-acl-api
     depends_on:
       mysql:

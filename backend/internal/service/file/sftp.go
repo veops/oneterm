@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/pkg/sftp"
@@ -16,6 +18,7 @@ import (
 	gsession "github.com/veops/oneterm/internal/session"
 	"github.com/veops/oneterm/internal/tunneling"
 	"github.com/veops/oneterm/pkg/logger"
+	"github.com/veops/oneterm/pkg/sshclient"
 )
 
 // =============================================================================
@@ -85,10 +88,15 @@ func AssetBasedTransfer(transferId, tempFilePath, targetPath string, assetId, ac
 	}
 
 	// Create SSH client with maximum performance optimizations for SFTP
-	sshClient, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", ip, port), &ssh.ClientConfig{
+	targetHost, targetPort, err := tunneling.Target("ssh", asset)
+	if err != nil {
+		return err
+	}
+	defer tunneling.CloseTunnels(sessionId)
+	sshClient, err := sshclient.Dial(context.Background(), net.JoinHostPort(ip, strconv.Itoa(port)), &ssh.ClientConfig{
 		User:            account.Account,
 		Auth:            []ssh.AuthMethod{auth},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		HostKeyCallback: sshclient.HostKey(net.JoinHostPort(targetHost, strconv.Itoa(targetPort))),
 		Timeout:         30 * time.Second,
 		// Ultra-high performance optimizations - fastest algorithms first
 		Config: ssh.Config{

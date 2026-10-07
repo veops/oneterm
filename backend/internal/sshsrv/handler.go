@@ -2,20 +2,16 @@ package sshsrv
 
 import (
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 	"github.com/gin-gonic/gin"
 	"github.com/gliderlabs/ssh"
 	"go.uber.org/zap"
 	gossh "golang.org/x/crypto/ssh"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/veops/oneterm/internal/acl"
 	"github.com/veops/oneterm/internal/model"
@@ -70,36 +66,13 @@ func handler(sess ssh.Session) {
 	rec := &testResponseWriter{}
 	ctx, _ := gin.CreateTestContext(rec)
 	ctx.Request = req
+	ctx.Request = ctx.Request.WithContext(sess.Context())
 	ctx.Set("sessionType", model.SESSIONTYPE_CLIENT)
 	ctx.Set("session", sess.Context().Value("session"))
 
-	eg, gctx := errgroup.WithContext(sess.Context())
-	// Use a kernel-backed bounded pipe between the SSH session and Bubble Tea.
-	// Unlike io.Pipe, it can absorb input while connector.Run is waiting for
-	// the target connection without allocating an unbounded user-space buffer.
-	r, w, err := os.Pipe()
-	if err != nil {
-		logger.L().Error("create SSH input pipe failed", zap.Error(err))
-		return
-	}
-	eg.Go(func() error {
-		defer w.Close()
-		_, err := io.Copy(w, sess)
-		return err
-	})
-	eg.Go(func() error {
-		defer sess.Close()
-		defer r.Close()
-		defer w.Close()
-		vw := initialView(ctx, sess, r, w, gctx)
-		defer vw.RecordHisCmd()
-		p := tea.NewProgram(vw, tea.WithContext(gctx), tea.WithInput(r), tea.WithOutput(sess))
-		_, err := p.Run()
-
-		return err
-	})
-
-	if err := eg.Wait(); err != nil {
+	_, windows, _ := sess.Pty()
+	defer sess.Close()
+	if err := runTerminal(ctx, newTerminal(pty, sess.RemoteAddr(), sess.Environ()...), sess, sess, windows); err != nil {
 		logger.L().Debug("handler stopped", zap.Error(err))
 	}
 }
@@ -179,7 +152,7 @@ func banner() string {
 		Foreground(lipgloss.Color("#2f54eb")).
 		Bold(true).
 		PaddingLeft(15).
-		Render("✨ Enterprise Bastion Host Solution")
+		Render("Enterprise Bastion Host Solution")
 
 	versionText := versionStyle.
 		PaddingLeft(25).

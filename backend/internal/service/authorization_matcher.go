@@ -152,46 +152,51 @@ func (m *AuthorizationMatcher) matchRule(ctx context.Context, rule *model.Author
 
 // matchSelector checks if a target selector matches the given target
 func (m *AuthorizationMatcher) matchSelector(ctx context.Context, selector model.TargetSelector, targetType string, targetId int) bool {
+	matched, _ := m.matchSelectorChecked(ctx, selector, targetType, targetId)
+	return matched
+}
+
+func (m *AuthorizationMatcher) matchSelectorChecked(ctx context.Context, selector model.TargetSelector, targetType string, targetId int) (bool, error) {
 	// Handle zero ID based on selector type
 	if targetId == 0 {
-		return selector.Type == model.SelectorTypeAll
+		return selector.Type == model.SelectorTypeAll, nil
 	}
 
 	// Check if target is in exclude list
 	if lo.Contains(selector.ExcludeIds, targetId) {
-		return false
+		return false, nil
 	}
 
 	switch selector.Type {
 	case "":
 		// Empty selector type means no restriction - skip this selector check
-		return true
+		return true, nil
 
 	case model.SelectorTypeAll:
-		return true
+		return true, nil
 
 	case model.SelectorTypeIds:
 		targetIds := lo.Map(selector.Values, func(v string, _ int) int {
 			return cast.ToInt(v)
 		})
-		return lo.Contains(targetIds, targetId)
+		return lo.Contains(targetIds, targetId), nil
 
 	case model.SelectorTypeRegex:
 		targetName, err := m.GetTargetName(targetType, targetId)
 		if err != nil {
-			return false
+			return false, err
 		}
-		return m.matchRegexPatterns(selector.Values, targetName)
+		return m.matchRegexPatterns(selector.Values, targetName), nil
 
 	case model.SelectorTypeTags:
 		targetTags, err := m.GetTargetTags(targetType, targetId)
 		if err != nil {
-			return false
+			return false, err
 		}
-		return len(lo.Intersect(selector.Values, targetTags)) > 0
+		return len(lo.Intersect(selector.Values, targetTags)) > 0, nil
 
 	default:
-		return false
+		return false, nil
 	}
 }
 

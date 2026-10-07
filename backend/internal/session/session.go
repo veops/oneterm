@@ -7,7 +7,6 @@ import (
 	"io"
 	"sync"
 	"time"
-	"unicode/utf8"
 
 	"github.com/gliderlabs/ssh"
 	"github.com/gorilla/websocket"
@@ -64,16 +63,9 @@ type CliRW struct {
 }
 
 func (rw *CliRW) Read() (p []byte, err error) {
-	rn, size, err := rw.Reader.ReadRune()
-	if err != nil {
-		return
-	}
-	if size <= 0 || rn == utf8.RuneError {
-		return
-	}
-	p = make([]byte, utf8.RuneLen(rn))
-	utf8.EncodeRune(p, rn)
-	return
+	p = make([]byte, 32768)
+	n, err := rw.Reader.Read(p)
+	return p[:n], err
 }
 
 func (rw *CliRW) Write(p []byte) (n int, err error) {
@@ -88,10 +80,47 @@ type SessionChans struct {
 	ErrChan    chan error
 	InChan     chan []byte
 	OutChan    chan []byte
-	OutBuf     *bytes.Buffer
+	OutBuf     *Buffer
 	WindowChan chan ssh.Window
 	AwayChan   chan struct{}
 	CloseChan  chan string
+	windowMu   sync.Mutex
+	closeOnce  sync.Once
+}
+
+type Buffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *Buffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *Buffer) WriteString(s string) (int, error) { return b.Write([]byte(s)) }
+
+func (b *Buffer) Len() int { b.mu.Lock(); defer b.mu.Unlock(); return b.buf.Len() }
+
+func (b *Buffer) Bytes() []byte {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return append([]byte(nil), b.buf.Bytes()...)
+}
+
+func (b *Buffer) Reset() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.buf.Reset()
+}
+
+func (b *Buffer) Drain() []byte {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	p := b.buf.Bytes()
+	b.buf = bytes.Buffer{}
+	return p
 }
 
 func NewSessionChans() *SessionChans {
@@ -102,15 +131,34 @@ func NewSessionChans() *SessionChans {
 		Win:        win,
 		Rout:       rout,
 		Wout:       wout,
-		ErrChan:    make(chan error),
+		ErrChan:    make(chan error, 1),
 		InChan:     make(chan []byte, 8),
 		OutChan:    make(chan []byte, 8),
-		OutBuf:     &bytes.Buffer{},
-		WindowChan: make(chan ssh.Window),
+		OutBuf:     &Buffer{},
+		WindowChan: make(chan ssh.Window, 1),
 		AwayChan:   make(chan struct{}),
 		CloseChan:  make(chan string),
 	}
 }
+
+func (c *SessionChans) Resize(window ssh.Window) {
+	if window.Width <= 0 || window.Height <= 0 || window.Width > 1000 || window.Height > 500 {
+		return
+	}
+	c.windowMu.Lock()
+	defer c.windowMu.Unlock()
+	select {
+	case c.WindowChan <- window:
+	default:
+		select {
+		case <-c.WindowChan:
+		default:
+		}
+		c.WindowChan <- window
+	}
+}
+
+func (c *SessionChans) CloseAway() { c.closeOnce.Do(func() { close(c.AwayChan) }) }
 
 func (c *SessionChans) SendOutput(ctx context.Context, data []byte) bool {
 	select {
@@ -151,6 +199,61 @@ type Session struct {
 	pamTransportMu     sync.Mutex
 	pamTransportClose  func()
 	pamTransportClosed bool
+	cancel             context.CancelFunc
+	wsMutex            sync.Mutex
+	idleMutex          sync.Mutex
+	idleStopped        bool
+	BinaryOutput       bool `json:"-" gorm:"-"`
+	textPending        []byte
+}
+
+func (s *Session) Stop() {
+	s.Once.Do(func() { close(s.Chans.AwayChan) })
+	if s.cancel != nil {
+		s.cancel()
+	}
+	s.ClosePAMTransport()
+	s.ClearSSHClient()
+	s.StopIdle()
+	if s.Ws != nil {
+		s.Ws.Close()
+	}
+	s.Chans.Rin.Close()
+	s.Chans.Win.Close()
+	s.Chans.Rout.Close()
+	s.Chans.Wout.Close()
+}
+
+func (s *Session) WriteWebsocket(kind int, p []byte) error {
+	s.wsMutex.Lock()
+	defer s.wsMutex.Unlock()
+	if kind == websocket.TextMessage && len(p) > 0 {
+		p, s.textPending = terminalText(s.textPending, p)
+		if len(p) == 0 {
+			return nil
+		}
+	}
+	if err := s.Ws.SetWriteDeadline(time.Now().Add(10 * time.Second)); err != nil {
+		return err
+	}
+	return s.Ws.WriteMessage(kind, p)
+}
+
+func (s *Session) WriteTerminal(p []byte) error {
+	kind := websocket.TextMessage
+	if s.BinaryOutput {
+		kind = websocket.BinaryMessage
+	}
+	return s.WriteWebsocket(kind, p)
+}
+
+func (s *Session) StopIdle() {
+	s.idleMutex.Lock()
+	defer s.idleMutex.Unlock()
+	s.idleStopped = true
+	if s.IdleTk != nil {
+		s.IdleTk.Stop()
+	}
 }
 
 func (s *Session) SetPAMTransportClose(closeTransport func()) {
@@ -186,12 +289,22 @@ func (m *Session) HasMonitors() (has bool) {
 	return
 }
 
-func (m *Session) SetIdle() {
+func IdleTimeout() time.Duration {
 	d := time.Hour
 	cfg := model.GlobalConfig.Load()
 	if cfg != nil && cfg.Timeout > 0 {
 		d = time.Second * time.Duration(cfg.Timeout)
 	}
+	return d
+}
+
+func (m *Session) SetIdle() {
+	m.idleMutex.Lock()
+	defer m.idleMutex.Unlock()
+	if m.idleStopped {
+		return
+	}
+	d := IdleTimeout()
 	if m.IdleTk == nil {
 		m.IdleTk = time.NewTicker(d)
 	} else {
@@ -202,10 +315,12 @@ func (m *Session) SetIdle() {
 
 func NewSession(ctx context.Context) *Session {
 	s := &Session{}
+	ctx, s.cancel = context.WithCancel(ctx)
 	s.G, s.Gctx = errgroup.WithContext(ctx)
 	s.Chans = NewSessionChans()
 	s.Monitors = &sync.Map{}
 	s.SetIdle()
+	context.AfterFunc(s.Gctx, s.Stop)
 	return s
 }
 

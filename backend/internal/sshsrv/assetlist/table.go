@@ -2,14 +2,15 @@ package assetlist
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/table"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/table"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/samber/lo"
 
 	"github.com/veops/oneterm/internal/model"
@@ -68,7 +69,7 @@ var DefaultTableKeyMap = TableKeyMap{
 		key.WithHelp("home/g", "first"),
 	),
 	End: key.NewBinding(
-		key.WithKeys("end", "G"),
+		key.WithKeys("end", "G", "shift+g"),
 		key.WithHelp("end/G", "last"),
 	),
 	Enter: key.NewBinding(
@@ -92,7 +93,8 @@ type Asset struct {
 	User      string
 	Host      string
 	Port      string
-	Info      [3]int // [accountId, assetId, port]
+	search    string
+	Info      [3]int     // [accountId, assetId, port]
 	LastLogin *time.Time // Optional: last login time for recent sessions
 }
 
@@ -113,111 +115,37 @@ type Model struct {
 
 // New creates a new asset list table
 func New(assets map[string][3]int, width, height int) Model {
-	m := Model{}
-	m.width = width
-	m.height = height
-	// Convert assets map to structured list
-	assetList := make([]Asset, 0, len(assets))
-	for cmd, info := range assets {
-		parts := strings.Fields(cmd)
-		if len(parts) >= 2 {
-			protocol := parts[0]
-			userHost := parts[1]
-
-			// Parse user@host format
-			var user, host string
-			if idx := strings.Index(userHost, "@"); idx > 0 {
-				user = userHost[:idx]
-				host = userHost[idx+1:]
-			} else {
-				user = "unknown"
-				host = userHost
-			}
-
-			// Extract port if present
-			port := ""
-			if len(parts) > 2 {
-				// Format: "protocol user@host:port"
-				if idx := strings.LastIndex(parts[len(parts)-1], ":"); idx > 0 {
-					port = parts[len(parts)-1][idx+1:]
-					host = strings.TrimSuffix(host, ":"+port)
-				}
-			}
-
-			assetList = append(assetList, Asset{
-				Protocol: protocol,
-				Command:  cmd,
-				User:     user,
-				Host:     host,
-				Port:     port,
-				Info:     info,
-			})
-		}
+	entries := make([]Asset, 0, len(assets))
+	for command, info := range assets {
+		protocol, address, _ := strings.Cut(command, " ")
+		user, host, _ := strings.Cut(address, "@")
+		port := strconv.Itoa(info[2])
+		host = strings.TrimSuffix(host, ":"+port)
+		entries = append(entries, Asset{Protocol: protocol, Command: command, User: user, Host: host, Port: port, Info: info})
 	}
+	return NewConnections(entries, width, height)
+}
 
-	// Assets are stored in the order they were found with responsive widths
-	columns := m.calculateColumnWidths(width, false)
+func NewConnections(entries []Asset, width, height int) Model {
+	return newTable(entries, width, height, false)
+}
 
-	// Create table rows - let table handle truncation
-	rows := make([]table.Row, len(assetList))
-	for i, asset := range assetList {
-		icon := icons.GetProtocolIcon(asset.Protocol)
-		protocolText := fmt.Sprintf("%s %s", icon, strings.ToUpper(asset.Protocol))
-		port := lo.Ternary(asset.Port != "", asset.Port, icons.GetDefaultPort(asset.Protocol))
-		
-		rows[i] = table.Row{
-			protocolText,
-			asset.User,
-			asset.Host,
-			port,
-			asset.Command,
-		}
+func newTable(entries []Asset, width, height int, recent bool) Model {
+	entries = append([]Asset(nil), entries...)
+	if !recent {
+		sort.Slice(entries, func(i, j int) bool { return entries[i].Command < entries[j].Command })
 	}
-
-	// Table height includes header (1) + separator (1) + data rows
-	viewportHeight := len(assetList) + 2
-	if viewportHeight < 3 {
-		viewportHeight = 3 // At least header + separator + 1 data row
+	for i := range entries {
+		entries[i].search = strings.ToLower(entries[i].Command + "\x00" + entries[i].Host + "\x00" + entries[i].User + "\x00" + entries[i].Protocol)
 	}
-
-	// Calculate max available height (account for UI overhead)
-	// Overhead: title(1) + header(2) + borders(2) + help(2) = 7 lines
-	maxViewportHeight := height - 10
-	if maxViewportHeight < 5 {
-		maxViewportHeight = 5 // Minimum usable height
-	}
-
-	// Use actual row count for small sets, cap for large sets
-	if viewportHeight > maxViewportHeight {
-		viewportHeight = maxViewportHeight
-	}
-
-	t := table.New(
-		table.WithColumns(columns),
-		table.WithRows(rows),
-		table.WithFocused(true),
-		table.WithHeight(viewportHeight),
-	)
-
-	// Style the table with primary colors
-	s := table.DefaultStyles()
-	s.Header = s.Header.
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(lipgloss.Color("#b1c9ff")). // Light accent
-		BorderBottom(true).
-		Bold(true).
-		Foreground(lipgloss.Color("#2f54eb")) // Primary color
-	s.Selected = selectedStyle
-	t.SetStyles(s)
-
-	m.table = t
-	m.assets = assetList
-	m.filteredAssets = assetList
-	m.filterModel = NewFilter()
-	m.focused = false
-	m.keyMap = DefaultTableKeyMap
-	m.showHelp = true
-
+	m := Model{assets: entries, width: width, height: height, isRecent: recent, filterModel: NewFilter(), keyMap: DefaultTableKeyMap, showHelp: true}
+	m.table = table.New(table.WithColumns(m.calculateColumnWidths(width, recent)), table.WithFocused(true), table.WithHeight(5))
+	styles := table.DefaultStyles()
+	styles.Header = styles.Header.BorderStyle(lipgloss.NormalBorder()).BorderForeground(lipgloss.Color("#b1c9ff")).BorderBottom(true).Bold(true).Foreground(lipgloss.Color("#2f54eb"))
+	styles.Selected = selectedStyle
+	m.table.SetStyles(styles)
+	m.updateFilter()
+	m.resize(width, height)
 	return m
 }
 
@@ -228,14 +156,23 @@ func (m Model) Init() tea.Cmd {
 
 // Update handles messages
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+	if size, ok := msg.(tea.WindowSizeMsg); ok {
+		m.resize(size.Width, size.Height)
+		var cmd tea.Cmd
+		m.filterModel, cmd = m.filterModel.Update(msg)
+		return m, cmd
+	}
 	var cmd tea.Cmd
 	var cmds []tea.Cmd
+	if keyMsg, ok := msg.(tea.KeyPressMsg); ok && !m.canShowTable() && key.Matches(keyMsg, m.keyMap.Enter) {
+		return m, nil
+	}
 
 	// Handle filter input first if active
 	if m.filterModel.Active() {
 		switch msg := msg.(type) {
-		case tea.KeyMsg:
-			switch msg.Type {
+		case tea.KeyPressMsg:
+			switch msg.Code {
 			case tea.KeyEscape:
 				// Exit filter mode
 				m.filterModel.SetActive(false)
@@ -286,6 +223,11 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		default:
 			// Let filter handle other messages
 			m.filterModel, cmd = m.filterModel.Update(msg)
+			if filter := m.filterModel.Value(); filter != m.filter {
+				m.filter = filter
+				m.updateFilter()
+				m.table.GotoTop()
+			}
 			if cmd != nil {
 				cmds = append(cmds, cmd)
 			}
@@ -294,7 +236,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	}
 
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 
 		switch {
 		case key.Matches(msg, m.keyMap.Enter):
@@ -316,11 +258,11 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				m.table.GotoTop()
 			} else {
 				// Start filtering mode
-				m.filterModel.SetActive(true)
+				cmd = m.filterModel.SetActive(true)
 				// Initialize filter to empty to prepare for input
 				m.filter = ""
 			}
-			return m, nil
+			return m, cmd
 
 		case key.Matches(msg, m.keyMap.Up),
 			key.Matches(msg, m.keyMap.Down),
@@ -337,33 +279,6 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			return m, cmd
 		}
 
-	case tea.WindowSizeMsg:
-		m.width = msg.Width
-		m.height = msg.Height
-		
-		// Update column widths based on new terminal size
-		m.updateColumnWidths()
-		
-		// Update table height based on new window size
-		// Table height includes header + separator + data rows
-		newHeight := len(m.filteredAssets) + 2
-		if newHeight < 3 {
-			newHeight = 3 // At least header + separator + 1 data row
-		}
-
-		// Calculate max available height
-		maxHeight := msg.Height - 10
-		if maxHeight < 5 {
-			maxHeight = 5 // Minimum usable height
-		}
-
-		// Use actual row count for small sets, cap for large sets
-		if newHeight > maxHeight {
-			newHeight = maxHeight
-		}
-		m.table.SetHeight(newHeight)
-		// Let table also handle the window size message
-		m.table, cmd = m.table.Update(msg)
 	}
 
 	return m, cmd
@@ -371,9 +286,14 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 // View renders the table
 func (m Model) View() string {
-	// ANSI escape to ensure cursor at column 1
-	resetCursor := "\r\033[0G"
-	title := titleStyle.Render(lo.Ternary(m.isRecent, "📊  Recent Sessions", "🗂️  Available Assets"))
+	if !m.canShowTable() {
+		return lipgloss.NewStyle().MaxWidth(max(1, m.width)).MaxHeight(max(1, m.height)).Render("Resize terminal to view assets")
+	}
+	return m.headerView() + "\n" + baseStyle.Render(m.table.View()) + "\n" + m.renderHelp()
+}
+
+func (m Model) headerView() string {
+	title := titleStyle.Render(lo.Ternary(m.isRecent, "Recent Sessions", "Available Assets"))
 
 	// Filter indicator or input
 	filterInfo := ""
@@ -397,21 +317,31 @@ func (m Model) View() string {
 		Foreground(lipgloss.Color("#8c8c8c")). // Secondary text
 		Render(count)
 
-	// Help text
-	help := m.renderHelp()
+	return lipgloss.NewStyle().MaxWidth(max(1, m.width-2)).Render(lipgloss.JoinHorizontal(lipgloss.Left, title, filterInfo, " ", countStyle))
+}
 
-	// Combine all elements
-	header := lipgloss.JoinHorizontal(lipgloss.Left, title, filterInfo, " ", countStyle)
+func (m *Model) resize(width, height int) {
+	m.width, m.height = max(1, width), max(1, height)
+	m.updateColumnWidths()
+	m.table.SetWidth(max(1, m.width-2))
+	m.filterModel.SetWidth(min(20, max(1, m.width-32)))
+	m.updateTableHeight()
+}
 
-	// Use the table component's view directly - let it handle its own width
-	tableView := m.table.View()
+func (m Model) availableTableHeight() int {
+	return m.height - lipgloss.Height(m.headerView()) - lipgloss.Height(m.renderHelp()) - baseStyle.GetVerticalFrameSize()
+}
 
-	// Apply base style to restore the border and proper formatting
-	tableBox := baseStyle.Render(tableView)
+func (m Model) canShowTable() bool {
+	minimumWidth := 28
+	if m.isRecent {
+		minimumWidth = 33
+	}
+	return m.width >= minimumWidth && m.availableTableHeight() >= 3
+}
 
-	// Combine all elements with cursor reset at start
-	result := resetCursor + header + "\n" + tableBox + "\n" + help
-	return result
+func (m *Model) updateTableHeight() {
+	m.table.SetHeight(min(max(3, len(m.filteredAssets)+2), max(3, m.availableTableHeight())))
 }
 
 // Helper functions
@@ -422,21 +352,17 @@ func (m *Model) updateFilter() {
 	} else {
 		filter := strings.ToLower(m.filter)
 		m.filteredAssets = lo.Filter(m.assets, func(a Asset, _ int) bool {
-			return strings.Contains(strings.ToLower(a.Command), filter) ||
-				strings.Contains(strings.ToLower(a.Host), filter) ||
-				strings.Contains(strings.ToLower(a.User), filter) ||
-				strings.Contains(strings.ToLower(a.Protocol), filter)
+			return strings.Contains(a.search, filter)
 		})
 	}
 
 	// Update table rows - handle different formats for recent sessions vs assets
 	rows := make([]table.Row, len(m.filteredAssets))
-	
+
 	for i, asset := range m.filteredAssets {
-		icon := icons.GetProtocolIcon(asset.Protocol)
-		protocolText := fmt.Sprintf("%s %s", icon, strings.ToUpper(asset.Protocol))
+		protocolText := strings.ToUpper(asset.Protocol)
 		port := lo.Ternary(asset.Port != "", asset.Port, icons.GetDefaultPort(asset.Protocol))
-		
+
 		if m.isRecent && asset.LastLogin != nil {
 			// Recent sessions format with Last Login column
 			timeAgo := formatTimeAgo(*asset.LastLogin)
@@ -461,24 +387,7 @@ func (m *Model) updateFilter() {
 	}
 	m.table.SetRows(rows)
 
-	// Update table height to show all filtered results when possible
-	// Table height includes header + separator + data rows
-	newHeight := len(m.filteredAssets) + 2
-	if newHeight < 3 {
-		newHeight = 3 // At least header + separator + 1 data row
-	}
-
-	// Calculate max available height
-	maxHeight := m.height - 10
-	if maxHeight < 5 {
-		maxHeight = 5 // Minimum usable height
-	}
-
-	// Use actual row count for small sets, cap for large sets
-	if newHeight > maxHeight {
-		newHeight = maxHeight
-	}
-	m.table.SetHeight(newHeight)
+	m.updateTableHeight()
 }
 
 func (m Model) renderHelp() string {
@@ -513,7 +422,7 @@ func (m Model) renderHelp() string {
 	return lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#8c8c8c")). // Secondary text
 		Padding(1, 0, 0, 0).
-		Render(strings.Join(helpItems, " • "))
+		Width(max(1, m.width-2)).Render(strings.Join(helpItems, " • "))
 }
 
 // Commands
@@ -556,7 +465,7 @@ func (m Model) IsFilterActive() bool {
 }
 
 // NewRecentSessions creates a new asset list table from recent sessions
-func NewRecentSessions(sessions []*model.Session, combines map[string][3]int, width, height int) Model {
+func NewRecentSessions(sessions []*model.Session, combines map[string][3]int, width, height int, connections ...[]Asset) Model {
 	// Convert sessions to asset list with last login time
 	assetList := make([]Asset, 0, len(sessions))
 	for _, session := range sessions {
@@ -587,7 +496,11 @@ func NewRecentSessions(sessions []*model.Session, combines map[string][3]int, wi
 		}
 
 		// Look up the asset info from combines map if available
-		info := [3]int{session.AccountId, session.AssetId, lo.Ternary(port != "", lo.Must(strconv.Atoi(port)), 0)}
+		number, _ := strconv.Atoi(port)
+		if number == 0 {
+			number, _ = strconv.Atoi(icons.GetDefaultPort(protocol))
+		}
+		info := [3]int{session.AccountId, session.AssetId, number}
 		if val, ok := combines[cmd]; ok {
 			info = val
 		}
@@ -603,122 +516,56 @@ func NewRecentSessions(sessions []*model.Session, combines map[string][3]int, wi
 		})
 	}
 
-	// Create table columns with responsive widths for recent sessions
-	m := Model{width: width, height: height, isRecent: true}
-	columns := m.calculateColumnWidths(width, true)
-
-	// Create table rows - let table handle truncation
-	rows := make([]table.Row, len(assetList))
-	for i, asset := range assetList {
-		icon := icons.GetProtocolIcon(asset.Protocol)
-		protocolText := fmt.Sprintf("%s %s", icon, strings.ToUpper(asset.Protocol))
-		port := lo.Ternary(asset.Port != "", asset.Port, icons.GetDefaultPort(asset.Protocol))
-		timeAgo := formatTimeAgo(*asset.LastLogin)
-		
-		rows[i] = table.Row{
-			protocolText,
-			asset.User,
-			asset.Host,
-			port,
-			timeAgo,
-			asset.Command,
+	if len(connections) > 0 {
+		type key struct {
+			info     [3]int
+			protocol string
 		}
+		current := make(map[key]Asset, len(connections[0]))
+		for _, connection := range connections[0] {
+			current[key{connection.Info, connection.Protocol}] = connection
+		}
+		available := assetList[:0]
+		for _, recent := range assetList {
+			if connection, ok := current[key{recent.Info, recent.Protocol}]; ok {
+				connection.LastLogin = recent.LastLogin
+				available = append(available, connection)
+			}
+		}
+		assetList = available
 	}
-
-	// Calculate viewport height
-	viewportHeight := len(assetList) + 2
-	if viewportHeight < 3 {
-		viewportHeight = 3
-	}
-
-	maxViewportHeight := height - 10
-	if maxViewportHeight < 5 {
-		maxViewportHeight = 5
-	}
-
-	if viewportHeight > maxViewportHeight {
-		viewportHeight = maxViewportHeight
-	}
-
-	t := table.New(
-		table.WithColumns(columns),
-		table.WithRows(rows),
-		table.WithFocused(true),
-		table.WithHeight(viewportHeight),
-	)
-
-	// Style the table
-	s := table.DefaultStyles()
-	s.Header = s.Header.
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(lipgloss.Color("#b1c9ff")).
-		BorderBottom(true).
-		Bold(true).
-		Foreground(lipgloss.Color("#2f54eb"))
-	s.Selected = selectedStyle
-	t.SetStyles(s)
-
-	m.table = t
-	m.assets = assetList
-	m.filteredAssets = assetList
-	m.filterModel = NewFilter()
-	m.focused = false
-	m.keyMap = DefaultTableKeyMap
-	m.showHelp = true
-	// m.isRecent is already set to true above
-	
-	return m
+	return newTable(assetList, width, height, true)
 }
 
 // formatTimeAgo formats time as relative time
 // calculateColumnWidths calculates reasonable column widths
-func (m *Model) calculateColumnWidths(terminalWidth int, isRecent bool) []table.Column {
-	// Use compact layout for very narrow terminals
-	isNarrow := terminalWidth < 100
-	
-	if isRecent {
-		if isNarrow {
-			// Compact recent sessions layout for narrow terminals
-			return []table.Column{
-				{Title: "Protocol", Width: 12},
-				{Title: "User", Width: 12},
-				{Title: "Host", Width: 15},
-				{Title: "Port", Width: 5},
-				{Title: "Last Login", Width: 10},
-				{Title: "Command", Width: 25},
-			}
-		} else {
-			// Normal recent sessions layout
-			return []table.Column{
-				{Title: "Protocol", Width: 15},
-				{Title: "User", Width: 15},
-				{Title: "Host", Width: 20},
-				{Title: "Port", Width: 6},
-				{Title: "Last Login", Width: 12},
-				{Title: "Command", Width: 30},
-			}
-		}
-	} else {
-		if isNarrow {
-			// Compact assets layout for narrow terminals
-			return []table.Column{
-				{Title: "Protocol", Width: 12},
-				{Title: "User", Width: 12},
-				{Title: "Host", Width: 15},
-				{Title: "Port", Width: 5},
-				{Title: "Command", Width: 25},
-			}
-		} else {
-			// Normal assets layout
-			return []table.Column{
-				{Title: "Protocol", Width: 15},
-				{Title: "User", Width: 15},
-				{Title: "Host", Width: 20},
-				{Title: "Port", Width: 6},
-				{Title: "Command", Width: 30},
-			}
-		}
+func (m *Model) calculateColumnWidths(width int, recent bool) []table.Column {
+	columns := []table.Column{{Title: "Protocol", Width: 12}, {Title: "User", Width: 12}, {Title: "Host", Width: 18}, {Title: "Port", Width: 5}}
+	if recent {
+		columns = append(columns, table.Column{Title: "Last Login", Width: 12})
 	}
+	columns = append(columns, table.Column{Title: "Command", Width: 30})
+	total := 0
+	for _, column := range columns {
+		total += column.Width
+	}
+	available := max(len(columns), width-2-2*len(columns))
+	minimum := []int{3, 3, 4, 5}
+	if recent {
+		minimum = append(minimum, 3)
+	}
+	minimum = append(minimum, 1)
+	reserve := 0
+	for _, size := range minimum {
+		reserve += size
+	}
+	remaining := available
+	for i := range columns {
+		columns[i].Width = max(1, minimum[i]+max(0, available-reserve)*columns[i].Width/total)
+		remaining -= columns[i].Width
+	}
+	columns[len(columns)-1].Width += max(0, remaining)
+	return columns
 }
 
 // updateColumnWidths updates table column widths based on current terminal size

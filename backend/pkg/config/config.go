@@ -148,6 +148,7 @@ type Auth struct {
 type SshConfig struct {
 	Host       string `yaml:"host"`
 	Port       int    `yaml:"port"`
+	KnownHosts string `yaml:"knownHosts"`
 	PrivateKey string `yaml:"privateKey,omitempty"` // Deprecated: now stored encrypted in database SystemConfig table
 }
 

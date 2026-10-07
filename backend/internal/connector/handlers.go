@@ -25,6 +25,7 @@ import (
 	"github.com/veops/oneterm/internal/service"
 	fileservice "github.com/veops/oneterm/internal/service/file"
 	gsession "github.com/veops/oneterm/internal/session"
+	"github.com/veops/oneterm/internal/tunneling"
 	myErrors "github.com/veops/oneterm/pkg/errors"
 	"github.com/veops/oneterm/pkg/logger"
 )
@@ -107,7 +108,13 @@ func ConnectMonitor(ctx *gin.Context) {
 	}
 
 	key := fmt.Sprintf("%d-%s-%d", currentUser.GetUid(), sessionId, time.Now().Nanosecond())
-	sess.Monitors.Store(key, ws)
+	if sess.IsGuacd() {
+		sess.Monitors.Store(key, ws)
+	} else {
+		monitor := protocols.NewMonitor(ws, ctx.Query("binary") == "true")
+		defer monitor.Close()
+		sess.Monitors.Store(key, monitor)
+	}
 	defer sess.Monitors.Delete(key)
 
 	g.Go(func() error {
@@ -175,7 +182,13 @@ func DoConnect(ctx *gin.Context, ws *websocket.Conn) (sess *gsession.Session, er
 	}
 
 	sess = gsession.NewSession(ctx.Request.Context())
+	defer func() {
+		if err != nil {
+			CloseTerminalSession(sess)
+		}
+	}()
 	sess.Ws = ws
+	sess.BinaryOutput = ctx.Query("binary") == "true"
 	sess.Session = &model.Session{
 		SessionType: ctx.GetInt("sessionType"),
 		SessionId:   sessionId,
@@ -211,8 +224,7 @@ func DoConnect(ctx *gin.Context, ws *websocket.Conn) (sess *gsession.Session, er
 		cmds, err := commandAnalyzer.AnalyzeSessionCommands(ctx, sess)
 		if err != nil {
 			logger.L().Error("Failed to analyze session commands", zap.String("sessionId", sess.SessionId), zap.Error(err))
-			// Continue with empty command list (no command restrictions)
-			cmds = []*model.Command{}
+			return sess, err
 		}
 		sess.SshParser.Cmds = cmds
 
@@ -306,12 +318,6 @@ func DoConnect(ctx *gin.Context, ws *websocket.Conn) (sess *gsession.Session, er
 		sess.SetPermissions(permissions)
 	}
 
-	// For SSH, check if user has any file permissions before initializing SFTP
-	hasFilePermissions := false
-	if protocol == "ssh" {
-		hasFilePermissions = result.IsAllowed(model.ActionFileUpload) || result.IsAllowed(model.ActionFileDownload)
-	}
-
 	switch protocol {
 	case "ssh":
 		go protocols.ConnectSsh(ctx, sess, asset, account, gateway)
@@ -327,11 +333,15 @@ func DoConnect(ctx *gin.Context, ws *websocket.Conn) (sess *gsession.Session, er
 		sess.Chans.ErrChan <- err
 		return
 	default:
-		logger.L().Error("wrong protocol " + sess.Protocol)
+		return sess, &myErrors.ApiError{Code: myErrors.ErrInvalidArgument, Data: map[string]any{"err": "unsupported protocol"}}
 	}
 
 	if sess.PAMAuthorization == nil {
-		err = <-sess.Chans.ErrChan
+		select {
+		case err = <-sess.Chans.ErrChan:
+		case <-sess.Gctx.Done():
+			err = sess.Gctx.Err()
+		}
 	} else {
 		err = waitPAMConnection(ctx.Request.Context(), sess)
 	}
@@ -359,73 +369,22 @@ func DoConnect(ctx *gin.Context, ws *websocket.Conn) (sess *gsession.Session, er
 	gsession.GetOnlineSession().Store(sess.SessionId, sess)
 	gsession.UpsertSession(sess)
 
-	// Initialize session-based file client only for SSH and only if user has file permissions
-	switch protocol {
-	case "ssh":
-		if hasFilePermissions {
-			if err := fileservice.DefaultFileService.InitSessionFileClient(sess.SessionId, sess.AssetId, sess.AccountId); err != nil {
-				logger.L().Warn("Failed to initialize session file client",
-					zap.String("sessionId", sess.SessionId),
-					zap.Int("assetId", sess.AssetId),
-					zap.Int("accountId", sess.AccountId),
-					zap.Error(err))
-				// Don't fail the session creation for file service initialization failure
-			} else {
-				logger.L().Info("Session file client initialized successfully",
-					zap.String("sessionId", sess.SessionId),
-					zap.Int("assetId", sess.AssetId),
-					zap.Int("accountId", sess.AccountId))
-			}
-		} else {
-			logger.L().Info("Skipping SFTP client initialization - no file permissions",
-				zap.String("sessionId", sess.SessionId),
-				zap.Int("assetId", sess.AssetId),
-				zap.Int("accountId", sess.AccountId))
-		}
-	case "rdp", "vnc":
-		logger.L().Debug("Skipping session file client initialization for Guacamole protocol",
-			zap.String("protocol", protocol),
-			zap.String("sessionId", sess.SessionId))
-		// RDP and VNC use Guacamole protocol for file transfer, not SSH/SFTP
-	}
-
 	return
 }
 
 // HandleTerm handles terminal sessions
 func HandleTerm(sess *gsession.Session, ctx *gin.Context) (err error) {
-	defer func() {
-		logger.L().Debug("defer HandleTerm", zap.String("sessionId", sess.SessionId))
-
-		// Clean up session-based file client (only for SSH-based protocols)
-		protocol := strings.Split(sess.Protocol, ":")[0]
-		if protocol == "ssh" {
-			fileservice.DefaultFileService.CloseSessionFileClient(sess.SessionId)
-			// Clear SSH client from session to ensure proper cleanup
-			sess.ClearSSHClient()
-		}
-
-		// Close SSH recorder to save recording file
-		if sess.SshRecoder != nil {
-			if closeErr := sess.SshRecoder.Close(); closeErr != nil {
-				logger.L().Error("Failed to close SSH recorder", zap.String("sessionId", sess.SessionId), zap.Error(closeErr))
-			}
-		}
-
-		sess.SshParser.Close(sess.Prompt)
-		sess.Status = model.SESSIONSTATUS_OFFLINE
-		sess.ClosedAt = lo.ToPtr(time.Now())
-		if err = gsession.UpsertSession(sess); err != nil {
-			logger.L().Error("upsert session failed", zap.Error(err))
-		}
-	}()
+	defer CloseTerminalSession(sess)
 	chs := sess.Chans
-	tk, tk1s, tk1m := time.NewTicker(time.Millisecond*100), time.NewTicker(time.Second), time.NewTicker(time.Minute)
-	assetService := service.NewAssetService()
+	tk, tk1s := time.NewTicker(time.Millisecond*100), time.NewTicker(time.Second)
+	defer tk.Stop()
+	defer tk1s.Stop()
+	sess.G.Go(func() error { return WatchTerminalSession(sess, ctx) })
 	sess.G.Go(func() error {
 		return protocols.Read(sess)
 	})
 	sess.G.Go(func() (err error) {
+		defer sess.Stop()
 		defer sess.Chans.Rin.Close()
 		defer sess.Chans.Wout.Close()
 		for {
@@ -434,45 +393,15 @@ func HandleTerm(sess *gsession.Session, ctx *gin.Context) (err error) {
 				protocols.Write(sess)
 				return
 			case <-chs.AwayChan:
-				// Flush any remaining output before terminating
-				protocols.Write(sess)
-				return
-			case <-sess.IdleTk.C:
-				msg := (&myErrors.ApiError{Code: myErrors.ErrIdleTimeout, Data: map[string]any{"second": model.GlobalConfig.Load().Timeout}}).MessageWithCtx(ctx)
-				protocols.WriteErrMsg(sess, msg)
-				return &myErrors.ApiError{Code: myErrors.ErrIdleTimeout, Data: map[string]any{"second": model.GlobalConfig.Load().Timeout}}
-			case <-tk1m.C:
-				asset, err := assetService.GetById(sess.Gctx, sess.AssetId)
-				if err != nil {
-					continue
-				}
-				if protocols.CheckTime(asset.AccessAuth) && (sess.ShareId == 0 || time.Now().Before(sess.ShareEnd)) {
-					continue
-				}
-				return &myErrors.ApiError{Code: myErrors.ErrAccessTime}
-			case closeBy := <-chs.CloseChan:
-				msg := (&myErrors.ApiError{Code: myErrors.ErrAdminClose, Data: map[string]any{"admin": closeBy}}).MessageWithCtx(ctx)
-				protocols.WriteErrMsg(sess, msg)
-				logger.L().Info("closed by", zap.String("admin", closeBy))
-				return &myErrors.ApiError{Code: myErrors.ErrAdminClose, Data: map[string]any{"admin": closeBy}}
+				return flushTerminalOutput(sess)
 			case in := <-chs.InChan:
 				if sess.SessionType == model.SESSIONTYPE_WEB {
-					rt := in[0]
-					msg := in[1:]
-					switch rt {
-					case '1':
-						in = msg
-					case '9':
-						continue
-					case 'w':
-						wh := strings.Split(string(msg), ",")
-						if len(wh) < 2 {
-							continue
-						}
-						chs.WindowChan <- ssh.Window{
-							Width:  cast.ToInt(wh[0]),
-							Height: cast.ToInt(wh[1]),
-						}
+					var window ssh.Window
+					in, window = protocols.TerminalMessage(in)
+					if window.Width > 0 {
+						chs.Resize(window)
+					}
+					if len(in) == 0 {
 						continue
 					}
 				}
@@ -483,6 +412,9 @@ func HandleTerm(sess *gsession.Session, ctx *gin.Context) (err error) {
 					continue
 				}
 				if _, err = chs.Win.Write(in); err != nil {
+					if sess.Gctx.Err() != nil {
+						return nil
+					}
 					return
 				}
 			case out := <-chs.OutChan:
@@ -490,6 +422,11 @@ func HandleTerm(sess *gsession.Session, ctx *gin.Context) (err error) {
 					return
 				}
 				sess.SshParser.AddOutput(out)
+				if chs.OutBuf.Len() >= 32768 {
+					if err = protocols.Write(sess); err != nil {
+						return err
+					}
+				}
 			case <-tk.C:
 				if err = protocols.Write(sess); err != nil {
 					return
@@ -498,7 +435,7 @@ func HandleTerm(sess *gsession.Session, ctx *gin.Context) (err error) {
 				if sess.Ws == nil {
 					continue
 				}
-				if err = sess.Ws.WriteMessage(websocket.TextMessage, nil); err != nil {
+				if err = sess.WriteWebsocket(websocket.TextMessage, nil); err != nil {
 					return
 				}
 			}
@@ -509,4 +446,98 @@ func HandleTerm(sess *gsession.Session, ctx *gin.Context) (err error) {
 		logger.L().Debug("handle term wait end", zap.String("id", sess.SessionId), zap.Error(err))
 	}
 	return
+}
+
+func flushTerminalOutput(sess *gsession.Session) error {
+	for {
+		select {
+		case out := <-sess.Chans.OutChan:
+			sess.Chans.OutBuf.Write(out)
+			sess.SshParser.AddOutput(out)
+		default:
+			return protocols.Write(sess)
+		}
+	}
+}
+
+func WatchTerminalSession(sess *gsession.Session, ctx *gin.Context) error {
+	tick := time.NewTicker(time.Minute)
+	defer tick.Stop()
+	for {
+		var err error
+		select {
+		case <-sess.Gctx.Done():
+			return nil
+		case <-sess.Chans.AwayChan:
+			return nil
+		case <-sess.IdleTk.C:
+			seconds := 3600
+			if cfg := model.GlobalConfig.Load(); cfg != nil && cfg.Timeout > 0 {
+				seconds = cfg.Timeout
+			}
+			err = &myErrors.ApiError{Code: myErrors.ErrIdleTimeout, Data: map[string]any{"second": seconds}}
+		case closer := <-sess.Chans.CloseChan:
+			err = &myErrors.ApiError{Code: myErrors.ErrAdminClose, Data: map[string]any{"admin": closer}}
+		case <-tick.C:
+			if sess.AssetId == 0 {
+				continue
+			}
+			err = checkTerminalAccess(sess, ctx)
+			if err == nil {
+				continue
+			}
+		}
+		sess.Stop()
+		return err
+	}
+}
+
+func checkTerminalAccess(sess *gsession.Session, ctx *gin.Context) error {
+	asset, err := service.NewAssetService().GetById(sess.Gctx, sess.AssetId)
+	if err != nil {
+		return err
+	}
+	if !protocols.CheckTime(asset.AccessAuth) || sess.ShareId != 0 && time.Now().After(sess.ShareEnd) {
+		return &myErrors.ApiError{Code: myErrors.ErrAccessTime}
+	}
+	if sess.PAMAuthorization != nil {
+		return nil
+	}
+	snapshot := &gsession.Session{Session: &model.Session{Asset: asset, AssetId: sess.AssetId, AccountId: sess.AccountId, ShareId: sess.ShareId}}
+	result, err := service.DefaultAuthService.HasStandingAuthorizationV2(ctx, snapshot, model.ActionConnect)
+	if err != nil {
+		return err
+	}
+	if !result.IsAllowed(model.ActionConnect) {
+		return &myErrors.ApiError{Code: myErrors.ErrUnauthorized, Data: map[string]any{"perm": "connect"}}
+	}
+	return nil
+}
+
+func CloseTerminalSession(sess *gsession.Session) {
+	if sess == nil || sess.Session == nil {
+		return
+	}
+	sess.Stop()
+	sess.StopIdle()
+	gsession.GetOnlineSession().Delete(sess.SessionId)
+	if fileservice.DefaultFileService != nil {
+		fileservice.DefaultFileService.CloseSessionFileClient(sess.SessionId)
+	}
+	sess.ClearSSHClient()
+	tunneling.CloseTunnels(sess.SessionId)
+	if sess.SshParser != nil {
+		sess.SshParser.Close(sess.Prompt)
+	}
+	if sess.SshRecoder != nil {
+		if err := sess.SshRecoder.Close(); err != nil {
+			logger.L().Error("close session recording failed", zap.Error(err))
+		}
+	}
+	sess.Status, sess.ClosedAt = model.SESSIONSTATUS_OFFLINE, lo.ToPtr(time.Now())
+	if sess.Id > 0 {
+		if err := gsession.UpsertSession(sess); err != nil {
+			logger.L().Error("close session failed", zap.Error(err))
+		}
+	}
 }

@@ -8,7 +8,9 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -16,8 +18,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/pkg/sftp"
-	"go.uber.org/zap"
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/sync/singleflight"
 	"gorm.io/gorm"
 
 	"github.com/veops/oneterm/internal/guacd"
@@ -25,7 +27,7 @@ import (
 	"github.com/veops/oneterm/internal/repository"
 	gsession "github.com/veops/oneterm/internal/session"
 	"github.com/veops/oneterm/internal/tunneling"
-	"github.com/veops/oneterm/pkg/logger"
+	"github.com/veops/oneterm/pkg/sshclient"
 )
 
 var (
@@ -121,10 +123,14 @@ func (fm *FileManager) GetFileClient(assetId, accountId int) (cli *sftp.Client, 
 		return
 	}
 
-	sshCli, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", ip, port), &ssh.ClientConfig{
+	targetHost, targetPort, err := tunneling.Target("sftp,ssh", asset)
+	if err != nil {
+		return nil, err
+	}
+	sshCli, err := sshclient.Dial(context.Background(), net.JoinHostPort(ip, strconv.Itoa(port)), &ssh.ClientConfig{
 		User:            account.Account,
 		Auth:            []ssh.AuthMethod{auth},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		HostKeyCallback: sshclient.HostKey(net.JoinHostPort(targetHost, strconv.Itoa(targetPort))),
 		Timeout:         time.Second,
 	})
 	if err != nil {
@@ -154,90 +160,88 @@ type SessionFileManager struct {
 	sessionSSH  map[string]*ssh.Client  // sessionId -> SSH client
 	lastActive  map[string]time.Time    // sessionId -> last active time
 	mutex       sync.RWMutex
+	inits       singleflight.Group
 }
 
 func (sfm *SessionFileManager) InitSessionSFTP(sessionId string, assetId, accountId int) error {
-	sfm.mutex.Lock()
-	defer sfm.mutex.Unlock()
+	session := gsession.GetOnlineSessionById(sessionId)
+	if session == nil || session.AssetId != assetId || session.AccountId != accountId {
+		return ErrSessionNotFound
+	}
+	_, err, _ := sfm.inits.Do(sessionId, func() (any, error) { return nil, sfm.initSessionSFTP(sessionId, assetId, accountId) })
+	return err
+}
 
-	// Check if already exists
+func (sfm *SessionFileManager) initSessionSFTP(sessionId string, assetId, accountId int) error {
+	session := gsession.GetOnlineSessionById(sessionId)
+	if session == nil || session.AssetId != assetId || session.AccountId != accountId {
+		return ErrSessionNotFound
+	}
+	if session.Gctx == nil || session.Gctx.Err() != nil {
+		return ErrSessionClosed
+	}
+	sfm.mutex.Lock()
 	if _, exists := sfm.sessionSFTP[sessionId]; exists {
 		sfm.lastActive[sessionId] = time.Now()
+		sfm.mutex.Unlock()
 		return nil
 	}
-
-	// CRITICAL OPTIMIZATION: Try to reuse existing SSH connection from terminal session
-	onlineSession := gsession.GetOnlineSessionById(sessionId)
-	var sshClient *ssh.Client
-	var shouldCloseClient = false
-
-	if onlineSession != nil && onlineSession.HasSSHClient() {
-		sshClient = onlineSession.GetSSHClient()
-		logger.L().Info("REUSING existing SSH connection from terminal session",
-			zap.String("sessionId", sessionId))
-	} else {
-		// Fallback: Create new SSH connection if no existing connection found
+	sfm.mutex.Unlock()
+	client := session.GetSSHClient()
+	owned := client == nil
+	if owned {
 		asset, account, gateway, err := repository.GetAAG(assetId, accountId)
 		if err != nil {
 			return err
 		}
-
-		// Use sessionId as proxy identifier for connection reuse
-		ip, port, err := tunneling.Proxy(false, sessionId, "sftp,ssh", asset, gateway)
+		host, port, err := tunneling.Target(session.Protocol, asset)
 		if err != nil {
 			return err
 		}
-
+		identity := net.JoinHostPort(host, strconv.Itoa(port))
+		host, port, err = tunneling.Proxy(false, sessionId, session.Protocol, asset, gateway)
+		if err != nil {
+			return err
+		}
 		auth, err := repository.GetAuth(account)
 		if err != nil {
 			return err
 		}
-
-		sshClient, err = ssh.Dial("tcp", fmt.Sprintf("%s:%d", ip, port), &ssh.ClientConfig{
-			User:            account.Account,
-			Auth:            []ssh.AuthMethod{auth},
-			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-			Timeout:         10 * time.Second,
-		})
+		client, err = sshclient.Dial(session.Gctx, net.JoinHostPort(host, strconv.Itoa(port)), &ssh.ClientConfig{
+			User: account.Account, Auth: []ssh.AuthMethod{auth}, HostKeyCallback: sshclient.HostKey(identity), Timeout: 10 * time.Second})
 		if err != nil {
-			return fmt.Errorf("failed to connect SSH for session %s: %w", sessionId, err)
+			return err
 		}
-		shouldCloseClient = true // We created it, so we manage its lifecycle
-		logger.L().Info("Created new SSH connection for file transfer",
-			zap.String("sessionId", sessionId))
 	}
-
-	// Create SFTP client with optimized settings for better performance
-	sftpClient, err := sftp.NewClient(sshClient,
-		sftp.MaxPacket(32768),                 // 32KB packets for maximum compatibility
-		sftp.MaxConcurrentRequestsPerFile(16), // Increase concurrent requests per file (default is 3)
-		sftp.UseConcurrentWrites(true),        // Enable concurrent writes
-		sftp.UseConcurrentReads(true),         // Enable concurrent reads
-		sftp.UseFstat(false),                  // Disable fstat for better compatibility
-	)
+	sftpClient, err := sftp.NewClient(client, sftp.MaxPacket(32768), sftp.MaxConcurrentRequestsPerFile(16),
+		sftp.UseConcurrentWrites(true), sftp.UseConcurrentReads(true), sftp.UseFstat(false))
 	if err != nil {
-		if shouldCloseClient {
-			sshClient.Close()
+		if owned {
+			client.Close()
 		}
-		return fmt.Errorf("failed to create SFTP client for session %s: %w", sessionId, err)
+		return err
 	}
-
-	// Store clients (only store SSH client if we created it)
+	sfm.mutex.Lock()
+	if session.Gctx.Err() != nil {
+		sfm.mutex.Unlock()
+		sftpClient.Close()
+		if owned {
+			client.Close()
+		}
+		return ErrSessionClosed
+	}
 	sfm.sessionSFTP[sessionId] = sftpClient
-	if shouldCloseClient {
-		sfm.sessionSSH[sessionId] = sshClient
+	if owned {
+		sfm.sessionSSH[sessionId] = client
 	}
 	sfm.lastActive[sessionId] = time.Now()
-
-	logger.L().Info("SFTP connection initialized for session",
-		zap.String("sessionId", sessionId),
-		zap.Bool("reusedConnection", !shouldCloseClient))
+	sfm.mutex.Unlock()
 	return nil
 }
 
 func (sfm *SessionFileManager) GetSessionSFTP(sessionId string) (*sftp.Client, error) {
-	sfm.mutex.RLock()
-	defer sfm.mutex.RUnlock()
+	sfm.mutex.Lock()
+	defer sfm.mutex.Unlock()
 
 	client, exists := sfm.sessionSFTP[sessionId]
 	if !exists {
@@ -250,24 +254,26 @@ func (sfm *SessionFileManager) GetSessionSFTP(sessionId string) (*sftp.Client, e
 }
 
 func (sfm *SessionFileManager) CloseSessionSFTP(sessionId string) {
+	sfm.closeSessionSFTP(sessionId, time.Time{})
+}
+
+func (sfm *SessionFileManager) closeSessionSFTP(sessionId string, cutoff time.Time) {
 	sfm.mutex.Lock()
-	defer sfm.mutex.Unlock()
-
-	if sftpClient, exists := sfm.sessionSFTP[sessionId]; exists {
-		sftpClient.Close()
-		delete(sfm.sessionSFTP, sessionId)
+	if !cutoff.IsZero() && sfm.lastActive[sessionId].After(cutoff) {
+		sfm.mutex.Unlock()
+		return
 	}
-
-	// Only close SSH client if we created it (not reused from terminal session)
-	if sshClient, exists := sfm.sessionSSH[sessionId]; exists {
-		sshClient.Close()
-		delete(sfm.sessionSSH, sessionId)
-		logger.L().Info("SFTP SSH connection closed for session", zap.String("sessionId", sessionId))
-	} else {
-		logger.L().Info("SFTP connection closed for session (SSH connection reused)", zap.String("sessionId", sessionId))
-	}
-
+	sftpClient, client := sfm.sessionSFTP[sessionId], sfm.sessionSSH[sessionId]
+	delete(sfm.sessionSFTP, sessionId)
+	delete(sfm.sessionSSH, sessionId)
 	delete(sfm.lastActive, sessionId)
+	sfm.mutex.Unlock()
+	if sftpClient != nil {
+		sftpClient.Close()
+	}
+	if client != nil {
+		client.Close()
+	}
 }
 
 func (sfm *SessionFileManager) IsSessionActive(sessionId string) bool {
@@ -279,28 +285,17 @@ func (sfm *SessionFileManager) IsSessionActive(sessionId string) bool {
 }
 
 func (sfm *SessionFileManager) CleanupInactiveSessions(timeout time.Duration) {
-	sfm.mutex.Lock()
-	defer sfm.mutex.Unlock()
-
+	var ids []string
 	cutoff := time.Now().Add(-timeout)
-	for sessionId, lastActive := range sfm.lastActive {
-		if lastActive.Before(cutoff) {
-			// Close and remove inactive session
-			if sftpClient, exists := sfm.sessionSFTP[sessionId]; exists {
-				sftpClient.Close()
-				delete(sfm.sessionSFTP, sessionId)
-			}
-
-			if sshClient, exists := sfm.sessionSSH[sessionId]; exists {
-				sshClient.Close()
-				delete(sfm.sessionSSH, sessionId)
-			}
-
-			delete(sfm.lastActive, sessionId)
-			logger.L().Info("Cleaned up inactive SFTP session",
-				zap.String("sessionId", sessionId),
-				zap.Duration("inactiveFor", time.Since(lastActive)))
+	sfm.mutex.Lock()
+	for id, last := range sfm.lastActive {
+		if last.Before(cutoff) {
+			ids = append(ids, id)
 		}
+	}
+	sfm.mutex.Unlock()
+	for _, id := range ids {
+		sfm.closeSessionSFTP(id, cutoff)
 	}
 }
 

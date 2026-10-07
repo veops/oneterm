@@ -15,7 +15,7 @@ func GetAllFromCacheDb[T model.Model](ctx context.Context, m T) (res []T, err er
 	if err = redis.Get(ctx, k, &res); err == nil {
 		return
 	}
-	if err = db.DB.Model(m).Find(&res).Error; err != nil {
+	if err = db.DB.WithContext(ctx).Model(m).Find(&res).Error; err != nil {
 		return
 	}
 	redis.SetEx(ctx, k, res, time.Hour)

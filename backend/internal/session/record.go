@@ -1,13 +1,14 @@
 package session
 
 import (
-	"bytes"
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -19,7 +20,12 @@ import (
 
 type Asciinema struct {
 	sessionID  string
-	buffer     *bytes.Buffer
+	mu         sync.Mutex
+	file       *os.File
+	writer     *bufio.Writer
+	err        error
+	closed     bool
+	pending    []byte
 	ts         time.Time
 	useStorage bool
 }
@@ -27,10 +33,21 @@ type Asciinema struct {
 func NewAsciinema(id string, w, h int) (ret *Asciinema, err error) {
 	ret = &Asciinema{
 		sessionID:  id,
-		buffer:     bytes.NewBuffer(nil),
 		ts:         time.Now(),
 		useStorage: storage.DefaultSessionReplayAdapter != nil,
 	}
+	if id == "" || filepath.Base(id) != id || strings.ContainsAny(id, "/\\\x00") {
+		return nil, fmt.Errorf("invalid recording id")
+	}
+	dir := filepath.Join(config.Cfg.Session.ReplayDir, ret.ts.Format("2006-01-02"))
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return nil, err
+	}
+	ret.file, err = os.OpenFile(filepath.Join(dir, id+".cast"), os.O_CREATE|os.O_EXCL|os.O_RDWR, 0600)
+	if err != nil {
+		return nil, err
+	}
+	ret.writer = bufio.NewWriterSize(ret.file, 32768)
 
 	// Write Asciinema header information
 	header := map[string]any{
@@ -51,75 +68,83 @@ func NewAsciinema(id string, w, h int) (ret *Asciinema, err error) {
 		return nil, err
 	}
 
-	ret.buffer.Write(append(bs, '\r', '\n'))
+	if _, err := ret.writer.Write(append(bs, '\r', '\n')); err != nil {
+		ret.file.Close()
+		return nil, err
+	}
 
 	return ret, nil
 }
 
 func (a *Asciinema) Write(p []byte) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.closed || a.err != nil {
+		return
+	}
+	p, a.pending = terminalText(a.pending, p)
+	if len(p) == 0 {
+		return
+	}
 	o := [3]any{}
 	o[0] = float64(time.Now().UnixMicro()-a.ts.UnixMicro()) / 1_000_000
 	o[1] = "o"
 	o[2] = string(p)
 	bs, _ := json.Marshal(o)
-	a.buffer.Write(append(bs, '\r', '\n'))
+	_, a.err = a.writer.Write(append(bs, '\r', '\n'))
 }
 
 func (a *Asciinema) Resize(w, h int) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.closed || a.err != nil {
+		return
+	}
 	r := [3]any{}
 	r[0] = float64(time.Now().UnixMicro()-a.ts.UnixMicro()) / 1_000_000
 	r[1] = "r"
 	r[2] = fmt.Sprintf("%dx%d", w, h)
 	bs, _ := json.Marshal(r)
-	a.buffer.Write(append(bs, '\r', '\n'))
+	_, a.err = a.writer.Write(append(bs, '\r', '\n'))
 }
 
 // Close closes the recording and saves to storage
 func (a *Asciinema) Close() error {
-	if a.useStorage && storage.DefaultSessionReplayAdapter != nil {
-		reader := bytes.NewReader(a.buffer.Bytes())
-		size := int64(a.buffer.Len())
-		err := storage.DefaultSessionReplayAdapter.SaveReplay(a.sessionID, reader, size)
-		if err != nil {
-			logger.L().Error("Failed to save replay to storage", zap.String("session_id", a.sessionID), zap.Error(err))
-			return a.saveToLocalFile()
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.closed {
+		return a.err
+	}
+	a.closed = true
+	defer a.file.Close()
+	if a.err != nil {
+		return a.err
+	}
+	if len(a.pending) > 0 {
+		event := [3]any{time.Since(a.ts).Seconds(), "o", strings.ToValidUTF8(string(a.pending), "\ufffd")}
+		bs, _ := json.Marshal(event)
+		if _, err := a.writer.Write(append(bs, '\r', '\n')); err != nil {
+			return err
 		}
-		return nil
 	}
-	return a.saveToLocalFile()
-}
-
-// saveToLocalFile saves to local filesystem (fallback solution)
-func (a *Asciinema) saveToLocalFile() error {
-	logger.L().Info("saveToLocalFile called", zap.String("session_id", a.sessionID))
-
-	// Use date hierarchy strategy for local files - directly under base_path
-	dateDir := a.ts.Format("2006-01-02")
-	replayDir := filepath.Join(config.Cfg.Session.ReplayDir, dateDir)
-
-	if err := os.MkdirAll(replayDir, 0755); err != nil {
-		logger.L().Error("create replay directory failed", zap.String("dir", replayDir), zap.Error(err))
-		return err
+	if a.err = a.writer.Flush(); a.err != nil {
+		return a.err
 	}
-
-	filePath := filepath.Join(replayDir, fmt.Sprintf("%s.cast", a.sessionID))
-	file, err := os.Create(filePath)
-	if err != nil {
-		logger.L().Error("create replay file failed", zap.String("path", filePath), zap.Error(err))
-		return err
+	if a.err = a.file.Sync(); a.err != nil {
+		return a.err
 	}
-	defer file.Close()
-
-	_, err = io.Copy(file, bytes.NewReader(a.buffer.Bytes()))
-	if err != nil {
-		logger.L().Error("write replay file failed", zap.String("path", filePath), zap.Error(err))
-		return err
+	if a.useStorage && storage.DefaultSessionReplayAdapter != nil {
+		if _, err := a.file.Seek(0, io.SeekStart); err != nil {
+			return err
+		}
+		stat, err := a.file.Stat()
+		if err != nil {
+			return err
+		}
+		if err := storage.DefaultSessionReplayAdapter.SaveReplayWithTimestamp(a.sessionID, a.file, stat.Size(), a.ts); err != nil {
+			logger.L().Error("upload session recording failed", zap.String("session_id", a.sessionID), zap.Error(err))
+		}
 	}
-
-	logger.L().Info("Replay saved to local file",
-		zap.String("session_id", a.sessionID),
-		zap.String("path", filePath))
-
 	return nil
 }
 

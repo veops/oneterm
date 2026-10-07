@@ -2,8 +2,9 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"regexp"
-	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/samber/lo"
@@ -12,24 +13,30 @@ import (
 	"github.com/veops/oneterm/internal/model"
 	"github.com/veops/oneterm/internal/repository"
 	gsession "github.com/veops/oneterm/internal/session"
+	dbpkg "github.com/veops/oneterm/pkg/db"
 	"github.com/veops/oneterm/pkg/logger"
 )
 
 // CommandAnalyzer handles command analysis for sessions
 type CommandAnalyzer struct {
 	authService IAuthorizationService
+	matcher     *AuthorizationMatcher
+	ctx         context.Context
 }
 
 // NewCommandAnalyzer creates a new command analyzer
 func NewCommandAnalyzer() *CommandAnalyzer {
 	return &CommandAnalyzer{
 		authService: DefaultAuthService,
+		matcher:     NewAuthorizationMatcher(repository.NewAuthorizationV2Repository(dbpkg.DB)).(*AuthorizationMatcher),
+		ctx:         context.Background(),
 	}
 }
 
 // AnalyzeSessionCommands analyzes and builds the final command list for a session
 // This combines asset-level and authorization-level command controls
 func (ca *CommandAnalyzer) AnalyzeSessionCommands(ctx *gin.Context, sess *gsession.Session) ([]*model.Command, error) {
+	ca.ctx = ctx.Request.Context()
 	// Get all available commands from cache
 	allCommands, err := repository.GetAllFromCacheDb(ctx, model.DefaultCommand)
 	if err != nil {
@@ -43,14 +50,16 @@ func (ca *CommandAnalyzer) AnalyzeSessionCommands(ctx *gin.Context, sess *gsessi
 	})
 
 	// Analyze asset-level command control
-	assetCommands := ca.analyzeAssetCommands(sess.Session.Asset, enabledCommands)
+	assetCommands, err := ca.analyzeAssetCommands(sess.Session.Asset, enabledCommands)
+	if err != nil {
+		return nil, err
+	}
 
 	// Analyze authorization-level command control
 	authCommands, err := ca.analyzeAuthorizationCommands(ctx, sess, enabledCommands)
 	if err != nil {
 		logger.L().Error("Failed to analyze authorization commands", zap.Error(err))
-		// Continue with asset-level commands only
-		authCommands = []*model.Command{}
+		return nil, err
 	}
 
 	// Merge and deduplicate command lists
@@ -62,10 +71,7 @@ func (ca *CommandAnalyzer) AnalyzeSessionCommands(ctx *gin.Context, sess *gsessi
 			if re, err := regexp.Compile(cmd.Cmd); err == nil {
 				cmd.Re = re
 			} else {
-				logger.L().Warn("Invalid regex pattern in command",
-					zap.String("cmd", cmd.Cmd),
-					zap.Int("id", cmd.Id),
-					zap.Error(err))
+				return nil, fmt.Errorf("invalid command rule %d: %w", cmd.Id, err)
 			}
 		}
 	}
@@ -80,7 +86,7 @@ func (ca *CommandAnalyzer) AnalyzeSessionCommands(ctx *gin.Context, sess *gsessi
 }
 
 // analyzeAssetCommands analyzes asset-level command controls from V2 system
-func (ca *CommandAnalyzer) analyzeAssetCommands(asset *model.Asset, allCommands []*model.Command) []*model.Command {
+func (ca *CommandAnalyzer) analyzeAssetCommands(asset *model.Asset, allCommands []*model.Command) ([]*model.Command, error) {
 	var result []*model.Command
 
 	// V2 asset command control
@@ -103,7 +109,10 @@ func (ca *CommandAnalyzer) analyzeAssetCommands(asset *model.Asset, allCommands 
 
 		// Process command template IDs
 		if len(asset.AssetCommandControl.TemplateIds) > 0 {
-			templateCommands := ca.expandCommandTemplates(asset.AssetCommandControl.TemplateIds, allCommands)
+			templateCommands, err := ca.expandCommandTemplates(asset.AssetCommandControl.TemplateIds, allCommands)
+			if err != nil {
+				return nil, err
+			}
 			v2Commands = append(v2Commands, templateCommands...)
 		}
 
@@ -115,7 +124,7 @@ func (ca *CommandAnalyzer) analyzeAssetCommands(asset *model.Asset, allCommands 
 			zap.Int("cmdCount", len(v2Commands)))
 	}
 
-	return lo.UniqBy(result, func(cmd *model.Command) int { return cmd.Id })
+	return lo.UniqBy(result, func(cmd *model.Command) int { return cmd.Id }), nil
 }
 
 // analyzeAuthorizationCommands analyzes authorization-level command controls from V2 rules
@@ -145,9 +154,15 @@ func (ca *CommandAnalyzer) analyzeAuthorizationCommands(ctx *gin.Context, sess *
 			continue
 		}
 
-		// Check if rule matches this session (simplified matching)
-		if ca.ruleMatchesSession(rule, sess) {
-			ruleCommands := ca.extractCommandsFromRule(rule, allCommands)
+		matched, err := ca.ruleMatchesSession(rule, sess)
+		if err != nil {
+			return nil, err
+		}
+		if matched {
+			ruleCommands, err := ca.extractCommandsFromRule(rule, allCommands)
+			if err != nil {
+				return nil, err
+			}
 			result = append(result, ruleCommands...)
 		}
 	}
@@ -155,42 +170,31 @@ func (ca *CommandAnalyzer) analyzeAuthorizationCommands(ctx *gin.Context, sess *
 	return lo.UniqBy(result, func(cmd *model.Command) int { return cmd.Id }), nil
 }
 
-// ruleMatchesSession checks if a V2 rule matches the current session (simplified)
-func (ca *CommandAnalyzer) ruleMatchesSession(rule *model.AuthorizationV2, sess *gsession.Session) bool {
-	// Quick check for asset selector
-	if rule.AssetSelector.Type == model.SelectorTypeIds {
-		assetIds := lo.FilterMap(rule.AssetSelector.Values, func(v string, _ int) (int, bool) {
-			if id, err := strconv.Atoi(v); err == nil {
-				return id, true
-			}
-			return 0, false
-		})
-		if !lo.Contains(assetIds, sess.AssetId) {
-			return false
-		}
-	} else if rule.AssetSelector.Type != model.SelectorTypeAll {
-		// For regex/tags selectors, we'd need more complex matching
-		// For now, assume they match (could be optimized later)
+func (ca *CommandAnalyzer) ruleMatchesSession(rule *model.AuthorizationV2, sess *gsession.Session) (bool, error) {
+	if !rule.IsValid(time.Now()) {
+		return false, nil
 	}
-
-	// Quick check for account selector
-	if rule.AccountSelector.Type == model.SelectorTypeIds {
-		accountIds := lo.FilterMap(rule.AccountSelector.Values, func(v string, _ int) (int, bool) {
-			if id, err := strconv.Atoi(v); err == nil {
-				return id, true
+	selectors := []model.TargetSelector{rule.NodeSelector, rule.AssetSelector, rule.AccountSelector}
+	types := []string{"node", "asset", "account"}
+	ids := []int{sess.Asset.ParentId, sess.AssetId, sess.AccountId}
+	for i, selector := range selectors {
+		if selector.Type == model.SelectorTypeRegex {
+			for _, pattern := range selector.Values {
+				if _, err := regexp.Compile(pattern); err != nil {
+					return false, err
+				}
 			}
-			return 0, false
-		})
-		if !lo.Contains(accountIds, sess.AccountId) {
-			return false
+		}
+		matched, err := ca.matcher.matchSelectorChecked(ca.ctx, selector, types[i], ids[i])
+		if err != nil || !matched {
+			return false, err
 		}
 	}
-
-	return true
+	return true, nil
 }
 
 // extractCommandsFromRule extracts commands from a V2 authorization rule
-func (ca *CommandAnalyzer) extractCommandsFromRule(rule *model.AuthorizationV2, allCommands []*model.Command) []*model.Command {
+func (ca *CommandAnalyzer) extractCommandsFromRule(rule *model.AuthorizationV2, allCommands []*model.Command) ([]*model.Command, error) {
 	var result []*model.Command
 
 	// Process direct command IDs
@@ -209,45 +213,36 @@ func (ca *CommandAnalyzer) extractCommandsFromRule(rule *model.AuthorizationV2, 
 
 	// Process command template IDs
 	if len(rule.AccessControl.TemplateIds) > 0 {
-		templateCommands := ca.expandCommandTemplates(rule.AccessControl.TemplateIds, allCommands)
+		templateCommands, err := ca.expandCommandTemplates(rule.AccessControl.TemplateIds, allCommands)
+		if err != nil {
+			return nil, err
+		}
 		result = append(result, templateCommands...)
 	}
 
 	// All configured commands are intercepted
-	return result
+	return result, nil
 }
 
 // expandCommandTemplates expands command template IDs to actual commands
-func (ca *CommandAnalyzer) expandCommandTemplates(templateIds []int, allCommands []*model.Command) []*model.Command {
-	// Get command templates from database
-	commandTemplateService := NewCommandTemplateService()
-	ctx := context.Background()
-
-	var expandedCommands []*model.Command
-
-	for _, templateId := range templateIds {
-		template, err := commandTemplateService.GetCommandTemplate(ctx, templateId)
-		if err != nil {
-			logger.L().Warn("Failed to get command template",
-				zap.Int("templateId", templateId),
-				zap.Error(err))
-			continue
-		}
-
-		if template == nil {
-			continue
-		}
-
-		// Get commands from template
-		templateCmdIds := lo.Map(template.CmdIds, func(id int, _ int) int { return id })
-		templateCommands := lo.Filter(allCommands, func(cmd *model.Command, _ int) bool {
-			return lo.Contains(templateCmdIds, cmd.Id)
-		})
-
-		expandedCommands = append(expandedCommands, templateCommands...)
+func (ca *CommandAnalyzer) expandCommandTemplates(ids []int, commands []*model.Command) ([]*model.Command, error) {
+	ctx, cancel := context.WithTimeout(ca.ctx, 5*time.Second)
+	defer cancel()
+	var templates []*model.CommandTemplate
+	ids = lo.Uniq(ids)
+	if err := dbpkg.DB.WithContext(ctx).Where("id IN ?", ids).Find(&templates).Error; err != nil {
+		return nil, err
 	}
-
-	return expandedCommands
+	if len(templates) != len(ids) {
+		return nil, fmt.Errorf("command template is unavailable")
+	}
+	selected := make(map[int]struct{})
+	for _, template := range templates {
+		for _, id := range template.CmdIds {
+			selected[id] = struct{}{}
+		}
+	}
+	return lo.Filter(commands, func(command *model.Command, _ int) bool { _, ok := selected[command.Id]; return ok }), nil
 }
 
 // mergeCommands merges and deduplicates command lists

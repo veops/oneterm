@@ -2,9 +2,11 @@ package session
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/samber/lo"
 	"github.com/veops/go-ansiterm"
@@ -67,11 +69,60 @@ type Parser struct {
 	lastRes      string
 	curRes       string
 	mu           *sync.Mutex
+	line         lineInput
+	commands     chan *model.SessionCmd
+	written      chan struct{}
+	closed       bool
 }
 
 func (p *Parser) AddInput(bs []byte) (cmd string, forbidden bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	if p.closed {
+		return "Session is closed", true
+	}
+	if strings.HasPrefix(p.Protocol, "ssh") {
+		if p.isPrompt {
+			if output := p.getOutputLocked(); output != "" {
+				p.prompt = output
+			}
+			p.WriteDb()
+			p.lastCmd, p.lastRes, p.isPrompt = "", "", false
+		}
+		commands := p.line.feed(bs)
+		if p.line.overflow && len(p.Cmds) > 0 {
+			p.line = lineInput{}
+			p.resetLocked()
+			return "Command is too long", true
+		}
+		for i, command := range commands {
+			if p.line.remote {
+				command = strings.TrimSpace(strings.TrimPrefix(p.getOutputLocked(), p.prompt))
+				if command == "" && len(p.Cmds) > 0 {
+					p.line = lineInput{}
+					p.resetLocked()
+					p.isPrompt = true
+					return "Command could not be verified", true
+				}
+			}
+			if filter, forbidden := p.IsForbidden(command); forbidden {
+				p.line = lineInput{}
+				p.resetLocked()
+				p.isPrompt = true
+				return filter, true
+			}
+			commands[i] = command
+		}
+		for _, command := range commands {
+			if p.lastCmd != "" {
+				p.WriteDb()
+			}
+			p.lastCmd, p.isPrompt = command, true
+			p.line.remote = false
+			p.resetLocked()
+		}
+		return "", false
+	}
 
 	if p.isPrompt && !p.isEdit {
 		//TODO: may someone has empty ps1?
@@ -115,7 +166,14 @@ func (p *Parser) IsForbidden(cmd string) (string, bool) {
 	}
 	for _, c := range p.Cmds {
 		if c.IsRe {
-			if c.Re.MatchString(cmd) {
+			if c.Re == nil {
+				return "Invalid command rule", true
+			}
+			matched := c.Re.MatchString(cmd)
+			for _, line := range strings.Split(cmd, "\n") {
+				matched = matched || c.Re.MatchString(line)
+			}
+			if matched {
 				return fmt.Sprintf("Regex: %s", c.Cmd), true
 			}
 		} else {
@@ -136,21 +194,39 @@ func (p *Parser) WriteDb() {
 		Cmd:       p.lastCmd,
 		Result:    p.lastRes,
 	}
-	err := dbpkg.DB.Model(m).Create(m).Error
-	if err != nil {
-		logger.L().Error("write session cmd failed", zap.Error(err), zap.Any("cmd", *m))
+	if p.commands == nil {
+		p.commands, p.written = make(chan *model.SessionCmd, 32), make(chan struct{})
+		go func() {
+			defer close(p.written)
+			for command := range p.commands {
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				if err := dbpkg.DB.WithContext(ctx).Create(command).Error; err != nil {
+					logger.L().Error("write session cmd failed", zap.Error(err))
+				}
+				cancel()
+			}
+		}()
 	}
+	p.commands <- m
 }
 
 func (p *Parser) Close(prompt string) {
 	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	if prompt == "" {
-		prompt = p.prompt
+	if p.closed {
+		p.mu.Unlock()
+		return
 	}
-	p.AddOutputLocked([]byte("\r\n" + prompt))
-	p.AddInputLocked([]byte("\r"))
+	p.closed = true
+	p.getOutputLocked()
+	p.WriteDb()
+	if p.commands != nil {
+		close(p.commands)
+	}
+	written := p.written
+	p.mu.Unlock()
+	if written != nil {
+		<-written
+	}
 }
 
 func (p *Parser) AddOutput(bs []byte) {
@@ -161,7 +237,11 @@ func (p *Parser) AddOutput(bs []byte) {
 }
 
 func (p *Parser) AddOutputLocked(bs []byte) {
-	p.Output = append(p.Output, bs...)
+	if !strings.HasPrefix(p.Protocol, "ssh") {
+		p.Output = append(p.Output, bs...)
+		return
+	}
+	p.OutputStream.Feed(bs)
 }
 
 func (p *Parser) AddInputLocked(bs []byte) {
@@ -223,7 +303,10 @@ func (p *Parser) getOutputLocked() string {
 		cleanOutput = p.Output
 	}
 
-	p.OutputStream.Feed(cleanOutput)
+	if len(cleanOutput) > 0 {
+		p.OutputStream.Feed(cleanOutput)
+		p.Output = nil
+	}
 
 	res := p.OutputStream.Listener.Display()
 	res = lo.DropRightWhile(res, func(item string) bool { return item == "" })
@@ -320,7 +403,10 @@ func (p *Parser) removeAutoCompletionFromRawOutput(rawOutput []byte) []byte {
 func (p *Parser) State(b []byte) bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	return p.stateLocked(b)
+}
 
+func (p *Parser) stateLocked(b []byte) bool {
 	if !p.isEdit && IsEditEnterMode(b) {
 		if !isNewScreen(b) {
 			p.isEdit = true

@@ -1,10 +1,12 @@
 package protocols
 
 import (
-	"bufio"
+	"errors"
 	"fmt"
+	"io"
+	"net"
+	"strconv"
 	"time"
-	"unicode/utf8"
 
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/cast"
@@ -16,126 +18,124 @@ import (
 	gsession "github.com/veops/oneterm/internal/session"
 	"github.com/veops/oneterm/internal/tunneling"
 	"github.com/veops/oneterm/pkg/logger"
+	"github.com/veops/oneterm/pkg/sshclient"
 )
 
-// ConnectSsh connects to SSH server
 func ConnectSsh(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, account *model.Account, gateway *model.Gateway) (err error) {
-	w, h := cast.ToInt(ctx.Query("w")), cast.ToInt(ctx.Query("h"))
 	chs := sess.Chans
 	defer func() {
 		if err != nil {
-			chs.ErrChan <- err
+			select {
+			case chs.ErrChan <- err:
+			default:
+			}
+			sess.Stop()
+			sess.ClearSSHClient()
+			tunneling.CloseTunnels(sess.SessionId)
 		}
 	}()
-
-	ip, port, err := tunneling.Proxy(false, sess.SessionId, "ssh", asset, gateway)
+	host, port, err := tunneling.Target(sess.Protocol, asset)
 	if err != nil {
-		return
+		return err
 	}
-
+	identity := net.JoinHostPort(host, strconv.Itoa(port))
+	ip, port, err := tunneling.Proxy(false, sess.SessionId, sess.Protocol, asset, gateway)
+	if err != nil {
+		return err
+	}
 	auth, err := repository.GetAuth(account)
 	if err != nil {
-		return
+		return err
 	}
-
-	sshCli, err := gossh.Dial("tcp", fmt.Sprintf("%s:%d", ip, port), &gossh.ClientConfig{
-		User:            account.Account,
-		Auth:            []gossh.AuthMethod{auth},
-		HostKeyCallback: gossh.InsecureIgnoreHostKey(),
-		Timeout:         time.Second,
-	})
+	client, err := sshclient.Dial(sess.Gctx, net.JoinHostPort(ip, strconv.Itoa(port)), &gossh.ClientConfig{
+		User: account.Account, Auth: []gossh.AuthMethod{auth}, HostKeyCallback: sshclient.HostKey(identity), Timeout: 10 * time.Second})
 	if err != nil {
-		logger.L().Error("ssh dial failed", zap.Error(err))
-		return
+		return err
 	}
-
-	// CRITICAL: Store SSH client in session for file transfer reuse
-	sess.SetSSHClient(sshCli)
-	sess.SetPAMTransportClose(func() { sshCli.Close() })
-	logger.L().Info("SSH client stored in session for reuse", zap.String("sessionId", sess.SessionId))
-
-	sshSess, err := sshCli.NewSession()
+	sess.SetSSHClient(client)
+	sess.SetPAMTransportClose(func() { client.Close() })
+	sshSession, err := client.NewSession()
 	if err != nil {
-		logger.L().Error("ssh session create failed", zap.Error(err))
-		return
+		return err
 	}
-	defer sshSess.Close()
-
-	sshSess.Stdin = chs.Rin
-	sshSess.Stdout = chs.Wout
-	sshSess.Stderr = chs.Wout
-
-	modes := gossh.TerminalModes{
-		gossh.ECHO:          1,
-		gossh.TTY_OP_ISPEED: 14400,
-		gossh.TTY_OP_OSPEED: 14400,
+	if sess.Gctx.Err() != nil {
+		sshSession.Close()
+		return sess.Gctx.Err()
 	}
-	if err = sshSess.RequestPty("xterm", h, w, modes); err != nil {
-		logger.L().Error("ssh request pty failed", zap.Error(err))
-		return
+	sshSession.Stdin, sshSession.Stdout, sshSession.Stderr = chs.Rin, chs.Wout, chs.Wout
+	w, h := cast.ToInt(ctx.Query("w")), cast.ToInt(ctx.Query("h"))
+	if w <= 0 || w > 1000 {
+		w = 80
 	}
-	if err = sshSess.Shell(); err != nil {
-		logger.L().Error("ssh start shell failed", zap.Error(err))
-		return
+	if h <= 0 || h > 500 {
+		h = 24
 	}
-
+	if err = sshSession.RequestPty("xterm-256color", h, w, gossh.TerminalModes{gossh.ECHO: 1}); err != nil {
+		sshSession.Close()
+		return err
+	}
+	if err = sshSession.Shell(); err != nil {
+		sshSession.Close()
+		return err
+	}
+	outputDone := make(chan struct{})
 	sess.G.Go(func() error {
-		err = sshSess.Wait()
-		// Always close AwayChan when SSH session ends
-		sess.Once.Do(func() { close(chs.AwayChan) })
-		if err != nil {
-			return fmt.Errorf("ssh session wait end with error: %w", err)
-		}
-		return nil
-	})
-
-	chs.ErrChan <- err
-
-	sess.G.Go(func() error {
-		buf := bufio.NewReader(chs.Rout)
+		defer close(outputDone)
 		for {
-			select {
-			case <-sess.Gctx.Done():
+			p := make([]byte, 32768)
+			n, err := chs.Rout.Read(p)
+			if n > 0 && !chs.SendOutput(sess.Gctx, p[:n]) {
 				return nil
-			default:
-				rn, size, err := buf.ReadRune()
-				if err != nil {
-					return err
-				}
-				if size <= 0 || rn == utf8.RuneError {
-					continue
-				}
-				p := make([]byte, utf8.RuneLen(rn))
-				utf8.EncodeRune(p, rn)
-				if !chs.SendOutput(sess.Gctx, p) {
+			}
+			if err != nil {
+				if errors.Is(err, io.EOF) || sess.Gctx.Err() != nil {
 					return nil
 				}
+				return err
 			}
 		}
 	})
 	sess.G.Go(func() error {
-		defer sshSess.Close()
-		defer sess.Chans.Rout.Close()
-		defer sess.Chans.Win.Close()
+		defer sshSession.Close()
 		for {
 			select {
 			case <-sess.Gctx.Done():
 				return nil
 			case <-chs.AwayChan:
-				// Normal termination - return sentinel error
-				return ErrSessionClosed
-			case window := <-chs.WindowChan:
-				if err := sshSess.WindowChange(window.Height, window.Width); err != nil {
-					logger.L().Warn("reset window size failed", zap.Error(err))
+				return nil
+			case window, open := <-chs.WindowChan:
+				if !open {
+					return nil
+				}
+				if err := sshSession.WindowChange(window.Height, window.Width); err != nil {
+					logger.L().Debug("SSH window change failed", zap.Error(err))
 					continue
 				}
-				sess.SshRecoder.Resize(window.Width, window.Height)
-				sess.SshParser.Resize(window.Width, window.Height)
+				if sess.SshRecoder != nil {
+					sess.SshRecoder.Resize(window.Width, window.Height)
+				}
+				if sess.SshParser != nil {
+					sess.SshParser.Resize(window.Width, window.Height)
+				}
 			}
 		}
 	})
-
-	sess.G.Wait()
-
-	return
+	sess.G.Go(func() error {
+		err := sshSession.Wait()
+		chs.Wout.Close()
+		select {
+		case <-outputDone:
+		case <-sess.Gctx.Done():
+		}
+		sess.Once.Do(func() { close(chs.AwayChan) })
+		if err != nil && sess.Gctx.Err() == nil {
+			return fmt.Errorf("SSH session ended: %w", err)
+		}
+		return nil
+	})
+	select {
+	case chs.ErrChan <- nil:
+	case <-sess.Gctx.Done():
+	}
+	return nil
 }

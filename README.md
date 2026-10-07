@@ -157,7 +157,7 @@ cd oneterm/deploy
 For complete setup instructions, troubleshooting, and development workflows:
 - **[Development Environment Setup Guide](deploy/DEV_README.md)**
 
-**Requirements**: Docker, Node.js 14.17.6+, Go 1.21.3+
+**Requirements**: Docker, Node.js 14.17.6+, Go 1.26+ (project toolchain: 1.26.8)
 
 ## Contributing
 We welcome all developers to contribute code and improve and extend this project. Please read our [Contribution Guide](CONTRIBUTING.md) first. Additionally, you can support Veops open source through social media, events, and sharing.

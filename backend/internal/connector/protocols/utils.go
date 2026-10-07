@@ -3,12 +3,13 @@ package protocols
 import (
 	"errors"
 	"fmt"
-	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gliderlabs/ssh"
 	"github.com/gorilla/websocket"
 	"github.com/nicksnyder/go-i18n/v2/i18n"
 	"github.com/samber/lo"
@@ -32,17 +33,44 @@ var (
 		HandshakeTimeout: time.Minute,
 		ReadBufferSize:   4096,
 		WriteBufferSize:  4096,
-		CheckOrigin: func(r *http.Request) bool {
-			return true
-		},
 	}
-
-	wsWriteMutex = &sync.Mutex{}
 )
+
+func TerminalMessage(data []byte) ([]byte, ssh.Window) {
+	if len(data) == 0 {
+		return nil, ssh.Window{}
+	}
+	switch data[0] {
+	case '1':
+		return data[1:], ssh.Window{}
+	case 'w':
+		parts := strings.Split(string(data[1:]), ",")
+		if len(parts) != 2 {
+			break
+		}
+		w, werr := strconv.Atoi(parts[0])
+		h, herr := strconv.Atoi(parts[1])
+		if werr == nil && herr == nil && w > 0 && h > 0 && w <= 1000 && h <= 500 {
+			return nil, ssh.Window{Width: w, Height: h}
+		}
+	}
+	return nil, ssh.Window{}
+}
 
 // WriteToMonitors sends data to all monitoring sessions
 func WriteToMonitors(monitors *sync.Map, out []byte) {
+	if len(out) == 0 {
+		return
+	}
+	var snapshot []byte
 	monitors.Range(func(k, v any) bool {
+		if monitor, ok := v.(*Monitor); ok {
+			if snapshot == nil {
+				snapshot = append([]byte(nil), out...)
+			}
+			monitor.Write(snapshot)
+			return true
+		}
 		ws, ok := v.(*websocket.Conn)
 		if ok && ws != nil {
 			ws.WriteMessage(websocket.TextMessage, out)
@@ -95,18 +123,21 @@ func HandleError(ctx *gin.Context, sess *gsession.Session, err error, ws *websoc
 		if sess == nil || sess.Chans == nil {
 			return
 		}
-		ch := sess.Chans.AwayChan
 		if chs != nil {
-			ch = chs.AwayChan
+			chs.CloseAway()
+			return
 		}
 
 		sess.Once.Do(func() {
 			logger.L().Debug("Closing AwayChan from HandleError",
 				zap.String("sessionId", sess.SessionId))
-			close(ch)
+			close(sess.Chans.AwayChan)
 		})
 	}()
 
+	if chs != nil {
+		return
+	}
 	if err == nil {
 		return
 	}
@@ -136,13 +167,11 @@ func WriteErrMsg(sess *gsession.Session, msg string) {
 // skipRecording: If true, it will skip recording to avoid duplicate recordings of manually recorded content
 func Write(sess *gsession.Session, skipRecording ...bool) (err error) {
 	chs := sess.Chans
-	out := chs.OutBuf.Bytes()
+	out := chs.OutBuf.Drain()
 
 	if sess.SessionType == model.SESSIONTYPE_WEB && sess.Ws != nil {
 		if len(out) > 0 || sess.IsGuacd() {
-			wsWriteMutex.Lock()
-			defer wsWriteMutex.Unlock()
-			err = sess.Ws.WriteMessage(websocket.TextMessage, out)
+			err = sess.WriteTerminal(out)
 		}
 	} else if sess.SessionType == model.SESSIONTYPE_CLIENT && len(out) > 0 {
 		_, err = sess.CliRw.Write(out)
@@ -155,7 +184,6 @@ func Write(sess *gsession.Session, skipRecording ...bool) (err error) {
 	}
 
 	WriteToMonitors(sess.Monitors, out)
-	chs.OutBuf.Reset()
 
 	return
 }
@@ -197,6 +225,9 @@ func Read(sess *gsession.Session) error {
 			case <-sess.Chans.AwayChan:
 				return nil
 			case err := <-errChan:
+				if sess.Gctx.Err() != nil {
+					return nil
+				}
 				return err
 			case p := <-readChan:
 				select {
@@ -220,8 +251,13 @@ func Read(sess *gsession.Session) error {
 			return nil
 		default:
 			if sess.SessionType == model.SESSIONTYPE_WEB {
+				sess.Ws.SetReadLimit(1024 * 1024)
+				sess.Ws.SetReadDeadline(time.Now().Add(max(2*time.Minute, gsession.IdleTimeout())))
 				t, msg, err := sess.Ws.ReadMessage()
 				if err != nil {
+					if sess.Gctx.Err() != nil {
+						return nil
+					}
 					return err
 				}
 				if len(msg) <= 0 {
@@ -229,9 +265,16 @@ func Read(sess *gsession.Session) error {
 				}
 				switch t {
 				case websocket.TextMessage:
-					chs.InChan <- msg
-					if msg[0] != '9' && ((sess.IsGuacd() && len(msg) > 0) || (!sess.IsGuacd() && IsActive(msg))) {
-						sess.SetIdle() // TODO: performance issue
+					select {
+					case chs.InChan <- msg:
+					case <-sess.Gctx.Done():
+						return nil
+					case <-chs.AwayChan:
+						return nil
+					}
+					input, window := TerminalMessage(msg)
+					if msg[0] != '9' && (sess.IsGuacd() || len(input) > 0 || window.Width > 0) {
+						sess.SetIdle()
 					}
 				}
 			}
@@ -289,6 +332,10 @@ func OfflineSession(ctx *gin.Context, sessionId string, closer string) {
 		}
 	}
 	session.Monitors.Range(func(key, value any) bool {
+		if monitor, ok := value.(*Monitor); ok {
+			monitor.Close()
+			return true
+		}
 		ws, ok := value.(*websocket.Conn)
 		if ok && ws != nil {
 			lang := ctx.PostForm("lang")

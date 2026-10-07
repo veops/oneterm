@@ -21,7 +21,7 @@ This guide helps developers quickly set up OneTerm's development environment for
 ### Prerequisites
 - Docker & Docker Compose
 - Node.js 14.17.6+ (for frontend development)
-- Go 1.21.3+ (for backend development)
+- Go 1.26+ (for backend development; project toolchain: 1.26.8)
 - Git
 
 ### 1. Clone the Project

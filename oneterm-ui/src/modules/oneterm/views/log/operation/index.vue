@@ -463,7 +463,7 @@ export default {
         type: 'xlsx',
         types: ['xlsx', 'csv', 'html', 'xml', 'txt'],
         isFooter: false,
-        columnFilterMethod: function(column) {
+        columnFilterMethod: function(column, $columnIndex) {
           return ['created_at', 'creator_id', 'action_type', 'type'].includes(column.column.field)
         },
       })

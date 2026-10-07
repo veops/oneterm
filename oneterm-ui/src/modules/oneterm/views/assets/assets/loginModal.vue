@@ -154,4 +154,37 @@ export default {
 }
 </script>
 
-<style></style>
+<style lang="less" scoped>
+.asset-login-modal {
+  /deep/ .ant-checkbox-wrapper {
+    margin-left: 0px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+  }
+
+  .asset-login-account {
+    /deep/ .ant-form-item-control {
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    /deep/ .ant-radio-wrapper {
+      display: flex;
+      align-items: center;
+    }
+
+    .asset-login-account-choice {
+      max-width: 300px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-wrap: nowrap;
+      display: inline-block;
+
+      &:not(:first-child) {
+        margin-top: 8px;
+      }
+    }
+  }
+}
+</style>

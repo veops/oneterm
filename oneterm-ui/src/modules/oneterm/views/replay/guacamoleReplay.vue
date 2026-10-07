@@ -94,7 +94,7 @@ export default {
   methods: {
     init() {
       const { session_id } = this.$route.params
-      const baseUrl = process.env.VUE_APP_API_BASE_URL || '/api'
+      const baseUrl = '/api'
       const RECORDING_URL = `${baseUrl}/oneterm/v1/session/replay/${session_id}`
       const tunnel = new Guacamole.StaticHTTPTunnel(RECORDING_URL)
       tunnel.onstatechange = this.onTunnelStateChange
@@ -143,7 +143,7 @@ export default {
     },
     handlePlayPause() {
       if (this.percent === this.max) {
-        // replay
+        // 重播
         this.percent = 0
         this.recording.seek(0, () => {
           this.recording.play()
@@ -156,7 +156,7 @@ export default {
       } else {
         this.recording.pause()
         this.stopSpeedUp()
-        this.$message.info(this.$t('oneterm.guacamole.pause'))
+        this.$message.info('暂停')
       }
     },
     startSpeedUp() {

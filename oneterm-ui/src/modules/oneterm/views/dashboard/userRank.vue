@@ -111,11 +111,13 @@ export default {
       text-overflow: ellipsis;
       max-width: 100%;
     }
+
     .user-rank-box-time {
       color: #98a9bc;
       font-weight: 400;
       font-size: 14px;
     }
+
     .user-rank-box-count {
       margin-left: auto;
       flex-shrink: 0;

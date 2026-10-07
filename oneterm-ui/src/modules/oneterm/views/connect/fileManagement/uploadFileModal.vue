@@ -257,7 +257,7 @@ export default {
         }
       }
 
-      const baseUrl = process.env.VUE_APP_API_BASE_URL || '/api'
+      const baseUrl = '/api'
       let postURL = `${baseUrl}/oneterm/v1/file/session/${this.sessionId}/upload?dir=${file.path}&transfer_id=${file.id}`
 
       if (this.connectType === 'rdp') {

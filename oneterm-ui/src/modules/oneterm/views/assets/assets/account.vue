@@ -266,10 +266,8 @@ export default {
         this.authList.splice(index, 1)
       }
     },
-
     getValues() {
       const authorization = {}
-
       const authList = _.cloneDeep(this.authList)
       if (this.hasWebProtocol) {
         authList.forEach((auth) => {
@@ -292,8 +290,7 @@ export default {
         })
       return { authorization }
     },
-
-    setValues({ authorization = {} }) {
+    setValues({ authorization }) {
       const authorizationList = Object.entries(authorization || {})
       if (authorizationList.length) {
         this.authList = authorizationList.map(([key, value]) => {

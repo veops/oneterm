@@ -1,22 +1,13 @@
 <template>
   <div
-    :class="[
-      'oneterm-terminal-container',
-      mode === 'FullScreen' ? 'oneterm-terminal-full' : 'oneterm-terminal-panel'
-    ]"
+    :class="['oneterm-terminal-container', mode === 'FullScreen' ? 'oneterm-terminal-full' : 'oneterm-terminal-panel']"
     :style="{
-      backgroundColor: terminalBackground
+      backgroundColor: terminalBackground,
     }"
   >
-    <div
-      class="oneterm-terminal-wrap"
-      ref="onetermTerminalRef"
-    ></div>
+    <div class="oneterm-terminal-wrap" ref="onetermTerminalRef"></div>
 
-    <CommandDrawer
-      ref="commandDrawerRef"
-      @write="writeCommand"
-    />
+    <CommandDrawer ref="commandDrawerRef" @write="writeCommand" />
 
     <FileManagementDrawer
       ref="fileManagementDrawerRef"
@@ -46,37 +37,37 @@ export default {
   name: 'Terminal',
   components: {
     CommandDrawer,
-    FileManagementDrawer
+    FileManagementDrawer,
   },
   props: {
     mode: {
       type: String,
-      default: 'FullScreen' // FullScreen | Asset | WebSSH
+      default: 'FullScreen', // FullScreen | Asset | WebSSH
     },
     assetId: {
       type: [String, Number],
-      default: ''
+      default: '',
     },
     accountId: {
       type: [String, Number],
-      default: ''
+      default: '',
     },
     protocol: {
       type: String,
-      default: ''
+      default: '',
     },
     shareId: {
       type: String,
-      default: ''
+      default: '',
     },
     preferenceSetting: {
       type: [Object, null],
-      default: null
+      default: null,
     },
     assetPermissions: {
       type: Object,
-      default: () => {}
-    }
+      default: () => {},
+    },
   },
   data() {
     return {
@@ -88,6 +79,15 @@ export default {
       sessionId: '',
 
       resizeObserver: null, // terminal container size observer
+      resizeHandler: null,
+      stdinEnabled: false,
+      socketClosed: false,
+      receivedOutput: false,
+      terminalDestroyed: false,
+      flowRequested: false,
+      flowControl: false,
+      flowReceived: 0,
+      flowAckAt: 0,
     }
   },
   computed: {
@@ -103,28 +103,30 @@ export default {
         accountId: this.accountId || account_id,
         protocol: this.protocol || protocol,
         isMonitor: is_monitor,
-        sessionId: this.sessionId || session_id
+        sessionId: this.sessionId || session_id,
       }
-    }
+    },
   },
   async mounted() {
     const { is_monitor } = this.$route.query
     const initMessage = localStorage.getItem(initMessageStorageKey)
 
     if (initMessage) {
-      const { timestamp, data } = JSON.parse(initMessage) || {}
-      if (
-        timestamp &&
-        data &&
-        new Date().getTime() - timestamp < 1000 * 30
-      ) {
-        this.initMessage = data
+      try {
+        const { timestamp, data } = JSON.parse(initMessage) || {}
+        if (timestamp && Array.isArray(data) && Date.now() - timestamp < 1000 * 30) {
+          this.initMessage = data
+        }
+      } catch (error) {
+        this.initMessage = []
       }
-
       localStorage.removeItem(initMessageStorageKey)
     }
 
     await this.initTerm({ disableStdin: !!is_monitor })
+    if (this.terminalDestroyed) {
+      return
+    }
     this.initWebsocket()
 
     if (!is_monitor) {
@@ -132,29 +134,14 @@ export default {
     }
   },
   beforeDestroy() {
-    if (this.resizeObserver) {
-      this.resizeObserver.disconnect()
-    }
-
-    if (this.websocket) {
-      this.websocket.close()
-      this.webSocket = null
-    }
-
-    if (this.fitAddon) {
-      this.fitAddon.dispose()
-    }
-
+    this.terminalDestroyed = true
+    this.socketClosed = true
+    this.cleanupSocket()
     if (this.term) {
       this.term.dispose()
       this.term = null
+      this.fitAddon = null
     }
-
-    if (this.interval) {
-      clearInterval(this.interval)
-      this.interval = null
-    }
-
     if (!this.$route?.query?.is_monitor) {
       window.removeEventListener('beforeunload', pageBeforeUnload)
     }
@@ -167,10 +154,11 @@ export default {
           this.updateTermDisplay(preferenceSetting)
         }
       },
-    }
+    },
   },
   methods: {
     async initTerm({ disableStdin = false }) {
+      this.stdinEnabled = !disableStdin
       this.fitAddon = new FitAddon()
       const preferenceSetting = this.preferenceSetting || {}
 
@@ -179,14 +167,17 @@ export default {
 
       this.term = new Terminal({
         fontSize: preferenceSetting?.font_size || defaultPreferenceSetting.font_size,
-        fontFamily: preferenceSetting?.font_family === 'default' || !preferenceSetting?.font_family ? 'Consolas, courier-new, courier, monospace' : preferenceSetting.font_family,
+        fontFamily:
+          preferenceSetting?.font_family === 'default' || !preferenceSetting?.font_family
+            ? 'Consolas, courier-new, courier, monospace'
+            : preferenceSetting.font_family,
         cursorStyle: preferenceSetting?.cursor_style || defaultPreferenceSetting.cursor_style,
         letterSpacing: preferenceSetting?.letter_spacing || defaultPreferenceSetting.letter_spacing,
         lineHeight: preferenceSetting?.line_height || defaultPreferenceSetting.line_height,
         cursorBlink: !disableStdin,
         allowProposedApi: true,
-        disableStdin: disableStdin,
-        theme: themeObj
+        disableStdin: true,
+        theme: themeObj,
       })
 
       this.term.loadAddon(this.fitAddon)
@@ -204,16 +195,12 @@ export default {
 
       if (!disableStdin) {
         this.term.onData((data) => {
-          if (this.websocket) {
-            this.websocket.send(`1${data}`)
-          }
+          this.sendInput(data)
         })
       }
 
       this.term.onResize((size) => {
-        if (this.websocket) {
-          this.websocket.send(`w${size.cols},${size.rows}`)
-        }
+        this.sendSocket(`w${size.cols},${size.rows}`)
       })
 
       this.fitAddon.fit()
@@ -228,7 +215,10 @@ export default {
       const options = this.term.options
 
       options.fontSize = preferenceSetting?.font_size || defaultPreferenceSetting.font_size
-      options.fontFamily = preferenceSetting?.font_family === 'default' || !preferenceSetting?.font_family ? 'Consolas, courier-new, courier, monospace' : preferenceSetting.font_family
+      options.fontFamily =
+        preferenceSetting?.font_family === 'default' || !preferenceSetting?.font_family
+          ? 'Consolas, courier-new, courier, monospace'
+          : preferenceSetting.font_family
       options.cursorStyle = preferenceSetting?.cursor_style || defaultPreferenceSetting.cursor_style
       options.letterSpacing = preferenceSetting?.letter_spacing || defaultPreferenceSetting.letter_spacing
       options.lineHeight = preferenceSetting?.line_height || defaultPreferenceSetting.line_height
@@ -243,26 +233,26 @@ export default {
     },
 
     initWebsocket() {
-      const {
-        assetId,
-        accountId,
-        isMonitor,
-        sessionId,
-        protocol: queryProtocol
-      } = this.connectData
+      if (!this.term || this.terminalDestroyed) {
+        return
+      }
+      this.cleanupSocket()
+      this.socketClosed = false
+      this.receivedOutput = false
+      const { assetId, accountId, isMonitor, sessionId, protocol: queryProtocol } = this.connectData
 
       const protocol = document.location.protocol.startsWith('https') ? 'wss' : 'ws'
 
       let socketLink = ''
       if (this.mode === 'WebSSH') {
-        socketLink = `${protocol}://${document.location.host}/api/oneterm/v1/connect/webssh`
-      // audit page (online session, offline session)
+        socketLink = `${protocol}://${document.location.host}/api/oneterm/v1/connect/webssh?w=${this.term.cols}&h=${this.term.rows}`
+        // audit page (online session, offline session)
       } else if (isMonitor) {
         socketLink = `${protocol}://${document.location.host}/api/oneterm/v1/connect/monitor/${sessionId}?w=${this.term.cols}&h=${this.term.rows}`
-      // share page (temporary link)
+        // share page (temporary link)
       } else if (this.shareId) {
         socketLink = `${protocol}://${document.location.host}/api/oneterm/v1/share/connect/${this.shareId}?w=${this.term.cols}&h=${this.term.rows}`
-      // work station
+        // work station
       } else {
         const sessionId = uuidv4()
         this.sessionId = sessionId
@@ -273,54 +263,143 @@ export default {
         return
       }
 
-      this.websocket = new WebSocket(
-        socketLink,
-        ['Sec-WebSocket-Protocol']
-      )
+      this.flowRequested = !isMonitor
+      socketLink += `${socketLink.includes('?') ? '&' : '?'}binary=true`
+      if (this.flowRequested) {
+        socketLink += '&flow=true'
+      }
+      this.websocket = new WebSocket(socketLink, ['Sec-WebSocket-Protocol'])
 
+      this.websocket.binaryType = 'arraybuffer'
       this.websocket.onopen = this.websocketOpen
       this.websocket.onmessage = this.getMessage
       this.websocket.onclose = this.closeWebSocket
       this.websocket.onerror = this.errorWebSocket
     },
 
-    websocketOpen() {
+    websocketOpen(event) {
+      if (this.terminalDestroyed || (event?.target && event.target !== this.websocket)) {
+        return
+      }
+      this.socketClosed = false
+      this.term.options.disableStdin = !this.stdinEnabled
+      this.sendSocket(`w${this.term.cols},${this.term.rows}`)
       this.$emit('open')
-
       if (this.$refs.onetermTerminalRef) {
-        this.resizeObserver = new ResizeObserver(_.debounce((entries) => {
-          if (entries?.length) {
-            this.handleResize()
-          }
-        }, 200))
+        this.resizeHandler = _.debounce(() => this.handleResize(), 200)
+        this.resizeObserver = new ResizeObserver(this.resizeHandler)
         this.resizeObserver.observe(this.$refs.onetermTerminalRef)
       }
-
-      this.interval = setInterval(() => {
-        this.websocket.send('9')
-      }, 10000)
+      this.interval = setInterval(() => this.sendSocket('9'), 10000)
     },
 
-    closeWebSocket(e) {
-      console.log('closeWebSocket', e)
-      if (this.term) {
-        this.term.writeln('\r\n')
-        this.term.writeln('\x1b[31mThe connection is closed!\x1b[0m')
-      }
-
-      this.$emit('close')
+    cleanupSocket() {
+      this.flowControl = false
+      this.flowReceived = 0
+      this.flowAckAt = 0
       if (this.interval) {
         clearInterval(this.interval)
         this.interval = null
       }
+      if (this.resizeObserver) {
+        this.resizeObserver.disconnect()
+        this.resizeObserver = null
+      }
+      if (this.resizeHandler) {
+        this.resizeHandler.cancel()
+        this.resizeHandler = null
+      }
+      if (this.websocket) {
+        const socket = this.websocket
+        this.websocket = null
+        socket.onopen = socket.onmessage = socket.onclose = socket.onerror = null
+        socket.close()
+      }
     },
-    errorWebSocket(e) {
-      console.log('errorWebSocket', e)
+
+    closeWebSocket(event) {
+      if (this.socketClosed || this.terminalDestroyed || (event?.target && event.target !== this.websocket)) {
+        return
+      }
+      this.socketClosed = true
+      this.cleanupSocket()
+      if (this.term) {
+        this.term.options.disableStdin = true
+        const message = this.receivedOutput
+          ? 'The connection is closed.'
+          : 'Unable to connect. Check your sign-in and server availability.'
+        this.term.writeln(`\r\n\x1b[31m${message}\x1b[0m`)
+      }
       this.$emit('close')
     },
+
+    errorWebSocket(event) {
+      this.closeWebSocket(event)
+    },
+
+    sendSocket(data) {
+      const socket = this.websocket
+      if (!socket || socket.readyState !== WebSocket.OPEN) {
+        return false
+      }
+      if (socket.bufferedAmount > 1024 * 1024) {
+        this.closeWebSocket()
+        return false
+      }
+      try {
+        socket.send(data)
+        return true
+      } catch (error) {
+        this.errorWebSocket({ target: socket })
+        return false
+      }
+    },
+
+    sendInput(content) {
+      for (let start = 0; start < content.length;) {
+        let end = Math.min(start + 8192, content.length)
+        const last = content.charCodeAt(end - 1)
+        if (end < content.length && last >= 0xd800 && last <= 0xdbff) {
+          end--
+        }
+        if (!this.sendSocket(`1${content.slice(start, end)}`)) {
+          return false
+        }
+        start = end
+      }
+      return true
+    },
+
     getMessage(message) {
-      if (this.term) {
-        this.term.write(message.data)
+      if (!this.term || this.terminalDestroyed || (message.target && message.target !== this.websocket)) {
+        return
+      }
+      if (this.flowRequested && !this.receivedOutput && message.data === '0flow') {
+        this.flowControl = true
+        return
+      }
+      const data = message.data instanceof ArrayBuffer ? new Uint8Array(message.data) : message.data
+      if (data?.length) {
+        this.receivedOutput = true
+        if (this.flowControl && data instanceof Uint8Array) {
+          this.flowReceived += data.length
+          if (!Number.isSafeInteger(this.flowReceived)) {
+            this.closeWebSocket()
+            return
+          }
+          if (this.flowReceived - this.flowAckAt >= 65536) {
+            const count = this.flowReceived
+            const socket = this.websocket
+            this.flowAckAt = count
+            this.term.write(data, () => {
+              if (!this.terminalDestroyed && socket && socket === this.websocket) {
+                this.sendSocket(`a${count}`)
+              }
+            })
+            return
+          }
+        }
+        this.term.write(data)
       }
     },
 
@@ -331,7 +410,7 @@ export default {
     },
 
     writeCommand(content) {
-      this.websocket.send(`1${content}`)
+      this.sendInput(content)
     },
 
     openCommandDrawer() {
@@ -340,7 +419,7 @@ export default {
 
     openFileManagementDrawer() {
       this.$refs.fileManagementDrawerRef.open()
-    }
+    },
   },
 }
 </script>

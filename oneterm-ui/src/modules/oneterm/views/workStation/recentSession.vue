@@ -130,7 +130,6 @@ export default {
             item.protocolIcon = PROTOCOL_ICON?.[protocolType] || ''
             item.protocolType = protocolType
           })
-
           this.tableData = tableData
           this.tablePage = {
             ...this.tablePage,
@@ -152,7 +151,6 @@ export default {
         info: true
       })
       const asset = (res?.data?.list || [])?.[0]
-
       const protocolType = row.protocol.split?.(':')?.[0] || ''
 
       this.$emit('openTerminal', {

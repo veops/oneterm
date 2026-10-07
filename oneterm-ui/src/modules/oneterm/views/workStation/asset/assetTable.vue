@@ -9,12 +9,7 @@
         @search="updateTableData"
       />
       <a-space>
-        <a-button
-          type="primary"
-          class="ops-button-ghost"
-          ghost
-          @click="updateTableData"
-        >
+        <a-button type="primary" class="ops-button-ghost" ghost @click="updateTableData">
           <ops-icon type="veops-refresh" />
           {{ $t('refresh') }}
         </a-button>
@@ -30,7 +25,7 @@
       :data="tableData"
       :loading="loading"
       :checkbox-config="{ reserve: true, highlight: true, range: true }"
-      :expand-config="{iconOpen: 'vxe-icon-square-minus', iconClose: 'vxe-icon-square-plus'}"
+      :expand-config="{ iconOpen: 'vxe-icon-square-minus', iconClose: 'vxe-icon-square-plus' }"
       :row-config="{ keyField: 'id', isHover: true }"
       @cell-click="onCellClick"
     >
@@ -41,42 +36,44 @@
         <template #content="{ row }">
           <div v-if="row.accountList.length" class="workstation-asset-table-account">
             <div
-              v-for="(item) in row.accountList"
+              v-for="item in row.accountList"
               :key="item.protocol + item.account_id"
               class="workstation-asset-table-account-item"
               @click="openTerminal(row.id, row.name, item)"
             >
               <ops-icon class="workstation-asset-table-account-protocol" :type="item.protocolIcon" />
               <span class="workstation-asset-table-account-name">{{ item.account_name }}</span>
+              <a-tooltip v-if="Number(item.account_id) > 0" :title="$t('oneterm.passwordView.settingsTitle')">
+                <a-button
+                  type="link"
+                  size="small"
+                  :aria-label="$t('oneterm.passwordView.settingsTitle')"
+                  @click.stop="$emit('view-password', Number(item.account_id))"
+                ><a-icon
+                  type="eye"
+                /></a-button>
+              </a-tooltip>
             </div>
           </div>
         </template>
       </vxe-column>
       <vxe-column :title="$t(`oneterm.assetList.ip`)" field="ip"> </vxe-column>
       <vxe-column :title="$t(`oneterm.assetList.folderName`)" field="node_chain"> </vxe-column>
-      <vxe-column
-        :title="$t(`status`)"
-        field="connectable"
-        align="center"
-        min-width="105px"
-      >
-        <template #default="{row}">
-          <span class="workstation-asset-table-status workstation-asset-table-right" v-if="row.connectable">{{ $t(`oneterm.assetList.online`) }}</span>
-          <span class="workstation-asset-table-status workstation-asset-table-error" v-else>{{ $t(`oneterm.assetList.offline`) }}</span>
+      <vxe-column :title="$t(`status`)" field="connectable" align="center" min-width="105px">
+        <template #default="{ row }">
+          <span class="workstation-asset-table-status workstation-asset-table-right" v-if="row.connectable">{{
+            $t(`oneterm.assetList.online`)
+          }}</span>
+          <span class="workstation-asset-table-status workstation-asset-table-error" v-else>{{
+            $t(`oneterm.assetList.offline`)
+          }}</span>
         </template>
       </vxe-column>
-      <vxe-column :title="$t(`operation`)" :width="100" align="center">
-        <template #default="{row}">
+      <vxe-column :title="$t(`operation`)" :width="130" align="center">
+        <template #default="{ row }">
           <a-space v-if="row.accountList.length">
-            <a-tooltip
-              v-for="(item) in row._protocols"
-              :key="item.key"
-              :title="item.key"
-            >
-              <a
-                class="workstation-asset-table-operation-btn"
-                @click="clickProtocol(item, row)"
-              >
+            <a-tooltip v-for="item in row._protocols" :key="item.key" :title="item.key">
+              <a class="workstation-asset-table-operation-btn" @click="clickProtocol(item, row)">
                 <ops-icon v-if="item.icon" :type="item.icon" />
               </a>
             </a-tooltip>
@@ -126,17 +123,17 @@ import LoginModal from '@/modules/oneterm/views/assets/assets/loginModal.vue'
 export default {
   name: 'AssetTable',
   components: {
-    LoginModal
+    LoginModal,
   },
   props: {
     selectedKeys: {
       type: Array,
-      default: () => []
+      default: () => [],
     },
     accountList: {
       type: Array,
-      default: () => []
-    }
+      default: () => [],
+    },
   },
   data() {
     return {
@@ -147,8 +144,9 @@ export default {
       totalResult: 0,
       loading: false,
       getRequestParams: {
-        info: false
-      }
+        info: false,
+      },
+      // CMDB CI preview
     }
   },
   computed: {
@@ -180,15 +178,16 @@ export default {
           const tableData = res?.data?.list || []
 
           tableData.forEach((row) => {
-            row._protocols = row?.protocols?.map((item) => {
-              const key = item?.split?.(':')?.[0] || ''
+            row._protocols =
+              row?.protocols?.map((item) => {
+                const key = item?.split?.(':')?.[0] || ''
 
-              return {
-                key,
-                value: item,
-                icon: PROTOCOL_ICON?.[key] || ''
-              }
-            }) || []
+                return {
+                  key,
+                  value: item,
+                  icon: PROTOCOL_ICON?.[key] || '',
+                }
+              }) || []
 
             const accountList = []
             row._protocols.forEach((protocol) => {
@@ -197,7 +196,7 @@ export default {
                 if (['https', 'http'].includes(protocol.key)) {
                   _find = {
                     id: -1,
-                    name: this.$t('oneterm.assetList.virtualAccount')
+                    name: this.$t('oneterm.assetList.virtualAccount'),
                   }
                 } else {
                   _find = this.accountList?.find((item) => Number(item.id) === Number(acc_id))
@@ -245,7 +244,7 @@ export default {
           assetName: row.name,
           accountId: row?.accountList?.[0]?.account_id,
           protocol: protocol.value,
-          protocolType: protocol.key
+          protocolType: protocol.key,
         })
       }
     },
@@ -256,7 +255,7 @@ export default {
         assetName,
         accountId: data.account_id,
         protocol: data.protocol,
-        protocolType: data.protocolType
+        protocolType: data.protocolType,
       })
     },
 
@@ -266,8 +265,8 @@ export default {
 
     loginOpenTerminalList(data) {
       this.$emit('openTerminalList', data)
-    }
-  }
+    },
+  },
 }
 </script>
 
@@ -283,9 +282,9 @@ export default {
   &-account {
     padding: 8px 0px 8px 16px;
     border-left: solid 3px @primary-color_9;
-    border-top: 1px solid #E4E7ED;
-    background-color: #F9FBFF;
-    box-shadow: 0px -2px 6px 0px rgba(98, 147, 192, 0.10) inset, 0px 2px 6px 0px rgba(98, 147, 192, 0.10) inset;
+    border-top: 1px solid #e4e7ed;
+    background-color: #f9fbff;
+    box-shadow: 0px -2px 6px 0px rgba(98, 147, 192, 0.1) inset, 0px 2px 6px 0px rgba(98, 147, 192, 0.1) inset;
 
     display: flex;
     align-items: center;
@@ -294,19 +293,19 @@ export default {
 
     &-protocol {
       font-size: 14px;
-      color: #2F54EB;
+      color: #2f54eb;
       margin-right: 8px;
     }
 
     &-name {
       font-size: 14px;
       font-weight: 400;
-      color: #1D2129;
+      color: #1d2129;
     }
 
     &-item {
       padding: 0px 8px;
-      background-color: #EBEFF8;
+      background-color: #ebeff8;
       height: 30px;
       display: flex;
       align-items: center;
@@ -315,8 +314,8 @@ export default {
       cursor: pointer;
 
       &:hover {
-        border-color: #7F97FA;
-        background-color: #E1EFFF;
+        border-color: #7f97fa;
+        background-color: #e1efff;
       }
     }
   }
@@ -352,6 +351,16 @@ export default {
 
     &:not(:first-child) {
       margin-left: 6px;
+    }
+
+    &_ci {
+      color: @primary-color;
+      transition: all 0.2s ease;
+
+      &:hover {
+        color: lighten(@primary-color, 10%);
+        transform: scale(1.1);
+      }
     }
   }
 

@@ -156,7 +156,7 @@ export default {
       if (!ranges.length) {
         this.clearWeektime()
       }
-    }
+    },
   },
 }
 </script>

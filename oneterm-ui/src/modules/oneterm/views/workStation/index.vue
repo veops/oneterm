@@ -6,17 +6,8 @@
       @updateSelectedKeys="updateSelectedKeys"
       @openWebSSH="openWebSSH"
     >
-      <div
-        :class="[
-          'oneterm-workstation-two',
-          openFullScreen ? 'oneterm-workstation-two_full' : ''
-        ]"
-        slot="two"
-      >
-        <a-tabs
-          id="workstation-drag-tab"
-          v-model="tabActiveKey"
-        >
+      <div :class="['oneterm-workstation-two', openFullScreen ? 'oneterm-workstation-two_full' : '']" slot="two">
+        <a-tabs id="workstation-drag-tab" v-model="tabActiveKey">
           <a-tab-pane :key="WORKSTATION_TAB_TYPE.MY_ASSETS">
             <template #tab>
               <div>
@@ -31,24 +22,32 @@
               :accountList="accountList"
               @openTerminal="openTerminal"
               @openTerminalList="openTerminalList"
+              @view-password="openPasswordView"
             />
           </a-tab-pane>
 
-          <template v-if="terminalList.length" >
-            <a-tab-pane
-              v-for="(item, index) in terminalList"
-              :key="item.id"
-            >
+          <template v-if="terminalList.length">
+            <a-tab-pane v-for="(item, index) in terminalList" :key="item.id">
               <template #tab>
                 <div class="oneterm-workstation-tab-terminal">
-                  <template v-if="![WORKSTATION_TAB_TYPE.DISPLAY_SETTING, WORKSTATION_TAB_TYPE.THEME_SETTING, WORKSTATION_TAB_TYPE.BATCH_EXECUTION].includes(item.type)">
-                    <a-icon
-                      v-if="item.socketStatus === SOCKET_STATUS.LOADING"
-                      type="loading"
-                    />
+                  <template
+                    v-if="
+                      ![
+                        WORKSTATION_TAB_TYPE.DISPLAY_SETTING,
+                        WORKSTATION_TAB_TYPE.THEME_SETTING,
+                        WORKSTATION_TAB_TYPE.BATCH_EXECUTION,
+                      ].includes(item.type)
+                    "
+                  >
+                    <a-icon v-if="item.socketStatus === SOCKET_STATUS.LOADING" type="loading" />
                     <span
                       v-else
-                      :class="['oneterm-workstation-tab-terminal-status', item.socketStatus === SOCKET_STATUS.ERROR ? 'oneterm-workstation-tab-terminal-status_error' : '']"
+                      :class="[
+                        'oneterm-workstation-tab-terminal-status',
+                        item.socketStatus === SOCKET_STATUS.ERROR
+                          ? 'oneterm-workstation-tab-terminal-status_error'
+                          : '',
+                      ]"
                     ></span>
                   </template>
 
@@ -130,17 +129,24 @@
             </a-tab-pane>
           </template>
 
-          <a-icon
-            slot="tabBarExtraContent"
-            :type="showOperationMenu ? 'menu-unfold' : 'menu-fold'"
-            class="operation-menu-icon"
-            @click="toggleOperationMenu"
-          />
+          <a-space slot="tabBarExtraContent">
+            <a-button
+              type="link"
+              class="workstation-password-entry"
+              @click="openPasswordView()"
+            ><a-icon type="key" />{{ $t('oneterm.passwordView.settingsTitle') }}</a-button
+            >
+            <a-icon
+              :type="showOperationMenu ? 'menu-unfold' : 'menu-fold'"
+              class="operation-menu-icon"
+              @click="toggleOperationMenu"
+            />
+          </a-space>
         </a-tabs>
 
         <OperationMenu
           :style="{
-            width: showOperationMenu ? '40px' : '0px'
+            width: showOperationMenu ? '40px' : '0px',
           }"
           :openFullScreen="openFullScreen"
           :accountList="accountList"
@@ -154,10 +160,19 @@
       </div>
     </AssetList>
 
-    <RecentSession
-      ref="recentSessionRef"
-      @openTerminal="openTerminal"
-    />
+    <RecentSession ref="recentSessionRef" @openTerminal="openTerminal" />
+    <a-drawer
+      :visible="passwordViewVisible"
+      width="min(1120px, 100vw)"
+      :title="$t('oneterm.passwordView.settingsTitle')"
+      @close="passwordViewVisible = false"
+    >
+      <PasswordViewAccounts
+        v-if="passwordViewVisible"
+        :account-id="passwordAccountId"
+        @clear-target="passwordAccountId = 0"
+      />
+    </a-drawer>
   </div>
 </template>
 
@@ -170,7 +185,7 @@ import { getOfUserStat } from '@/modules/oneterm/api/stat'
 import { getPreference } from '@/modules/oneterm/api/preference.js'
 import { getAccountList } from '@/modules/oneterm/api/account'
 import { getConfig } from '@/modules/oneterm/api/config'
-import { getAssetPermissions } from '@/modules/oneterm/api/asset'
+import { getAssetPermissions, getAssetList } from '@/modules/oneterm/api/asset'
 import { startWebProxy } from '@/modules/oneterm/api/webProxy'
 import { defaultPreferenceSetting } from '../systemSettings/terminalDisplay/constants.js'
 import { WORKSTATION_TAB_TYPE, SOCKET_STATUS } from './constants.js'
@@ -185,6 +200,7 @@ import ThemeSetting from '../systemSettings/terminalDisplay/themeSetting.vue'
 import AssetTable from './asset/assetTable.vue'
 import BatchExecution from './batchExecution/index.vue'
 import OperationMenu from './operationMenu/index.vue'
+import PasswordViewAccounts from './passwordView/index.vue'
 
 const operationMenuExpandKey = 'ops_oneterm_work_station_menu_expand'
 
@@ -200,13 +216,16 @@ export default {
     ThemeSetting,
     AssetTable,
     BatchExecution,
-    OperationMenu
+    OperationMenu,
+    PasswordViewAccounts,
   },
   data() {
     return {
       userStat: {},
       terminalList: [],
       tabActiveKey: WORKSTATION_TAB_TYPE.MY_ASSETS,
+      passwordAccountId: 0,
+      passwordViewVisible: false,
       preferenceSetting: {
         ...defaultPreferenceSetting,
       },
@@ -216,7 +235,9 @@ export default {
       loading: false,
       WORKSTATION_TAB_TYPE,
       SOCKET_STATUS,
-      showOperationMenu: localStorage.getItem(operationMenuExpandKey) ? localStorage.getItem(operationMenuExpandKey) === 'true' : true,
+      showOperationMenu: localStorage.getItem(operationMenuExpandKey)
+        ? localStorage.getItem(operationMenuExpandKey) === 'true'
+        : true,
       controlConfig: {},
     }
   },
@@ -235,25 +256,23 @@ export default {
     currentTabData() {
       if (this.tabActiveKey === WORKSTATION_TAB_TYPE.MY_ASSETS) {
         return {
-          id: WORKSTATION_TAB_TYPE.MY_ASSETS
+          id: WORKSTATION_TAB_TYPE.MY_ASSETS,
         }
       }
 
       const _find = this.terminalList.find((item) => item.id === this.tabActiveKey)
       return _find
-    }
+    },
   },
   mounted() {
-    Promise.all([
-      this.getAccountList(),
-      this.getOfUserStat(),
-      this.getPreference(),
-      this.getConfig()
-    ]).finally(() => {
+    Promise.all([this.getAccountList(), this.getOfUserStat(), this.getPreference(), this.getConfig()]).finally(() => {
       this.$nextTick(() => {
         this.initSortable()
       })
       this.loading = true
+
+      // Handle ci_id from URL query parameter
+      this.handleCiIdFromUrl()
     })
   },
   beforeDestroy() {
@@ -263,14 +282,18 @@ export default {
     }
   },
   methods: {
+    openPasswordView(accountId = 0) {
+      this.passwordAccountId = Number(accountId)
+      this.passwordViewVisible = true
+    },
     async getAccountList() {
       const res = await getAccountList({ page_index: 1, info: this.forMyAsset })
       this.accountList = res?.data?.list || []
     },
 
-    getOfUserStat: _.debounce(async function() {
+    getOfUserStat: _.debounce(async function () {
       const res = await getOfUserStat({
-        info: true
+        info: true,
       })
       this.userStat = res?.data ?? {}
     }, 2000),
@@ -288,7 +311,7 @@ export default {
 
     async getConfig() {
       const res = await getConfig({
-        info: true
+        info: true,
       })
       this.controlConfig = res?.data || {}
     },
@@ -297,9 +320,9 @@ export default {
       const dragTab = document.getElementById('workstation-drag-tab')?.querySelector?.('.ant-tabs-nav')?.firstChild
       if (dragTab) {
         this.sortableInstance = Sortable.create(dragTab, {
-          handle: '.ant-tabs-tab', // css selector
-          draggable: '.ant-tabs-tab:not(:first-child)', // draggable css selector
-          onEnd: this.handleSortEnd
+          handle: '.ant-tabs-tab', // 标签选择器
+          draggable: '.ant-tabs-tab:not(:first-child)', // 可拖动的标签选择器
+          onEnd: this.handleSortEnd,
         })
       }
     },
@@ -308,7 +331,7 @@ export default {
       this.selectedKeys = keys
     },
 
-    async openTerminal(data) {
+    async openTerminal(data, grantedPermissions) {
       const type = this.getConnectType(data.protocolType)
       if (type === WORKSTATION_TAB_TYPE.WEB) {
         this.openWebClient(data)
@@ -318,7 +341,7 @@ export default {
       const id = uuidv4()
       const accountName = this.getAccountName(data.accountId)
       const name = accountName ? `${accountName}@${data.assetName}` : data.assetName
-      const permissions = await this.getAssetPermissions(data.assetId, data.accountId)
+      const permissions = grantedPermissions || (await this.getAssetPermissions(data.assetId, data.accountId))
 
       this.terminalList.push({
         ...data,
@@ -326,15 +349,13 @@ export default {
         id,
         name,
         type,
-        permissions: permissions?.[data.accountId] || {}
+        permissions: permissions?.[data.accountId] || {},
       })
-
       this.tabActiveKey = id
     },
 
     async openTerminalList(data) {
       const permissions = await this.getAssetPermissions(data.assetId, data.accountList.map((id) => id).join(','))
-
       const newList = data.accountList.map((id) => {
         const accountName = this.getAccountName(id)
         const name = accountName ? `${accountName}@${data.assetName}` : data.assetName
@@ -348,7 +369,7 @@ export default {
           socketStatus: SOCKET_STATUS.LOADING,
           id: uuidv4(),
           type: this.getConnectType(data.protocolType),
-          permissions: permissions?.[id] || {}
+          permissions: permissions?.[id] || {},
         }
       })
 
@@ -367,7 +388,8 @@ export default {
           const permissionData = data?.[accountId]?.results || {}
           permissions[accountId] = {}
           Object.keys(defaultPermissions).forEach((permissionType) => {
-            permissions[accountId][permissionType] = permissionData?.[permissionType]?.allowed ?? defaultPermissions?.[permissionType] ?? false
+            permissions[accountId][permissionType] =
+              permissionData?.[permissionType]?.allowed ?? defaultPermissions?.[permissionType] ?? false
           })
         })
       } catch (error) {
@@ -389,7 +411,7 @@ export default {
       this.terminalList.push({
         ...item,
         socketStatus: SOCKET_STATUS.LOADING,
-        id
+        id,
       })
 
       this.tabActiveKey = id
@@ -438,13 +460,12 @@ export default {
         this.terminalList.push({
           id,
           type,
-          name: this.$t(name)
+          name: this.$t(name),
         })
 
         this.tabActiveKey = id
       }
     },
-
     handleSortEnd(evt) {
       const { oldIndex, newIndex } = evt
       if (oldIndex === newIndex) {
@@ -463,7 +484,7 @@ export default {
         id,
         type: WORKSTATION_TAB_TYPE.BATCH_EXECUTION,
         name: this.$t('oneterm.workStation.batchExecution'),
-        batchExecutionData: data
+        batchExecutionData: data,
       })
       this.tabActiveKey = id
     },
@@ -478,6 +499,33 @@ export default {
     toggleOperationMenu() {
       this.showOperationMenu = !this.showOperationMenu
       localStorage.setItem(operationMenuExpandKey, this.showOperationMenu)
+    },
+
+    async handleCiIdFromUrl() {
+      // Check if ci_id is present in URL query parameters
+      const ciId = this.$route.query.ci_id
+      if (!ciId) {
+        return
+      }
+
+      try {
+        // Query asset by ci_id
+        const res = await getAssetList({ ci_id: ciId, page_size: 1 })
+        const assetList = res?.data?.list || []
+
+        if (assetList.length > 0) {
+          const asset = assetList[0]
+          // Set selectedKeys to the asset's parent folder
+          if (asset.parent_id) {
+            this.selectedKeys = [asset.parent_id]
+            console.log(`Auto-selected folder for CI ${ciId}, asset: ${asset.name}, folder: ${asset.parent_id}`)
+          }
+        } else {
+          console.warn(`No asset found for ci_id: ${ciId}`)
+        }
+      } catch (err) {
+        console.error('Failed to load asset by ci_id:', err)
+      }
     },
 
     getAccountName(id) {
@@ -495,15 +543,17 @@ export default {
           asset_id: data.assetId,
         },
         false
-      ).then((res) => {
-        if (res?.proxy_url) {
-          window.open(res?.proxy_url, '_blank')
-        } else {
-          return Promise.error()
-        }
-      }).catch((error) => {
-        this.$message.error(error?.response?.data?.error || this.$t('requestError'))
-      })
+      )
+        .then((res) => {
+          if (res?.proxy_url) {
+            window.open(res?.proxy_url, '_blank')
+          } else {
+            return Promise.error()
+          }
+        })
+        .catch((error) => {
+          this.$message.error(error?.response?.data?.error || this.$t('requestError'))
+        })
     },
 
     openWebSSH() {
@@ -513,10 +563,10 @@ export default {
         socketStatus: SOCKET_STATUS.LOADING,
         id,
         name: 'WebSSH',
-        type: WORKSTATION_TAB_TYPE.WEB_SSH
+        type: WORKSTATION_TAB_TYPE.WEB_SSH,
       })
       this.tabActiveKey = id
-    }
+    },
   },
 }
 </script>
@@ -529,7 +579,7 @@ export default {
   &-two {
     width: 100%;
     height: 100%;
-    background-color: #FFFFFF;
+    background-color: #ffffff;
     border-radius: 8px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     display: flex;
@@ -543,7 +593,7 @@ export default {
     .oneterm-workstation-panel {
       height: calc(100vh - 172px);
       margin: 0px;
-      background-color: #FFFFFF;
+      background-color: #ffffff;
     }
 
     &_full {
@@ -569,14 +619,14 @@ export default {
       width: 8px;
       height: 8px;
       border-radius: 50%;
-      background-color: #00B42A;
+      background-color: #00b42a;
       position: relative;
       flex-shrink: 0;
-      box-shadow: 0 0 0 2px fade(#00B42A, 20%);
+      box-shadow: 0 0 0 2px fade(#00b42a, 20%);
 
       &_error {
-        background-color: #F53F3F;
-        box-shadow: 0 0 0 2px fade(#F53F3F, 20%);
+        background-color: #f53f3f;
+        box-shadow: 0 0 0 2px fade(#f53f3f, 20%);
       }
     }
 

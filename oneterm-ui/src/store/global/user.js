@@ -1,5 +1,6 @@
 import Vue from 'vue'
 import { login, getInfo, logout } from '@/api/login'
+import { MFARevoke } from '@/api/mfa'
 import { ACCESS_TOKEN } from '@/store/global/mutation-types'
 import { welcome } from '@/utils/util'
 import { getAllUsers } from '../../api/login'
@@ -12,6 +13,8 @@ import { getAuthDataEnable } from '@/api/auth'
 const user = {
   state: {
     token: '',
+    mfa_tokens: {},
+    mfa_token: { valid_time: 0, value: '', scope: '' },
     name: '',
     welcome: '',
     avatar: '',
@@ -24,20 +27,20 @@ const user = {
     allEmployees: [],
     allDepartments: [],
     detailPermissions: {
-      'backend': [
+      backend: [
         {
-          'name': '公司信息',
-          'permissions': ['read']
+          name: '公司信息',
+          permissions: ['read'],
         },
         {
-          'name': '公司架构',
-          'permissions': ['read']
+          name: '公司架构',
+          permissions: ['read'],
         },
         {
-          'name': '用户分组',
-          'permissions': ['read']
-        }
-      ]
+          name: '用户分组',
+          permissions: ['read'],
+        },
+      ],
     },
     username: '',
     mobile: '',
@@ -49,15 +52,49 @@ const user = {
     position_name: '',
     direct_supervisor_id: null,
     auth_enable: {},
-    notice_info: {}
+    notice_info: {},
   },
 
   mutations: {
+    SET_MFA_TOKEN: (state, data) => {
+      state.mfa_token = data
+      if (data.value) state.mfa_tokens = { ...state.mfa_tokens, [data.scope]: data }
+      else if (data.scope) Vue.delete(state.mfa_tokens, data.scope)
+      else state.mfa_tokens = {}
+    },
     SET_TOKEN: (state, token) => {
       state.token = token
     },
 
-    SET_USER_INFO: (state, { name, welcome, avatar, roles, info, uid, rid, username, mobile, department_id, employee_id, email, nickname, sex, position_name, direct_supervisor_id, annual_leave, virtual_annual_leave, is_internship, current_company, entry_date, acl_uid, last_login, notice_info }) => {
+    SET_USER_INFO: (
+      state,
+      {
+        name,
+        welcome,
+        avatar,
+        roles,
+        info,
+        uid,
+        rid,
+        username,
+        mobile,
+        department_id,
+        employee_id,
+        email,
+        nickname,
+        sex,
+        position_name,
+        direct_supervisor_id,
+        annual_leave,
+        virtual_annual_leave,
+        is_internship,
+        current_company,
+        entry_date,
+        acl_uid,
+        last_login,
+        notice_info,
+      }
+    ) => {
       state.name = name
       state.welcome = welcome
       state.avatar = avatar
@@ -97,165 +134,189 @@ const user = {
     SET_DETAIL_PERMISSIONS: (state, data) => {
       state.detailPermissions = {
         ...state.detailPermissions,
-        ...data
+        ...data,
       }
     },
     SET_AUTH_ENABLE: (state, data) => {
       state.auth_enable = data
-    }
+    },
   },
 
   actions: {
     // 获取enable_list
     GetAuthDataEnable({ commit }, userInfo) {
       return new Promise((resolve, reject) => {
-        getAuthDataEnable().then(res => {
-          commit('SET_AUTH_ENABLE', res)
-          resolve()
-        }).catch(error => {
-          reject(error)
-        })
+        getAuthDataEnable()
+          .then((res) => {
+            commit('SET_AUTH_ENABLE', res)
+            resolve()
+          })
+          .catch((error) => {
+            reject(error)
+          })
       })
     },
     // 登录
     Login({ commit }, { userInfo, auth_type = undefined }) {
       return new Promise((resolve, reject) => {
-        login(userInfo, auth_type).then(response => {
-          Vue.ls.set(ACCESS_TOKEN, response.token, 7 * 24 * 60 * 60 * 1000)
-          commit('SET_TOKEN', response.token)
-          resolve()
-        }).catch(error => {
-          reject(error)
-        })
+        login(userInfo, auth_type)
+          .then((response) => {
+            Vue.ls.set(ACCESS_TOKEN, response.token, 7 * 24 * 60 * 60 * 1000)
+            commit('SET_TOKEN', response.token)
+            resolve()
+          })
+          .catch((error) => {
+            reject(error)
+          })
       })
     },
 
     // 获取用户信息
     GetInfo({ commit }) {
       return new Promise((resolve, reject) => {
-        getInfo().then(response => {
-          const result = response.result
+        getInfo()
+          .then((response) => {
+            const result = response.result
 
-          const role = result.role
-          role.permissions = result.role.permissions
-          role.permissions.map(per => {
-            if (per.actionEntitySet != null && per.actionEntitySet.length > 0) {
-              const action = per.actionEntitySet.map(action => { return action.action })
-              per.actionList = action
+            const role = result.role
+            role.permissions = result.role.permissions
+            role.permissions.map((per) => {
+              if (per.actionEntitySet != null && per.actionEntitySet.length > 0) {
+                const action = per.actionEntitySet.map((action) => {
+                  return action.action
+                })
+                per.actionList = action
+              }
+            })
+            role.permissionList = role.permissions.map((permission) => {
+              return permission
+            })
+
+            const promise1 = searchPermResourceByRoleId(result.rid, {
+              resource_type_id: '操作权限',
+              app_id: 'backend',
+            })
+            const promises = [promise1]
+            if (appConfig?.buildModules.includes('oneterm')) {
+              const promise2 = searchPermResourceByRoleId(result.rid, {
+                resource_type_id: 'menu',
+                app_id: 'oneterm',
+              })
+              promises.push(promise2)
             }
-          })
-          role.permissionList = role.permissions.map(permission => { return permission })
-
-          const promise1 = searchPermResourceByRoleId(result.rid, {
-            resource_type_id: '操作权限',
-            app_id: 'backend',
-          })
-          const promises = [promise1]
-          if (appConfig?.buildModules.includes('oneterm')) {
-            const promise2 = searchPermResourceByRoleId(result.rid, {
-              resource_type_id: 'menu',
-              app_id: 'oneterm',
+            Promise.all(promises).then(([res1, res2]) => {
+              commit('SET_DETAIL_PERMISSIONS', { backend: res1.resources, oneterm: res2?.resources })
+              resolve(response)
             })
-            promises.push(promise2)
-          }
-          Promise.all(promises).then(([res1, res2]) => {
-            commit('SET_DETAIL_PERMISSIONS', { backend: res1.resources, oneterm: res2?.resources })
-            resolve(response)
-          })
 
-          getEmployeeByUid(result.uid).then(res => {
-            commit('SET_USER_INFO', {
-              roles: result.role,
-              info: result,
-              name: result.name,
-              welcome: welcome(),
-              avatar: result.avatar,
-              uid: result.uid,
-              rid: result.rid,
-              username: result.username,
-              mobile: res.mobile,
-              department_id: res.department_id,
-              employee_id: res.employee_id,
-              email: res.email,
-              nickname: res.nickname,
-              sex: res.sex,
-              position_name: res.position_name,
-              direct_supervisor_id: res.direct_supervisor_id,
-              annual_leave: res.annual_leave,
-              virtual_annual_leave: res.virtual_annual_leave,
-              is_internship: res.is_internship,
-              current_company: res.current_company,
-              entry_date: res.entry_date,
-              acl_uid: res.acl_uid,
-              last_login: res.last_login,
-              notice_info: res.notice_info
-            })
-          }).catch(error => {
+            getEmployeeByUid(result.uid)
+              .then((res) => {
+                commit('SET_USER_INFO', {
+                  roles: result.role,
+                  info: result,
+                  name: result.name,
+                  welcome: welcome(),
+                  avatar: result.avatar,
+                  uid: result.uid,
+                  rid: result.rid,
+                  username: result.username,
+                  mobile: res.mobile,
+                  department_id: res.department_id,
+                  employee_id: res.employee_id,
+                  email: res.email,
+                  nickname: res.nickname,
+                  sex: res.sex,
+                  position_name: res.position_name,
+                  direct_supervisor_id: res.direct_supervisor_id,
+                  annual_leave: res.annual_leave,
+                  virtual_annual_leave: res.virtual_annual_leave,
+                  is_internship: res.is_internship,
+                  current_company: res.current_company,
+                  entry_date: res.entry_date,
+                  acl_uid: res.acl_uid,
+                  last_login: res.last_login,
+                  notice_info: res.notice_info,
+                })
+              })
+              .catch((error) => {
+                reject(error)
+              })
+          })
+          .catch((error) => {
             reject(error)
           })
-        }).catch(error => {
-          reject(error)
-        })
       })
     },
 
     // 登出
-    Logout({ commit, state }) {
+    async Logout({ commit, state }) {
+      try {
+        await MFARevoke()
+      } catch (error) {
+        // Logout must remain available when the API is unreachable.
+      }
+      commit('SET_MFA_TOKEN', { valid_time: 0, value: '', scope: '' })
       return new Promise((resolve) => {
         commit('SET_TOKEN', '')
         commit('SET_ROLES', [])
         Vue.ls.remove(ACCESS_TOKEN)
 
-        logout(state.token).then(() => {
-          resolve()
-        }).catch(() => {
-          resolve()
-        }).finally(() => {
-          let logoutURL = '/user/logout'
-          const fullPath = window.location.pathname + window.location.search
-          if (
-            fullPath &&
-            fullPath !== '/'
-          ) {
-            logoutURL += `?redirect=${fullPath}`
-          }
+        logout(state.token)
+          .then(() => {
+            resolve()
+          })
+          .catch(() => {
+            resolve()
+          })
+          .finally(() => {
+            let logoutURL = '/user/logout'
+            const fullPath = window.location.pathname + window.location.search
+            if (fullPath && fullPath !== '/') {
+              logoutURL += `?redirect=${fullPath}`
+            }
 
-          window.location.href = logoutURL
-        })
+            window.location.href = logoutURL
+          })
       })
     },
 
     loadAllUsers({ commit, state }) {
       return new Promise((resolve, reject) => {
-        getAllUsers({ page_size: 9999 }).then(res => {
-          commit('LOAD_ALL_USERS', res.users)
-          resolve()
-        }).catch(error => {
-          reject(error)
-        })
+        getAllUsers({ page_size: 9999 })
+          .then((res) => {
+            commit('LOAD_ALL_USERS', res.users)
+            resolve()
+          })
+          .catch((error) => {
+            reject(error)
+          })
       })
     },
     loadAllEmployees({ commit, state }) {
       return new Promise((resolve, reject) => {
-        getEmployeeList({ page_size: 99999 }).then(res => {
-          commit('LOAD_ALL_EMPLOYEES', res.data_list)
-          resolve()
-        }).catch(error => {
-          reject(error)
-        })
+        getEmployeeList({ page_size: 99999 })
+          .then((res) => {
+            commit('LOAD_ALL_EMPLOYEES', res.data_list)
+            resolve()
+          })
+          .catch((error) => {
+            reject(error)
+          })
       })
     },
     loadAllDepartments({ commit, state }) {
       return new Promise((resolve, reject) => {
-        getAllDepartmentList({ is_tree: 0 }).then(res => {
-          commit('LOAD_ALL_DEPARMTMENTS', res)
-          resolve()
-        }).catch(error => {
-          reject(error)
-        })
+        getAllDepartmentList({ is_tree: 0 })
+          .then((res) => {
+            commit('LOAD_ALL_DEPARMTMENTS', res)
+            resolve()
+          })
+          .catch((error) => {
+            reject(error)
+          })
       })
-    }
-  }
+    },
+  },
 }
 
 export default user

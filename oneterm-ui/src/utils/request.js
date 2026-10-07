@@ -16,14 +16,15 @@ const service = axios.create({
 })
 
 const err = (error) => {
-  console.log(error)
+  if (axios.isCancel(error)) return Promise.reject(error)
+  console.warn('API request failed', { method: error.config?.method, status: error.response?.status })
   const reg = /5\d{2}/g
   if (error.response && reg.test(error.response.status)) {
     const errorMsg = ((error.response || {}).data || {}).message || i18n.t('requestServiceError')
     message.error(errorMsg)
-  } else if (error.response.status === 404 && error.config.url.includes('ci_types')) {
+  } else if (error.response?.status === 404 && error.config?.url.includes('ci_types')) {
     message.warning(i18n.t('requestContact'))
-  } else if (error.response.status === 412) {
+  } else if (error.response?.status === 412) {
     let seconds = 5
     notification.warning({
       key: 'notification',
@@ -49,13 +50,12 @@ const err = (error) => {
         duration: seconds,
       })
     }, 1000)
-  } else if (error.config.url === '/api/v0.1/ci_types/can_define_computed' || error.config.isShowMessage === false) {
+  } else if (error.config?.url === '/api/v0.1/ci_types/can_define_computed' || error.config?.isShowMessage === false) {
   } else {
     const errorMsg = ((error.response || {}).data || {}).message || i18n.t('requestError')
     message.error(`${errorMsg}`)
   }
   if (error.response) {
-    console.log(error.config.url)
     if (error.response.status === 401 && router.path === '/user/login') {
       window.location.href = '/user/logout'
     }

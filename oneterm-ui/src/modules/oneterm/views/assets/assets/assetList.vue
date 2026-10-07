@@ -1,7 +1,7 @@
 <template>
   <TwoColumnLayout
     class="oneterm-asset-list"
-    appName="oneterm-asset-list-management"
+    appName="oneterm-assets-management"
     :style="{ height: `${windowHeight - 88}px` }"
     :triggerLength="8"
     calcBasedParent
@@ -292,6 +292,7 @@ export default {
       immediate: true,
       deep: true,
       handler() {
+        console.log('selectedKeys', this.selectedKeys)
         this.updateTableData()
       },
     },
@@ -318,6 +319,7 @@ export default {
       this.chainIds = ''
       this.treeData = []
       this.refreshTreeFlag = false
+
       getNodeList({
         info: this.getRequestParams.info,
         parent_id: 0
@@ -389,6 +391,7 @@ export default {
       })
         .then(async (res) => {
           const tableData = res?.data?.list || []
+
           tableData.forEach((row) => {
             row._protocols = row?.protocols?.map((item) => {
               const key = item?.split?.(':')?.[0] || ''
@@ -509,6 +512,7 @@ export default {
         })
       }
     },
+
     createAsset() {
       getNodeById(this.selectedKeys[0]).then((res) => {
         if (res?.data?.list.length) {
@@ -565,6 +569,7 @@ export default {
 
 <style lang="less" scoped>
 @import '../../../style/index.less';
+
 .asset-list-sidebar {
   height: 100%;
   display: flex;

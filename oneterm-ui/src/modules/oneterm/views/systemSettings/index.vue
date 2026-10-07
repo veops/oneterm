@@ -1,19 +1,8 @@
 <template>
   <div class="system-settings">
-    <a-tabs
-      class="system-settings-menu"
-      tabPosition="left"
-      :activeKey="activeKey"
-      @change="handleChangeTab"
-    >
-      <a-tab-pane
-        v-for="(item) in menuList"
-        :key="item.key"
-      >
-        <div
-          class="system-settings-menu-title"
-          slot="tab"
-        >
+    <a-tabs class="system-settings-menu" tabPosition="left" :activeKey="activeKey" @change="handleChangeTab">
+      <a-tab-pane v-for="item in menuList" :key="item.key">
+        <div class="system-settings-menu-title" slot="tab">
           <ops-icon :type="item.icon" />
           <span>{{ $t(item.label) }}</span>
         </div>
@@ -25,6 +14,7 @@
 
 <script>
 import { mapState } from 'vuex'
+import { mixinPermissions } from '@/utils/mixin'
 
 import AccessControl from './accessControl/index.vue'
 import PublicKey from './publicKey/index.vue'
@@ -36,12 +26,13 @@ const systemSettingTabStorageKey = 'ops_oneterm_system_setting_tab_key'
 
 export default {
   name: 'SystemSettings',
+  mixins: [mixinPermissions],
   components: {
     AccessControl,
     PublicKey,
     QuickCommand,
     TerminalDisplay,
-    StorageConfig
+    StorageConfig,
   },
   data() {
     return {
@@ -50,11 +41,15 @@ export default {
   },
   computed: {
     ...mapState({
-      roles: (state) => state.user.roles
+      roles: (state) => state.user.roles,
+      detailPermissions: (state) => state.user.detailPermissions,
     }),
     isAdmin() {
       const permissions = this?.roles?.permissions || []
-      const isAdmin = permissions?.includes?.('oneterm_admin') || permissions?.includes?.('acl_admin')
+      const isAdmin =
+        permissions?.includes?.('admin') ||
+        permissions?.includes?.('oneterm_admin') ||
+        permissions?.includes?.('acl_admin')
       return isAdmin
     },
     menuList() {
@@ -64,40 +59,44 @@ export default {
           icon: 'ops-oneterm-publickey',
           key: 'publicKey',
           component: 'PublicKey',
+          permission: 'public_key',
         },
         {
           label: 'oneterm.systemSettings.quickCommand',
           icon: 'quick_commands',
           key: 'quickCommand',
           component: 'QuickCommand',
+          permission: 'quick_command',
         },
         {
           label: 'oneterm.systemSettings.terminalDisplay',
           icon: 'terminal_settings',
           key: 'terminalDisplay',
-          component: 'TerminalDisplay'
-        }
+          component: 'TerminalDisplay',
+          permission: 'terminal_show',
+        },
+        {
+          label: 'oneterm.systemSettings.accessControl',
+          icon: 'basic_settings',
+          key: 'accessControl',
+          component: 'AccessControl',
+          permission: 'terminal_control',
+        },
+        {
+          label: 'oneterm.systemSettings.storageConfig',
+          icon: 'itsm-default_line',
+          key: 'storageConfig',
+          component: 'StorageConfig',
+          permission: 'storage_config',
+        },
       ]
 
-      if (this.isAdmin) {
-        menuList.push(
-          {
-            label: 'oneterm.systemSettings.accessControl',
-            icon: 'basic_settings',
-            key: 'accessControl',
-            component: 'AccessControl',
-          },
-          {
-            label: 'oneterm.systemSettings.storageConfig',
-            icon: 'itsm-default_line',
-            key: 'storageConfig',
-            component: 'StorageConfig'
-          }
-        )
-      }
-
-      return menuList
-    }
+      return menuList.filter(
+        (item) =>
+          item.available !== false &&
+          (this.isAdmin || (!item.adminOnly && this.hasDetailPermission('oneterm', 'System_Config', [item.permission])))
+      )
+    },
   },
   watch: {
     menuList: {
@@ -112,14 +111,14 @@ export default {
           this.handleChangeTab(menuList[0].key)
         }
       },
-    }
+    },
   },
   methods: {
     handleChangeTab(key) {
       localStorage.setItem(systemSettingTabStorageKey, key)
       this.activeKey = key
-    }
-  }
+    },
+  },
 }
 </script>
 
@@ -161,8 +160,10 @@ export default {
 
 .system-settings {
   .system-settings-menu {
-    /deep/ .ant-tabs-bar {
-      border-right: 1px solid #e8eaed;
+    /deep/ .ant-tabs-bar,
+    /deep/ .ant-tabs-content {
+      border-left: 0;
+      border-right: 0;
     }
 
     /deep/ .ant-tabs-nav-wrap {

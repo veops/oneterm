@@ -84,9 +84,9 @@ const mixinPermissions = {
     // 根据appName  资源名  perms名  返回true/false
     // 判断该登录用户是否有传入的perms权限
     hasDetailPermission(appName, resourceName, perms = []) {
-      const appNamePer = this.detailPermissions[`${appName}`]
+      const appNamePer = this.detailPermissions[`${appName}`] || []
       const _findResourcePermissions = appNamePer.find(item => item.name === resourceName)
-      return this.roles?.permissions.includes('acl_admin') || this.roles?.permissions.includes('backend_admin') || _findResourcePermissions?.permissions.some(item => perms.includes(item))
+      return this.roles?.permissions?.includes('acl_admin') || this.roles?.permissions?.includes('backend_admin') || _findResourcePermissions?.permissions?.some(item => perms.includes(item))
     }
   }
 }

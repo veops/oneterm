@@ -166,7 +166,7 @@ export default {
       loading: false,
       isDetail: false,
       session_id: null,
-      baseUrl: process.env.VUE_APP_API_BASE_URL || '/api',
+      baseUrl: '/api',
     }
   },
   computed: {

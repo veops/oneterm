@@ -158,7 +158,7 @@ export default {
         client.onclipboard = this.handleClipboardReceived
       }
 
-      // fired whenever the state of this Guacamole.Client changes.
+      // 处理客户端的状态变化事件
       client.onstatechange = (state) => {
         this.onClientStateChange(state)
       }
@@ -169,7 +169,6 @@ export default {
 
       // Get display div from document
       const displayEle = this.$refs.onetermGuacamoleRef
-
       // Add client to display div
       const element = client.getDisplay().getElement()
       displayEle.appendChild(element)
@@ -184,6 +183,7 @@ export default {
       }
 
       client.connect(queryString)
+
       const display = client.getDisplay()
       display.onresize = () => {
         const { width, height } = this.getClientSize()
@@ -264,6 +264,8 @@ export default {
           this.$message.destroy(this.messageKey)
           this.$message.success({ content: this.$t('oneterm.guacamole.connected'), duration: 3, key: this.messageKey })
           this.$emit('open')
+          // 向后台发送请求，更新会话的状态
+          //   sessionApi.connect(sessionId)
           break
         case STATE_DISCONNECTING:
           break
@@ -280,6 +282,7 @@ export default {
           break
       }
     },
+
     handleDisplaySize() {
       const { width, height } = this.getClientSize()
 

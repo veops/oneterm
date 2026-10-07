@@ -103,6 +103,7 @@
 </template>
 
 <script>
+import _ from 'lodash'
 import moment from 'moment'
 import { mapState } from 'vuex'
 import ChartTime from '@/components/chartTime'
@@ -234,7 +235,6 @@ export default {
             action: this.$t(this.actionTypeMap?.[item.action]?.text || item.action)
           }
         })
-
       this.$refs.opsTable.getVxetableRef().exportData({
         data,
         filename: this.$t('oneterm.menu.fileLog'),

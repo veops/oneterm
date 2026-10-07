@@ -6,7 +6,7 @@
     @cancel="handleCancel"
   >
     <a-tabs v-model="tabKey">
-      <a-tab-pane key="accessPermission" :tab="$t('oneterm.assetList.accessPermission')">
+      <a-tab-pane v-if="showAccessPermission" key="accessPermission" :tab="$t('oneterm.assetList.accessPermission')">
         <PermissionForm
           ref="permissionFormRef"
           :dataType="dataType"
@@ -22,6 +22,7 @@
         <ACLTable
           :tableData="aclTableData"
           :resourceId="resourceId"
+          :columns="permissionColumns"
         />
         <a-space>
           <span class="grant-button" @click="openGrantUserModal('depart')">{{ $t('oneterm.assetList.grantUserOrDep') }}</span>
@@ -41,6 +42,8 @@
 import _ from 'lodash'
 import { mapState } from 'vuex'
 import { getResourcePerms } from '@/modules/acl/api/permission'
+import { searchResourceType } from '@/modules/acl/api/resource'
+import { emptyPermissions, permissionColumns } from './permissions'
 
 import PermissionForm from './permissionForm.vue'
 import ACLTable from './aclTable.vue'
@@ -62,9 +65,14 @@ export default {
       ids: [], // id list
       dataType: 'node',
       showACLConfig: true,
+      permissionColumns: [],
+      requestGeneration: 0,
     }
   },
   computed: {
+    showAccessPermission() {
+      return ['node', 'asset', 'account'].includes(this.dataType)
+    },
     ...mapState({
       allEmployees: (state) => state.user.allEmployees,
       allDepartments: (state) => state.user.allDepartments,
@@ -78,7 +86,7 @@ export default {
         case 'account':
           return 'oneterm.assetList.accountOperationPermissions'
         default:
-          return ''
+          return 'oneterm.assetList.operationPermissions'
       }
     }
   },
@@ -88,17 +96,24 @@ export default {
       ids,
       resourceId,
     }) {
-      this.tabKey = 'accessPermission'
+      const generation = ++this.requestGeneration
       this.showACLConfig = type === 'node' || (type !== 'node' && ids.length === 1)
       this.ids = ids
       this.dataType = type
       this.resourceId = resourceId ?? ''
+      this.tabKey = this.showAccessPermission ? 'accessPermission' : 'operationPermissions'
 
       let aclTableData = []
       if (this.showACLConfig) {
+        const definitions = await searchResourceType({ app_id: 'oneterm', q: type, page_size: 100 })
+        if (generation !== this.requestGeneration) return
+        const resourceType = (definitions?.groups || []).find((item) => item.name === type)
+        const actions = resourceType ? (definitions?.id2perms?.[resourceType.id] || []).map((item) => item.name) : []
+        this.permissionColumns = permissionColumns(actions)
         const aclPerms = await getResourcePerms(resourceId, {
           need_users: 0
         })
+        if (generation !== this.requestGeneration) return
         const permsKeys = Object.keys(aclPerms)
         if (permsKeys.length) {
           aclTableData = permsKeys.map((key) => {
@@ -107,14 +122,11 @@ export default {
             const data = {
               name: key,
               rid: perms?.[0]?.rid || '',
-              read: false,
-              write: false,
-              delete: false,
-              grant: false
+              permissions: emptyPermissions(this.permissionColumns)
             }
             perms.forEach((item) => {
-              if (data?.[item.name] !== undefined) {
-                data[item.name] = true
+              if (Object.prototype.hasOwnProperty.call(data.permissions, item.name)) {
+                data.permissions[item.name] = true
               }
             })
             return data
@@ -126,7 +138,7 @@ export default {
     },
 
     handleCancel() {
-      this.rids = []
+      this.requestGeneration += 1
       this.visible = false
       if (this.$refs.permissionFormRef) {
         this.$refs.permissionFormRef.resetFields()
@@ -136,6 +148,7 @@ export default {
       this.ids = []
       this.dataType = 'node'
       this.showACLConfig = true
+      this.permissionColumns = []
     },
 
     openGrantUserModal(type) {
@@ -165,10 +178,7 @@ export default {
       }
 
       addTableData.forEach((item) => {
-        item.read = false
-        item.write = false
-        item.delete = false
-        item.grant = false
+        item.permissions = emptyPermissions(this.permissionColumns)
       })
 
       const newTableData = _.uniqBy(

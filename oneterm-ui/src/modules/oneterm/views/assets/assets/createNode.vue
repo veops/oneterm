@@ -24,7 +24,7 @@
           class="custom-treeselect custom-treeselect-white"
           :style="{
             '--custom-height': '32px',
-            lineHeight: '32px',
+            lineHeight: '32px'
           }"
           v-model="baseForm.parent_id"
           :multiple="false"
@@ -126,14 +126,14 @@ export default {
           id = null,
           name = '',
           parent_id,
-          authorization = {}
+          authorization = {},
         } = node ?? {}
-
         this.nodeId = id
         this.baseForm = {
           name,
           parent_id: parent_id || undefined
         }
+
         this.$refs.account.setValues({ authorization })
       })
     },
@@ -142,6 +142,7 @@ export default {
         if (valid) {
           const { name, parent_id } = this.baseForm
           const { authorization } = this.$refs.account.getValues()
+
           const params = {
             name,
             parent_id: parent_id ?? 0,

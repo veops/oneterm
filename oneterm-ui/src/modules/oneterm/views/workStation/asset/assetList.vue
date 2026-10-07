@@ -230,10 +230,6 @@ export default {
       }
     },
 
-    openRecentSession() {
-      this.$emit('openRecentSession')
-    },
-
     openWebSSH() {
       this.$emit('openWebSSH')
     }

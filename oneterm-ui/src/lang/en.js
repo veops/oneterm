@@ -3,6 +3,19 @@ import acl_en from '@/modules/acl/lang/en.js'
 import oneterm_en from '@/modules/oneterm/lang/en.js'
 
 export default {
+  mfa: {
+    installApp: 'Install App',
+    installAppTip1: 'Please download and install the MFA Validator app on your cell phone or WeChat mini program',
+    installAppTip2:
+      'Click Next to enter the binding page after the installation is complete, (if already installed, go directly to the next step)',
+    androidDownload: 'Android Download',
+    iphoneDownload: 'Iphone Download',
+    nextStep: 'Next Step',
+    bindMFA: 'MFA',
+    bindMFATip1: 'Scan the QR code with the MFA Validator app to get the 6-digit validation code',
+    bindMFATip2: 'Please enter the 6-digit verification code',
+    bindMFATip3: 'If you cannot provide the MFA verification code, please contact the administrator!'
+  },
     commonMenu: {
         permission: 'Permission',
         role: 'Roles',

@@ -94,7 +94,6 @@ export default {
               name: this.$t('oneterm.connect'),
               type: 'line',
               symbol: 'none',
-              symbolSize: 5,
               areaStyle: {
                 color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
                   { offset: 0, color: 'rgba(56, 125, 255, 0.7)' },
@@ -115,7 +114,6 @@ export default {
               name: this.$t('oneterm.session'),
               type: 'line',
               symbol: 'none',
-              symbolSize: 5,
               areaStyle: {
                 color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
                   { offset: 0, color: 'rgba(35, 184, 153, 0.7)' },
@@ -136,7 +134,6 @@ export default {
               name: this.$t('oneterm.connectedAssets'),
               type: 'line',
               symbol: 'none',
-              symbolSize: 5,
               areaStyle: {
                 color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
                   { offset: 0, color: 'rgba(254, 124, 75, 0.7)' },
@@ -157,7 +154,6 @@ export default {
               name: this.$t('oneterm.connectedUsers'),
               type: 'line',
               symbol: 'none',
-              symbolSize: 5,
               areaStyle: {
                 color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
                   { offset: 0, color: 'rgba(78, 194, 239, 0.7)' },

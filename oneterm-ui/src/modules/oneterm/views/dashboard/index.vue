@@ -92,6 +92,7 @@ export default {
     font-weight: 600;
     margin-bottom: 16px;
   }
+
   .dashboard-timeradio {
     position: absolute;
     right: 20px;

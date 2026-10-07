@@ -3,6 +3,18 @@ import acl_zh from '@/modules/acl/lang/zh.js'
 import oneterm_zh from '@/modules/oneterm/lang/zh.js'
 
 export default {
+  mfa: {
+    installApp: '安装应用',
+    installAppTip1: '请在手机端或者微信小程序下载并安装MFA验证器应用',
+    installAppTip2: '安装完成后点击下一步进入绑定页面，(如已安装，直接进入下一步）',
+    androidDownload: 'Android手机下载',
+    iphoneDownload: 'iphone手机下载',
+    nextStep: '下一步',
+    bindMFA: 'MFA 多因子认证',
+    bindMFATip1: '使用MFA验证器应用扫描一下二维码，获取6位验证码',
+    bindMFATip2: '请输入6位验证码',
+    bindMFATip3: '如果不能提供 MFA 验证码，请联系管理员!'
+  },
     commonMenu: {
         permission: '权限管理',
         role: '角色管理',

@@ -16,6 +16,7 @@ import (
 	"github.com/spf13/cast"
 	"go.uber.org/zap"
 
+	"github.com/veops/oneterm/internal/guacd"
 	myi18n "github.com/veops/oneterm/internal/i18n"
 	"github.com/veops/oneterm/internal/model"
 	fileservice "github.com/veops/oneterm/internal/service/file"
@@ -156,11 +157,17 @@ func HandleError(ctx *gin.Context, sess *gsession.Session, err error, ws *websoc
 }
 
 // WriteErrMsg writes an error message to the session
-func WriteErrMsg(sess *gsession.Session, msg string) {
+func WriteErrMsg(sess *gsession.Session, msg string, queued ...bool) {
 	chs := sess.Chans
 	out := []byte(fmt.Sprintf("\r\n \033[31m %s \x1b[0m", msg))
+	if len(queued) > 0 && queued[0] && chs.OutBuf.Len()+len(out) > 1024*1024 {
+		sess.Stop()
+		return
+	}
 	chs.OutBuf.Write(out)
-	Write(sess)
+	if len(queued) == 0 || !queued[0] {
+		Write(sess)
+	}
 }
 
 // Write writes data to the session output
@@ -174,7 +181,7 @@ func Write(sess *gsession.Session, skipRecording ...bool) (err error) {
 			err = sess.WriteTerminal(out)
 		}
 	} else if sess.SessionType == model.SESSIONTYPE_CLIENT && len(out) > 0 {
-		_, err = sess.CliRw.Write(out)
+		_, err = sess.CliRw.WriteContext(sess.Gctx, out)
 	}
 
 	// Only write to recording if skipRecording is not specified or explicitly set to false
@@ -243,11 +250,16 @@ func Read(sess *gsession.Session) error {
 	}
 
 	// Original logic for WEB type
+	away := chs.AwayChan
+	if sess.OutputFlow != nil {
+		// Read acknowledgements until final output has drained.
+		away = nil
+	}
 	for {
 		select {
 		case <-sess.Gctx.Done():
 			return nil
-		case <-sess.Chans.AwayChan:
+		case <-away:
 			return nil
 		default:
 			if sess.SessionType == model.SESSIONTYPE_WEB {
@@ -265,15 +277,33 @@ func Read(sess *gsession.Session) error {
 				}
 				switch t {
 				case websocket.TextMessage:
+					if handled, err := sess.HandleOutputAck(msg); handled {
+						if err != nil {
+							return err
+						}
+						continue
+					}
+					select {
+					case <-chs.AwayChan:
+						continue
+					default:
+					}
 					select {
 					case chs.InChan <- msg:
 					case <-sess.Gctx.Done():
 						return nil
 					case <-chs.AwayChan:
+						if sess.OutputFlow != nil {
+							continue
+						}
 						return nil
 					}
 					input, window := TerminalMessage(msg)
-					if msg[0] != '9' && (sess.IsGuacd() || len(input) > 0 || window.Width > 0) {
+					active := len(input) > 0 || window.Width > 0
+					if sess.IsGuacd() {
+						active = guacd.IsActive(msg)
+					}
+					if msg[0] != '9' && active {
 						sess.SetIdle()
 					}
 				}

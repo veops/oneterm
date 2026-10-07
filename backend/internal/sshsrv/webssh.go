@@ -1,6 +1,7 @@
 package sshsrv
 
 import (
+	"context"
 	"errors"
 	"io"
 	"net"
@@ -38,6 +39,11 @@ func HandleWebSSH(ctx *gin.Context) {
 	ctx.Abort()
 	sess := createWebSSHSession(ctx, ws, user)
 	defer myConnector.CloseTerminalSession(sess)
+	if ctx.Query("flow") == "true" && sess.BinaryOutput {
+		if err := sess.StartOutputFlow(); err != nil {
+			return
+		}
+	}
 	if sess.SshRecoder == nil {
 		return
 	}
@@ -104,6 +110,12 @@ func (r *webSSHInput) Read(p []byte) (int, error) {
 		if err != nil {
 			return 0, err
 		}
+		if handled, err := r.sess.HandleOutputAck(data); handled {
+			if err != nil {
+				return 0, err
+			}
+			continue
+		}
 		input, window := protocols.TerminalMessage(data)
 		if window.Width > 0 {
 			r.sess.SetIdle()
@@ -124,7 +136,11 @@ func (r *webSSHInput) Read(p []byte) (int, error) {
 type webSSHOutput struct{ sess *gsession.Session }
 
 func (w *webSSHOutput) Write(p []byte) (int, error) {
-	if err := w.sess.WriteTerminal(p); err != nil {
+	return w.WriteContext(w.sess.Gctx, p)
+}
+
+func (w *webSSHOutput) WriteContext(ctx context.Context, p []byte) (int, error) {
+	if err := w.sess.WriteTerminalContext(ctx, p); err != nil {
 		return 0, err
 	}
 	if w.sess.SshRecoder != nil {

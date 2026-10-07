@@ -219,6 +219,7 @@ func (p *Parser) Close(prompt string) {
 	p.closed = true
 	p.getOutputLocked()
 	p.WriteDb()
+	p.OutputStream.Close()
 	if p.commands != nil {
 		close(p.commands)
 	}

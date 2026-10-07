@@ -72,6 +72,15 @@ func (rw *CliRW) Write(p []byte) (n int, err error) {
 	return rw.Writer.Write(p)
 }
 
+func (rw *CliRW) WriteContext(ctx context.Context, p []byte) (int, error) {
+	if writer, ok := rw.Writer.(interface {
+		WriteContext(context.Context, []byte) (int, error)
+	}); ok {
+		return writer.WriteContext(ctx, p)
+	}
+	return rw.Write(p)
+}
+
 type SessionChans struct {
 	Rin        io.ReadCloser
 	Win        io.WriteCloser
@@ -203,7 +212,8 @@ type Session struct {
 	wsMutex            sync.Mutex
 	idleMutex          sync.Mutex
 	idleStopped        bool
-	BinaryOutput       bool `json:"-" gorm:"-"`
+	BinaryOutput       bool        `json:"-" gorm:"-"`
+	OutputFlow         *OutputFlow `json:"-" gorm:"-"`
 	textPending        []byte
 }
 
@@ -212,7 +222,7 @@ func (s *Session) Stop() {
 	if s.cancel != nil {
 		s.cancel()
 	}
-	s.ClosePAMTransport()
+	s.CloseTransport()
 	s.ClearSSHClient()
 	s.StopIdle()
 	if s.Ws != nil {
@@ -227,6 +237,10 @@ func (s *Session) Stop() {
 func (s *Session) WriteWebsocket(kind int, p []byte) error {
 	s.wsMutex.Lock()
 	defer s.wsMutex.Unlock()
+	return s.writeWebsocket(kind, p)
+}
+
+func (s *Session) writeWebsocket(kind int, p []byte) error {
 	if kind == websocket.TextMessage && len(p) > 0 {
 		p, s.textPending = terminalText(s.textPending, p)
 		if len(p) == 0 {
@@ -240,6 +254,25 @@ func (s *Session) WriteWebsocket(kind int, p []byte) error {
 }
 
 func (s *Session) WriteTerminal(p []byte) error {
+	return s.WriteTerminalContext(s.Gctx, p)
+}
+
+func (s *Session) WriteTerminalContext(ctx context.Context, p []byte) error {
+	if s.OutputFlow != nil {
+		s.wsMutex.Lock()
+		defer s.wsMutex.Unlock()
+		for len(p) > 0 {
+			size := min(len(p), 32768)
+			if err := s.OutputFlow.reserve(ctx, s.Gctx, size); err != nil {
+				return err
+			}
+			if err := s.writeWebsocket(websocket.BinaryMessage, p[:size]); err != nil {
+				return err
+			}
+			p = p[size:]
+		}
+		return nil
+	}
 	kind := websocket.TextMessage
 	if s.BinaryOutput {
 		kind = websocket.BinaryMessage
@@ -260,6 +293,10 @@ func (s *Session) SetPAMTransportClose(closeTransport func()) {
 	if s.PAMAuthorization == nil {
 		return
 	}
+	s.SetTransportClose(closeTransport)
+}
+
+func (s *Session) SetTransportClose(closeTransport func()) {
 	s.pamTransportMu.Lock()
 	alreadyClosed := s.pamTransportClosed
 	if !alreadyClosed {
@@ -272,6 +309,10 @@ func (s *Session) SetPAMTransportClose(closeTransport func()) {
 }
 
 func (s *Session) ClosePAMTransport() {
+	s.CloseTransport()
+}
+
+func (s *Session) CloseTransport() {
 	s.pamTransportMu.Lock()
 	closeTransport := s.pamTransportClose
 	s.pamTransportClosed, s.pamTransportClose = true, nil

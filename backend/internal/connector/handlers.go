@@ -65,7 +65,7 @@ func Connect(ctx *gin.Context) {
 	}
 
 	if sess.IsGuacd() {
-		protocols.HandleGuacd(sess)
+		protocols.HandleGuacd(sess, ctx)
 	} else {
 		HandleTerm(sess, ctx)
 	}
@@ -368,6 +368,11 @@ func DoConnect(ctx *gin.Context, ws *websocket.Conn) (sess *gsession.Session, er
 
 	gsession.GetOnlineSession().Store(sess.SessionId, sess)
 	gsession.UpsertSession(sess)
+	if ws != nil && !sess.IsGuacd() && sess.BinaryOutput && ctx.Query("flow") == "true" {
+		if err = sess.StartOutputFlow(); err != nil {
+			return sess, err
+		}
+	}
 
 	return
 }
@@ -384,16 +389,12 @@ func HandleTerm(sess *gsession.Session, ctx *gin.Context) (err error) {
 		return protocols.Read(sess)
 	})
 	sess.G.Go(func() (err error) {
-		defer sess.Stop()
-		defer sess.Chans.Rin.Close()
-		defer sess.Chans.Wout.Close()
 		for {
 			select {
 			case <-sess.Gctx.Done():
-				protocols.Write(sess)
-				return
+				return nil
 			case <-chs.AwayChan:
-				return flushTerminalOutput(sess)
+				return nil
 			case in := <-chs.InChan:
 				if sess.SessionType == model.SESSIONTYPE_WEB {
 					var window ssh.Window
@@ -406,7 +407,7 @@ func HandleTerm(sess *gsession.Session, ctx *gin.Context) (err error) {
 					}
 				}
 				if cmd, forbidden := sess.SshParser.AddInput(in); forbidden {
-					protocols.WriteErrMsg(sess, fmt.Sprintf("%s is forbidden\n", cmd))
+					protocols.WriteErrMsg(sess, fmt.Sprintf("%s is forbidden\n", cmd), true)
 					sess.SshParser.AddInput(byteClearAll)
 					chs.Win.Write(byteClearAll)
 					continue
@@ -417,6 +418,20 @@ func HandleTerm(sess *gsession.Session, ctx *gin.Context) (err error) {
 					}
 					return
 				}
+			}
+		}
+	})
+	sess.G.Go(func() (err error) {
+		defer sess.Stop()
+		defer sess.Chans.Rin.Close()
+		defer sess.Chans.Wout.Close()
+		for {
+			select {
+			case <-sess.Gctx.Done():
+				protocols.Write(sess)
+				return
+			case <-chs.AwayChan:
+				return flushTerminalOutput(sess)
 			case out := <-chs.OutChan:
 				if _, err = chs.OutBuf.Write(out); err != nil {
 					return
@@ -461,57 +476,7 @@ func flushTerminalOutput(sess *gsession.Session) error {
 }
 
 func WatchTerminalSession(sess *gsession.Session, ctx *gin.Context) error {
-	tick := time.NewTicker(time.Minute)
-	defer tick.Stop()
-	for {
-		var err error
-		select {
-		case <-sess.Gctx.Done():
-			return nil
-		case <-sess.Chans.AwayChan:
-			return nil
-		case <-sess.IdleTk.C:
-			seconds := 3600
-			if cfg := model.GlobalConfig.Load(); cfg != nil && cfg.Timeout > 0 {
-				seconds = cfg.Timeout
-			}
-			err = &myErrors.ApiError{Code: myErrors.ErrIdleTimeout, Data: map[string]any{"second": seconds}}
-		case closer := <-sess.Chans.CloseChan:
-			err = &myErrors.ApiError{Code: myErrors.ErrAdminClose, Data: map[string]any{"admin": closer}}
-		case <-tick.C:
-			if sess.AssetId == 0 {
-				continue
-			}
-			err = checkTerminalAccess(sess, ctx)
-			if err == nil {
-				continue
-			}
-		}
-		sess.Stop()
-		return err
-	}
-}
-
-func checkTerminalAccess(sess *gsession.Session, ctx *gin.Context) error {
-	asset, err := service.NewAssetService().GetById(sess.Gctx, sess.AssetId)
-	if err != nil {
-		return err
-	}
-	if !protocols.CheckTime(asset.AccessAuth) || sess.ShareId != 0 && time.Now().After(sess.ShareEnd) {
-		return &myErrors.ApiError{Code: myErrors.ErrAccessTime}
-	}
-	if sess.PAMAuthorization != nil {
-		return nil
-	}
-	snapshot := &gsession.Session{Session: &model.Session{Asset: asset, AssetId: sess.AssetId, AccountId: sess.AccountId, ShareId: sess.ShareId}}
-	result, err := service.DefaultAuthService.HasStandingAuthorizationV2(ctx, snapshot, model.ActionConnect)
-	if err != nil {
-		return err
-	}
-	if !result.IsAllowed(model.ActionConnect) {
-		return &myErrors.ApiError{Code: myErrors.ErrUnauthorized, Data: map[string]any{"perm": "connect"}}
-	}
-	return nil
+	return protocols.WatchTerminalSession(sess, ctx)
 }
 
 func CloseTerminalSession(sess *gsession.Session) {

@@ -1,8 +1,10 @@
 package guacd
 
 import (
+	"bytes"
 	"fmt"
 	"strings"
+	"unicode/utf8"
 )
 
 const (
@@ -62,6 +64,61 @@ func (i *Instruction) Parse(content string) *Instruction {
 }
 
 func IsActive(p []byte) bool {
-	i := (&Instruction{}).Parse(string(p))
-	return i.Opcode == "mouse" || i.Opcode == "key"
+	active := false
+	for len(p) > 0 {
+		opcode, size := instructionOpcode(p)
+		if size == 0 {
+			return false
+		}
+		active = active || bytes.Equal(opcode, []byte("mouse")) || bytes.Equal(opcode, []byte("key"))
+		p = p[size:]
+	}
+	return active
+}
+
+func instructionOpcode(p []byte) (opcode []byte, size int) {
+	for position := 0; position < len(p); {
+		length, digits := 0, 0
+		for position < len(p) && p[position] >= '0' && p[position] <= '9' {
+			length = length*10 + int(p[position]-'0')
+			if length > len(p) {
+				return nil, 0
+			}
+			position++
+			digits++
+		}
+		if digits == 0 || position >= len(p) || p[position] != '.' {
+			return nil, 0
+		}
+		position++
+		start := position
+		for i := 0; i < length; i++ {
+			if position >= len(p) {
+				return nil, 0
+			}
+			width := 1
+			if p[position] >= utf8.RuneSelf {
+				_, width = utf8.DecodeRune(p[position:])
+				if width == 1 {
+					return nil, 0
+				}
+			}
+			position += width
+		}
+		if opcode == nil {
+			opcode = p[start:position]
+		}
+		if position >= len(p) {
+			return nil, 0
+		}
+		switch p[position] {
+		case ';':
+			return opcode, position + 1
+		case ',':
+			position++
+		default:
+			return nil, 0
+		}
+	}
+	return nil, 0
 }

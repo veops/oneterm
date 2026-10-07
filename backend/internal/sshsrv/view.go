@@ -18,6 +18,8 @@ import (
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	uv "github.com/charmbracelet/ultraviolet"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/gin-gonic/gin"
 	"github.com/gliderlabs/ssh"
 	"github.com/muesli/cancelreader"
@@ -67,6 +69,7 @@ func init() {
 type errMsg error
 
 type connectionEndedMsg struct{ err error }
+type outputPrintedMsg struct{}
 
 type keymap struct{}
 
@@ -113,6 +116,11 @@ type view struct {
 	help          help.Model
 	height        int
 	cliHeight     int
+	width         int
+	cursorText    string
+	cursorPos     int
+	cursorWidth   int
+	cursorX       int
 	keys          keymap
 	r             io.ReadCloser
 	w             io.WriteCloser
@@ -196,6 +204,7 @@ func initialView(ctx *gin.Context, sess terminalSession, r io.ReadCloser, w io.W
 	ti.Focus()
 	ti.Prompt = prompt
 	ti.ShowSuggestions = true
+	ti.SetVirtualCursor(false)
 	styles := ti.Styles()
 	styles.Focused.Prompt = colors.PrimaryStyle
 	styles.Focused.Placeholder = lipgloss.NewStyle().Foreground(colors.TextSecondary)
@@ -242,6 +251,7 @@ func welcomeMessage() string {
 
 func (m *view) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if size, ok := msg.(tea.WindowSizeMsg); ok {
+		m.width = max(1, size.Width)
 		m.height = max(1, size.Height)
 		m.textinput.SetWidth(max(1, size.Width-lipgloss.Width(prompt)-1))
 		m.help.SetWidth(max(1, size.Width-2))
@@ -307,7 +317,7 @@ func (m *view) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if cmd == "" {
 				return m, m.textinput.Focus()
 			}
-			hisCmd = tea.Printf("%s%s", prompt, cmd)
+			hisCmd = m.printf("%s%s", prompt, cmd)
 			m.cmds = append(m.cmds, cmd)
 			ln := len(m.cmds)
 			if ln > 100 {
@@ -318,9 +328,9 @@ func (m *view) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			switch {
 			case cmd == "exit" || cmd == "quit" || cmd == `\q`:
-				return m, tea.Sequence(tea.Printf("Goodbye."), tea.Quit)
+				return m, tea.Sequence(m.printf("Goodbye."), tea.Quit)
 			case cmd == "help" || cmd == `\h` || cmd == `\?`:
-				return m, tea.Batch(m.textinput.Focus(), tea.Sequence(hisCmd, tea.Printf("%s", m.helpText())))
+				return m, tea.Batch(m.textinput.Focus(), tea.Sequence(hisCmd, m.printf("%s", m.helpText())))
 			case cmd == "clear" || cmd == `\c`:
 				return m, tea.ClearScreen
 			case cmd == "list" || cmd == "ls" || cmd == "table":
@@ -357,14 +367,14 @@ func (m *view) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if err != nil {
 					return m, tea.Sequence(
 						hisCmd,
-						tea.Printf("\n  %s %v\n\n", errStyle.Render("Failed to fetch recent sessions:"), err),
+						m.printf("\n  %s %v\n\n", errStyle.Render("Failed to fetch recent sessions:"), err),
 					)
 				}
 
 				if len(sessions) == 0 {
 					return m, tea.Sequence(
 						hisCmd,
-						tea.Printf("\n  %s\n\n", hintStyle.Render("No recent sessions found")),
+						m.printf("\n  %s\n\n", hintStyle.Render("No recent sessions found")),
 					)
 				}
 
@@ -391,7 +401,7 @@ func (m *view) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return m, tea.Sequence(
 					hisCmd,
-					tea.Printf("  %s %s%s\n\n",
+					m.printf("  %s %s%s\n\n",
 						errStyle.Render("Unknown command:"),
 						cmd,
 						hintStyle.Render(suggestion),
@@ -494,13 +504,13 @@ func (m *view) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case errMsg:
 		if msg != nil {
-			return m, tea.Batch(m.textinput.Focus(), tea.Printf("  [ERROR] %s\n", errStyle.Render(msg.Error())))
+			return m, tea.Batch(m.textinput.Focus(), m.printf("  [ERROR] %s\n", errStyle.Render(msg.Error())))
 		}
 	case connectionEndedMsg:
 		m.connecting = false
 		m.textinput.SetSuggestions(nil)
 		if msg.err != nil {
-			return m, tea.Batch(m.textinput.Focus(), tea.Printf("  [ERROR] %s\n", errStyle.Render(msg.err.Error())))
+			return m, tea.Batch(m.textinput.Focus(), m.printf("  [ERROR] %s\n", errStyle.Render(msg.err.Error())))
 		}
 		return m, m.textinput.Focus()
 	}
@@ -527,6 +537,16 @@ func (m *view) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(hisCmd, tiCmd, spinnerCmd)
 }
 
+func (m *view) filterMessage(_ tea.Model, msg tea.Msg) tea.Msg {
+	if _, ok := msg.(outputPrintedMsg); ok {
+		if m.width <= 0 || m.height <= 0 {
+			return nil
+		}
+		return tea.WindowSizeMsg{Width: m.width, Height: m.height}
+	}
+	return msg
+}
+
 func (m *view) focusCLI() tea.Cmd {
 	m.mode = modeCLI
 	m.selectedSugg = ""
@@ -535,17 +555,72 @@ func (m *view) focusCLI() tea.Cmd {
 }
 
 func (m *view) View() tea.View {
-	v := tea.NewView(m.render())
+	input := ""
+	if m.mode == modeCLI && !m.connecting {
+		input = m.textinput.View()
+	}
+	v := tea.NewView(m.render(input))
 	v.AltScreen = m.mode == modeTable
 	if m.mode == modeCLI && !m.connecting {
-		// Keep inline frame height stable when completion results shrink.
+		v.Content = strings.TrimRight(v.Content, " \n")
 		m.cliHeight = max(m.cliHeight, lipgloss.Height(v.Content))
 		if m.height > 0 {
-			m.cliHeight = min(m.cliHeight, m.height)
+			m.cliHeight = min(m.cliHeight, max(1, m.height-1))
 		}
-		v.Content = lipgloss.NewStyle().Height(m.cliHeight).Render(v.Content)
+		v.Content = lipgloss.NewStyle().Height(m.cliHeight).MaxHeight(m.cliHeight).Render(v.Content)
+		v.Cursor = m.inputCursor(input)
 	}
 	return v
+}
+
+func (m *view) printf(format string, args ...any) tea.Cmd {
+	width := m.width
+	if width <= 0 {
+		width = 80
+	}
+	// Insert one physical row at a time, preserving styles across wraps.
+	lines := uv.NewStyledString(ansi.Hardwrap(fmt.Sprintf(format, args...), width, true)).Lines(ansi.WcWidth)
+	cmds := make([]tea.Cmd, 0, len(lines)+1)
+	for _, line := range lines {
+		text := line.String()
+		if text == "" {
+			text = " "
+		}
+		cmds = append(cmds, tea.Printf("%s", text))
+	}
+	// Unmanaged output moves the cursor even when the view is unchanged.
+	cmds = append(cmds, func() tea.Msg { return outputPrintedMsg{} })
+	return tea.Sequence(cmds...)
+}
+
+func (m *view) inputCursor(text string) *tea.Cursor {
+	cur := m.textinput.Cursor()
+	if cur == nil {
+		return nil
+	}
+	pos, width := m.textinput.Position(), m.textinput.Width()
+	if text == m.cursorText && pos == m.cursorPos && width == m.cursorWidth {
+		cur.X = m.cursorX
+		return cur
+	}
+	// Use the editor's visible cursor to account for Unicode and scrolling.
+	input := m.textinput
+	input.SetVirtualCursor(true)
+	styles := input.Styles()
+	styles.Cursor.Blink = false
+	input.SetStyles(styles)
+	lines := uv.NewStyledString(input.View()).Lines(ansi.WcWidth)
+	for x, cell := range lines[0] {
+		if cell.Style.Attrs&uv.AttrReverse != 0 {
+			cur.X = x
+			break
+		}
+	}
+	if m.width > 0 {
+		cur.X = min(cur.X, m.width-1)
+	}
+	m.cursorText, m.cursorPos, m.cursorWidth, m.cursorX = text, pos, width, cur.X
+	return cur
 }
 
 func (m *view) suggestionLimit() int {
@@ -555,7 +630,7 @@ func (m *view) suggestionLimit() int {
 	return min(8, max(0, m.height-7))
 }
 
-func (m *view) render() string {
+func (m *view) render(input string) string {
 	if m.connecting {
 		return m.renderConnectingStatus()
 	}
@@ -569,7 +644,7 @@ func (m *view) render() string {
 
 	return fmt.Sprintf(
 		"%s\n  %s\n%s%s",
-		m.textinput.View(),
+		input,
 		m.help.View(m.keys),
 		suggestionView,
 		m.assetOverview(),
@@ -705,7 +780,7 @@ func (m *view) handleConnectionCommand(cmd string) tea.Cmd {
 	m.connecting = true
 
 	return tea.Sequence(
-		tea.Printf("\n  %s\n", colors.AccentStyle.Render(fmt.Sprintf("Connecting to %s", cmd))),
+		m.printf("\n  %s\n", colors.AccentStyle.Render(fmt.Sprintf("Connecting to %s", cmd))),
 		// Start spinner and connection in background
 		m.spinner.Tick,
 		tea.Exec(&connector{Ctx: newCtx, Sess: m.Sess, gctx: m.gctx}, func(err error) tea.Msg { return connectionEndedMsg{err: err} }),

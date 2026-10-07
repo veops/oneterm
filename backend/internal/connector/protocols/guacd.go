@@ -16,7 +16,6 @@ import (
 	"github.com/veops/oneterm/internal/model"
 	"github.com/veops/oneterm/internal/service"
 	gsession "github.com/veops/oneterm/internal/session"
-	myErrors "github.com/veops/oneterm/pkg/errors"
 	"github.com/veops/oneterm/pkg/logger"
 )
 
@@ -70,7 +69,7 @@ func ConnectGuacd(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, 
 		return
 	}
 	defer t.Close()
-	sess.SetPAMTransportClose(t.Close)
+	sess.SetTransportClose(t.Close)
 
 	sess.ConnectionId = t.ConnectionId
 	sess.GuacdTunnel = t
@@ -85,6 +84,9 @@ func ConnectGuacd(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, 
 			default:
 				p, err := t.Read()
 				if err != nil {
+					if sess.Gctx.Err() != nil {
+						return nil
+					}
 					return err
 				}
 				if len(p) <= 0 {
@@ -116,19 +118,19 @@ func ConnectGuacd(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, 
 }
 
 // HandleGuacd handles Guacamole sessions
-func HandleGuacd(sess *gsession.Session) (err error) {
+func HandleGuacd(sess *gsession.Session, ctx *gin.Context) (err error) {
 	defer func() {
-		sess.GuacdTunnel.Disconnect()
+		sess.Stop()
+		sess.StopIdle()
+		gsession.GetOnlineSession().Delete(sess.SessionId)
 		sess.Status = model.SESSIONSTATUS_OFFLINE
 		sess.ClosedAt = lo.ToPtr(time.Now())
-		if err = gsession.UpsertSession(sess); err != nil {
-			logger.L().Error("offline guacd session failed", zap.Error(err))
-			return
+		if saveErr := gsession.UpsertSession(sess); saveErr != nil {
+			logger.L().Error("offline guacd session failed", zap.Error(saveErr))
 		}
 	}()
 	chs := sess.Chans
-	tk := time.NewTicker(time.Minute)
-	assetService := service.NewAssetService()
+	sess.G.Go(func() error { return WatchTerminalSession(sess, ctx) })
 	sess.G.Go(func() error {
 		return Read(sess)
 	})
@@ -137,23 +139,15 @@ func HandleGuacd(sess *gsession.Session) (err error) {
 			select {
 			case <-sess.Gctx.Done():
 				return nil
-			case <-sess.IdleTk.C:
-				return &myErrors.ApiError{Code: myErrors.ErrIdleTimeout, Data: map[string]any{"second": model.GlobalConfig.Load().Timeout}}
-			case <-tk.C:
-				asset, err := assetService.GetById(sess.Gctx, sess.AssetId)
-				if err != nil {
-					continue
-				}
-				if CheckTime(asset.AccessAuth) && (sess.ShareId == 0 || time.Now().Before(sess.ShareEnd)) {
-					continue
-				}
-				return &myErrors.ApiError{Code: myErrors.ErrAccessTime}
-			case closeBy := <-chs.CloseChan:
-				return &myErrors.ApiError{Code: myErrors.ErrAdminClose, Data: map[string]any{"admin": closeBy}}
 			case err := <-chs.ErrChan:
 				return err
 			case out := <-chs.OutChan:
-				sess.Ws.WriteMessage(websocket.TextMessage, out)
+				if err := sess.WriteWebsocket(websocket.TextMessage, out); err != nil {
+					if sess.Gctx.Err() != nil {
+						return nil
+					}
+					return err
+				}
 			}
 		}
 	})

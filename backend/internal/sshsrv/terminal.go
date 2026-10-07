@@ -230,6 +230,7 @@ func runTerminal(ctx *gin.Context, terminal *terminalState, input io.ReadCloser,
 		return err
 	}
 	p := tea.NewProgram(vw, tea.WithContext(runCtx), tea.WithInput(r), tea.WithOutput(writer),
+		tea.WithFilter(vw.filterMessage),
 		tea.WithWindowSize(pty.Window.Width, pty.Window.Height), tea.WithEnvironment(terminal.environ),
 		tea.WithColorProfile(colorprofile.Env(terminal.environ)))
 	stop := context.AfterFunc(runCtx, func() { input.Close(); w.Close() })

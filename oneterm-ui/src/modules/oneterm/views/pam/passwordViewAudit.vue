@@ -14,22 +14,24 @@
           <a-select-option v-for="item in actions" :key="item">{{ actionLabel({ action: item }) }}</a-select-option>
         </a-select>
         <a-range-picker v-model="range" show-time format="YYYY-MM-DD HH:mm" @change="load(1)" />
-        <a-tooltip
-          :title="$t('refresh')"
-        ><a-button
-          :loading="loading"
-          :aria-label="$t('refresh')"
-          @click="load(page)"
-        ><ops-icon v-if="!loading" type="veops-refresh" /></a-button
-        ></a-tooltip>
-        <a-dropdown :disabled="!rows.length">
-          <a-button><a-icon type="download" />{{ $t('oneterm.pam.exportPage') }}</a-button>
-          <a-menu
-            slot="overlay"
-            @click="({ key }) => exportPage(key)"
-          ><a-menu-item key="csv">CSV</a-menu-item><a-menu-item key="xlsx">Excel</a-menu-item></a-menu
-          >
-        </a-dropdown>
+        <a-space class="password-audit-actions">
+          <a-tooltip
+            :title="$t('refresh')"
+          ><a-button
+            :loading="loading"
+            :aria-label="$t('refresh')"
+            @click="load(page)"
+          ><ops-icon v-if="!loading" type="veops-refresh" /></a-button
+          ></a-tooltip>
+          <a-dropdown :disabled="!rows.length">
+            <a-button><a-icon type="download" />{{ $t('oneterm.pam.exportPage') }}</a-button>
+            <a-menu
+              slot="overlay"
+              @click="({ key }) => exportPage(key)"
+            ><a-menu-item key="csv">CSV</a-menu-item><a-menu-item key="xlsx">Excel</a-menu-item></a-menu
+            >
+          </a-dropdown>
+        </a-space>
       </div>
       <ops-table
         ref="table"
@@ -265,5 +267,13 @@ export default {
 }
 .password-audit-toolbar .ant-select {
   width: 160px;
+  max-width: 100%;
+}
+.password-audit-toolbar .ant-calendar-picker {
+  max-width: 100%;
+}
+.password-audit-actions {
+  margin-left: auto;
+  flex-shrink: 0;
 }
 </style>

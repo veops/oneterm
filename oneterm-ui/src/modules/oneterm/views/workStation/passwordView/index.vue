@@ -119,9 +119,9 @@ export default {
 
 <style scoped>
 .workstation-passwords { padding: 8px 0; min-width: 0; }
-.workstation-passwords-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.workstation-passwords-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 16px; }
 .workstation-passwords-toolbar .ant-input-search { width: 280px; max-width: 100%; }
 .workstation-passwords-toolbar > :last-child { margin-left: auto; flex-shrink: 0; }
 .workstation-passwords-approved { color: #23834d; }
-.workstation-passwords-pagination { display: flex; justify-content: flex-end; padding-top: 16px; }
+.workstation-passwords-pagination { display: flex; justify-content: flex-end; flex-wrap: wrap; padding-top: 16px; }
 </style>

@@ -35,7 +35,7 @@ server {
 
     location ^~ /api/oneterm/v1/connect {
         proxy_pass http://${ONETERM_API_HOST};
-        proxy_set_header Host $host;
+        proxy_set_header Host $http_host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Scheme $scheme;
@@ -55,7 +55,7 @@ server {
     #          /api/oneterm/v1/file/upload/:asset_id/:account_id
     location ~ ^/api/oneterm/v1/(rdp/sessions/.+/files/upload|file/(session/.+/upload|upload/.+/.+)) {
         proxy_pass http://${ONETERM_API_HOST};
-        proxy_set_header Host $host;
+        proxy_set_header Host $http_host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Scheme $scheme;
@@ -78,7 +78,7 @@ server {
 
     location ^~ /api/oneterm {
         proxy_pass http://${ONETERM_API_HOST};
-        proxy_set_header Host $host;
+        proxy_set_header Host $http_host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Scheme $scheme;
@@ -92,7 +92,7 @@ server {
 
     location /api { 
         proxy_pass http://${ACL_API_HOST};
-        proxy_set_header Host $host;
+        proxy_set_header Host $http_host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Scheme $scheme;

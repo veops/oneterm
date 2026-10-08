@@ -1,6 +1,6 @@
 services:
   oneterm-api:
-    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-api:v25.9.1
+    image: ghcr.io/veops/oneterm-api:v26.10.1
     container_name: oneterm-api
     environment:
       ONETERM_RDP_DRIVE_PATH: /rdp
@@ -31,7 +31,7 @@ services:
       - "2222:2222"
 
   oneterm-guacd:
-    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-guacd:1.5.4
+    image: ghcr.io/veops/oneterm-guacd:v26.10.1
     container_name: oneterm-guacd
     user: root
     restart: always
@@ -51,7 +51,7 @@ services:
           - oneterm-guacd
 
   mysql:
-    image: registry.cn-hangzhou.aliyuncs.com/veops/mysql:8.2.0
+    image: ghcr.io/veops/mysql:v26.10.1
     container_name: oneterm-mysql
     environment:
       TZ: Asia/Shanghai
@@ -77,7 +77,7 @@ services:
           - mysql
 
   redis:
-    image: registry.cn-hangzhou.aliyuncs.com/veops/redis:7.2.3
+    image: ghcr.io/veops/redis:v26.10.1
     container_name: oneterm-redis
     restart: always
     environment:
@@ -95,7 +95,7 @@ services:
           - redis
 
   oneterm-ui:
-    image: registry.cn-hangzhou.aliyuncs.com/veops/oneterm-ui:v25.9.1
+    image: ghcr.io/veops/oneterm-ui:v26.10.1
     container_name: oneterm-ui
     depends_on:
       oneterm-api:
@@ -121,7 +121,7 @@ services:
       - "8666:80"
 
   acl-api:
-    image: registry.cn-hangzhou.aliyuncs.com/veops/acl-api:2.2
+    image: ghcr.io/veops/acl-api:v26.10.1
     container_name: oneterm-acl-api
     depends_on:
       mysql:
@@ -134,6 +134,7 @@ services:
       SYSTEM_DEFAULT_LANGUAGE:  # en-US, zh-CN
     volumes:
       - ./.env:/data/apps/acl/.env
+      - ./acl-schema.py:/data/apps/acl/acl-schema.py:ro
     restart: always
     command:
       - /bin/sh
@@ -146,6 +147,8 @@ services:
           flask init-department
           touch /var/run/.initialized
         fi
+
+        python acl-schema.py || exit 1
 
         nohup bash -c 'flask db-setup && flask common-check-new-columns' >/dev/null 2>&1 &
 

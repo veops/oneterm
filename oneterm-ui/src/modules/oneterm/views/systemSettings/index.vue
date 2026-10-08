@@ -146,32 +146,112 @@ export default {
     }
   }
 
-  /deep/ .ant-tabs-content {
-    height: 100%;
-  }
-
-  /deep/ .ant-tabs-tabpane-active {
-    height: 100%;
-  }
 }
 </style>
 <style lang="less">
 @import '../../style/index.less';
 
 .system-settings {
+  .system-settings-panel {
+    width: 100%;
+    min-height: 100%;
+    min-width: 0;
+    background-color: #fff;
+    border-radius: 6px;
+  }
+
+  .terminal-settings-tab {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+
+    > .ant-tabs-bar {
+      flex-shrink: 0;
+    }
+
+    > .ant-tabs-content {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+
+      > .ant-tabs-tabpane-active {
+        height: 100%;
+      }
+    }
+  }
+
+  .system-settings-form {
+    .ant-form-item-label {
+      white-space: normal;
+    }
+
+    .ant-form-extra {
+      max-width: 420px;
+      line-height: 22px;
+      color: @text-color_3;
+    }
+  }
+
+  .system-settings-value {
+    display: inline-block;
+    max-width: 420px;
+    padding: 8px 0;
+    line-height: 22px;
+    color: @text-color_2;
+  }
+
+  @media (max-width: 900px) {
+    .system-settings-form {
+      .ant-form-item-label {
+        width: 100%;
+        padding: 0 16px 8px;
+        line-height: 22px;
+        text-align: left;
+      }
+
+      .ant-form-item-control-wrapper {
+        width: 100%;
+        margin-left: 0;
+        padding: 0 16px;
+      }
+    }
+  }
+
+  .system-settings-input {
+    width: 250px;
+    max-width: 100%;
+  }
+
+  .system-settings-toolbar {
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+
+    .ant-space {
+      flex-wrap: wrap;
+      row-gap: 8px;
+      max-width: 100%;
+    }
+
+    .ant-space-item,
+    .ant-input-search {
+      max-width: 100%;
+    }
+  }
+
   .system-settings-menu {
-    /deep/ .ant-tabs-bar,
-    /deep/ .ant-tabs-content {
+    > .ant-tabs-bar,
+    > .ant-tabs-content {
       border-left: 0;
       border-right: 0;
     }
 
-    /deep/ .ant-tabs-nav-wrap {
+    > .ant-tabs-bar .ant-tabs-nav-wrap {
       background-color: #fafafa;
       padding: 16px 0;
     }
 
-    /deep/ .ant-tabs-tab {
+    > .ant-tabs-bar .ant-tabs-tab {
       padding: 12px 24px;
       margin: 0;
       transition: all 0.2s ease;
@@ -186,7 +266,7 @@ export default {
       }
     }
 
-    /deep/ .ant-tabs-tab-active {
+    > .ant-tabs-bar .ant-tabs-tab-active {
       background-color: fade(@primary-color, 10%);
       font-weight: 600;
       color: @primary-color;
@@ -196,12 +276,19 @@ export default {
       }
     }
 
-    /deep/ .ant-tabs-ink-bar {
+    > .ant-tabs-bar .ant-tabs-ink-bar {
       display: none !important;
     }
 
-    /deep/ .ant-tabs-content {
+    > .ant-tabs-content {
+      height: 100%;
+      min-width: 0;
       padding-left: 20px;
+      overflow: auto;
+
+      > .ant-tabs-tabpane-active {
+        height: 100%;
+      }
     }
   }
 }

@@ -1,7 +1,7 @@
 <template>
-  <div class="quick-command">
+  <div class="quick-command system-settings-panel">
     <a-spin :tip="loadTip" :spinning="loading">
-      <div class="quick-command-header">
+      <div class="quick-command-header system-settings-toolbar">
         <a-space>
           <a-input-search
             v-model="filterName"
@@ -226,8 +226,6 @@ export default {
 <style lang="less" scoped>
 .quick-command {
   padding: 18px;
-  background-color: #ffffff;
-  border-radius: 6px;
 
   &-header {
     display: flex;

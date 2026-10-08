@@ -1,7 +1,7 @@
 <template>
-  <div class="session-recording">
+  <div class="session-recording system-settings-panel">
     <a-spin :tip="loadTip" :spinning="loading">
-      <div class="session-recording-header">
+      <div class="session-recording-header system-settings-toolbar">
         <a-space>
           <a-input-search
             v-model="filterName"

@@ -1,11 +1,12 @@
 <template>
-  <div class="display-setting">
+  <div class="display-setting system-settings-panel">
     <a-form-model
       ref="displaySettingForm"
+      class="system-settings-form"
       :model="form"
       :rules="rules"
-      :label-col="{ span: 7 }"
-      :wrapper-col="{ span: 14 }"
+      :label-col="{ xs: { span: 24 }, sm: { span: 7 } }"
+      :wrapper-col="{ xs: { span: 24 }, sm: { span: 14 } }"
     >
       <a-form-model-item :label="$t('oneterm.terminalDisplay.fontFamily')" prop="font_family">
         <a-select
@@ -93,7 +94,7 @@
         />
       </a-form-model-item>
 
-      <a-form-model-item :wrapper-col="{ span: 14, offset: 7 }">
+      <a-form-model-item :wrapper-col="{ xs: { span: 24 }, sm: { span: 14, offset: 7 } }">
         <a-button type="primary" @click="handleSubmit">
           {{ $t('save') }}
         </a-button>
@@ -196,13 +197,11 @@ export default {
 
 <style lang="less" scoped>
 .display-setting {
-  background-color: #FFFFFF;
-  width: 100%;
-  padding: 24px 0px 1px;
-  height: calc(100vh - 130px);
+  padding: 18px 0 1px;
 
   &-input {
     width: 250px;
+    max-width: 100%;
   }
 
   &-cursor {

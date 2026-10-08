@@ -1,7 +1,7 @@
 <template>
-  <div class="public-key">
+  <div class="public-key system-settings-panel">
     <a-spin :tip="loadTip" :spinning="loading">
-      <div class="public-key-header">
+      <div class="public-key-header system-settings-toolbar">
         <a-space>
           <a-input-search
             :placeholder="$t('placeholderSearch')"
@@ -216,16 +216,7 @@ export default {
 
 <style lang="less" scoped>
 .public-key {
-  background-color: #fff;
-  height: 100%;
-  border-radius: 6px;
   padding: 18px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-  transition: box-shadow 0.3s ease;
-
-  &:hover {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  }
 
   &-header {
     display: flex;

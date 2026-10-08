@@ -1,6 +1,13 @@
 <template>
-  <div class="access-control">
-    <a-form-model ref="configForm" :model="form" :rules="rules" :label-col="{ span: 7 }" :wrapper-col="{ span: 14 }">
+  <div class="access-control system-settings-panel">
+    <a-form-model
+      ref="configForm"
+      class="system-settings-form"
+      :model="form"
+      :rules="rules"
+      :label-col="{ xs: { span: 24 }, sm: { span: 7 } }"
+      :wrapper-col="{ xs: { span: 24 }, sm: { span: 14 } }"
+    >
       <a-form-model-item :label="$t('oneterm.accessControl.timeout')" prop="timeout">
         <a-input-number
           :min="0"
@@ -93,10 +100,7 @@ export default {
 
 <style lang="less" scoped>
 .access-control {
-  background-color: #fff;
-  height: 100%;
-  padding: 18px 0px;
-  border-radius: 6px;
+  padding: 18px 0;
 
   &-label {
     display: inline-flex;

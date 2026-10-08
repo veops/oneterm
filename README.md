@@ -1,7 +1,5 @@
 <p align="center">
-  <a href="https://v1ops.com/">
-    <img alt="oneterm_banner" src="https://github.com/user-attachments/assets/6a96c210-3c85-4b8e-ad84-6cecd95e2066" />
-  </a>
+  <img alt="oneterm_banner" src="https://github.com/user-attachments/assets/6a96c210-3c85-4b8e-ad84-6cecd95e2066" />
 </p>
 
 <p align="center">
@@ -29,11 +27,6 @@
 
 OneTerm is a simple, lightweight, and flexible enterprise-level bastion host product. Based on the 4A concept: Authentication, Authorization, Account, and Audit, it ensures system security and compliance through strict access control and monitoring functions.
 
-- Official Website: [v1ops.com](https://v1ops.com/)
-- Product Documentation: [v1ops.com/docs/design](https://v1ops.com/docs/design/)
-- Online Demo: [oneterm.v1ops.com](https://oneterm.v1ops.com/)
-  - Username: demo or admin
-  - Password: 123456
 - **Note**: The `main` branch may be in an **unstable state** during development. Please obtain the latest stable version through [releases](https://github.com/veops/oneterm/releases).
 
 ## Core Features

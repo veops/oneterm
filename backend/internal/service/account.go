@@ -2,12 +2,19 @@ package service
 
 import (
 	"context"
+	"errors"
 
 	"github.com/gin-gonic/gin"
 	"github.com/veops/oneterm/internal/acl"
 	"github.com/veops/oneterm/internal/model"
 	"github.com/veops/oneterm/internal/repository"
+	"github.com/veops/oneterm/pkg/config"
 	"gorm.io/gorm"
+)
+
+var (
+	ErrAccountNotFound  = errors.New("account not found")
+	ErrAccountForbidden = errors.New("permission denied")
 )
 
 // AccountService handles account business logic
@@ -74,16 +81,32 @@ func (s *AccountService) BuildQueryWithAuthorization(ctx *gin.Context) (*gorm.DB
 
 // GetAccountCredentials gets account credentials with ACL permission check
 func (s *AccountService) GetAccountCredentials(ctx *gin.Context, accountId int) (*model.Account, error) {
-	credential, err := RetrieveHumanCredential(ctx, model.PAMCredentialTarget{Kind: model.PAMOwnerAccount, ID: accountId})
+	currentUser, err := acl.GetSessionFromCtx(ctx)
 	if err != nil {
 		return nil, err
 	}
-	// Keep the legacy response shape while all disclosure checks and audit use the same broker.
+
 	var account model.Account
 	baseRepo := repository.NewBaseRepository()
 	if err := baseRepo.GetById(ctx, accountId, &account); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrAccountNotFound
+		}
 		return nil, err
 	}
-	account.SetCredentialValues(credential.Password, credential.PK, credential.Phrase)
+
+	if !acl.IsAdmin(currentUser) {
+		hasPermission, err := acl.HasPermission(ctx, currentUser.GetRid(), config.RESOURCE_ACCOUNT, account.ResourceId, acl.READ)
+		if err != nil {
+			return nil, err
+		}
+		if !hasPermission {
+			return nil, ErrAccountForbidden
+		}
+	}
+
+	if err := repository.ResolveCredential(ctx.Request.Context(), &account); err != nil {
+		return nil, err
+	}
 	return &account, nil
 }

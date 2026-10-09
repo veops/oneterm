@@ -1227,11 +1227,6 @@ paths:
         name: id
         required: true
         type: integer
-      - description: MFA verification token
-        in: header
-        name: X-MFA-Token
-        required: true
-        type: string
       responses:
         "200":
           description: OK
@@ -1242,7 +1237,7 @@ paths:
                 data:
                   $ref: '#/definitions/model.Account'
               type: object
-      summary: Get account credentials with MFA verification
+      summary: Get account credentials with authorization check only
       tags:
       - account
   /account/{id}/credentials2:

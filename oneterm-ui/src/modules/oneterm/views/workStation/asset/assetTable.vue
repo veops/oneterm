@@ -43,16 +43,6 @@
             >
               <ops-icon class="workstation-asset-table-account-protocol" :type="item.protocolIcon" />
               <span class="workstation-asset-table-account-name">{{ item.account_name }}</span>
-              <a-tooltip v-if="Number(item.account_id) > 0" :title="$t('oneterm.passwordView.settingsTitle')">
-                <a-button
-                  type="link"
-                  size="small"
-                  :aria-label="$t('oneterm.passwordView.settingsTitle')"
-                  @click.stop="$emit('view-password', Number(item.account_id))"
-                ><a-icon
-                  type="eye"
-                /></a-button>
-              </a-tooltip>
             </div>
           </div>
         </template>

@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/samber/lo"
 	"github.com/spf13/cast"
 
+	"github.com/veops/oneterm/internal/acl"
 	"github.com/veops/oneterm/internal/model"
 	"github.com/veops/oneterm/internal/service"
 	"github.com/veops/oneterm/pkg/config"
@@ -116,7 +118,6 @@ func (c *Controller) GetAccounts(ctx *gin.Context) {
 	}
 
 	// Always exclude sensitive fields (password, pk, phrase) for security
-	// These fields require separate MFA-protected API calls to access
 	if info {
 		db = db.Select("id", "name", "account")
 	} else {
@@ -132,15 +133,28 @@ func (c *Controller) GetAccounts(ctx *gin.Context) {
 // GetAccountCredentials godoc
 //
 //	@Tags		account
-//	@Summary	Get account credentials with MFA verification
-//	@Param		id			path		int		true	"Account ID"
-//	@Param		X-MFA-Token	header		string	true	"MFA verification token"
-//	@Success	200			{object}	HttpResponse{data=model.Account}
+//	@Summary	Get account credentials with authorization check only
+//	@Param		id	path		int	true	"Account ID"
+//	@Success	200	{object}	HttpResponse{data=model.Account}
 //	@Router		/account/{id}/credentials [post]
 func (c *Controller) GetAccountCredentials(ctx *gin.Context) {
+	c.writeAccountCredentials(ctx)
+}
+
+// GetAccountCredentials2 godoc
+//
+//	@Tags		account
+//	@Summary	Get account credentials with authorization check only
+//	@Param		id	path		int	true	"Account ID"
+//	@Success	200	{object}	HttpResponse{data=model.Account}
+//	@Router		/account/{id}/credentials2 [get]
+func (c *Controller) GetAccountCredentials2(ctx *gin.Context) {
+	c.writeAccountCredentials(ctx)
+}
+
+func (c *Controller) writeAccountCredentials(ctx *gin.Context) {
 	ctx.Header("Cache-Control", "no-store")
 	ctx.Header("Pragma", "no-cache")
-	// Get account ID from path parameter
 	accountId := cast.ToInt(ctx.Param("id"))
 	if accountId == 0 {
 		ctx.AbortWithError(http.StatusBadRequest, &myErrors.ApiError{
@@ -152,24 +166,28 @@ func (c *Controller) GetAccountCredentials(ctx *gin.Context) {
 
 	account, err := accountService.GetAccountCredentials(ctx, accountId)
 	if err != nil {
-		abortPAM(ctx, err)
+		switch {
+		case errors.Is(err, service.ErrAccountNotFound):
+			ctx.AbortWithError(http.StatusNotFound, &myErrors.ApiError{
+				Data: map[string]any{"err": "Account not found"},
+			})
+		case errors.Is(err, service.ErrAccountForbidden):
+			ctx.AbortWithError(http.StatusForbidden, &myErrors.ApiError{
+				Code: myErrors.ErrNoPerm,
+				Data: map[string]any{"perm": acl.READ},
+			})
+		default:
+			ctx.AbortWithError(http.StatusInternalServerError, &myErrors.ApiError{
+				Code: myErrors.ErrInternal,
+				Data: map[string]any{"err": err.Error()},
+			})
+		}
 		return
 	}
 
 	ctx.JSON(http.StatusOK, HttpResponse{
 		Data: account,
 	})
-}
-
-// GetAccountCredentials2 godoc
-//
-//	@Tags		account
-//	@Summary	Get account credentials with authorization check only
-//	@Param		id		path		int		true	"Account ID"
-//	@Success	200		{object}	HttpResponse{data=model.Account}
-//	@Router		/account/{id}/credentials2 [get]
-func (c *Controller) GetAccountCredentials2(ctx *gin.Context) {
-	c.GetAccountCredentials(ctx)
 }
 
 // GetAccountIdsByAuthorization gets account IDs by authorization

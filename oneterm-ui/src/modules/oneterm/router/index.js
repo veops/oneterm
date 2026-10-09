@@ -100,7 +100,7 @@ const genOnetermRoutes = () => {
         path: '/oneterm/audit',
         name: 'oneterm_session',
         component: RouteView,
-        meta: { title: 'oneterm.menu.auditCentre', appName: 'oneterm', icon: 'ops-oneterm-log-selected', selectedIcon: 'ops-oneterm-log-selected', permission: ['oneterm_admin', 'Audits.online_session', 'Audits.offline_session', 'Audits.login_audit', 'Audits.operation_audit', 'Audits.file_history', 'Audits.credential_access_audit', 'Audits.password_view_audit'] },
+        meta: { title: 'oneterm.menu.auditCentre', appName: 'oneterm', icon: 'ops-oneterm-log-selected', selectedIcon: 'ops-oneterm-log-selected', permission: ['oneterm_admin', 'Audits.online_session', 'Audits.offline_session', 'Audits.login_audit', 'Audits.operation_audit', 'Audits.file_history'] },
         redirect: '/oneterm/session/online',
         hideChildrenInMenu: false,
         children: [
@@ -124,7 +124,7 @@ const genOnetermRoutes = () => {
           {
             path: `/oneterm/log`,
             name: `oneterm_log`,
-            meta: { title: 'oneterm.menu.logAuditing', appName: 'oneterm', disabled: true, style: 'margin-left: 12px', permission: ['oneterm_admin', 'Audits.login_audit', 'Audits.operation_audit', 'Audits.file_history', 'Audits.credential_access_audit', 'Audits.password_view_audit'] },
+            meta: { title: 'oneterm.menu.logAuditing', appName: 'oneterm', disabled: true, style: 'margin-left: 12px', permission: ['oneterm_admin', 'Audits.login_audit', 'Audits.operation_audit', 'Audits.file_history'] },
           },
           {
             path: '/oneterm/log/login',
@@ -143,18 +143,6 @@ const genOnetermRoutes = () => {
             name: 'oneterm_log_file',
             meta: { title: 'oneterm.menu.fileLog', appName: 'oneterm', icon: 'ops-oneterm-file_log', selectedIcon: 'ops-oneterm-file_log-selected', permission: ['文件日志', 'oneterm_admin', 'Audits.file_history'] },
             component: () => import('../views/log/file')
-          },
-          {
-            path: '/oneterm/pam/audit',
-            name: 'oneterm_pam_audit',
-            meta: { title: 'oneterm.pam.audit', appName: 'oneterm', icon: 'safety-certificate', permission: ['oneterm_admin', 'Audits.credential_access_audit'] },
-            component: () => import('../views/pam/accessAudit.vue')
-          },
-          {
-            path: '/oneterm/pam/password-view-audit',
-            name: 'oneterm_password_view_audit',
-            meta: { title: 'oneterm.passwordView.auditTitle', appName: 'oneterm', icon: 'file-search', permission: ['oneterm_admin', 'Audits.password_view_audit'] },
-            component: () => import('../views/pam/passwordViewAudit.vue')
           }
         ]
       },
@@ -162,7 +150,7 @@ const genOnetermRoutes = () => {
         path: '/oneterm/settings',
         name: 'onterm_settings',
         component: () => import('../views/systemSettings'),
-        meta: { title: 'oneterm.menu.systemSettings', appName: 'oneterm', icon: 'veops-setting2', selectedIcon: 'veops-setting2', keepAlive: false, permission: ['oneterm_admin', 'System_Config.public_key', 'System_Config.quick_command', 'System_Config.terminal_show', 'System_Config.terminal_control', 'System_Config.password_view'] }
+        meta: { title: 'oneterm.menu.systemSettings', appName: 'oneterm', icon: 'veops-setting2', selectedIcon: 'veops-setting2', keepAlive: false, permission: ['oneterm_admin', 'System_Config.public_key', 'System_Config.quick_command', 'System_Config.terminal_show', 'System_Config.terminal_control'] }
       },
       {
         path: '/oneterm/terminal',

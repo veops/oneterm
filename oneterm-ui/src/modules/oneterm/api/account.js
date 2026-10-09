@@ -31,11 +31,9 @@ export function deleteAccountById(id) {
   })
 }
 
-export function verifyUserByMFA(id, headers) {
+export function getAccountByCredentials(id) {
   return axios({
-    url: `/oneterm/v1/account/${id}/credentials`,
-    method: 'post',
-    headers,
-    isShowMessage: false
+    url: `/oneterm/v1/account/${id}/credentials2`,
+    method: 'get',
   })
 }

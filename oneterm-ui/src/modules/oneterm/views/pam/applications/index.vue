@@ -55,9 +55,6 @@
               <a-tooltip :title="$t('edit')">
                 <a-button type="link" size="small" :disabled="!allowed(row, 'write') || Boolean(pending)" @click="edit(row)"><ops-icon type="icon-xianxing-edit" /></a-button>
               </a-tooltip>
-              <a-tooltip :title="$t('oneterm.pam.audit')">
-                <a-button type="link" size="small" @click="openAudit(row)"><a-icon type="history" /></a-button>
-              </a-tooltip>
               <a-tooltip :title="$t('grant')">
                 <a-button type="link" size="small" :disabled="!allowed(row, 'grant')" @click="grant(row)"><a-icon type="team" /></a-button>
               </a-tooltip>
@@ -181,9 +178,6 @@ export default {
         this.allTreeLoaded = true
       }
       this.$refs.grant.open({ type: 'pam_application', resourceId: row.resource_id, ids: [row.id] })
-    },
-    openAudit(row) {
-      this.$router.push({ path: '/oneterm/pam/audit', query: { actor_type: 'application', actor_id: String(row.id), application_name: row.name } })
     },
     save(input) { this.begin({ type: 'save', ...input }) },
     confirmDisable(row) {

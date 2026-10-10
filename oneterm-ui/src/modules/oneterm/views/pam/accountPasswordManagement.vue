@@ -5,7 +5,12 @@
         <template v-if="account && capabilities">
           <div class="pam-managed-summary"><strong>{{ account.account }}</strong><span>{{ authority(account) }}</span><span>{{ $t('oneterm.pam.platforms.' + account.platform) }}</span></div>
           <div class="pam-managed-detail-actions">
-            <CredentialReveal :id="account.id" :name="account.name" :auth-type="Number(account.account_type)" :disabled="!account.enabled || !allowed(account, 'retrieve')" :load="reveal" />
+            <span class="pam-credential-view">
+              <a v-if="allowed(account, 'read')" @click="showCredential"><a-icon :type="credentialVisible ? 'eye' : 'eye-invisible'" /></a>
+              <span v-if="credentialVisible">{{ credentialText }}</span>
+              <span v-else>******</span>
+              <a v-if="credentialVisible" @click="copyCredential"><a-icon type="copy" /></a>
+            </span>
             <a-space>
               <a-tooltip :title="$t('grant')"><a-button :disabled="!allowed(account, 'grant')" @click="grant(account)"><a-icon type="team" /></a-button></a-tooltip>
               <a-dropdown v-if="allowed(account, 'manage_policy')" :trigger="['click']" :disabled="Boolean(pending)">
@@ -65,20 +70,28 @@
 
 <script>
 import { mapState } from 'vuex'
+import { getAccountByCredentials } from '@/modules/oneterm/api/account'
 import {
-  getPAMCapabilities, getPAMAccount, getPAMAccountBindings, getPAMPolicy,
-  adoptPAMAccount, attachPAMAccount, reviewPAMBinding, setPAMAccountEnabled, savePAMPolicy, retrievePAMCredential, removeAccountManagement
+  getPAMCapabilities,
+  getPAMAccount,
+  getPAMAccountBindings,
+  getPAMPolicy,
+  adoptPAMAccount,
+  attachPAMAccount,
+  reviewPAMBinding,
+  setPAMAccountEnabled,
+  savePAMPolicy,
+  removeAccountManagement
 } from '@/modules/oneterm/api/pam'
 import ManagedAccountEditor from './managedAccountEditor.vue'
 import PolicyEditor from './policyEditor.vue'
 import MFAModal from '@/views/mfa/mfaModal'
 import GrantModal from '@/modules/oneterm/components/grant/grantModal.vue'
-import CredentialReveal from '@/modules/oneterm/components/credentialReveal.vue'
 import PasswordOperations from './passwordOperations.vue'
 
 export default {
   name: 'AccountPasswordManagement',
-  components: { ManagedAccountEditor, PolicyEditor, MFAModal, GrantModal, CredentialReveal, PasswordOperations },
+  components: { ManagedAccountEditor, PolicyEditor, MFAModal, GrantModal, PasswordOperations },
   data() {
     return { visible: false,
       capabilities: null,
@@ -95,7 +108,9 @@ export default {
       detailTab: 'bindings',
       pending: null,
       actionId: 0,
-      retried: false }
+      retried: false,
+      credentialVisible: false,
+      credentialText: '' }
   },
   computed: {
     passwordPlatform() { return (this.capabilities?.managed_account_platforms || []).some((item) => item.id === this.account?.platform && (item.operations || []).includes('verify_secret')) },
@@ -126,11 +141,32 @@ export default {
       }
     },
     close() { this.visible = false; this.opening += 1; this.closeDetail(); if (this.$refs.editor) this.$refs.editor.close() },
-    closeDetail() { this.detailVisible = false; this.detailGeneration += 1; this.bindingGeneration += 1; this.account = null; this.policy = null; this.cancelOperation() },
+    closeDetail() { this.detailVisible = false; this.detailGeneration += 1; this.bindingGeneration += 1; this.account = null; this.policy = null; this.clearCredential(); this.cancelOperation() },
+    clearCredential() { this.credentialVisible = false; this.credentialText = '' },
+    async showCredential() {
+      if (!this.account || !this.allowed(this.account, 'read')) return
+      if (this.credentialVisible) {
+        this.clearCredential()
+        return
+      }
+      try {
+        const response = await getAccountByCredentials(this.account.id)
+        const data = response?.data || {}
+        this.credentialText = Number(data.account_type) === 1 ? (data.password || '') : (data.pk || '')
+        this.credentialVisible = true
+      } catch (error) {
+        this.clearCredential()
+        this.$message.error(error?.response?.data?.message || this.$t('requestError'))
+      }
+    },
+    copyCredential() {
+      this.$copyText(this.credentialText).then(() => this.$message.success(this.$t('copySuccess')))
+    },
     allowed(row, permission) { return this.isAdmin || (row?.permissions || []).includes(permission) },
     authority(row) { return row.authority_kind === 'shared' ? row.authority_ref : this.$t('oneterm.pam.localAccount') },
     async inspect(id, retainTab = false) {
       const generation = ++this.detailGeneration
+      this.clearCredential()
       if (!retainTab) { this.account = null; this.policy = null; this.bindings = []; this.bindingTotal = 0; this.detailTab = 'bindings' }
       this.detailVisible = true; this.detailLoading = true
       try {
@@ -158,7 +194,6 @@ export default {
     adopt(source) { if (this.capabilities) this.$refs.editor.open(source || null, this.capabilities) },
     attach() { this.$refs.editor.open(this.account, this.capabilities, this.account) },
     grant(row) { this.$refs.grant.open({ type: 'account', resourceId: row.resource_id, ids: [row.id] }) },
-    reveal(id, token) { return retrievePAMCredential('account', id, token).then((response) => response.data) },
     toggleAccount(row) {
       this.$confirm({ title: this.$t(row.enabled ? 'oneterm.pam.disableManagedAccount' : 'oneterm.pam.enableManagedAccount'),
         content: this.$t(row.enabled ? 'oneterm.pam.disableManagedConfirm' : 'oneterm.pam.enableManagedConfirm', { name: row.name }),
@@ -232,6 +267,8 @@ export default {
 .pam-managed-summary strong { font-size: 16px; }
 .pam-managed-summary span { color: #78818b; }
 .pam-managed-detail-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.pam-credential-view { display: inline-flex; align-items: center; gap: 8px; max-width: 420px; }
+.pam-credential-view span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pam-managed-warning { color: #a35b15; }
 .pam-managed-detail-spin { height: 100%; }
 .pam-managed-detail-spin /deep/ .ant-spin-container { display: flex; flex-direction: column; height: 100%; }

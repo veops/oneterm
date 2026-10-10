@@ -22,7 +22,6 @@
               :accountList="accountList"
               @openTerminal="openTerminal"
               @openTerminalList="openTerminalList"
-              @view-password="openPasswordView"
             />
           </a-tab-pane>
 
@@ -130,12 +129,6 @@
           </template>
 
           <a-space slot="tabBarExtraContent">
-            <a-button
-              type="link"
-              class="workstation-password-entry"
-              @click="openPasswordView()"
-            ><a-icon type="key" />{{ $t('oneterm.passwordView.settingsTitle') }}</a-button
-            >
             <a-icon
               :type="showOperationMenu ? 'menu-unfold' : 'menu-fold'"
               class="operation-menu-icon"
@@ -161,18 +154,6 @@
     </AssetList>
 
     <RecentSession ref="recentSessionRef" @openTerminal="openTerminal" />
-    <a-drawer
-      :visible="passwordViewVisible"
-      width="min(1120px, 100vw)"
-      :title="$t('oneterm.passwordView.settingsTitle')"
-      @close="passwordViewVisible = false"
-    >
-      <PasswordViewAccounts
-        v-if="passwordViewVisible"
-        :account-id="passwordAccountId"
-        @clear-target="passwordAccountId = 0"
-      />
-    </a-drawer>
   </div>
 </template>
 
@@ -200,7 +181,6 @@ import ThemeSetting from '../systemSettings/terminalDisplay/themeSetting.vue'
 import AssetTable from './asset/assetTable.vue'
 import BatchExecution from './batchExecution/index.vue'
 import OperationMenu from './operationMenu/index.vue'
-import PasswordViewAccounts from './passwordView/index.vue'
 
 const operationMenuExpandKey = 'ops_oneterm_work_station_menu_expand'
 
@@ -217,15 +197,12 @@ export default {
     AssetTable,
     BatchExecution,
     OperationMenu,
-    PasswordViewAccounts,
   },
   data() {
     return {
       userStat: {},
       terminalList: [],
       tabActiveKey: WORKSTATION_TAB_TYPE.MY_ASSETS,
-      passwordAccountId: 0,
-      passwordViewVisible: false,
       preferenceSetting: {
         ...defaultPreferenceSetting,
       },
@@ -282,10 +259,6 @@ export default {
     }
   },
   methods: {
-    openPasswordView(accountId = 0) {
-      this.passwordAccountId = Number(accountId)
-      this.passwordViewVisible = true
-    },
     async getAccountList() {
       const res = await getAccountList({ page_index: 1, info: this.forMyAsset })
       this.accountList = res?.data?.list || []

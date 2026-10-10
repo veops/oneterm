@@ -193,20 +193,13 @@ const docTemplate = `{
                 "tags": [
                     "account"
                 ],
-                "summary": "Get account credentials with MFA verification",
+                "summary": "Get account credentials with authorization check only",
                 "parameters": [
                     {
                         "type": "integer",
                         "description": "Account ID",
                         "name": "id",
                         "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "MFA verification token",
-                        "name": "X-MFA-Token",
-                        "in": "header",
                         "required": true
                     }
                 ],

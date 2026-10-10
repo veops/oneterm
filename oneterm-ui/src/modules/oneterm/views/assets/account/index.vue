@@ -52,16 +52,32 @@
           <vxe-column type="checkbox" width="60px"></vxe-column>
           <vxe-column :title="$t(`oneterm.name`)" field="name"> </vxe-column>
           <vxe-column :title="$t(`oneterm.account`)" field="account"> </vxe-column>
-          <vxe-column :title="$t('oneterm.passwordView.credentialColumn')" field="account_type" min-width="150">
+          <vxe-column :title="$t(`oneterm.password`) + ' | ' + $t('oneterm.secretkey')" field="account_type">
             <template #default="{row}">
-              <CredentialReveal
-                :key="row.id"
-                :id="row.id"
-                :name="row.name"
-                :auth-type="Number(row.account_type)"
-                :disabled="!getAccountPermission(row, 'retrieve')"
-                :load="revealCredential"
-              />
+              <div class="table-password">
+                <template v-if="getPasswordText(row) && row.showPassword">
+                  <a @click="row.showPassword = false"><a-icon type="eye" /></a>
+                  <a @click="copyPassword(getPasswordText(row))"><a-icon type="copy" /></a>
+                  <a-tooltip
+                    :title="getPasswordText(row)"
+                    :overlayStyle="{
+                      overflow: 'auto',
+                      maxHeight: '400px'
+                    }"
+                  >
+                    <span>{{ getPasswordText(row) }}</span>
+                  </a-tooltip>
+                </template>
+                <template v-else>
+                  <a
+                    v-if="getAccountPermission(row, 'read')"
+                    @click="showTablePassword(row)"
+                  >
+                    <a-icon type="eye-invisible" />
+                  </a>
+                  <span>******</span>
+                </template>
+              </div>
             </template>
           </vxe-column>
           <vxe-column :title="$t(`oneterm.assetCount`)" field="asset_count"> </vxe-column>
@@ -114,15 +130,13 @@
 </template>
 
 <script>
-import _ from 'lodash'
 import moment from 'moment'
 import { mapState } from 'vuex'
-import { getAccountList, deleteAccountById, verifyUserByMFA } from '@/modules/oneterm/api/account'
+import { getAccountList, deleteAccountById, getAccountByCredentials } from '@/modules/oneterm/api/account'
 import { getAllDepAndEmployee } from '@/api/company'
 
 import GrantModal from '@/modules/oneterm/components/grant/grantModal.vue'
 import AccountModal from './accountModal.vue'
-import CredentialReveal from '../../../components/credentialReveal.vue'
 import AccountPasswordManagement from '../../pam/accountPasswordManagement.vue'
 
 export default {
@@ -130,7 +144,6 @@ export default {
   components: {
     AccountModal,
     GrantModal,
-    CredentialReveal,
     AccountPasswordManagement
   },
   provide() {
@@ -181,6 +194,9 @@ export default {
       })
         .then((res) => {
           const tableData = res?.data?.list || []
+          tableData.forEach((item) => {
+            item.showPassword = false
+          })
           this.tableData = tableData
           this.tablePage = {
             ...this.tablePage,
@@ -271,9 +287,49 @@ export default {
     clickEditButton(data) {
       this.$refs.accountModal.open(data)
     },
-    async revealCredential(id, token) {
-      const response = await verifyUserByMFA(id, { 'X-MFA-Token': token })
-      return response.data
+
+    getPasswordText(data) {
+      return data.account_type === 1 ? data.password : data.pk
+    },
+
+    async showTablePassword(data) {
+      if (this.getPasswordText(data)) {
+        data.showPassword = true
+      } else {
+        const res = await getAccountByCredentials(data.id)
+        if (res?.data) {
+          const accountData = this.handleTablePassword(res.data)
+          this.$set(accountData, 'showPassword', true)
+        }
+      }
+    },
+
+    handleTablePassword(data) {
+      let newData = data
+      const tableDataIndex = this.tableData.findIndex((item) => item.id === data.id)
+
+      if (tableDataIndex !== -1) {
+        const rowData = this.tableData[tableDataIndex]
+        const { pk, password, phrase, account_type } = data
+        if (account_type === 1) {
+          rowData.password = password
+        } else {
+          rowData.pk = pk
+          rowData.phrase = phrase
+        }
+
+        this.$set(this.tableData, tableDataIndex, rowData)
+        newData = rowData
+      }
+
+      return newData
+    },
+
+    copyPassword(text) {
+      this.$copyText(text)
+        .then(() => {
+          this.$message.success(this.$t('copySuccess'))
+        })
     }
   },
 }
@@ -282,4 +338,21 @@ export default {
 <style lang="less" scoped>
 @import '../../../style/index.less';
 
+.table-password {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+
+  a {
+    margin-right: 8px;
+    flex-shrink: 0;
+  }
+
+  span {
+    width: 100%;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    text-wrap: nowrap;
+  }
+}
 </style>

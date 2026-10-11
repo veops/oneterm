@@ -1,11 +1,8 @@
 package controller
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
 	"reflect"
 	"time"
@@ -277,26 +274,11 @@ func doUpdate[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType 
 		return
 	}
 
-	// Read request body for partial update field detection
-	bodyBytes, err := io.ReadAll(ctx.Request.Body)
-	if err != nil {
+	// Authentication caches JSON; use the same body for field detection and binding.
+	var bodyFields map[string]any
+	if err = ctx.ShouldBindBodyWithJSON(&bodyFields); err != nil {
 		ctx.AbortWithError(http.StatusBadRequest, &myErrors.ApiError{Code: myErrors.ErrInvalidArgument, Data: map[string]any{"err": err}})
 		return
-	}
-	// Restore body for binding
-	ctx.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
-
-	// Parse body to extract field keys for partial update
-	var bodyFields map[string]any
-	if len(bodyBytes) > 0 {
-		json.Unmarshal(bodyBytes, &bodyFields)
-	}
-	if _, credential := any(md).(model.CredentialOwner); credential {
-		// Authentication caches and consumes JSON. Credential replacement needs the original field presence.
-		if err = ctx.ShouldBindBodyWithJSON(&bodyFields); err != nil {
-			ctx.AbortWithError(http.StatusBadRequest, &myErrors.ApiError{Code: myErrors.ErrInvalidArgument, Data: map[string]any{"err": err}})
-			return
-		}
 	}
 
 	if err = ctx.ShouldBindBodyWithJSON(md); err != nil {
@@ -328,20 +310,29 @@ func doUpdate[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType 
 
 	if needAcl {
 		md.SetResourceId(old.GetResourceId())
-		if !hasPerm(ctx, md, resourceType, acl.WRITE) {
+		if !hasPerm(ctx, old, resourceType, acl.WRITE) {
 			ctx.AbortWithError(http.StatusForbidden, &myErrors.ApiError{Code: myErrors.ErrNoPerm, Data: map[string]any{"perm": acl.WRITE}})
 			return
 		}
 
-		rename := true
-		if _, ok := any(md).(model.CredentialOwner); ok {
-			_, rename = bodyFields["name"]
-			rename = rename && md.GetName() != old.GetName()
+		if _, present := bodyFields["authorization"]; present {
+			changed := false
+			switch updated := any(md).(type) {
+			case *model.Asset:
+				changed = !reflect.DeepEqual(updated.Authorization, any(old).(*model.Asset).Authorization)
+			case *model.Node:
+				changed = !reflect.DeepEqual(updated.Authorization, any(old).(*model.Node).Authorization)
+			}
+			if changed && !hasPerm(ctx, old, resourceType, acl.GRANT) {
+				ctx.AbortWithError(http.StatusForbidden, &myErrors.ApiError{Code: myErrors.ErrNoPerm, Data: map[string]any{"perm": acl.GRANT}})
+				return
+			}
 		}
-		if rename {
+
+		if _, rename := bodyFields["name"]; rename && md.GetName() != old.GetName() {
 			_, ok := any(md).(*model.Node)
 			if err = acl.UpdateResource(ctx, currentUser.GetUid(), old.GetResourceId(),
-				map[string]string{"name": lo.Ternary(ok, cast.ToString(md.GetId()), md.GetName())}); err != nil {
+				map[string]string{"name": lo.Ternary(ok, cast.ToString(id), md.GetName())}); err != nil {
 				handleRemoteErr(ctx, err)
 				return
 			}
@@ -366,9 +357,11 @@ func doUpdate[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType 
 
 			switch t := any(md).(type) {
 			case *model.Asset:
-				if err = service.DefaultAuthService.HandleAuthorization(ctx, tx, model.ACTION_UPDATE, t, nil); err != nil {
-					handleRemoteErr(ctx, err)
-					return
+				if _, present := bodyFields["authorization"]; present {
+					if err = service.DefaultAuthService.HandleAuthorization(ctx, tx, model.ACTION_UPDATE, t, nil); err != nil {
+						handleRemoteErr(ctx, err)
+						return
+					}
 				}
 				// Define allowed fields based on auth type
 				if cast.ToBool(ctx.Value("isAuthWithKey")) {
@@ -380,9 +373,15 @@ func doUpdate[T model.Model](ctx *gin.Context, needAcl bool, md T, resourceType 
 						"comment", "connectable", "access_time_control", "asset_command_control", "web_config", "ci_id", "ci_type_id"}
 				}
 			case *model.Node:
-				if err = handleNodeAuthorization(ctx, tx, model.ACTION_UPDATE, t); err != nil {
-					handleRemoteErr(ctx, err)
-					return
+				if _, present := bodyFields["authorization"]; present {
+					if err = handleNodeAuthorization(ctx, tx, model.ACTION_UPDATE, t); err != nil {
+						handleRemoteErr(ctx, err)
+						return
+					}
+				}
+				allowedFields = []string{"name", "comment", "parent_id", "authorization", "protocols", "gateway_id"}
+				if _, present := bodyFields["access_auth"]; present {
+					selects = append(selects, "start", "end", "cmd_ids", "ranges", "allow")
 				}
 			case *model.Account:
 				// For accounts, allow selective field updates for sensitive data

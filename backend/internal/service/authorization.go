@@ -529,6 +529,33 @@ func (s *AuthorizationService) getClientIP(ctx *gin.Context) string {
 	return ctx.ClientIP()
 }
 
+func (s *AuthorizationService) createV2AuthorizationRule(ctx context.Context, tx *gorm.DB, rule *model.AuthorizationV2, currentUser *acl.Session) (err error) {
+	resourceId, err := acl.CreateAcl(ctx, currentUser, config.RESOURCE_AUTHORIZATION, rule.Name)
+	if err != nil {
+		return fmt.Errorf("failed to create ACL resource: %w", err)
+	}
+	rule.ResourceId = resourceId
+	defer func() {
+		if err == nil {
+			return
+		}
+		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancel()
+		if cleanupErr := acl.DeleteResource(cleanupCtx, currentUser.GetUid(), resourceId); cleanupErr != nil {
+			logger.L().Error("Failed to clean up authorization resource", zap.Int("resourceId", resourceId))
+		}
+	}()
+	if err = tx.Create(rule).Error; err != nil {
+		return fmt.Errorf("failed to create V2 authorization rule: %w", err)
+	}
+	if len(rule.Rids) > 0 {
+		if err = acl.BatchGrantRoleResource(ctx, currentUser.GetUid(), rule.Rids, resourceId, []string{acl.READ}); err != nil {
+			return fmt.Errorf("failed to grant role permissions: %w", err)
+		}
+	}
+	return nil
+}
+
 // createV2AuthorizationRulesForAsset creates V2 authorization rules for an asset
 func (s *AuthorizationService) createV2AuthorizationRulesForAsset(ctx context.Context, tx *gorm.DB, asset *model.Asset, currentUser *acl.Session) error {
 	if len(asset.Authorization) == 0 {
@@ -566,6 +593,7 @@ func (s *AuthorizationService) createV2AuthorizationRulesForAsset(ctx context.Co
 				Enabled:     true,
 
 				// Target selectors - specific asset and account
+				NodeSelector: model.TargetSelector{Type: model.SelectorTypeAll},
 				AssetSelector: model.TargetSelector{
 					Type:       model.SelectorTypeIds,
 					Values:     []string{fmt.Sprintf("%d", asset.Id)},
@@ -588,29 +616,8 @@ func (s *AuthorizationService) createV2AuthorizationRulesForAsset(ctx context.Co
 				UpdaterId: currentUser.GetUid(),
 			}
 
-			// Create ACL resource for this rule
-			resourceId, err := acl.CreateAcl(ctx, currentUser, config.RESOURCE_AUTHORIZATION, rule.Name)
-			if err != nil {
-				return fmt.Errorf("failed to create ACL resource: %w", err)
-			}
-			rule.ResourceId = resourceId
-
-			// Create the V2 rule
-			if err := tx.Create(rule).Error; err != nil {
-				return fmt.Errorf("failed to create V2 authorization rule: %w", err)
-			}
-
-			// Grant permissions to roles
-			if len(authData.Rids) > 0 {
-				if err := acl.BatchGrantRoleResource(ctx, currentUser.GetUid(), authData.Rids, resourceId, []string{acl.READ}); err != nil {
-					// Log error but continue - ACL resource was created successfully
-					logger.L().Error("Failed to grant role permissions during rule creation",
-						zap.Int("assetId", asset.Id),
-						zap.Int("accountId", accountId),
-						zap.Int("resourceId", resourceId),
-						zap.Ints("rids", authData.Rids),
-						zap.Error(err))
-				}
+			if err := s.createV2AuthorizationRule(ctx, tx, rule, currentUser); err != nil {
+				return err
 			}
 
 			// Important: Update the asset.Authorization field with the rule ID
@@ -708,6 +715,7 @@ func (s *AuthorizationService) updateV2AuthorizationRulesForAsset(ctx context.Co
 					Enabled:     true,
 
 					// Target selectors - specific asset and account
+					NodeSelector: model.TargetSelector{Type: model.SelectorTypeAll},
 					AssetSelector: model.TargetSelector{
 						Type:       model.SelectorTypeIds,
 						Values:     []string{fmt.Sprintf("%d", asset.Id)},
@@ -730,29 +738,8 @@ func (s *AuthorizationService) updateV2AuthorizationRulesForAsset(ctx context.Co
 					UpdaterId: currentUser.GetUid(),
 				}
 
-				// Create ACL resource for this rule
-				resourceId, err := acl.CreateAcl(ctx, currentUser, config.RESOURCE_AUTHORIZATION, rule.Name)
-				if err != nil {
-					return fmt.Errorf("failed to create ACL resource: %w", err)
-				}
-				rule.ResourceId = resourceId
-
-				// Create the V2 rule
-				if err := tx.Create(rule).Error; err != nil {
-					return fmt.Errorf("failed to create V2 authorization rule: %w", err)
-				}
-
-				// Grant permissions to roles
-				if len(newAuth.Rids) > 0 {
-					if err := acl.BatchGrantRoleResource(ctx, currentUser.GetUid(), newAuth.Rids, resourceId, []string{acl.READ}); err != nil {
-						// Log error but continue - ACL resource was created successfully
-						logger.L().Error("Failed to grant role permissions during rule creation",
-							zap.Int("assetId", asset.Id),
-							zap.Int("accountId", accountId),
-							zap.Int("resourceId", resourceId),
-							zap.Ints("rids", newAuth.Rids),
-							zap.Error(err))
-					}
+				if err := s.createV2AuthorizationRule(ctx, tx, rule, currentUser); err != nil {
+					return err
 				}
 
 				// Update the asset.Authorization field with the new rule ID
@@ -843,7 +830,7 @@ func (s *AuthorizationService) deleteV2AuthorizationRuleById(ctx context.Context
 }
 
 // updateV2AuthorizationRuleById updates a specific V2 authorization rule by ID
-func (s *AuthorizationService) updateV2AuthorizationRuleById(ctx context.Context, tx *gorm.DB, ruleId int, newAuth *model.AccountAuthorization, currentUser *acl.Session) error {
+func (s *AuthorizationService) updateV2AuthorizationRuleById(ctx context.Context, tx *gorm.DB, ruleId int, newAuth *model.AccountAuthorization, currentUser *acl.Session) (err error) {
 	// Get the existing rule
 	var existingRule model.AuthorizationV2
 	if err := tx.Where("id = ?", ruleId).First(&existingRule).Error; err != nil {
@@ -860,27 +847,36 @@ func (s *AuthorizationService) updateV2AuthorizationRuleById(ctx context.Context
 
 	// Check if role IDs changed
 	if !reflect.DeepEqual(existingRule.Rids, newAuth.Rids) {
+		removedRids := lo.Without(existingRule.Rids, newAuth.Rids...)
+		addedRids := lo.Without(newAuth.Rids, existingRule.Rids...)
+		defer func() {
+			if err == nil {
+				return
+			}
+			cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+			defer cancel()
+			if len(addedRids) > 0 {
+				if cleanupErr := acl.BatchRevokeRoleResource(cleanupCtx, currentUser.GetUid(), addedRids, existingRule.ResourceId, []string{acl.READ}); cleanupErr != nil {
+					logger.L().Error("Failed to roll back authorization grants", zap.Int("ruleId", ruleId))
+				}
+			}
+			if len(removedRids) > 0 {
+				if cleanupErr := acl.BatchGrantRoleResource(cleanupCtx, currentUser.GetUid(), removedRids, existingRule.ResourceId, []string{acl.READ}); cleanupErr != nil {
+					logger.L().Error("Failed to restore authorization grants", zap.Int("ruleId", ruleId))
+				}
+			}
+		}()
 		// Revoke old role permissions
-		if len(existingRule.Rids) > 0 {
-			if err := acl.BatchRevokeRoleResource(ctx, currentUser.GetUid(), existingRule.Rids, existingRule.ResourceId, []string{acl.READ}); err != nil {
-				// Log error but continue - ACL resource might not exist
-				logger.L().Error("Failed to revoke old role permissions, continuing anyway",
-					zap.Int("ruleId", ruleId),
-					zap.Int("resourceId", existingRule.ResourceId),
-					zap.Ints("rids", existingRule.Rids),
-					zap.Error(err))
+		if len(removedRids) > 0 {
+			if err := acl.BatchRevokeRoleResource(ctx, currentUser.GetUid(), removedRids, existingRule.ResourceId, []string{acl.READ}); err != nil {
+				return fmt.Errorf("failed to update role permissions: %w", err)
 			}
 		}
 
 		// Grant new role permissions
-		if len(newAuth.Rids) > 0 {
-			if err := acl.BatchGrantRoleResource(ctx, currentUser.GetUid(), newAuth.Rids, existingRule.ResourceId, []string{acl.READ}); err != nil {
-				// Log error but continue - we can still update the database record
-				logger.L().Error("Failed to grant new role permissions, continuing anyway",
-					zap.Int("ruleId", ruleId),
-					zap.Int("resourceId", existingRule.ResourceId),
-					zap.Ints("rids", newAuth.Rids),
-					zap.Error(err))
+		if len(addedRids) > 0 {
+			if err := acl.BatchGrantRoleResource(ctx, currentUser.GetUid(), addedRids, existingRule.ResourceId, []string{acl.READ}); err != nil {
+				return fmt.Errorf("failed to update role permissions: %w", err)
 			}
 		}
 
@@ -940,6 +936,7 @@ func (s *AuthorizationService) createV2AuthorizationRulesForNode(ctx context.Con
 				Enabled:     true,
 
 				// Target selectors - specific node and account
+				AssetSelector: model.TargetSelector{Type: model.SelectorTypeAll},
 				NodeSelector: model.TargetSelector{
 					Type:       model.SelectorTypeIds,
 					Values:     []string{fmt.Sprintf("%d", node.Id)},
@@ -962,29 +959,8 @@ func (s *AuthorizationService) createV2AuthorizationRulesForNode(ctx context.Con
 				UpdaterId: currentUser.GetUid(),
 			}
 
-			// Create ACL resource for this rule
-			resourceId, err := acl.CreateAcl(ctx, currentUser, config.RESOURCE_AUTHORIZATION, rule.Name)
-			if err != nil {
-				return fmt.Errorf("failed to create ACL resource: %w", err)
-			}
-			rule.ResourceId = resourceId
-
-			// Create the V2 rule
-			if err := tx.Create(rule).Error; err != nil {
-				return fmt.Errorf("failed to create V2 authorization rule: %w", err)
-			}
-
-			// Grant permissions to roles
-			if len(authData.Rids) > 0 {
-				if err := acl.BatchGrantRoleResource(ctx, currentUser.GetUid(), authData.Rids, resourceId, []string{acl.READ}); err != nil {
-					// Log error but continue - ACL resource was created successfully
-					logger.L().Error("Failed to grant role permissions during rule creation",
-						zap.Int("nodeId", node.Id),
-						zap.Int("accountId", accountId),
-						zap.Int("resourceId", resourceId),
-						zap.Ints("rids", authData.Rids),
-						zap.Error(err))
-				}
+			if err := s.createV2AuthorizationRule(ctx, tx, rule, currentUser); err != nil {
+				return err
 			}
 
 			// Important: Update the node.Authorization field with the rule ID
@@ -1082,6 +1058,7 @@ func (s *AuthorizationService) updateV2AuthorizationRulesForNode(ctx context.Con
 					Enabled:     true,
 
 					// Target selectors - specific node and account
+					AssetSelector: model.TargetSelector{Type: model.SelectorTypeAll},
 					NodeSelector: model.TargetSelector{
 						Type:       model.SelectorTypeIds,
 						Values:     []string{fmt.Sprintf("%d", node.Id)},
@@ -1104,29 +1081,8 @@ func (s *AuthorizationService) updateV2AuthorizationRulesForNode(ctx context.Con
 					UpdaterId: currentUser.GetUid(),
 				}
 
-				// Create ACL resource for this rule
-				resourceId, err := acl.CreateAcl(ctx, currentUser, config.RESOURCE_AUTHORIZATION, rule.Name)
-				if err != nil {
-					return fmt.Errorf("failed to create ACL resource: %w", err)
-				}
-				rule.ResourceId = resourceId
-
-				// Create the V2 rule
-				if err := tx.Create(rule).Error; err != nil {
-					return fmt.Errorf("failed to create V2 authorization rule: %w", err)
-				}
-
-				// Grant permissions to roles
-				if len(newAuth.Rids) > 0 {
-					if err := acl.BatchGrantRoleResource(ctx, currentUser.GetUid(), newAuth.Rids, resourceId, []string{acl.READ}); err != nil {
-						// Log error but continue - ACL resource was created successfully
-						logger.L().Error("Failed to grant role permissions during rule creation",
-							zap.Int("nodeId", node.Id),
-							zap.Int("accountId", accountId),
-							zap.Int("resourceId", resourceId),
-							zap.Ints("rids", newAuth.Rids),
-							zap.Error(err))
-					}
+				if err := s.createV2AuthorizationRule(ctx, tx, rule, currentUser); err != nil {
+					return err
 				}
 
 				// Update the node.Authorization field with the new rule ID

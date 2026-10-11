@@ -185,6 +185,8 @@ export default {
 
       loading: false,
       loadTip: '',
+      hasActivated: false,
+      requestId: 0,
       permissionConfigKeys: Object.values(PERMISSION_TYPE),
       authRawKeys: [
         'access_control',
@@ -216,16 +218,27 @@ export default {
       this.allTreeDepAndEmp = res
     })
   },
+  activated() {
+    if (this.hasActivated) {
+      this.updateTableData()
+    }
+    this.hasActivated = true
+  },
+  beforeDestroy() {
+    this.requestId += 1
+  },
   methods: {
     updateTableData() {
+      const requestId = ++this.requestId
       this.loading = true
 
-      getAuthList({
+      return getAuthList({
         page_index: this.currentPage,
         page_size: this.pageSize,
         search: this.searchValue
       })
         .then((res) => {
+          if (requestId !== this.requestId) return
           const tableData = res?.data?.list || []
           tableData.forEach((row) => {
             row.createdTimeText = moment(row.created_at).format('YYYY-MM-DD HH:mm:ss')
@@ -250,7 +263,9 @@ export default {
           this.totalResult = res?.data?.count ?? 0
         })
         .finally(() => {
-          this.loading = false
+          if (requestId === this.requestId) {
+            this.loading = false
+          }
         })
     },
     handleTargetSelectText(data) {

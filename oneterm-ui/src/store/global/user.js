@@ -7,7 +7,6 @@ import { getAllUsers } from '../../api/login'
 import { searchPermResourceByRoleId } from '@/modules/acl/api/permission'
 import { getEmployeeByUid, getEmployeeList } from '@/api/employee'
 import { getAllDepartmentList } from '@/api/company'
-import appConfig from '@/config/app.js'
 import { getAuthDataEnable } from '@/api/auth'
 
 const user = {
@@ -192,22 +191,13 @@ const user = {
               return permission
             })
 
-            const promise1 = searchPermResourceByRoleId(result.rid, {
+            searchPermResourceByRoleId(result.rid, {
               resource_type_id: '操作权限',
               app_id: 'backend',
-            })
-            const promises = [promise1]
-            if (appConfig?.buildModules.includes('oneterm')) {
-              const promise2 = searchPermResourceByRoleId(result.rid, {
-                resource_type_id: 'menu',
-                app_id: 'oneterm',
-              })
-              promises.push(promise2)
-            }
-            Promise.all(promises).then(([res1, res2]) => {
-              commit('SET_DETAIL_PERMISSIONS', { backend: res1.resources, oneterm: res2?.resources })
+            }).then((res) => {
+              commit('SET_DETAIL_PERMISSIONS', { backend: res.resources })
               resolve(response)
-            })
+            }).catch(reject)
 
             getEmployeeByUid(result.uid)
               .then((res) => {

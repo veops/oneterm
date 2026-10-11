@@ -128,7 +128,6 @@
 </template>
 
 <script>
-import { mixinPermissions } from '@/utils/mixin'
 import { WORKSTATION_TAB_TYPE, SOCKET_STATUS } from '@/modules/oneterm/views/workStation/constants.js'
 import { OPERATION_MENU_TYPE } from './constants.js'
 import { PERMISSION_TYPE } from '@/modules/oneterm/views/systemSettings/accessControl/constants.js'
@@ -138,7 +137,6 @@ import ShareAssetModal from './shareAssetModal.vue'
 
 export default {
   name: 'OperationMenu',
-  mixins: [mixinPermissions],
   components: {
     ChooseAssetsModal,
     ShareAssetModal
@@ -177,19 +175,13 @@ export default {
       const controlDisplayList = [
         OPERATION_MENU_TYPE.FULL_SCREEN,
         OPERATION_MENU_TYPE.RECENT_SESSION,
-        OPERATION_MENU_TYPE.BATCH_EXECUTION
+        OPERATION_MENU_TYPE.BATCH_EXECUTION,
+        OPERATION_MENU_TYPE.DISPLAY_SETTING,
+        OPERATION_MENU_TYPE.THEME_SETTING
       ]
 
-      const showTerminalSetting = this.hasDetailPermission('oneterm', 'System_Config', ['terminal_show'])
-      if (showTerminalSetting) {
-        controlDisplayList.push(
-          OPERATION_MENU_TYPE.DISPLAY_SETTING,
-          OPERATION_MENU_TYPE.THEME_SETTING
-        )
-
-        if (this.isGuacamole && socketStatus === SOCKET_STATUS.SUCCESS) {
-          controlDisplayList.push(OPERATION_MENU_TYPE.RESOLUTION)
-        }
+      if (this.isGuacamole && socketStatus === SOCKET_STATUS.SUCCESS) {
+        controlDisplayList.push(OPERATION_MENU_TYPE.RESOLUTION)
       }
 
       const showShare = assetPermissions?.[PERMISSION_TYPE.SHARE] || false
@@ -197,12 +189,7 @@ export default {
         controlDisplayList.push(OPERATION_MENU_TYPE.SHARE)
       }
 
-      const showQuickCommand = this.hasDetailPermission('oneterm', 'System_Config', ['quick_command'])
-      if (
-        this.isTerminal &&
-        showQuickCommand &&
-        socketStatus === SOCKET_STATUS.SUCCESS
-      ) {
+      if (this.isTerminal && socketStatus === SOCKET_STATUS.SUCCESS) {
         controlDisplayList.push(OPERATION_MENU_TYPE.QUICK_COMMAND)
       }
 

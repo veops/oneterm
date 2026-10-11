@@ -12,7 +12,6 @@
           </div>
 
           <div
-            v-if="isCreateRootNode"
             class="asset-list-title-create"
             @click="openNode()"
           >
@@ -36,11 +35,9 @@ import AssetList from './assetList.vue'
 import CreateNode from './createNode.vue'
 import CreateAsset from './createAsset.vue'
 import { getAllDepAndEmployee } from '@/api/company'
-import { mixinPermissions } from '@/utils/mixin'
 
 export default {
   name: 'Assets',
-  mixins: [mixinPermissions],
   components: { AssetList, CreateNode, CreateAsset },
   provide() {
     return {
@@ -53,11 +50,6 @@ export default {
     return {
       type: 'create',
       allTreeDepAndEmp: [],
-    }
-  },
-  computed: {
-    isCreateRootNode() {
-      return this.hasDetailPermission('oneterm', 'Assets', ['create_root_node'])
     }
   },
   mounted() {

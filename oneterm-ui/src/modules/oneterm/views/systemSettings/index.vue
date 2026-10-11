@@ -14,7 +14,6 @@
 
 <script>
 import { mapState } from 'vuex'
-import { mixinPermissions } from '@/utils/mixin'
 
 import AccessControl from './accessControl/index.vue'
 import PublicKey from './publicKey/index.vue'
@@ -26,7 +25,6 @@ const systemSettingTabStorageKey = 'ops_oneterm_system_setting_tab_key'
 
 export default {
   name: 'SystemSettings',
-  mixins: [mixinPermissions],
   components: {
     AccessControl,
     PublicKey,
@@ -41,15 +39,11 @@ export default {
   },
   computed: {
     ...mapState({
-      roles: (state) => state.user.roles,
-      detailPermissions: (state) => state.user.detailPermissions,
+      roles: (state) => state.user.roles
     }),
     isAdmin() {
       const permissions = this?.roles?.permissions || []
-      const isAdmin =
-        permissions?.includes?.('admin') ||
-        permissions?.includes?.('oneterm_admin') ||
-        permissions?.includes?.('acl_admin')
+      const isAdmin = permissions?.includes?.('oneterm_admin') || permissions?.includes?.('acl_admin')
       return isAdmin
     },
     menuList() {
@@ -59,44 +53,40 @@ export default {
           icon: 'ops-oneterm-publickey',
           key: 'publicKey',
           component: 'PublicKey',
-          permission: 'public_key',
         },
         {
           label: 'oneterm.systemSettings.quickCommand',
           icon: 'quick_commands',
           key: 'quickCommand',
           component: 'QuickCommand',
-          permission: 'quick_command',
         },
         {
           label: 'oneterm.systemSettings.terminalDisplay',
           icon: 'terminal_settings',
           key: 'terminalDisplay',
-          component: 'TerminalDisplay',
-          permission: 'terminal_show',
-        },
-        {
-          label: 'oneterm.systemSettings.accessControl',
-          icon: 'basic_settings',
-          key: 'accessControl',
-          component: 'AccessControl',
-          permission: 'terminal_control',
-        },
-        {
-          label: 'oneterm.systemSettings.storageConfig',
-          icon: 'itsm-default_line',
-          key: 'storageConfig',
-          component: 'StorageConfig',
-          permission: 'storage_config',
-        },
+          component: 'TerminalDisplay'
+        }
       ]
 
-      return menuList.filter(
-        (item) =>
-          item.available !== false &&
-          (this.isAdmin || (!item.adminOnly && this.hasDetailPermission('oneterm', 'System_Config', [item.permission])))
-      )
-    },
+      if (this.isAdmin) {
+        menuList.push(
+          {
+            label: 'oneterm.systemSettings.accessControl',
+            icon: 'basic_settings',
+            key: 'accessControl',
+            component: 'AccessControl',
+          },
+          {
+            label: 'oneterm.systemSettings.storageConfig',
+            icon: 'itsm-default_line',
+            key: 'storageConfig',
+            component: 'StorageConfig'
+          }
+        )
+      }
+
+      return menuList
+    }
   },
   watch: {
     menuList: {

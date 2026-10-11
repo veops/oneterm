@@ -61,15 +61,38 @@ func (p *Local) Upload(ctx context.Context, key string, reader io.Reader, size i
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
-	file, err := os.Create(filePath)
+	// A recording may already reside at its storage destination.
+	if source, ok := reader.(*os.File); ok {
+		if src, err := source.Stat(); err == nil && src.Size() == size {
+			if dst, err := os.Stat(filePath); err == nil && os.SameFile(src, dst) {
+				if offset, err := source.Seek(0, io.SeekCurrent); err == nil && offset == 0 {
+					return nil
+				}
+			}
+		}
+	}
+
+	file, err := os.CreateTemp(dir, ".upload-*")
 	if err != nil {
 		return fmt.Errorf("failed to create file: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		file.Close()
+		os.Remove(file.Name())
+	}()
 
 	_, err = io.Copy(file, reader)
 	if err != nil {
 		return fmt.Errorf("failed to write file: %w", err)
+	}
+	if err := file.Sync(); err != nil {
+		return fmt.Errorf("failed to sync file: %w", err)
+	}
+	if err := file.Close(); err != nil {
+		return fmt.Errorf("failed to close file: %w", err)
+	}
+	if err := os.Rename(file.Name(), filePath); err != nil {
+		return fmt.Errorf("failed to replace file: %w", err)
 	}
 
 	return nil

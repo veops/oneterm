@@ -7,6 +7,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/samber/lo"
 	"github.com/veops/go-ansiterm"
@@ -70,6 +72,8 @@ type Parser struct {
 	curRes       string
 	mu           *sync.Mutex
 	line         lineInput
+	editLine     lineInput
+	modes        terminalModes
 	commands     chan *model.SessionCmd
 	written      chan struct{}
 	closed       bool
@@ -82,6 +86,29 @@ func (p *Parser) AddInput(bs []byte) (cmd string, forbidden bool) {
 		return "Session is closed", true
 	}
 	if strings.HasPrefix(p.Protocol, "ssh") {
+		if p.isEdit && p.modes.alternate == 0 && p.matchesPrompt(p.getOutputLocked()) {
+			p.isEdit = false
+			p.modes.hidden, p.modes.redraw = false, false
+			p.line, p.editLine = lineInput{}, lineInput{}
+		}
+		if p.isEdit {
+			commands := p.editLine.feed(bs)
+			if len(commands) > 0 && p.editLine.remote && len(p.Cmds) > 0 {
+				p.editLine = lineInput{}
+				return "Command could not be verified", true
+			}
+			if p.editLine.overflow && len(p.Cmds) > 0 {
+				p.editLine = lineInput{}
+				return "Command is too long", true
+			}
+			for _, command := range commands {
+				if filter, forbidden := p.IsForbidden(command); forbidden {
+					p.editLine = lineInput{}
+					return filter, true
+				}
+			}
+			return "", false
+		}
 		if p.isPrompt {
 			if output := p.getOutputLocked(); output != "" {
 				p.prompt = output
@@ -160,8 +187,26 @@ func (p *Parser) AddInput(bs []byte) (cmd string, forbidden bool) {
 	return
 }
 
+func (p *Parser) matchesPrompt(output string) bool {
+	prompt := strings.TrimSpace(p.prompt)
+	output = strings.TrimSpace(output)
+	if prompt == "" || output == "" {
+		return false
+	}
+	if output == prompt {
+		return true
+	}
+	// Prompt prefixes can change after cd or sudo.
+	ending, _ := utf8.DecodeLastRuneInString(prompt)
+	if ending == '$' || ending == '#' {
+		return strings.HasSuffix(output, "$") || strings.HasSuffix(output, "#")
+	}
+	current, _ := utf8.DecodeLastRuneInString(output)
+	return current == ending && (unicode.IsPunct(ending) || unicode.IsSymbol(ending))
+}
+
 func (p *Parser) IsForbidden(cmd string) (string, bool) {
-	if p.isEdit || cmd == "" {
+	if cmd == "" || p.isEdit && !strings.HasPrefix(p.Protocol, "ssh") {
 		return "", false
 	}
 	for _, c := range p.Cmds {
@@ -242,6 +287,7 @@ func (p *Parser) AddOutputLocked(bs []byte) {
 		p.Output = append(p.Output, bs...)
 		return
 	}
+	p.stateLocked(bs)
 	p.OutputStream.Feed(bs)
 }
 
@@ -408,6 +454,20 @@ func (p *Parser) State(b []byte) bool {
 }
 
 func (p *Parser) stateLocked(b []byte) bool {
+	if strings.HasPrefix(p.Protocol, "ssh") {
+		editing := p.modes.feed(b)
+		if p.lastCmd == "" {
+			editing = false
+		}
+		if editing != p.isEdit {
+			p.line, p.editLine = lineInput{}, lineInput{}
+			if !editing {
+				p.resetLocked()
+			}
+			p.isEdit = editing
+		}
+		return p.isEdit
+	}
 	if !p.isEdit && IsEditEnterMode(b) {
 		if !isNewScreen(b) {
 			p.isEdit = true

@@ -4,11 +4,11 @@ package version
 // Update these values before each release
 var (
 	// Version is the current version of OneTerm
-	Version = "v26.10.1"
+	Version = "v26.10.2"
 
 	// BuildDate can be set at compile time using ldflags
 	// go build -ldflags "-X github.com/veops/oneterm/internal/version.BuildDate=$(date +%Y%m%d)"
-	BuildDate = "2026-10-07"
+	BuildDate = "2026-10-11"
 
 	// GitCommit can be set at compile time using ldflags
 	// go build -ldflags "-X github.com/veops/oneterm/internal/version.GitCommit=$(git rev-parse --short HEAD)"

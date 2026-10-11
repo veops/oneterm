@@ -1,6 +1,6 @@
 services:
   oneterm-api:
-    image: ghcr.io/veops/oneterm-api:v26.10.1
+    image: ghcr.io/veops/oneterm-api:v26.10.2
     container_name: oneterm-api
     environment:
       ONETERM_RDP_DRIVE_PATH: /rdp
@@ -95,7 +95,7 @@ services:
           - redis
 
   oneterm-ui:
-    image: ghcr.io/veops/oneterm-ui:v26.10.1
+    image: ghcr.io/veops/oneterm-ui:v26.10.2
     container_name: oneterm-ui
     depends_on:
       oneterm-api:

@@ -1034,11 +1034,12 @@ func (c *Controller) SftpFileLS(ctx *gin.Context) {
 		return
 	}
 
-	// Check connect permission for SFTP file listing
-	if result, err := service.DefaultAuthService.HasAuthorizationV2(ctx, onlineSession, model.ActionConnect); err != nil {
+	// Require connect and file permissions before initializing SFTP.
+	if result, err := service.DefaultAuthService.HasAuthorizationV2(ctx, onlineSession,
+		model.ActionConnect, model.ActionFileUpload, model.ActionFileDownload); err != nil {
 		ctx.AbortWithError(http.StatusBadRequest, &myErrors.ApiError{Code: myErrors.ErrInvalidArgument, Data: map[string]any{"err": err}})
 		return
-	} else if !result.IsAllowed(model.ActionConnect) {
+	} else if !result.IsAllowed(model.ActionConnect) || (!result.IsAllowed(model.ActionFileUpload) && !result.IsAllowed(model.ActionFileDownload)) {
 		ctx.AbortWithError(http.StatusForbidden, &myErrors.ApiError{Code: myErrors.ErrNoPerm, Data: map[string]any{}})
 		return
 	}

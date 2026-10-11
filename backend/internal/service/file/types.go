@@ -165,8 +165,11 @@ type SessionFileManager struct {
 
 func (sfm *SessionFileManager) InitSessionSFTP(sessionId string, assetId, accountId int) error {
 	session := gsession.GetOnlineSessionById(sessionId)
-	if session == nil || session.AssetId != assetId || session.AccountId != accountId {
+	if session == nil || session.Session == nil || session.AssetId != assetId || session.AccountId != accountId {
 		return ErrSessionNotFound
+	}
+	if !session.IsSsh() {
+		return ErrSFTPNotAvailable
 	}
 	_, err, _ := sfm.inits.Do(sessionId, func() (any, error) { return nil, sfm.initSessionSFTP(sessionId, assetId, accountId) })
 	return err
@@ -174,8 +177,11 @@ func (sfm *SessionFileManager) InitSessionSFTP(sessionId string, assetId, accoun
 
 func (sfm *SessionFileManager) initSessionSFTP(sessionId string, assetId, accountId int) error {
 	session := gsession.GetOnlineSessionById(sessionId)
-	if session == nil || session.AssetId != assetId || session.AccountId != accountId {
+	if session == nil || session.Session == nil || session.AssetId != assetId || session.AccountId != accountId {
 		return ErrSessionNotFound
+	}
+	if !session.IsSsh() {
+		return ErrSFTPNotAvailable
 	}
 	if session.Gctx == nil || session.Gctx.Err() != nil {
 		return ErrSessionClosed
@@ -240,6 +246,26 @@ func (sfm *SessionFileManager) initSessionSFTP(sessionId string, assetId, accoun
 }
 
 func (sfm *SessionFileManager) GetSessionSFTP(sessionId string) (*sftp.Client, error) {
+	session := gsession.GetOnlineSessionById(sessionId)
+	if session == nil || session.Session == nil {
+		return nil, ErrSessionNotFound
+	}
+	if !session.IsSsh() {
+		return nil, ErrSFTPNotAvailable
+	}
+	if session.Gctx == nil || session.Gctx.Err() != nil {
+		return nil, ErrSessionClosed
+	}
+	if client, err := sfm.getCachedSessionSFTP(sessionId); err == nil {
+		return client, nil
+	}
+	if err := sfm.InitSessionSFTP(sessionId, session.AssetId, session.AccountId); err != nil {
+		return nil, err
+	}
+	return sfm.getCachedSessionSFTP(sessionId)
+}
+
+func (sfm *SessionFileManager) getCachedSessionSFTP(sessionId string) (*sftp.Client, error) {
 	sfm.mutex.Lock()
 	defer sfm.mutex.Unlock()
 
@@ -277,11 +303,8 @@ func (sfm *SessionFileManager) closeSessionSFTP(sessionId string, cutoff time.Ti
 }
 
 func (sfm *SessionFileManager) IsSessionActive(sessionId string) bool {
-	sfm.mutex.RLock()
-	defer sfm.mutex.RUnlock()
-
-	_, exists := sfm.sessionSFTP[sessionId]
-	return exists
+	session := gsession.GetOnlineSessionById(sessionId)
+	return session != nil && session.Session != nil && session.IsSsh() && session.Gctx != nil && session.Gctx.Err() == nil
 }
 
 func (sfm *SessionFileManager) CleanupInactiveSessions(timeout time.Duration) {

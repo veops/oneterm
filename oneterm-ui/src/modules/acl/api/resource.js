@@ -30,7 +30,7 @@ export function deleteResourceById(id, params) {
   return axios({
     url: urlPrefix + `/resources/${id}`,
     method: 'DELETE',
-    params
+    data: params
   })
 }
 

@@ -287,7 +287,7 @@ export default {
       this.$refs.resourcePermForm.handlePerm(record, this.isGroup)
     },
     handleDelete(record) {
-      this.deleteResource(record.id)
+      this.deleteResource(record.id, record.app_id)
     },
     handleOk() {
       this.tablePage.currentPage = 1
@@ -296,14 +296,19 @@ export default {
     handleCreate() {
       this.$refs.resourceForm.handleCreate(this.currentType)
     },
-    deleteResource(id) {
+    deleteResource(id, appId) {
       if (!this.isGroup) {
-        deleteResourceById(id, { app_id: this.$route.name.split('_')[0] }).then((res) => {
+        const app_id = Number(appId)
+        if (!Number.isInteger(app_id) || app_id <= 0) {
+          this.$message.error(this.$t('acl.errorTips'))
+          return
+        }
+        return deleteResourceById(id, { app_id }).then((res) => {
           this.$message.success(this.$t('deleteSuccess'))
           this.handleOk()
         })
       } else {
-        deleteResourceGroup(id).then((res) => {
+        return deleteResourceGroup(id).then((res) => {
           this.$message.success(this.$t('deleteSuccess'))
           this.handleOk()
         })

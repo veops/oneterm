@@ -15,7 +15,7 @@ import (
 type SessionRepository interface {
 	GetSession(ctx context.Context, sessionId string) (*model.Session, error)
 	BuildQuery(ctx *gin.Context, isAdmin bool, uid int) (*gorm.DB, error)
-	BuildCmdQuery(ctx *gin.Context, sessionId string) *gorm.DB
+	BuildCmdQuery(ctx *gin.Context, sessionId string, isAdmin bool, uid int) *gorm.DB
 	GetSessionOptionAssets(ctx context.Context) ([]*model.SessionOptionAsset, error)
 	GetSessionOptionClientIps(ctx context.Context) ([]string, error)
 	CreateSessionCmd(ctx context.Context, cmd *model.SessionCmd) error
@@ -36,7 +36,7 @@ func NewSessionRepository() SessionRepository {
 // GetSession retrieves a session by session ID
 func (r *sessionRepository) GetSession(ctx context.Context, sessionId string) (*model.Session, error) {
 	session := &model.Session{}
-	if err := dbpkg.DB.Where("session_id = ?", sessionId).First(session).Error; err != nil {
+	if err := dbpkg.DB.WithContext(ctx).Where("session_id = ?", sessionId).First(session).Error; err != nil {
 		return nil, err
 	}
 	return session, nil
@@ -44,7 +44,7 @@ func (r *sessionRepository) GetSession(ctx context.Context, sessionId string) (*
 
 // BuildQuery constructs a query for sessions with filters
 func (r *sessionRepository) BuildQuery(ctx *gin.Context, isAdmin bool, uid int) (*gorm.DB, error) {
-	db := dbpkg.DB.Model(model.DefaultSession)
+	db := dbpkg.DB.WithContext(ctx.Request.Context()).Model(model.DefaultSession)
 
 	// Apply user filter if not admin
 	if !isAdmin {
@@ -85,9 +85,13 @@ func (r *sessionRepository) BuildQuery(ctx *gin.Context, isAdmin bool, uid int) 
 }
 
 // BuildCmdQuery constructs a query for session commands
-func (r *sessionRepository) BuildCmdQuery(ctx *gin.Context, sessionId string) *gorm.DB {
-	db := dbpkg.DB.Model(&model.SessionCmd{})
+func (r *sessionRepository) BuildCmdQuery(ctx *gin.Context, sessionId string, isAdmin bool, uid int) *gorm.DB {
+	db := dbpkg.DB.WithContext(ctx.Request.Context()).Model(&model.SessionCmd{})
 	db = db.Where("session_id = ?", sessionId)
+	if !isAdmin {
+		visible := dbpkg.DB.Model(model.DefaultSession).Select("session_id").Where("uid = ?", uid)
+		db = db.Where("session_id IN (?)", visible)
+	}
 
 	// Apply text search
 	if q, ok := ctx.GetQuery("search"); ok && q != "" {
@@ -187,7 +191,7 @@ func (r *sessionRepository) GetRecentSessionsByUser(ctx context.Context, uid int
 		AccountId int
 		MaxId     int
 	}
-	
+
 	var maxSessions []MaxSession
 	err := dbpkg.DB.Model(&model.Session{}).
 		Select("asset_id, account_id, MAX(id) as max_id").
@@ -198,17 +202,17 @@ func (r *sessionRepository) GetRecentSessionsByUser(ctx context.Context, uid int
 		Where("protocol NOT LIKE ?", "vnc%").
 		Group("asset_id, account_id").
 		Find(&maxSessions).Error
-	
+
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Extract the IDs
 	var sessionIds []int
 	for _, ms := range maxSessions {
 		sessionIds = append(sessionIds, ms.MaxId)
 	}
-	
+
 	if len(sessionIds) == 0 {
 		return sessions, nil
 	}

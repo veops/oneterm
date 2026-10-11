@@ -86,7 +86,10 @@ func (s *SessionService) CreateSessionCmd(ctx context.Context, cmd *model.Sessio
 
 // BuildQuery constructs a query for sessions
 func (s *SessionService) BuildQuery(ctx *gin.Context) (*gorm.DB, error) {
-	currentUser, _ := acl.GetSessionFromCtx(ctx)
+	currentUser, err := acl.GetSessionFromCtx(ctx)
+	if err != nil {
+		return nil, err
+	}
 	isAdmin := acl.IsAdmin(currentUser)
 
 	return s.repo.BuildQuery(ctx, isAdmin, currentUser.GetUid())
@@ -94,7 +97,11 @@ func (s *SessionService) BuildQuery(ctx *gin.Context) (*gorm.DB, error) {
 
 // BuildCmdQuery constructs a query for session commands
 func (s *SessionService) BuildCmdQuery(ctx *gin.Context, sessionId string) *gorm.DB {
-	return s.repo.BuildCmdQuery(ctx, sessionId)
+	currentUser, err := acl.GetSessionFromCtx(ctx)
+	if err != nil {
+		return s.repo.BuildCmdQuery(ctx, sessionId, false, 0).Where("1 = 0")
+	}
+	return s.repo.BuildCmdQuery(ctx, sessionId, acl.IsAdmin(currentUser), currentUser.GetUid())
 }
 
 // GetSessionOptionAssets retrieves session option assets
@@ -146,5 +153,16 @@ func (s *SessionService) GetSessionReplayFilename(ctx context.Context, sessionId
 
 // GetSessionReplay gets session replay file reader
 func (s *SessionService) GetSessionReplay(ctx context.Context, sessionId string) (io.ReadCloser, error) {
+	currentUser, err := acl.GetSessionFromCtx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	session, err := s.repo.GetSession(ctx, sessionId)
+	if err != nil {
+		return nil, err
+	}
+	if !acl.IsAdmin(currentUser) && session.Uid != currentUser.GetUid() {
+		return nil, gorm.ErrRecordNotFound
+	}
 	return gsession.GetReplay(sessionId)
 }

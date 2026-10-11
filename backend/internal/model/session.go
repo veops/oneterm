@@ -25,7 +25,7 @@ type Session struct {
 	Id          int        `json:"id" gorm:"column:id;primarykey;autoIncrement"`
 	SessionType int        `json:"session_type" gorm:"column:session_type"`
 	SessionId   string     `json:"session_id" gorm:"column:session_id;uniqueIndex:session_id;size:128"`
-	Uid         int        `json:"uid" gorm:"column:uid"`
+	Uid         int        `json:"uid" gorm:"column:uid;index:idx_session_uid_status,priority:1"`
 	UserName    string     `json:"user_name" gorm:"column:user_name"`
 	AssetId     int        `json:"asset_id" gorm:"column:asset_id"`
 	Asset       *Asset     `json:"-" gorm:"-"`
@@ -36,7 +36,7 @@ type Session struct {
 	GatewayInfo string     `json:"gateway_info" gorm:"column:gateway_info"`
 	ClientIp    string     `json:"client_ip" gorm:"column:client_ip"`
 	Protocol    string     `json:"protocol" gorm:"column:protocol"`
-	Status      int        `json:"status" gorm:"column:status"`
+	Status      int        `json:"status" gorm:"column:status;index:idx_session_uid_status,priority:2;index:idx_session_status"`
 	Duration    int64      `json:"duration" gorm:"-"`
 	ClosedAt    *time.Time `json:"closed_at" gorm:"column:closed_at"`
 	ShareId     int        `json:"share_id" gorm:"column:share_id"`
@@ -53,7 +53,7 @@ func (m *Session) TableName() string {
 
 type SessionCmd struct {
 	Id        int    `json:"id" gorm:"column:id;primarykey;autoIncrement"`
-	SessionId string `json:"session_id" gorm:"column:session_id"`
+	SessionId string `json:"session_id" gorm:"column:session_id;index:idx_session_cmd_session_id,length:128"`
 	Cmd       string `json:"cmd" gorm:"column:cmd"`
 	Result    string `json:"result" gorm:"column:result"`
 	Level     int    `json:"level" gorm:"column:level"`

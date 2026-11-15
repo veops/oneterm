@@ -66,6 +66,35 @@ type Tunnel struct {
 }
 
 func NewTunnel(connectionId, sessionId string, w, h, dpi int, protocol string, asset *model.Asset, account *model.Account, gateway *model.Gateway, permissions *PermissionInfo) (t *Tunnel, err error) {
+	var targetHost string
+	var targetPort int
+	cleanProtocol := strings.ToLower(strings.SplitN(protocol, ":", 2)[0])
+	if connectionId == "" {
+		if asset == nil || account == nil {
+			return nil, fmt.Errorf("missing connection target")
+		}
+		if cleanProtocol != "rdp" && cleanProtocol != "vnc" {
+			return nil, fmt.Errorf("unsupported graphical protocol")
+		}
+		configured := *asset
+		configured.Protocols = make(model.Slice[string], 0, len(asset.Protocols))
+		for _, value := range asset.Protocols {
+			value = strings.ToLower(value)
+			if !strings.Contains(value, ":") {
+				if value == "rdp" {
+					value = "rdp:3389"
+				}
+				if value == "vnc" {
+					value = "vnc:5900"
+				}
+			}
+			configured.Protocols = append(configured.Protocols, value)
+		}
+		targetHost, targetPort, err = tunneling.Target(strings.ToLower(protocol), &configured)
+		if err != nil {
+			return nil, err
+		}
+	}
 	var hostPort string
 	if strings.Contains(config.Cfg.Guacd.Host, ":") {
 		// IPv6 address
@@ -78,30 +107,17 @@ func NewTunnel(connectionId, sessionId string, w, h, dpi int, protocol string, a
 	if err != nil {
 		return
 	}
-	// Find the port for the protocol from asset.Protocols
-	var port string
-	protocolLower := strings.ToLower(protocol)
-	for _, p := range asset.Protocols {
-		if strings.HasPrefix(strings.ToLower(p), protocolLower) {
-			parts := strings.Split(p, ":")
-			if len(parts) >= 2 {
-				port = parts[1]
-				break
+	defer func() {
+		if err != nil {
+			if t != nil {
+				t.Close()
+			} else {
+				conn.Close()
 			}
 		}
-	}
-
-	// Fallback to default ports if not found in asset.Protocols
-	if port == "" {
-		switch protocolLower {
-		case "rdp":
-			port = "3389"
-		case "vnc":
-			port = "5900"
-		default:
-			port = "22" // SSH default
-		}
-	}
+	}()
+	conn.SetDeadline(time.Now().Add(15 * time.Second))
+	port := cast.ToString(targetPort)
 
 	// Determine if file transfer should be enabled
 	enableFileTransfer := permissions != nil && (permissions.AllowFileUpload || permissions.AllowFileDownload)
@@ -113,7 +129,7 @@ func NewTunnel(connectionId, sessionId string, w, h, dpi int, protocol string, a
 		ConnectionId:    connectionId,
 		transferManager: DefaultFileTransferManager,
 		Config: &Configuration{
-			Protocol: protocol,
+			Protocol: cleanProtocol,
 			Parameters: lo.TernaryF(
 				connectionId == "",
 				func() map[string]string {
@@ -126,8 +142,8 @@ func NewTunnel(connectionId, sessionId string, w, h, dpi int, protocol string, a
 						"width":                 cast.ToString(w),
 						"height":                cast.ToString(h),
 						"dpi":                   cast.ToString(dpi),
-						"scheme":                protocol,
-						"hostname":              asset.Ip,
+						"scheme":                cleanProtocol,
+						"hostname":              targetHost,
 						"port":                  port,
 						"username":              account.Account,
 						"password":              account.Password,
@@ -176,16 +192,30 @@ func NewTunnel(connectionId, sessionId string, w, h, dpi int, protocol string, a
 		t.Config.Parameters["recording-name"] = t.SessionId
 	}
 	if gateway != nil && gateway.Id != 0 && t.ConnectionId == "" {
-		t.gw, err = tunneling.OpenTunnel(false, t.SessionId, asset.Ip, cast.ToInt(port), gateway)
+		t.gw, err = tunneling.OpenTunnelForGuacd(t.SessionId, targetHost, targetPort, gateway, conn)
 		if err != nil {
 			return t, err
 		}
-		t.Config.Parameters["hostname"] = "localhost"
+		t.Config.Parameters["hostname"] = t.gw.LocalIp
 		t.Config.Parameters["port"] = cast.ToString(t.gw.LocalPort)
 	}
 
 	err = t.handshake()
-
+	if err != nil {
+		return
+	}
+	if t.gw != nil {
+		select {
+		case err = <-t.gw.Opened:
+			if err != nil {
+				return
+			}
+		case <-time.After(10 * time.Second):
+			err = fmt.Errorf("SSH gateway forwarding did not become ready")
+			return
+		}
+	}
+	conn.SetDeadline(time.Time{})
 	return
 }
 
@@ -312,7 +342,9 @@ func (t *Tunnel) Close() {
 	if t.conn != nil {
 		t.conn.Close()
 	}
-	tunneling.CloseTunnels(t.SessionId)
+	if t.SessionId != "" {
+		tunneling.CloseTunnels(t.SessionId)
+	}
 }
 
 func (t *Tunnel) Disconnect() {

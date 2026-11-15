@@ -18,21 +18,22 @@ import (
 )
 
 type GatewayTunnel struct {
-	listener   net.Listener
-	GatewayId  int
-	SessionId  string
-	LocalIp    string
-	LocalPort  int
-	RemoteIp   string
-	RemotePort int
-	LocalConn  net.Conn
-	RemoteConn net.Conn
-	Opened     chan error
-	mu         sync.Mutex
-	closed     bool
-	client     *ssh.Client
-	ctx        context.Context
-	cancel     context.CancelFunc
+	listener    net.Listener
+	GatewayId   int
+	SessionId   string
+	LocalIp     string
+	LocalPort   int
+	RemoteIp    string
+	RemotePort  int
+	allowedPeer net.IP
+	LocalConn   net.Conn
+	RemoteConn  net.Conn
+	Opened      chan error
+	mu          sync.Mutex
+	closed      bool
+	client      *ssh.Client
+	ctx         context.Context
+	cancel      context.CancelFunc
 }
 
 func (gt *GatewayTunnel) close() {
@@ -77,12 +78,24 @@ func (gt *GatewayTunnel) Open(client *ssh.Client, probe bool) (err error) {
 		}
 	}()
 	timer := time.AfterFunc(3*time.Second, func() { gt.listener.Close() })
-	local, err := gt.listener.Accept()
+	var local net.Conn
+	for {
+		local, err = gt.listener.Accept()
+		if err != nil {
+			timer.Stop()
+			return err
+		}
+		if gt.allowedPeer == nil {
+			break
+		}
+		peer, ok := local.RemoteAddr().(*net.TCPAddr)
+		if ok && gt.allowedPeer.Equal(peer.IP) {
+			break
+		}
+		local.Close()
+	}
 	timer.Stop()
 	gt.listener.Close()
-	if err != nil {
-		return err
-	}
 	if !gt.attach(local, false) {
 		return context.Canceled
 	}
@@ -180,10 +193,28 @@ func (tm *TunnelManager) gatewayClient(gateway *model.Gateway) (*ssh.Client, err
 }
 
 func (tm *TunnelManager) OpenTunnel(probe bool, id, host string, port int, gateway *model.Gateway) (*GatewayTunnel, error) {
+	return tm.openTunnelOn(probe, id, host, port, gateway, net.ParseIP("127.0.0.1"), nil)
+}
+
+// The existing guacd connection identifies the API interface and the only peer
+// allowed to use this one-shot callback. No wildcard listener is created.
+func (tm *TunnelManager) OpenTunnelForGuacd(id, host string, port int, gateway *model.Gateway, connection net.Conn) (*GatewayTunnel, error) {
+	if connection == nil {
+		return nil, fmt.Errorf("missing guacd connection")
+	}
+	local, localOK := connection.LocalAddr().(*net.TCPAddr)
+	peer, peerOK := connection.RemoteAddr().(*net.TCPAddr)
+	if !localOK || !peerOK || local.IP == nil || local.IP.IsUnspecified() || peer.IP == nil || peer.IP.IsUnspecified() || id == "" {
+		return nil, fmt.Errorf("invalid guacd forwarding endpoint")
+	}
+	return tm.openTunnelOn(false, id, host, port, gateway, local.IP, peer.IP)
+}
+
+func (tm *TunnelManager) openTunnelOn(probe bool, id, host string, port int, gateway *model.Gateway, bindIP, allowedPeer net.IP) (*GatewayTunnel, error) {
 	if gateway == nil {
 		return nil, fmt.Errorf("gateway is nil")
 	}
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	listener, err := net.Listen("tcp", net.JoinHostPort(bindIP.String(), "0"))
 	if err != nil {
 		return nil, err
 	}
@@ -193,7 +224,7 @@ func (tm *TunnelManager) OpenTunnel(probe bool, id, host string, port int, gatew
 		return nil, err
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	tunnel := &GatewayTunnel{listener: listener, GatewayId: gateway.Id, SessionId: id, LocalIp: "127.0.0.1",
+	tunnel := &GatewayTunnel{listener: listener, GatewayId: gateway.Id, SessionId: id, LocalIp: bindIP.String(), allowedPeer: append(net.IP(nil), allowedPeer...),
 		LocalPort: listener.Addr().(*net.TCPAddr).Port, RemoteIp: host, RemotePort: port, Opened: make(chan error, 1), client: client, ctx: ctx, cancel: cancel}
 	tm.CloseTunnels(id)
 	tm.mtx.Lock()

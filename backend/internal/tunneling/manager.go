@@ -1,5 +1,7 @@
 package tunneling
 
+import "net"
+
 import "github.com/veops/oneterm/internal/model"
 
 // Global tunnel manager instance
@@ -18,4 +20,8 @@ func OpenTunnel(isConnectable bool, sessionId, remoteIp string, remotePort int, 
 // CloseTunnels closes gateway tunnels by session IDs using the default manager
 func CloseTunnels(sessionIds ...string) {
 	DefaultManager.CloseTunnels(sessionIds...)
+}
+
+func OpenTunnelForGuacd(sessionId, remoteIP string, remotePort int, gateway *model.Gateway, connection net.Conn) (*GatewayTunnel, error) {
+	return DefaultManager.OpenTunnelForGuacd(sessionId, remoteIP, remotePort, gateway, connection)
 }

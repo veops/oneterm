@@ -1,8 +1,10 @@
 package middleware
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
+	"net"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -14,11 +16,20 @@ import (
 
 type bodyWriter struct {
 	gin.ResponseWriter
-	body *bytes.Buffer
+	body     *bytes.Buffer
+	hijacked bool
 }
 
 func (w bodyWriter) Write(b []byte) (int, error) {
 	return w.body.Write(b)
+}
+
+func (w *bodyWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	connection, buffer, err := w.ResponseWriter.Hijack()
+	if err == nil {
+		w.hijacked = true
+	}
+	return connection, buffer, err
 }
 
 func Error2RespMiddleware() gin.HandlerFunc {
@@ -38,6 +49,9 @@ func Error2RespMiddleware() gin.HandlerFunc {
 		ctx.Writer = wb
 
 		ctx.Next()
+		if wb.hijacked {
+			return
+		}
 
 		obj := make(map[string]any)
 		json.Unmarshal(wb.body.Bytes(), &obj)

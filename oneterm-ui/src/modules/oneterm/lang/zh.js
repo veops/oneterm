@@ -1,4 +1,15 @@
 const oneterm_zh = {
+  connectionErrors: {
+    '4432': '目标服务器拒绝了凭据记录“{account}”的认证，请核对当前记录中的密码或私钥。',
+    '4433': '服务器身份与可信记录不一致，请联系管理员核对服务器。',
+    '4434': '无法连接目标服务器，请检查服务器地址、端口和网络。',
+    'closed': '连接已结束。',
+    'unknown': '终端连接未建立，服务器尚未返回明确原因。请重试或联系管理员。',
+    'signInExpired': '登录已失效，请重新登录后再连接。',
+    'serviceDenied': '连接服务拒绝了当前请求，请检查账号权限。',
+    'serviceUnavailable': '连接服务暂时不可用，请重试或联系管理员。',
+    'network': '无法访问连接服务，请检查网络或稍后重试。',
+  },
   passwordView: {
     approvalUnavailable: '当前版本不支持发起审批，请联系管理员。',
     settingsTitle: '密码查看',

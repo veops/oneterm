@@ -43,6 +43,9 @@ const (
 	ErrPAMSessionEnded        = 4420
 	ErrPAMSessionCapacity     = 4421
 	ErrPAMSessionConflict     = 4422
+	ErrTargetAuthentication   = 4432
+	ErrTargetHostIdentity     = 4433
+	ErrTargetUnavailable      = 4434
 	ErrPAMCredentialShared    = 4423
 	ErrPAMExecutionState      = 4424
 	ErrPAMTemplateDenied      = 4425
@@ -56,6 +59,10 @@ const (
 
 var (
 	Err2Msg = map[int]*i18n.Message{
+		ErrTargetAuthentication: myi18n.MsgTargetAuthentication,
+		ErrTargetHostIdentity:   myi18n.MsgTargetHostIdentity,
+		ErrTargetUnavailable:    myi18n.MsgTargetUnavailable,
+
 		ErrBadRequest:             myi18n.MsgBadRequest,
 		ErrInvalidArgument:        myi18n.MsgInvalidArguemnt,
 		ErrDuplicateName:          myi18n.MsgDupName,

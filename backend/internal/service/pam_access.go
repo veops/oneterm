@@ -106,17 +106,59 @@ func authorizePAMConnection(ctx *gin.Context, database *gorm.DB, sess *gsession.
 			if err := checkPAMOwner(ctx.Request.Context(), tx, owner, policy, ctx.ClientIP()); err != nil {
 				return err
 			}
-			permit := &model.PAMConnectionPermit{OwnerID: target.ID, UID: operator.Uid, AssetID: sess.AssetId, AccountID: sess.AccountId,
+			permit := &model.PAMConnectionPermit{ShareID: sess.ShareId, OwnerID: target.ID, UID: operator.Uid, AssetID: sess.AssetId, AccountID: sess.AccountId,
 				BindingID: current.ID, BindingRevision: current.Revision, PolicyID: policy.Id, PolicyRevision: policy.Revision, SourceIP: ctx.ClientIP()}
+			if sess.ShareId != 0 && !sess.ShareEnd.IsZero() {
+				deadline := sess.ShareEnd
+				permit.Deadline = &deadline
+			}
 			grants := make(map[string]bool)
-			required := requiresPAMApproval(policy, "connect") || !result.IsAllowed(model.ActionConnect)
+			standingConnection := result.IsAllowed(model.ActionConnect)
+			approvalRequired := requiresPAMApproval(policy, "connect")
+			if standingConnection && approvalRequired && sess.ShareId == 0 {
+				gate, err := findPAMGrant(tx, pamGrantScope{UID: operator.Uid, Action: "connect", Owner: owner, Policy: policy, Binding: current, Operation: model.ActionConnect})
+				if err != nil {
+					return ErrPAMUnavailable
+				}
+				if gate != nil {
+					permit.GrantIDs = []string{gate.ID}
+					permit.StandingApproval = true
+					if _, exists := result.Results[model.ActionShare]; exists {
+						result.Results[model.ActionShare] = &model.AuthResult{Allowed: false, Reason: "pam_approval_is_personal"}
+					}
+					deadline := gate.ExpiresAt
+					if permit.Deadline == nil || deadline.Before(*permit.Deadline) {
+						permit.Deadline = &deadline
+					}
+					// Approval gates the connection; V2 remains the ceiling for every action.
+					result.PAM = permit
+					return nil
+				}
+			}
+			if standingConnection && !approvalRequired {
+				result.PAM = permit
+				return nil
+			}
+			temporaryEligible := false
+			if !standingConnection && policy.AllowRequests && sess.ShareId == 0 {
+				var permissionErr error
+				temporaryEligible, permissionErr = pamResourcePermission(ctx.Request.Context(), operator, owner, acl.RequestAccess, true)
+				if permissionErr != nil {
+					return ErrPAMUnavailable
+				}
+			}
+			required := approvalRequired || !standingConnection
 			for action, standing := range result.Results {
 				if standing.Allowed && !required {
 					continue
 				}
-				result.Results[action] = &model.AuthResult{Allowed: false, Reason: "pam_authorization_required"}
+				reason := "pam_authorization_required"
+				if standingConnection && approvalRequired && sess.ShareId == 0 {
+					reason = "pam_approval_required"
+				}
+				result.Results[action] = &model.AuthResult{Allowed: false, Reason: reason}
 				// Shared access never borrows a requester's temporary authorization.
-				if sess.ShareId != 0 || action == model.ActionShare {
+				if sess.ShareId != 0 || action == model.ActionShare || (standingConnection && approvalRequired) || (!standingConnection && !temporaryEligible) {
 					continue
 				}
 				grant, err := findPAMGrant(tx, pamGrantScope{UID: operator.Uid, Action: "connect", Owner: owner,

@@ -56,6 +56,9 @@ func Connect(ctx *gin.Context) {
 
 	var sess *gsession.Session
 	defer func() {
+		if err != nil && sess == nil {
+			protocols.ReportConnectionError(ctx, nil, ws, err, "")
+		}
 		protocols.HandleError(ctx, sess, err, ws, nil)
 	}()
 
@@ -184,6 +187,7 @@ func DoConnect(ctx *gin.Context, ws *websocket.Conn) (sess *gsession.Session, er
 	sess = gsession.NewSession(ctx.Request.Context())
 	defer func() {
 		if err != nil {
+			protocols.ReportConnectionError(ctx, sess, ws, err, account.Name)
 			CloseTerminalSession(sess)
 		}
 	}()
@@ -265,13 +269,21 @@ func DoConnect(ctx *gin.Context, ws *websocket.Conn) (sess *gsession.Session, er
 
 	result, err := service.DefaultAuthService.HasAuthorizationV2(ctx, sess, requiredActions...)
 	if err != nil {
-		err = &myErrors.ApiError{Code: myErrors.ErrInvalidArgument, Data: map[string]any{"err": err}}
+		var problem *myErrors.ApiError
+		if errors.As(err, &problem) {
+			err = problem
+		} else {
+			err = &myErrors.ApiError{Code: myErrors.ErrPAMUnavailable}
+		}
 		return sess, err
 	}
 
-	// Check connect permission (required for all protocols)
+	// Permission failures are distinct from an expired platform sign-in.
 	if !result.IsAllowed(model.ActionConnect) {
-		err = &myErrors.ApiError{Code: myErrors.ErrUnauthorized, Data: map[string]any{"perm": "connect"}}
+		err = &myErrors.ApiError{Code: myErrors.ErrNoPerm, Data: map[string]any{"perm": "connect"}}
+		if decision := result.Results[model.ActionConnect]; decision != nil && decision.Reason == "pam_approval_required" {
+			err = &myErrors.ApiError{Code: myErrors.ErrPAMApprovalRequired}
+		}
 		return sess, err
 	}
 	sess.PAMAuthorization = result.PAM

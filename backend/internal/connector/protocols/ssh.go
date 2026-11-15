@@ -25,6 +25,7 @@ func ConnectSsh(ctx *gin.Context, sess *gsession.Session, asset *model.Asset, ac
 	chs := sess.Chans
 	defer func() {
 		if err != nil {
+			ReportConnectionError(ctx, sess, sess.Ws, err, account.Name)
 			select {
 			case chs.ErrChan <- err:
 			default:

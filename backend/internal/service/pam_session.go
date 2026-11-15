@@ -19,12 +19,20 @@ func CheckPAMConnectionPermit(ctx context.Context, permit *model.PAMConnectionPe
 	if permit == nil {
 		return nil
 	}
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
 	if permit.Deadline != nil && !time.Now().Before(*permit.Deadline) {
 		return ErrPAMDenied
 	}
-	subject, err := acl.GetPAMKeySubject(ctx, permit.UID)
-	if err != nil || subject.Blocked {
-		return ErrPAMDenied
+	if (len(permit.GrantIDs) == 0 || permit.StandingApproval) && permit.ShareID == 0 {
+		if err := checkPAMStandingConnection(ctx, permit); err != nil {
+			return err
+		}
+	} else {
+		subject, err := acl.GetPAMKeySubject(ctx, permit.UID)
+		if err != nil || subject.Blocked {
+			return ErrPAMDenied
+		}
 	}
 	return db.GetDB().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		target := model.PAMCredentialTarget{Kind: model.PAMOwnerAccount, ID: permit.OwnerID}
@@ -58,6 +66,16 @@ func checkPAMConnectionScope(ctx context.Context, tx *gorm.DB, permit *model.PAM
 	if len(permit.GrantIDs) == 0 {
 		if requiresPAMApproval(policy, "connect") {
 			return ErrPAMDenied
+		}
+		if permit.ShareID != 0 {
+			var share model.Share
+			if err := tx.Where("id = ? AND asset_id = ? AND account_id = ?", permit.ShareID, permit.AssetID, permit.AccountID).First(&share).Error; err != nil {
+				return ErrPAMDenied
+			}
+			now := time.Now()
+			if now.Before(share.Start) || !now.Before(share.End) {
+				return ErrPAMDenied
+			}
 		}
 		return nil
 	}

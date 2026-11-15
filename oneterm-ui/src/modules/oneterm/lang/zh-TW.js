@@ -1,4 +1,15 @@
 const oneterm_zh = {
+  connectionErrors: {
+    '4432': '目標伺服器拒絕了憑證紀錄「{account}」的驗證，請核對該紀錄中的密碼或私鑰。',
+    '4433': '伺服器身分與可信紀錄不一致，請聯絡管理員核對伺服器。',
+    '4434': '無法連線目標伺服器，請檢查伺服器位址、連接埠和網路。',
+    'closed': '連線已結束。',
+    'unknown': '終端連線未建立，伺服器尚未回傳明確原因。請重試或聯絡管理員。',
+    'signInExpired': '登入已失效，請重新登入後再連線。',
+    'serviceDenied': '連線服務拒絕了目前請求，請檢查帳號權限。',
+    'serviceUnavailable': '連線服務暫時無法使用，請重試或聯絡管理員。',
+    'network': '無法存取連線服務，請檢查網路或稍後重試。',
+  },
   passwordView: {
     approvalUnavailable: '目前版本不支援發起審核，請聯絡管理員。',
     settingsTitle: '密碼查看',

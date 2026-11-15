@@ -13,8 +13,11 @@ import (
 )
 
 var (
-	Bundle = i18n.NewBundle(language.English)
-	langs  = []string{"en", "zh"}
+	MsgTargetAuthentication = &i18n.Message{ID: "MsgTargetAuthentication", Other: "The target server rejected authentication for credential record {{.account}}. Check that the selected record contains the current password or private key."}
+	MsgTargetHostIdentity   = &i18n.Message{ID: "MsgTargetHostIdentity", Other: "The target server identity does not match the trusted record. Ask an administrator to verify the server."}
+	MsgTargetUnavailable    = &i18n.Message{ID: "MsgTargetUnavailable", Other: "The target server could not be reached. Check its address, port and network."}
+	Bundle                  = i18n.NewBundle(language.English)
+	langs                   = []string{"en", "zh"}
 )
 
 //go:embed locales/active.*.toml

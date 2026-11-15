@@ -434,3 +434,12 @@ other = "该账号还关联其他资产，请使用独立账号管理单个资�
 
 [MsgPAMExecutionState]
 other = "密码任务状态不允许此操作，请先核对改密记录"
+
+[MsgTargetAuthentication]
+other = "目标服务器拒绝了凭据记录“{{.account}}”的认证。请检查当前选择的记录是否保存了有效的密码或私钥。"
+
+[MsgTargetHostIdentity]
+other = "目标服务器身份与可信记录不一致，请联系管理员核对服务器。"
+
+[MsgTargetUnavailable]
+other = "无法连接目标服务器，请检查服务器地址、端口和网络。"

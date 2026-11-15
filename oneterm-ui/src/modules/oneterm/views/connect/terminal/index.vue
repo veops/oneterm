@@ -83,6 +83,11 @@ export default {
       stdinEnabled: false,
       socketClosed: false,
       receivedOutput: false,
+      socketOpened: false,
+      connectionFailure: null,
+      failureRendered: false,
+      diagnosticController: null,
+      failureGeneration: 0,
       terminalDestroyed: false,
       flowRequested: false,
       flowControl: false,
@@ -263,6 +268,10 @@ export default {
         return
       }
 
+      this.socketOpened = false
+      this.connectionFailure = null
+      this.failureRendered = false
+      socketLink += `${socketLink.includes('?') ? '&' : '?'}errors=true`
       this.flowRequested = !isMonitor
       socketLink += `${socketLink.includes('?') ? '&' : '?'}binary=true`
       if (this.flowRequested) {
@@ -282,6 +291,7 @@ export default {
         return
       }
       this.socketClosed = false
+      this.socketOpened = true
       this.term.options.disableStdin = !this.stdinEnabled
       this.sendSocket(`w${this.term.cols},${this.term.rows}`)
       this.$emit('open')
@@ -294,6 +304,8 @@ export default {
     },
 
     cleanupSocket() {
+      this.failureGeneration += 1
+      if (this.diagnosticController) { this.diagnosticController.abort(); this.diagnosticController = null }
       this.flowControl = false
       this.flowReceived = 0
       this.flowAckAt = 0
@@ -325,12 +337,59 @@ export default {
       this.cleanupSocket()
       if (this.term) {
         this.term.options.disableStdin = true
-        const message = this.receivedOutput
-          ? 'The connection is closed.'
-          : 'Unable to connect. Check your sign-in and server availability.'
-        this.term.writeln(`\r\n\x1b[31m${message}\x1b[0m`)
+        const code = /^oneterm:(\d+)$/.exec(event?.reason || '')
+        if (!this.connectionFailure && code) this.connectionFailure = { code: Number(code[1]) }
+        if (this.connectionFailure) this.renderConnectionFailure(this.connectionFailure)
+        else if (this.receivedOutput) this.term.writeln(`\r\n${this.connectionText('closed', 'The connection is closed.')}`)
+        else if (!this.socketOpened && !this.shareId) this.diagnoseConnection()
+        else this.renderConnectionFailure({ message: this.connectionText('unknown', 'The terminal connection ended before the server returned a result. Please retry or contact an administrator.') })
       }
       this.$emit('close')
+    },
+
+    connectionText(key, fallback, values = {}) {
+      const name = 'oneterm.connectionErrors.' + key
+      const translated = this.$i18n && typeof this.$t === 'function' ? this.$t(name, values) : name
+      return translated !== name ? translated : fallback
+    },
+
+    renderConnectionFailure(failure) {
+      if (!this.term || this.terminalDestroyed || this.failureRendered) return
+      const fallback = failure.message || 'The connection could not be established. Please contact an administrator.'
+      const message = failure.code ? this.connectionText(failure.code, fallback, { account: failure.account || '' }) : fallback
+      const safe = Array.from(String(message)).filter(char => { const code = char.codePointAt(0); return code === 9 || code === 10 || (code >= 32 && code !== 127 && (code < 128 || code > 159)) }).join('').slice(0, 2048)
+      this.failureRendered = true
+      this.term.writeln(`\r\n\x1b[31m${safe}\x1b[0m`)
+    },
+
+    async diagnoseConnection() {
+      if (typeof fetch !== 'function') {
+        this.renderConnectionFailure({ message: this.connectionText('unknown', 'The terminal connection could not be established. Please retry or contact an administrator.') })
+        return
+      }
+      const generation = this.failureGeneration
+      const controller = typeof AbortController === 'function' ? new AbortController() : null
+      this.diagnosticController = controller
+      let key = 'unknown'
+      try {
+        const response = await fetch('/api/oneterm/v1/pam/capabilities', { credentials: 'same-origin', cache: 'no-store', ...(controller ? { signal: controller.signal } : {}) })
+        if (response.status === 401) key = 'signInExpired'
+        else if (response.status === 403) key = 'serviceDenied'
+        else if (response.status === 404 || response.status >= 500) key = 'serviceUnavailable'
+      } catch (error) {
+        if (controller?.signal.aborted) return
+        key = 'network'
+      }
+      if (generation !== this.failureGeneration || this.terminalDestroyed || !this.term) return
+      this.diagnosticController = null
+      const fallbacks = {
+        signInExpired: 'Your sign-in has expired. Sign in again before connecting.',
+        serviceDenied: 'The connection service rejected the request. Check your account permissions.',
+        serviceUnavailable: 'The connection service is unavailable. Please retry or contact an administrator.',
+        network: 'The connection service could not be reached. Check your network or retry later.',
+        unknown: 'The terminal connection could not be established. Please retry or contact an administrator.'
+      }
+      this.renderConnectionFailure({ message: this.connectionText(key, fallbacks[key]) })
     },
 
     errorWebSocket(event) {
@@ -373,6 +432,17 @@ export default {
     getMessage(message) {
       if (!this.term || this.terminalDestroyed || (message.target && message.target !== this.websocket)) {
         return
+      }
+      if (typeof message.data === 'string' && message.data.startsWith('0error ')) {
+        try {
+          const failure = JSON.parse(message.data.slice(7))
+          if (Number.isInteger(failure.code) && failure.code >= 4000 && failure.code < 6000 && typeof failure.message === 'string') {
+            this.connectionFailure = failure
+            this.receivedOutput = true
+            this.renderConnectionFailure(failure)
+            return
+          }
+        } catch (error) { /* An invalid control message cannot replace terminal output. */ }
       }
       if (this.flowRequested && !this.receivedOutput && message.data === '0flow') {
         this.flowControl = true

@@ -1,4 +1,15 @@
 const oneterm_en = {
+  connectionErrors: {
+    '4432': 'The target server rejected authentication for credential record "{account}". Check its saved password or private key.',
+    '4433': 'The server identity does not match the trusted record. Ask an administrator to verify it.',
+    '4434': 'The target server could not be reached. Check its address, port and network.',
+    'closed': 'The connection is closed.',
+    'unknown': 'The terminal connection could not be established. The server has not returned a specific cause. Please retry or contact an administrator.',
+    'signInExpired': 'Your sign-in has expired. Sign in again before connecting.',
+    'serviceDenied': 'The connection service rejected the request. Check your account permissions.',
+    'serviceUnavailable': 'The connection service is unavailable. Please retry or contact an administrator.',
+    'network': 'The connection service could not be reached. Check your network or retry later.',
+  },
   passwordView: {
     approvalUnavailable: 'Approval is unavailable in this edition. Contact an administrator.',
     settingsTitle: 'Password Viewing',

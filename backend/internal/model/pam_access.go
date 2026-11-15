@@ -136,19 +136,21 @@ func (r *PAMAccessRequest) HasActiveAccess(now time.Time) bool {
 
 // PAMConnectionPermit is server-side admission evidence, not a client-supplied token.
 type PAMConnectionPermit struct {
-	OwnerID         int
-	UID             int
-	AssetID         int
-	AccountID       int
-	BindingID       uint64
-	BindingRevision uint64
-	PolicyID        int
-	PolicyRevision  uint64
-	GrantIDs        []string
-	Deadline        *time.Time
-	SourceIP        string
-	LeaseID         string
-	LeaseExpiresAt  time.Time
+	StandingApproval bool
+	ShareID          int
+	OwnerID          int
+	UID              int
+	AssetID          int
+	AccountID        int
+	BindingID        uint64
+	BindingRevision  uint64
+	PolicyID         int
+	PolicyRevision   uint64
+	GrantIDs         []string
+	Deadline         *time.Time
+	SourceIP         string
+	LeaseID          string
+	LeaseExpiresAt   time.Time
 }
 
 type PAMSessionLease struct {

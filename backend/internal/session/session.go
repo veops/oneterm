@@ -181,6 +181,7 @@ func (c *SessionChans) SendOutput(ctx context.Context, data []byte) bool {
 }
 
 type Session struct {
+	ConnectionErrorOnce sync.Once `json:"-" gorm:"-"`
 	*model.Session
 	G            *errgroup.Group `json:"-" gorm:"-"`
 	Gctx         context.Context `json:"-" gorm:"-"`

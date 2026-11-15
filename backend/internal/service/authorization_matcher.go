@@ -255,6 +255,13 @@ func (m *AuthorizationMatcher) checkUpdatedTimeRestrictions(assetTimeControl *mo
 
 	// 3. Check authorization rule's custom time ranges if configured
 	if len(accessControl.CustomTimeRanges) > 0 {
+		if accessControl.Timezone != "" {
+			location, err := time.LoadLocation(accessControl.Timezone)
+			if err != nil {
+				return false
+			}
+			timestamp = timestamp.In(location)
+		}
 		if !m.checkTimeRanges(accessControl.CustomTimeRanges, timestamp) {
 			return false
 		}
@@ -272,7 +279,7 @@ func (m *AuthorizationMatcher) checkTimeTemplateAccess(templateRef *model.TimeTe
 	// Get the template
 	ctx := context.Background()
 	template, err := timeTemplateService.GetTimeTemplate(ctx, templateRef.TemplateId)
-	if err != nil || template == nil {
+	if err != nil || template == nil || !template.IsActive {
 		// If template cannot be found, deny access for safety
 		return false
 	}

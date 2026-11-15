@@ -276,6 +276,9 @@ func (s *TimeTemplateService) CheckTimeAccess(ctx context.Context, templateID in
 
 // IsTimeInTemplate checks if current time matches any time range in the template
 func (s *TimeTemplateService) IsTimeInTemplate(template *model.TimeTemplate, timezone string) bool {
+	if template == nil || !template.IsActive {
+		return false
+	}
 	// Use template's timezone if not specified
 	if timezone == "" {
 		timezone = template.Timezone

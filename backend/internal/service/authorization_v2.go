@@ -216,6 +216,10 @@ func (s *AuthorizationV2Service) CheckTimeAccess(ctx context.Context, accessCont
 			return false, errors.New("time template not found")
 		}
 
+		if !template.IsActive {
+			return false, nil
+		}
+
 		// Use template's timezone if not specified in access control
 		templateTimezone := timezone
 		if templateTimezone == "" {

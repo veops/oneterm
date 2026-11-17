@@ -109,7 +109,7 @@ export default {
         if (generation !== this.requestGeneration) return
         const resourceType = (definitions?.groups || []).find((item) => item.name === type)
         const actions = resourceType ? (definitions?.id2perms?.[resourceType.id] || []).map((item) => item.name) : []
-        this.permissionColumns = permissionColumns(actions)
+        this.permissionColumns = permissionColumns(actions, this.dataType)
         const aclPerms = await getResourcePerms(resourceId, {
           need_users: 0
         })

@@ -13,8 +13,9 @@ export const ACTION_LABELS = {
   request_access: 'oneterm.credential.permissions.requestAccess'
 }
 
-export function permissionColumns(actions) {
-  const unique = [...new Set(actions.filter((action) => typeof action === 'string' && action))]
+export function permissionColumns(actions, resourceType) {
+  const unique = [...new Set(actions.filter((action) => typeof action === 'string' && action &&
+    (!['node', 'asset'].includes(resourceType) || action !== 'read')))]
   const known = Object.keys(ACTION_LABELS).filter((action) => unique.includes(action))
   return [...known, ...unique.filter((action) => !known.includes(action))]
     .map((field) => ({ field, titleKey: ACTION_LABELS[field] || '', label: field }))

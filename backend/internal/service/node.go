@@ -587,7 +587,7 @@ func (s *NodeService) handleNodePermissions(ctx *gin.Context, nodes []*model.Nod
 	isAdmin := acl.IsAdmin(currentUser)
 	for _, node := range nodes {
 		if isAdmin {
-			node.SetPerms(acl.AllPermissions)
+			node.SetPerms(acl.ResourceActions(resourceType, acl.AllPermissions))
 		} else {
 			node.SetPerms(resId2perms[node.GetResourceId()])
 		}

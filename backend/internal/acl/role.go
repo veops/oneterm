@@ -44,6 +44,9 @@ func GetRoleResources(ctx context.Context, rid int, resourceTypeId string) (res 
 	}
 
 	res = data.Resources
+	for _, resource := range res {
+		resource.Permissions = ResourceActions(resourceTypeId, resource.Permissions)
+	}
 
 	// redis.SetEx(ctx, k, res, time.Minute)
 
@@ -61,6 +64,10 @@ func GetRoleResourceIds(ctx context.Context, rid int, resourceTypeId string) (id
 }
 
 func HasPermission(ctx context.Context, rid int, resourceTypeName string, resourceId int, permission string) (res bool, err error) {
+	if permission == READ && (resourceTypeName == "asset" || resourceTypeName == "node") {
+		return false, nil
+	}
+
 	token, err := remote.GetAclToken(ctx)
 	if err != nil {
 		return false, err

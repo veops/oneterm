@@ -35,7 +35,7 @@ func MigrateNode() {
 	}
 
 	if !lo.ContainsBy(rts, func(rt *ResourceType) bool { return rt.Name == "node" }) {
-		if err = AddResourceTypes(ctx, &ResourceType{Name: "node", Perms: AllPermissions}); err != nil {
+		if err = AddResourceTypes(ctx, &ResourceType{Name: "node", Perms: ResourceActions("node", AllPermissions)}); err != nil {
 			logger.L().Fatal("add resource type failed", zap.Error(err))
 		}
 	}

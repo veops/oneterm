@@ -612,7 +612,7 @@ func handlePermissions[T any](ctx *gin.Context, data []T, resourceTypeName strin
 	b := acl.IsAdmin(currentUser)
 	for _, d := range ds {
 		if b {
-			d.SetPerms(acl.AllPermissions)
+			d.SetPerms(acl.ResourceActions(resourceTypeName, acl.AllPermissions))
 			continue
 		}
 		d.SetPerms(resId2perms[d.GetResourceId()])

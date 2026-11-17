@@ -25,6 +25,21 @@ var (
 	AllPermissions = []string{WRITE, DELETE, READ, GRANT}
 )
 
+// Asset and directory visibility comes from access authorization. Legacy read
+// grants remain stored in ACL but are not active management actions.
+func ResourceActions(resourceType string, actions []string) []string {
+	if resourceType != "asset" && resourceType != "node" {
+		return actions
+	}
+	active := make([]string, 0, len(actions))
+	for _, action := range actions {
+		if action != READ {
+			active = append(active, action)
+		}
+	}
+	return active
+}
+
 type Role struct {
 	Permissions []string `json:"permissions"`
 }

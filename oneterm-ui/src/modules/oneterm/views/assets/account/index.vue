@@ -188,6 +188,7 @@ export default {
     updateTableData(currentPage = 1, pageSize = this.tablePage.pageSize) {
       this.loading = true
       getAccountList({
+        purpose: 'manage',
         page_index: currentPage,
         page_size: pageSize,
         search: this.filterName,

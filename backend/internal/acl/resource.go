@@ -287,6 +287,7 @@ func AddResource(ctx context.Context, uid int, resourceTypeId string, name strin
 	res = &Resource{}
 	url := fmt.Sprintf("%s/acl/resources", config.Cfg.Auth.Acl.Url)
 	resp, err := remote.RC.R().
+		SetContext(remote.CopyContext(ctx)).
 		SetHeaders(map[string]string{
 			"App-Access-Token": token,
 			"X-User-Id":        cast.ToString(uid),

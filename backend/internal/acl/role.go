@@ -105,6 +105,7 @@ func GrantRoleResource(ctx context.Context, uid int, roleId int, resourceId int,
 
 	url := fmt.Sprintf("%s/acl/roles/%d/resources/%d/grant", config.Cfg.Auth.Acl.Url, roleId, resourceId)
 	resp, err := remote.RC.R().
+		SetContext(remote.CopyContext(ctx)).
 		SetHeaders(map[string]string{
 			"App-Access-Token": token,
 			"X-User-Id":        cast.ToString(uid)}).
@@ -124,6 +125,7 @@ func RevokeRoleResource(ctx context.Context, uid int, roleId int, resourceId int
 
 	url := fmt.Sprintf("%s/acl/roles/%d/resources/%d/revoke", config.Cfg.Auth.Acl.Url, roleId, resourceId)
 	resp, err := remote.RC.R().
+		SetContext(remote.CopyContext(ctx)).
 		SetHeaders(map[string]string{
 			"App-Access-Token": token,
 			"X-User-Id":        cast.ToString(uid)}).

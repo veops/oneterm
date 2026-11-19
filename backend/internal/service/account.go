@@ -51,14 +51,32 @@ func (s *AccountService) GetAccountIdsByAuthorization(ctx context.Context, asset
 
 // BuildQueryWithAuthorization builds query with integrated V2 authorization filter
 func (s *AccountService) BuildQueryWithAuthorization(ctx *gin.Context) (*gorm.DB, error) {
+	purpose := ctx.DefaultQuery("purpose", "access")
+	if purpose != "access" && purpose != "manage" && purpose != "grant" {
+		return nil, ErrPAMInput
+	}
 	// Start with base query
 	db := s.repo.BuildQuery(ctx)
 
 	currentUser, _ := acl.GetSessionFromCtx(ctx)
+	if currentUser == nil || currentUser.Uid <= 0 {
+		return nil, ErrPAMDenied
+	}
 
 	// Administrators have access to all accounts
 	if acl.IsAdmin(currentUser) {
 		return db, nil
+	}
+	var managementIDs []int
+	if purpose != "access" {
+		var err error
+		managementIDs, err = accountManagementResources(ctx, purpose == "grant")
+		if err != nil {
+			return nil, err
+		}
+		if purpose == "grant" {
+			return db.Where("resource_id IN ?", managementIDs), nil
+		}
 	}
 
 	// Apply V2 authorization filter: get authorized account IDs using V2 system
@@ -71,9 +89,9 @@ func (s *AccountService) BuildQueryWithAuthorization(ctx *gin.Context) (*gorm.DB
 	// Filter by authorized account IDs at database level (much more efficient)
 	if len(accountIds) == 0 {
 		// No access to any accounts
-		db = db.Where("1 = 0") // Returns empty result set efficiently
+		db = db.Where("resource_id IN ?", managementIDs)
 	} else {
-		db = db.Where("id IN ?", accountIds)
+		db = db.Where("(id IN ? OR resource_id IN ?)", accountIds, managementIDs)
 	}
 
 	return db, nil

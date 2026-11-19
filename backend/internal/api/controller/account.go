@@ -112,7 +112,7 @@ func (c *Controller) GetAccounts(ctx *gin.Context) {
 	// Build query with integrated V2 authorization filter
 	db, err := accountService.BuildQueryWithAuthorization(ctx)
 	if err != nil {
-		ctx.AbortWithError(http.StatusInternalServerError, &myErrors.ApiError{Code: myErrors.ErrInternal, Data: map[string]any{"err": err}})
+		abortPAM(ctx, err)
 		return
 	}
 

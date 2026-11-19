@@ -204,7 +204,7 @@ export default {
     },
 
     async getAccountList() {
-      const res = await getAccountList({ page_index: 1 })
+      const res = await getAccountList({ page_index: 1, purpose: 'manage' })
       const accountList = res?.data?.list || []
       accountList.forEach((item) => {
         item.toolTip = item.name + (item.account ? `(${item.account})` : '')
